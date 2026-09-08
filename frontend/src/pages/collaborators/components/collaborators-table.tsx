@@ -49,6 +49,7 @@ const CollaboratorsTable = ({
 
     return (
         <EntityTable
+            tableKey="collaborators"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

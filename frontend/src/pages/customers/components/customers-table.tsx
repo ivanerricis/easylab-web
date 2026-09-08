@@ -85,6 +85,7 @@ const CustomersTable = ({
 
     return (
         <EntityTable
+            tableKey="customers"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

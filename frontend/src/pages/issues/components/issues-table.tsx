@@ -36,6 +36,7 @@ const IssuesTable = ({ columns, rows, onEditIssue, onDeleteIssue }: IssuesTableP
 
     return (
         <EntityTable
+            tableKey="issues"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

@@ -86,6 +86,7 @@ const InterventionsTable = ({
 
     return (
         <EntityTable
+            tableKey="interventions"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

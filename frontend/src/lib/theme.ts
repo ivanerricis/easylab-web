@@ -85,6 +85,7 @@ const tableDensityAttribute = "data-table-density";
 const fontSizeStorageKey = "easylab-web-font-size";
 const fontSizeAttribute = "data-font-size";
 const tableRowsPerPageStorageKey = "easylab-web-table-rows-per-page";
+const tableColumnWidthsStorageKey = "easylab-web-table-column-widths";
 
 export const cornerRadiusPresets: CornerRadiusPreset[] = [
     {
@@ -455,4 +456,54 @@ export const getStoredTableRowsPerPage = (tableKey: string): TableRowsPerPageKey
 
 export const setStoredTableRowsPerPage = (tableKey: string, pageSize: TableRowsPerPageKey) => {
     localStorage.setItem(`${tableRowsPerPageStorageKey}:${tableKey}`, String(pageSize));
+};
+
+/**
+ * Larghezze delle colonne trascinate dall'utente, una mappa `chiave colonna -> pixel`.
+ *
+ * Come per le righe per pagina la chiave è per tabella, ma qui senza fallback su un valore
+ * globale: una larghezza ha senso solo per la colonna che l'ha misurata, e "Cliente" negli
+ * interventi non è la stessa colonna di "Cliente" nelle schede.
+ *
+ * Si salvano **solo** le colonne effettivamente ridimensionate: le altre restano senza voce
+ * e ricadono sulla larghezza naturale misurata al primo render. Così una colonna aggiunta o
+ * rinominata in seguito non eredita per sbaglio la misura di un'altra, e un `reset` è
+ * semplicemente l'assenza della chiave.
+ */
+export const getStoredTableColumnWidths = (tableKey: string): Record<string, number> => {
+    const rawValue = localStorage.getItem(`${tableColumnWidthsStorageKey}:${tableKey}`);
+
+    if (!rawValue) {
+        return {};
+    }
+
+    try {
+        const parsedValue: unknown = JSON.parse(rawValue);
+
+        if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
+            return {};
+        }
+
+        // Il contenuto arriva da localStorage, quindi può essere qualunque cosa: si tengono
+        // solo le voci numeriche plausibili invece di fidarsi della forma salvata.
+        return Object.fromEntries(
+            Object.entries(parsedValue as Record<string, unknown>).filter(
+                (entry): entry is [string, number] =>
+                    typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0
+            )
+        );
+    } catch {
+        return {};
+    }
+};
+
+export const setStoredTableColumnWidths = (tableKey: string, widths: Record<string, number>) => {
+    const storageKey = `${tableColumnWidthsStorageKey}:${tableKey}`;
+
+    if (Object.keys(widths).length === 0) {
+        localStorage.removeItem(storageKey);
+        return;
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(widths));
 };

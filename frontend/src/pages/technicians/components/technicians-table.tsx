@@ -49,6 +49,7 @@ const TechniciansTable = ({
 
     return (
         <EntityTable
+            tableKey="technicians"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

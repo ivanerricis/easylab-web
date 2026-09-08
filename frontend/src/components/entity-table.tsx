@@ -1,6 +1,8 @@
 import EntityCardList from "@/components/entity-card-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { ReactNode } from "react";
+import { useResizableColumns } from "@/hooks/useResizableColumns";
+import { cn } from "@/lib/utils";
+import { useMemo, type ReactNode } from "react";
 
 export type EntityColumn<TRow> = {
     /** `"actions"` è speciale: quella colonna ospita i pulsanti di riga, non un valore. */
@@ -11,6 +13,11 @@ export type EntityColumn<TRow> = {
 };
 
 type EntityTableProps<TRow> = {
+    /**
+     * Identifica la tabella per le preferenze salvate (per ora le larghezze delle colonne).
+     * Stessa convenzione delle righe per pagina: "interventions", "customers", ...
+     */
+    tableKey: string;
     columns: EntityColumn<TRow>[];
     rows: TRow[];
     getRowKey: (row: TRow) => React.Key;
@@ -32,6 +39,9 @@ type EntityTableProps<TRow> = {
     onRowOpen?: (row: TRow) => void;
 };
 
+/** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
+const actionsColumnKey = "actions";
+
 /**
  * Tabella su desktop, elenco di schede su mobile: è la forma che hanno tutte le liste
  * dell'app. Prima ogni entità ne aveva una copia integrale — sette file identici a meno
@@ -45,8 +55,15 @@ type EntityTableProps<TRow> = {
  * I pulsanti di riga restano invece del chiamante: sono davvero diversi da un'entità
  * all'altra (i clienti ne hanno sei, i dispositivi due) e ridurli a configurazione
  * costerebbe più di quanto farebbe risparmiare.
+ *
+ * Le colonne sono trascinabili per il bordo destro dell'intestazione, con la larghezza
+ * ricordata per tabella: vedi `useResizableColumns` per il perché della misurazione iniziale.
+ * Da qui la conseguenza visibile anche a chi non trascina niente: appena le larghezze sono
+ * note la tabella passa a `table-layout: fixed`, quindi un valore più lungo della sua colonna
+ * viene troncato con i puntini invece di allargarla.
  */
 const EntityTable = <TRow,>({
+    tableKey,
     columns,
     rows,
     getRowKey,
@@ -56,16 +73,53 @@ const EntityTable = <TRow,>({
     getAccentClassName,
     onRowOpen,
 }: EntityTableProps<TRow>) => {
+    const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
+
+    const { tableRef, isResizable, getColumnWidth, getResizeHandleProps, tableStyle } = useResizableColumns({
+        tableKey,
+        columnKeys,
+        elasticColumnKey: actionsColumnKey,
+        canMeasure: rows.length > 0,
+    });
+
+    // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
+    // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti.
+    const truncateClassName = (columnKey: string) =>
+        isResizable && columnKey !== actionsColumnKey ? "overflow-hidden text-ellipsis" : undefined;
+
     return (
         <>
-            <Table className="hidden bg-background sm:table">
+            <Table ref={tableRef} style={tableStyle} className="hidden bg-background sm:table">
+                {isResizable ? (
+                    <colgroup>
+                        {columns.map((column) => (
+                            <col key={column.key} style={{ width: getColumnWidth(column.key) }} />
+                        ))}
+                    </colgroup>
+                ) : null}
                 <TableHeader className="w-full">
                     <TableRow>
-                        {columns.map((column) => (
-                            <TableHead key={column.key} className={column.className}>
-                                {column.header}
-                            </TableHead>
-                        ))}
+                        {columns.map((column) => {
+                            const resizeHandleProps = getResizeHandleProps(column.key, column.header);
+
+                            return (
+                                <TableHead
+                                    key={column.key}
+                                    className={cn("relative", truncateClassName(column.key), column.className)}
+                                >
+                                    {column.header}
+                                    {resizeHandleProps ? (
+                                        // La maniglia sta dentro il `th` e non a cavallo del bordo:
+                                        // l'intestazione è in `overflow: hidden` per troncare il
+                                        // titolo, quindi la metà esterna verrebbe tagliata via.
+                                        <span
+                                            {...resizeHandleProps}
+                                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none transition-colors select-none hover:bg-background/40 focus-visible:bg-background/60 focus-visible:outline-none"
+                                        />
+                                    ) : null}
+                                </TableHead>
+                            );
+                        })}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -86,13 +140,14 @@ const EntityTable = <TRow,>({
                                 {columns.map((column) => (
                                     <TableCell
                                         key={`${getRowKey(row)}-${column.key}`}
-                                        className={
-                                            column.key === "actions" && getRowStatusColor
+                                        className={cn(
+                                            truncateClassName(column.key),
+                                            column.key === actionsColumnKey && getRowStatusColor
                                                 ? "bg-background text-foreground"
                                                 : column.className
-                                        }
+                                        )}
                                     >
-                                        {column.key === "actions" ? (
+                                        {column.key === actionsColumnKey ? (
                                             // I pulsanti di riga sono l'unico punto interattivo della
                                             // riga: fermare qui il doppio click evita che un click
                                             // ripetuto su un'azione apra anche la scheda.
@@ -115,7 +170,7 @@ const EntityTable = <TRow,>({
 
             <EntityCardList
                 className="sm:hidden"
-                columns={columns.filter((column) => column.key !== "actions")}
+                columns={columns.filter((column) => column.key !== actionsColumnKey)}
                 rows={rows}
                 getRowKey={getRowKey}
                 getAccentClassName={getAccentClassName}

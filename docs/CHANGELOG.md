@@ -11,6 +11,63 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Colonne delle tabelle ridimensionabili trascinando l'intestazione
+
+**Cosa.** Le sette liste principali (interventi, report, clienti, collaboratori, tecnici,
+dispositivi, difetti) hanno le colonne trascinabili per il bordo destro dell'intestazione. La
+larghezza è ricordata per tabella in `localStorage`, doppio click sulla maniglia riporta la
+colonna alla larghezza naturale, e le frecce sinistra/destra la regolano da tastiera di 16px
+per volta (la maniglia è un `role="separator"` raggiungibile con Tab). Nuovo hook
+[useResizableColumns](../frontend/src/hooks/useResizableColumns.ts), usato da
+[entity-table.tsx](../frontend/src/components/entity-table.tsx), che è il punto in cui tutte e
+sette convergono; le chiavi di salvataggio sono le stesse già usate per le righe per pagina
+("interventions", "customers", ...).
+
+**Il perché.** Le colonne erano dimensionate dal browser sul contenuto della pagina corrente,
+senza nessun modo di dare più spazio a quella che serve. La conseguenza non ovvia è che
+trascinare un bordo richiede larghezze esplicite, quindi `table-layout: fixed`: le tabelle non
+si auto-dimensionano più sul contenuto e un valore più lungo della sua colonna viene troncato
+con i puntini invece di allargarla. Per non cambiare l'aspetto a chi non trascina niente le
+larghezze di partenza non sono inventate — si lascia fare il primo render in `auto`, si misura
+quello che il browser ha deciso e solo allora si passa a `fixed` con quelle stesse misure, il
+tutto in `useLayoutEffect`, cioè prima del paint.
+
+**La trappola dei font.** La misurazione va fatta a font caricato, altrimenti congela le
+larghezze del font di ripiego (più stretto) e il testo resta troncato per sempre: "Data/Orario"
+nasceva a 178px invece dei 186px che le servono, e l'ID "4982" si leggeva "49...".
+`document.fonts.ready` **non** risolve il problema, perché si risolve appena non c'è nessun
+caricamento in corso e Inter parte solo quando la tabella disegna il primo testo — misurato in
+Edge: `ready` risolta a 919ms, il font carica tra 3988ms e 4196ms, la misurazione nel mezzo a
+3977ms. L'unico segnale affidabile è l'evento `loadingdone`, alla cui ricezione si azzerano le
+larghezze naturali: la tabella torna in `table-layout: auto` per un render — l'unico modo di
+rimisurare, perché una tabella già a larghezze fisse restituirebbe quelle stesse larghezze — e
+la misura riparte con il font vero.
+
+**Scelte di dettaglio.** La colonna "Azioni" non ha maniglia e non ha larghezza propria: è la
+colonna elastica che assorbe lo spazio avanzato, necessaria perché con `table-layout: fixed`
+una tabella più larga della somma delle colonne ridistribuirebbe il resto da sola, allargando
+in modo arbitrario tutte le altre. È anche l'unica cella esclusa dal troncamento, dove
+`overflow: hidden` taglierebbe i contorni di focus dei pulsanti. Minimo 56px per colonna. Si
+misura solo con righe vere sotto le intestazioni: su una tabella vuota le colonne verrebbero
+larghe quanto il loro titolo. Le larghezze salvate sono solo quelle effettivamente trascinate,
+così una colonna aggiunta o rinominata non eredita per sbaglio la misura di un'altra. Su
+mobile non cambia niente: sotto `sm` le righe sono già schede e la tabella non è nemmeno resa.
+
+**Verificato in locale** con Playwright su Edge, sulla pagina Interventi: trascinamento di
++120px che sposta esattamente quella colonna e lascia le altre invariate (delta 0 sulla
+colonna ID), persistenza dopo reload, minimo a 56px con ellissi confermata
+(`clientWidth` 55 < `scrollWidth` 92), doppio click che riporta a 144px cioè la larghezza
+naturale, nessuna maniglia sull'ultima colonna con i 5 pulsanti azione tutti presenti, e a
+480px di viewport tabella non resa con le 10 schede al suo posto. Nessuna cella troncata nello
+stato iniziale.
+
+**Ancora da fare.** Le tabelle scritte a mano fuori da `EntityTable` non sono coperte:
+Impostazioni (utenti, log, backup, tema) e le liste dentro le schede di cliente,
+collaboratore e tecnico. L'hook è generico apposta, ma ognuna va adattata a parte perché ha
+i suoi `<TableHead>` inline.
+- File: `frontend/src/hooks/useResizableColumns.ts`, `frontend/src/components/entity-table.tsx`,
+  `frontend/src/lib/theme.ts`, `frontend/src/pages/*/components/*-table.tsx`.
+
 ## 2026-09-08 — `.env.example` con valori segnaposto invece di configurazioni reali
 
 **Cosa.** I valori di [.env.example](../.env.example) non sono più quelli di una

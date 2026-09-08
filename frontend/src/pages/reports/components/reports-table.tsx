@@ -67,6 +67,7 @@ const ReportsTable = ({
 
     return (
         <EntityTable
+            tableKey="reports"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

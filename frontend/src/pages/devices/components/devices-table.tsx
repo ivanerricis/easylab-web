@@ -36,6 +36,7 @@ const DevicesTable = ({ columns, rows, onEditDevice, onDeleteDevice }: DevicesTa
 
     return (
         <EntityTable
+            tableKey="devices"
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}

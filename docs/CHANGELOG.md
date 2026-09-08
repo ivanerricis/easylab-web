@@ -11,6 +11,33 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — `.env.example` con valori segnaposto invece di configurazioni reali
+
+**Cosa.** I valori di [.env.example](../.env.example) non sono più quelli di una
+configurazione funzionante (`easylab`, `easylab_password`, `easylab_db`, `EasyLab`,
+`info@easylab.local`, `/opt/easylab-web/backups`) ma segnaposto costruiti sul nome della
+variabile in minuscolo: `postgres_user`, `postgres_password`, `postgres_db`, `lab_name`,
+`lab_address`, `lab_logo_text`, `lab_email@example.com`, `/path/to/backup_host_dir`.
+Restano invariate le due voci in cui il valore *è* la configurazione corretta e non un
+esempio: `PUBLIC_DOMAIN` (vuoto, lo scrive `install-tunnel.sh`) e `LAB_LOGO_URL`
+(`/assets/logo.jpg`, il percorso servito dal backend). Aggiunta in testa una nota che
+spiega la natura del file e rimanda a `scripts/edit-env.sh` per i default veri.
+
+**Il perché.** Un file di esempio con valori plausibili si copia e si dimentica: `cp
+.env.example .env` produceva uno stack che parte, quindi niente spingeva a cambiare la
+password del database, che restava `easylab_password` anche in produzione. Con segnaposto
+evidenti la sostituzione diventa un passo obbligato e visibile, e il file torna a fare solo
+il mestiere per cui esiste — elencare le chiavi e il loro formato. I default operativi non
+si perdono: `scripts/edit-env.sh` li propone già uno per uno nel prompt interattivo, che è
+il percorso consigliato dal README subito dopo la copia.
+
+**Compatibilità.** Nessun consumatore legge i valori di `.env.example`: `edit-env.sh` e
+`restore-db.sh` hanno i propri default interni, e la CI usa il file solo come sorgente di
+variabili per `docker compose --env-file .env.example build`. Verificato con `docker compose
+--env-file .env.example config -q` (esce senza errori: `BACKUP_HOST_DIR` resta un percorso
+assoluto non vuoto, requisito del bind mount `${BACKUP_HOST_DIR}:/app/backups`).
+- File: `.env.example`.
+
 ## 2026-09-08 — Stato dell'intervento come card, pillole ridondanti rimosse
 
 **Cosa.** `InterventionPage` mostrava sopra la griglia le stesse tre pillole che il 2026-09-07

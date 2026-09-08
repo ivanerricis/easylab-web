@@ -29,6 +29,8 @@ export type InterventionPrintData = {
     description: string | null;
     /** Valorizzato solo per gli interventi in sede o da remoto. */
     problem: string | null;
+    /** Annotazioni libere: facoltative sempre, quindi la sezione può non esserci. */
+    note: string | null;
     interventionDateLabel: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -221,6 +223,27 @@ const buildTechnicianHoursSection = (intervention: InterventionPrintData) => {
     };
 };
 
+/**
+ * Sezione a sé e non una riga dentro "REPORT ATTIVITA": le note sono di natura diversa dal
+ * problema e dal lavoro svolto — accordi col cliente, promemoria — e il cliente che firma il
+ * foglio deve poterle distinguere a colpo d'occhio. Quando non ci sono la sezione sparisce,
+ * come già fa il problema riscontrato: una barra "NOTE" seguita dal vuoto è peggio che niente.
+ */
+const buildNotesSection = (intervention: InterventionPrintData) => {
+    if (!intervention.note) {
+        return null;
+    }
+
+    return {
+        table: {
+            widths: ["*"],
+            body: [sectionBarRow("NOTE", 1), [{ text: intervention.note, style: "value", margin: [0, 2, 0, 2] }]],
+        },
+        layout: tableLayout,
+        margin: [0, 0, 0, 8],
+    };
+};
+
 const buildLegalNoticeSection = () => ({
     stack: [
         {
@@ -322,6 +345,7 @@ const buildCustomerInterventionsTable = (interventions: CustomerInterventionSumm
 export const createInterventionPdfBuffer = async (intervention: InterventionPrintData) => {
     const logoDataUrl = await loadImageDataUrl(intervention.labLogoUrl);
     const hoursSection = buildTechnicianHoursSection(intervention);
+    const notesSection = buildNotesSection(intervention);
 
     const documentDefinition = {
         pageSize: "A4",
@@ -336,6 +360,7 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
             buildCustomerSection(intervention),
             buildActivitySection(intervention),
             ...(hoursSection ? [hoursSection] : []),
+            ...(notesSection ? [notesSection] : []),
             buildLegalNoticeSection(),
             buildSignatureSection(),
         ],

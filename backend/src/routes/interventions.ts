@@ -55,6 +55,8 @@ const interventionBodySchema = z
         description: z.string().trim().max(4000).nullable().optional(),
         // Solo per gli interventi in sede o da remoto: le consegne materiale lo ignorano.
         problem: z.string().trim().max(4000).nullable().optional(),
+        // Annotazioni libere: facoltative sempre, per qualunque tipo e stato.
+        note: z.string().trim().max(4000).nullable().optional(),
         status: z.enum(interventionStatuses).optional(),
         customerId: z.coerce.number().int().positive(),
         collaboratorId: z.coerce.number().int().positive(),
@@ -184,6 +186,7 @@ const loadInterventionPrintContext = async (
             type: interventionTable.type,
             description: interventionTable.description,
             problem: interventionTable.problem,
+            note: interventionTable.note,
             status: interventionTable.status,
             interventionDate: interventionTable.interventionDate,
             startTime: interventionTable.startTime,
@@ -231,6 +234,7 @@ const loadInterventionPrintContext = async (
             status: intervention.status as (typeof interventionStatuses)[number],
             description: intervention.description,
             problem: intervention.problem,
+            note: intervention.note,
             interventionDateLabel: intervention.interventionDate ? formatDayLabel(intervention.interventionDate) : null,
             startTime: intervention.startTime,
             endTime: intervention.endTime,
@@ -306,6 +310,7 @@ interventionsRouter.post("/", validate({ body: interventionCreateBodySchema }), 
         // scrive NULL, come per `problem`.
         description: req.body.description || null,
         problem: isOnSite ? (req.body.problem ?? null) : null,
+        note: req.body.note || null,
         status: req.body.status ?? "programmato",
         customerId: req.body.customerId,
         collaboratorId: req.body.collaboratorId,
@@ -339,6 +344,7 @@ interventionsRouter.put(
         const nextProblem = "problem" in req.body ? (req.body.problem ?? null) : existing.problem;
         const nextStatus = (req.body.status ?? existing.status) as (typeof interventionStatuses)[number];
         const nextDescription = "description" in req.body ? req.body.description || null : existing.description;
+        const nextNote = "note" in req.body ? req.body.note || null : existing.note;
         // Come per il prezzo dei report: la combinazione da validare nasce dall'unione del
         // corpo parziale con la riga esistente, quindi lo schema non può vederla da solo.
         const scheduled = isScheduledStatus(nextStatus);
@@ -379,6 +385,7 @@ interventionsRouter.put(
             interventionDate: nextInterventionDate,
             description: nextDescription,
             problem: isOnSite ? nextProblem : null,
+            note: nextNote,
             startTime: isOnSite ? nextStartTime : null,
             endTime: isOnSite ? nextEndTime : null,
         });

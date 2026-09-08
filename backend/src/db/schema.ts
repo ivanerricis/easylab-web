@@ -245,6 +245,12 @@ export const interventionTable = pgTable(
         description: text("description"),
         /** Solo per gli interventi in sede o da remoto: resta NULL per le consegne materiale. */
         problem: text("problem"),
+        /**
+         * Annotazioni libere, sempre facoltative e valide per qualunque tipo e stato: è il
+         * posto per quello che non rientra né nel problema né nel lavoro svolto (accordi presi
+         * col cliente, materiale da riportare, promemoria per il prossimo passaggio).
+         */
+        note: text("note"),
         status: varchar("status", { length: 20 }).notNull().default("programmato"),
         interventionDate: date("intervention_date"),
         startTime: time("start_time"),

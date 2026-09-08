@@ -11,6 +11,55 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Note sugli interventi, in scheda, dialoghi e PDF
+
+**Cosa.** Gli interventi hanno un campo `note`: testo libero facoltativo, disponibile per
+qualunque tipo e qualunque stato. Compare come campo nei dialoghi di creazione e modifica
+(sotto la descrizione del lavoro), come voce "Note" nella card Dettagli di
+[InterventionPage](../frontend/src/pages/interventions/InterventionPage.tsx), e come sezione
+"NOTE" nel PDF dell'intervento, dopo "ORE TECNICI" e prima delle diciture di legge. Nuova
+migrazione [0024_add_intervention_note.sql](../backend/drizzle/0024_add_intervention_note.sql).
+
+**Il perché.** Fra "problema riscontrato" e "assistenza effettuata" non c'era posto per quello
+che non è né l'uno né l'altro: accordi presi col cliente, materiale lasciato in prestito da
+riportare, promemoria per il passaggio successivo. Finiva schiacciato dentro la descrizione,
+mescolato al lavoro svolto, e sul foglio che il cliente firma non si distingueva.
+
+**Le scelte.** Il campo è `text` come `description` e `problem` — non `varchar(255)` come la
+nota dei report — perché convive con quei due e ne condivide il limite di 4000 caratteri in
+validazione. È facoltativo sempre: a differenza di `problem` non dipende dal tipo, e a
+differenza di `description` non diventa obbligatorio quando l'intervento esce da
+"programmato"; una nota per definizione può non esserci. Stringa vuota e campo assente
+diventano entrambi NULL, come già fa `description`. Nel PDF è una sezione a sé e non una riga
+dentro "REPORT ATTIVITA", perché è informazione di natura diversa e chi firma deve
+distinguerla a colpo d'occhio; quando la nota manca la sezione sparisce del tutto, come già
+fa il problema riscontrato — una barra "NOTE" seguita dal vuoto è peggio che niente.
+
+**Fuori perimetro, di proposito.** La colonna non entra nella lista interventi (la tabella ha
+già nove colonne) né fra i campi cercati dalla ricerca: `report.note` ha un indice trigram
+perché la ricerca report lo interroga, qui aggiungerlo vorrebbe dire allargare la `OR` della
+ricerca interventi, che è già uno dei punti aperti sulle prestazioni. Non entra nemmeno nel
+PDF riepilogativo degli interventi per cliente, che è una tabella a sei colonne già fitta.
+
+**Verificato in locale**: creazione via API con nota (201, valore riletto identico), PDF 200
+`application/pdf` che cresce di 353 byte con la nota e torna al valore precedente quando la
+si azzera, sezione "NOTE" confermata visivamente rendendo il PDF con PDF.js, voce "Note"
+presente nella card Dettagli, valore precaricato correttamente nel dialogo di modifica, e
+campo presente anche per "consegna materiale" (dove "Problema" giustamente non c'è).
+
+**Nota per chi applica la migrazione.** Il registro delle migrazioni sta nello schema
+`drizzle`, non in `public`: lo stack applica le migrazioni con `node migrate.js`
+(docker-compose, sia dev sia produzione), che usa il migrator di `drizzle-orm` con la tabella
+di default. Lo script `npm run db:migrate` usa invece `drizzle.config.ts`, dove
+`migrations.schema` è `public`: punta a un registro vuoto e tenterebbe di riapplicare l'intera
+storia dalla 0000. Usare `node migrate.js`.
+- File: `backend/drizzle/0024_add_intervention_note.sql`, `backend/drizzle/meta/_journal.json`,
+  `backend/src/db/schema.ts`, `backend/src/routes/interventions.ts`,
+  `backend/src/services/interventionPdf.ts`, `frontend/src/lib/api/interventions.ts`,
+  `frontend/src/components/dialogs/create/createInterventionDialog.tsx`,
+  `frontend/src/components/dialogs/edit/editInterventionDialog.tsx`,
+  `frontend/src/pages/interventions/InterventionPage.tsx`.
+
 ## 2026-09-08 — Colonne delle tabelle ridimensionabili trascinando l'intestazione
 
 **Cosa.** Le sette liste principali (interventi, report, clienti, collaboratori, tecnici,

@@ -8,6 +8,8 @@ export type InterventionEntityDto = {
     description: string | null;
     /** Valorizzato solo per gli interventi in sede o da remoto. */
     problem: string | null;
+    /** Annotazioni libere, facoltative per qualunque tipo e stato. */
+    note: string | null;
     status: InterventionStatus;
     interventionDate: string | null;
     startTime: string | null;
@@ -22,6 +24,7 @@ export type InterventionCreateInput = {
     type: InterventionType;
     description?: string | null;
     problem?: string | null;
+    note?: string | null;
     status?: InterventionStatus;
     customerId: number;
     collaboratorId: number;

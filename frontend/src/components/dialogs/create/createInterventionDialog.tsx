@@ -42,6 +42,7 @@ export type CreateInterventionSubmitValues = {
     /** `null` quando l'intervento è solo programmato: il lavoro non è ancora stato svolto. */
     description: string | null;
     problem: string | null;
+    note: string | null;
     customer: string;
     customerId: number | null;
     collaboratorId: number;
@@ -63,6 +64,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
         status: "programmato" as InterventionStatus,
         description: "",
         problem: "",
+        note: "",
         customer: "",
         collaboratorId: "",
         interventionDate: getTodayDateString(),
@@ -90,6 +92,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 status: "programmato",
                 description: "",
                 problem: "",
+                note: "",
                 customer: "",
                 collaboratorId: "",
                 // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
@@ -167,6 +170,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 status: formValues.status,
                 description: formValues.description.trim() || null,
                 problem: isOnSite ? formValues.problem.trim() : null,
+                note: formValues.note.trim() || null,
                 customer: formValues.customer,
                 customerId: customerIdByOption[formValues.customer] ?? null,
                 collaboratorId: Number(formValues.collaboratorId),
@@ -414,6 +418,23 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                         value={formValues.description}
                                         onChange={(event) =>
                                             setFormValues((prev) => ({ ...prev, description: event.target.value }))
+                                        }
+                                    />
+                                </div>
+
+                                <div className="grid gap-1 lg:col-span-2">
+                                    <Label htmlFor="note" className="text-lg">
+                                        Note
+                                        <span className="text-base text-muted-foreground"> (facoltative)</span>
+                                    </Label>
+                                    <Textarea
+                                        id="note"
+                                        className="resize-none text-lg!"
+                                        rows={4}
+                                        placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
+                                        value={formValues.note}
+                                        onChange={(event) =>
+                                            setFormValues((prev) => ({ ...prev, note: event.target.value }))
                                         }
                                     />
                                 </div>

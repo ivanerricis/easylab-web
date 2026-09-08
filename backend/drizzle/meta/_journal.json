@@ -169,6 +169,13 @@
       "when": 1776370000000,
       "tag": "0023_add_user_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776370001000,
+      "tag": "0024_add_intervention_note",
+      "breakpoints": true
     }
   ]
 }

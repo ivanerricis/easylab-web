@@ -112,6 +112,7 @@ const InterventionPage = () => {
             status: values.status,
             description: values.description,
             problem: values.problem,
+            note: values.note,
             collaboratorId: values.collaboratorId,
             interventionDate: values.interventionDate,
             startTime: values.startTime,
@@ -292,6 +293,7 @@ const InterventionPage = () => {
                     <CardContent className="grid gap-2">
                         {isOnSite ? <DetailItem label="Problema" value={details.intervention.problem ?? "-"} /> : null}
                         <DetailItem label="Descrizione" value={details.intervention.description ?? "-"} />
+                        <DetailItem label="Note" value={details.intervention.note ?? "-"} />
                         <DetailItem label="Creato il" value={formatDateTime(details.intervention.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"

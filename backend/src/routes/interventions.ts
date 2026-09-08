@@ -73,7 +73,8 @@ const interventionBodySchema = z
  * Il problema riscontrato non segue questa regola: si conosce già al momento della chiamata
  * del cliente, ed è il motivo per cui l'intervento viene programmato.
  */
-const isScheduledStatus = (status?: (typeof interventionStatuses)[number]) => (status ?? "programmato") === "programmato";
+const isScheduledStatus = (status?: (typeof interventionStatuses)[number]) =>
+    (status ?? "programmato") === "programmato";
 
 const interventionCreateBodySchema = interventionBodySchema.superRefine((value, ctx) => {
     if (!value.interventionDate) {
@@ -337,7 +338,7 @@ interventionsRouter.put(
         const nextEndTime = "endTime" in req.body ? (req.body.endTime ?? null) : existing.endTime;
         const nextProblem = "problem" in req.body ? (req.body.problem ?? null) : existing.problem;
         const nextStatus = (req.body.status ?? existing.status) as (typeof interventionStatuses)[number];
-        const nextDescription = "description" in req.body ? (req.body.description || null) : existing.description;
+        const nextDescription = "description" in req.body ? req.body.description || null : existing.description;
         // Come per il prezzo dei report: la combinazione da validare nasce dall'unione del
         // corpo parziale con la riga esistente, quindi lo schema non può vederla da solo.
         const scheduled = isScheduledStatus(nextStatus);

@@ -96,7 +96,10 @@ export const listInterventions = async ({
               : sql`${column} <= ${scheduledRangeBounds?.to}`;
     const scheduledRangeCondition = scheduledRangeBounds
         ? or(
-              and(sql`${interventionTable.interventionDate} IS NOT NULL`, inScheduledRange(interventionTable.interventionDate)),
+              and(
+                  sql`${interventionTable.interventionDate} IS NOT NULL`,
+                  inScheduledRange(interventionTable.interventionDate)
+              ),
               and(
                   sql`${interventionTable.interventionDate} IS NULL`,
                   inScheduledRange(sql`${interventionTable.created_at}::date`)

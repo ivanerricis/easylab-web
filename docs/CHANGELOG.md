@@ -11,6 +11,43 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Barra di paginazione a tre zone: conteggio, pagine al centro, selettore a destra
+
+**Cosa.** Sotto ogni tabella la barra ha ora tre zone distinte: il conteggio "Visualizzati
+1-10 di 16" tutto a sinistra, i controlli di pagina **al centro della tabella**, il selettore
+"Righe per pagina" tutto a destra. Prima selettore e controlli di pagina stavano appaiati nello
+stesso gruppo a destra (vedi la voce del 2026-09-07), e la paginazione risultava sbilanciata.
+
+**Il perché della griglia al posto di `justify-between`.** Con tre figli in un flex
+`justify-between` l'elemento centrale non è centrato rispetto al contenitore: è centrato in ciò
+che gli avanza fra i due lati, quindi si sposta ogni volta che uno dei due cambia larghezza. E
+qui cambiano di continuo — "Visualizzati 1-10 di 16" e "Visualizzati 1-10 di 1.234" non sono
+larghi uguali. La griglia `sm:grid-cols-[1fr_auto_1fr]` risolve alla radice: le due colonne
+laterali si dividono lo spazio in parti uguali per costruzione, quindi la colonna `auto` di
+mezzo cade sempre sull'asse della tabella, qualunque cosa contengano i lati.
+
+**La trappola: i contenitori vuoti.** I due lati sono opzionali — la paginazione non si
+renderizza con una pagina sola, il selettore manca dove non è passato `onPageSizeChange`. Se
+il contenitore corrispondente non venisse emesso, la griglia riassegnerebbe le colonne per
+posizione e il selettore scivolerebbe **al centro**. I contenitori quindi ci sono sempre, e a
+gestire i due casi è una coppia di varianti: `empty:hidden` toglie il gap fantasma nello stack
+verticale del mobile, `sm:empty:flex` lo rimette in griglia da `sm` in su, dove serve che occupi
+la sua colonna anche a larghezza zero.
+
+**Verificato con Playwright, con controllo e casi limite.** Struttura iniettata nella pagina di
+login (la dev DB ha 2 righe per tabella: su una pagina sola i controlli non esistono e la
+verifica sulla pagina reale non proverebbe nulla — stessa trappola della voce precedente).
+Con il fix, su viewport 1280: conteggio a **0px** dal bordo sinistro, centro della paginazione a
+**0px** dal centro del contenitore, selettore a **0px** dal bordo destro. Togliendo le classi
+nuove a runtime i numeri si muovono di 235px e 876px, cioè il test discrimina davvero. Provati
+poi i quattro casi: pagina unica (selettore comunque a filo destro), assenza del selettore
+(paginazione comunque centrata), mobile a 420px (impilato, altezza 116px = 20+36+36 più i due
+gap) e mobile con pagina unica (altezza 68px, nessun gap di troppo).
+
+**File:** [frontend/src/components/table-pagination.tsx](../frontend/src/components/table-pagination.tsx).
+
+---
+
 ## 2026-09-07 — Un intervento programmato non ha più bisogno di orari né di lavoro svolto
 
 **Cosa.** Creando un intervento con stato "Programmato", ora **ora inizio, ora fine e la

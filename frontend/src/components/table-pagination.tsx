@@ -17,9 +17,9 @@ type TablePaginationProps = {
     pageSize: number;
     onPageChange: (page: number) => void;
     /**
-     * Quando c'è, a destra (accanto ai controlli di pagina) compare il selettore delle righe
-     * per pagina. È il punto giusto in cui metterlo: questo componente è già sotto ogni
-     * tabella dell'app, mentre la barra dei filtri esiste solo su tre pagine su dodici.
+     * Quando c'è, in fondo a destra compare il selettore delle righe per pagina. È il punto
+     * giusto in cui metterlo: questo componente è già sotto ogni tabella dell'app, mentre la
+     * barra dei filtri esiste solo su tre pagine su dodici.
      */
     onPageSizeChange?: (pageSize: TableRowsPerPageKey) => void;
 };
@@ -57,19 +57,22 @@ const TablePagination = ({
     const visiblePages = getVisiblePages(currentPage, totalPages);
 
     return (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        // Tre zone: conteggio a sinistra, controlli di pagina al centro, selettore a destra.
+        // Griglia e non `justify-between`, perché con le colonne laterali a `1fr` la
+        // paginazione resta centrata sulla tabella anche quando i due lati hanno larghezze
+        // diverse (ed è il caso normale: "Visualizzati 1-10 di 16" contro il select).
+        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4">
             <p className="text-sm text-muted-foreground">
                 Visualizzati {startItem}-{endItem} di {totalItems}
             </p>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {onPageSizeChange ? (
-                    <RowsPerPageSelect value={pageSize as TableRowsPerPageKey} onValueChange={onPageSizeChange} />
-                ) : null}
-
+            {/* `empty:hidden` evita che il contenitore vuoto (pagina unica) si porti dietro un
+                gap in più nello stack verticale del mobile; da `sm` in su resta invece in
+                griglia, altrimenti il selettore scivolerebbe nella colonna centrale. */}
+            <div className="flex justify-center empty:hidden sm:empty:flex">
                 {totalPages <= 1 ? null : (
-                    // `w-auto` annulla il `w-full` di default di Pagination: qui sta accanto al
-                    // selettore, e a piena larghezza andrebbe a capo su una riga tutta sua.
+                    // `w-auto` annulla il `w-full` di default di Pagination: a piena larghezza
+                    // il `nav` rivendica tutta la colonna e si disallinea dagli altri due lati.
                     <Pagination className="mx-0 w-auto">
                         <PaginationContent>
                             <PaginationItem>
@@ -129,6 +132,12 @@ const TablePagination = ({
                         </PaginationContent>
                     </Pagination>
                 )}
+            </div>
+
+            <div className="flex justify-start empty:hidden sm:justify-end sm:empty:flex">
+                {onPageSizeChange ? (
+                    <RowsPerPageSelect value={pageSize as TableRowsPerPageKey} onValueChange={onPageSizeChange} />
+                ) : null}
             </div>
         </div>
     );

@@ -1,5 +1,6 @@
 import EntityCardList from "@/components/entity-card-list";
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import OpenEntityButton from "@/components/open-entity-button";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage, getCustomerReportsPrintUrl, listCustomers, listDevices, listReports } from "@/lib/api";
 import { openPrintWindow } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
@@ -66,6 +67,35 @@ const CustomerPage = () => {
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const paginatedReportRows = visibleReportRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+    const loadData = useCallback(async () => {
+        try {
+            const [reports, customers, devices] = await Promise.all([listReports(), listCustomers(), listDevices()]);
+
+            const customer = customers.find((item) => item.id === customerId);
+            if (customer) {
+                setCustomerName(`${customer.firstName} ${customer.lastName ?? ""}`.trim());
+            }
+
+            const deviceById = new Map(devices.map((device) => [device.id, device]));
+
+            const rows = reports
+                .filter((report) => report.customerId === customerId)
+                .map((report) => {
+                    const device = deviceById.get(report.deviceId);
+
+                    return {
+                        id: report.id,
+                        deviceName: device?.name ?? "Dispositivo sconosciuto",
+                        closed: report.closed,
+                    };
+                });
+
+            setReportRows(rows);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare i report del cliente"));
+        }
+    }, [customerId]);
+
     useEffect(() => {
         if (!hasValidCustomerId) {
             toast.error("Cliente non valido");
@@ -73,44 +103,17 @@ const CustomerPage = () => {
             return;
         }
 
-        const loadData = async () => {
+        // Solo il primo caricamento copre la pagina con lo spinner: l'aggiornamento manuale
+        // lascia i dati a schermo e segnala l'attesa nel pulsante.
+        void (async () => {
+            setIsLoading(true);
             try {
-                setIsLoading(true);
-                const [reports, customers, devices] = await Promise.all([
-                    listReports(),
-                    listCustomers(),
-                    listDevices(),
-                ]);
-
-                const customer = customers.find((item) => item.id === customerId);
-                if (customer) {
-                    setCustomerName(`${customer.firstName} ${customer.lastName ?? ""}`.trim());
-                }
-
-                const deviceById = new Map(devices.map((device) => [device.id, device]));
-
-                const rows = reports
-                    .filter((report) => report.customerId === customerId)
-                    .map((report) => {
-                        const device = deviceById.get(report.deviceId);
-
-                        return {
-                            id: report.id,
-                            deviceName: device?.name ?? "Dispositivo sconosciuto",
-                            closed: report.closed,
-                        };
-                    });
-
-                setReportRows(rows);
-            } catch (error) {
-                toast.error(getApiErrorMessage(error, "Impossibile caricare i report del cliente"));
+                await loadData();
             } finally {
                 setIsLoading(false);
             }
-        };
-
-        void loadData();
-    }, [customerId, hasValidCustomerId, navigate]);
+        })();
+    }, [hasValidCustomerId, navigate, loadData]);
 
     if (isLoading) {
         return <LoadingPage />;
@@ -138,20 +141,23 @@ const CustomerPage = () => {
                     <h1 className="text-2xl font-bold">{customerName}</h1>
                 </div>
 
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            size="lg"
-                            className="self-end lg:self-auto"
-                            onClick={() => setIsPrintDialogOpen(true)}
-                            aria-label="Stampa resoconto report"
-                        >
-                            <Printer className="size-5" />
-                            <Label className="hidden text-lg lg:inline">Stampa</Label>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Stampa resoconto report</TooltipContent>
-                </Tooltip>
+                <div className="flex items-center gap-2 self-end lg:self-auto">
+                    <RefreshButton onRefresh={loadData} label="Aggiorna report del cliente" />
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                size="lg"
+                                onClick={() => setIsPrintDialogOpen(true)}
+                                aria-label="Stampa resoconto report"
+                            >
+                                <Printer className="size-5" />
+                                <Label className="hidden text-lg lg:inline">Stampa</Label>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Stampa resoconto report</TooltipContent>
+                    </Tooltip>
+                </div>
             </div>
 
             <p className="ml-12">Report del cliente</p>

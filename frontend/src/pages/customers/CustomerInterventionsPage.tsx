@@ -1,5 +1,6 @@
 import EntityCardList from "@/components/entity-card-list";
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import OpenEntityButton from "@/components/open-entity-button";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import {
     formatInterventionType,
     interventionStatusOptions,
 } from "@/lib/interventions";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { InterventionStatus } from "@/types/dtos";
 import { useNavigate, useParams } from "react-router-dom";
@@ -97,6 +98,34 @@ const CustomerInterventionsPage = () => {
         currentPage * pageSize
     );
 
+    const loadData = useCallback(async () => {
+        try {
+            const [interventions, customers] = await Promise.all([listInterventions(), listCustomers()]);
+
+            const customer = customers.find((item) => item.id === customerId);
+            if (customer) {
+                setCustomerName(`${customer.firstName} ${customer.lastName ?? ""}`.trim());
+            }
+
+            const rows = interventions
+                .filter((intervention) => intervention.customerId === customerId)
+                .map((intervention) => ({
+                    id: intervention.id,
+                    type: formatInterventionType(intervention.type),
+                    schedule: formatSchedule(
+                        intervention.interventionDate,
+                        intervention.startTime,
+                        intervention.endTime
+                    ),
+                    status: intervention.status,
+                }));
+
+            setInterventionRows(rows);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare gli interventi del cliente"));
+        }
+    }, [customerId]);
+
     useEffect(() => {
         if (!hasValidCustomerId) {
             toast.error("Cliente non valido");
@@ -104,39 +133,17 @@ const CustomerInterventionsPage = () => {
             return;
         }
 
-        const loadData = async () => {
+        // Solo il primo caricamento copre la pagina con lo spinner: l'aggiornamento manuale
+        // lascia i dati a schermo e segnala l'attesa nel pulsante.
+        void (async () => {
+            setIsLoading(true);
             try {
-                setIsLoading(true);
-                const [interventions, customers] = await Promise.all([listInterventions(), listCustomers()]);
-
-                const customer = customers.find((item) => item.id === customerId);
-                if (customer) {
-                    setCustomerName(`${customer.firstName} ${customer.lastName ?? ""}`.trim());
-                }
-
-                const rows = interventions
-                    .filter((intervention) => intervention.customerId === customerId)
-                    .map((intervention) => ({
-                        id: intervention.id,
-                        type: formatInterventionType(intervention.type),
-                        schedule: formatSchedule(
-                            intervention.interventionDate,
-                            intervention.startTime,
-                            intervention.endTime
-                        ),
-                        status: intervention.status,
-                    }));
-
-                setInterventionRows(rows);
-            } catch (error) {
-                toast.error(getApiErrorMessage(error, "Impossibile caricare gli interventi del cliente"));
+                await loadData();
             } finally {
                 setIsLoading(false);
             }
-        };
-
-        void loadData();
-    }, [customerId, hasValidCustomerId, navigate]);
+        })();
+    }, [hasValidCustomerId, navigate, loadData]);
 
     if (isLoading) {
         return <LoadingPage />;
@@ -164,20 +171,23 @@ const CustomerInterventionsPage = () => {
                     <h1 className="text-2xl font-bold">{customerName}</h1>
                 </div>
 
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            size="lg"
-                            className="self-end lg:self-auto"
-                            onClick={() => setIsPrintDialogOpen(true)}
-                            aria-label="Stampa resoconto interventi"
-                        >
-                            <Printer className="size-5" />
-                            <Label className="hidden text-lg lg:inline">Stampa</Label>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Stampa resoconto interventi</TooltipContent>
-                </Tooltip>
+                <div className="flex items-center gap-2 self-end lg:self-auto">
+                    <RefreshButton onRefresh={loadData} label="Aggiorna interventi del cliente" />
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                size="lg"
+                                onClick={() => setIsPrintDialogOpen(true)}
+                                aria-label="Stampa resoconto interventi"
+                            >
+                                <Printer className="size-5" />
+                                <Label className="hidden text-lg lg:inline">Stampa</Label>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Stampa resoconto interventi</TooltipContent>
+                    </Tooltip>
+                </div>
             </div>
 
             <p className="ml-12">Interventi del cliente</p>

@@ -1,4 +1,5 @@
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import EditInterventionDialog, {
     type EditInterventionSubmitValues,
 } from "@/components/dialogs/edit/editInterventionDialog";
@@ -97,6 +98,14 @@ const InterventionPage = () => {
         });
     }, [interventionId]);
 
+    const handleRefreshIntervention = async () => {
+        try {
+            await loadDetails();
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile aggiornare l'intervento"));
+        }
+    };
+
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
         await updateIntervention(values.interventionId, {
             type: values.type,
@@ -177,6 +186,8 @@ const InterventionPage = () => {
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2 self-end lg:self-auto">
+                            <RefreshButton onRefresh={handleRefreshIntervention} label="Aggiorna intervento" />
+
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button

@@ -1,9 +1,10 @@
-import { Download, RefreshCw, RotateCcw } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SettingsCard } from "@/components/settings/settingsUi";
-import { cn, formatDateTime, formatFileSize } from "@/lib/utils";
+import RefreshButton from "@/components/refresh-button";
+import { formatDateTime, formatFileSize } from "@/lib/utils";
 import type { BackupPanel } from "./useBackupPanel";
 
 const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
@@ -11,21 +12,12 @@ const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
         title="Archivio dump"
         description="Dump presenti sul server: scaricali oppure ripristinali direttamente. Il ripristino sovrascrive i dati attuali ed è irreversibile."
         action={
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        disabled={panel.isLoadingDumps}
-                        onClick={() => void panel.loadDumpFiles()}
-                        aria-label="Aggiorna elenco dump"
-                    >
-                        <RefreshCw className={cn("size-4", panel.isLoadingDumps && "animate-spin")} />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>Aggiorna elenco dump</TooltipContent>
-            </Tooltip>
+            <RefreshButton
+                size="icon"
+                onRefresh={panel.loadDumpFiles}
+                isRefreshing={panel.isLoadingDumps}
+                label="Aggiorna elenco dump"
+            />
         }
     >
         <div className="rounded-md border border-primary/15">

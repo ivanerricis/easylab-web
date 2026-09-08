@@ -1,11 +1,12 @@
 import CardReport from "@/components/cardReport";
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage, listCollaborators, listCustomers, listDevices, listReports } from "@/lib/api";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
@@ -58,6 +59,45 @@ const CollaboratorPage = () => {
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const paginatedReportCards = visibleReportCards.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+    const loadData = useCallback(async () => {
+        try {
+            const [reports, collaborators, customers, devices] = await Promise.all([
+                listReports(),
+                listCollaborators(),
+                listCustomers(),
+                listDevices(),
+            ]);
+
+            const collaborator = collaborators.find((item) => item.id === collaboratorId);
+            if (collaborator) {
+                setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
+            }
+
+            const customerById = new Map(customers.map((customer) => [customer.id, customer]));
+            const deviceById = new Map(devices.map((device) => [device.id, device]));
+
+            const cards = reports
+                .filter((report) => report.collaboratorId === collaboratorId)
+                .map((report) => {
+                    const customer = customerById.get(report.customerId);
+                    const device = deviceById.get(report.deviceId);
+
+                    return {
+                        id: report.id,
+                        customerName: customer
+                            ? `${customer.firstName} ${customer.lastName ?? ""}`.trim()
+                            : "Cliente sconosciuto",
+                        deviceName: device?.name ?? "Dispositivo sconosciuto",
+                        closed: report.closed,
+                    };
+                });
+
+            setReportCards(cards);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare i report del collaboratore"));
+        }
+    }, [collaboratorId]);
+
     useEffect(() => {
         if (!hasValidCollaboratorId) {
             toast.error("Collaboratore non valido");
@@ -65,50 +105,17 @@ const CollaboratorPage = () => {
             return;
         }
 
-        const loadData = async () => {
+        // Solo il primo caricamento copre la pagina con lo spinner: l'aggiornamento manuale
+        // lascia i dati a schermo e segnala l'attesa nel pulsante.
+        void (async () => {
+            setIsLoading(true);
             try {
-                setIsLoading(true);
-                const [reports, collaborators, customers, devices] = await Promise.all([
-                    listReports(),
-                    listCollaborators(),
-                    listCustomers(),
-                    listDevices(),
-                ]);
-
-                const collaborator = collaborators.find((item) => item.id === collaboratorId);
-                if (collaborator) {
-                    setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
-                }
-
-                const customerById = new Map(customers.map((customer) => [customer.id, customer]));
-                const deviceById = new Map(devices.map((device) => [device.id, device]));
-
-                const cards = reports
-                    .filter((report) => report.collaboratorId === collaboratorId)
-                    .map((report) => {
-                        const customer = customerById.get(report.customerId);
-                        const device = deviceById.get(report.deviceId);
-
-                        return {
-                            id: report.id,
-                            customerName: customer
-                                ? `${customer.firstName} ${customer.lastName ?? ""}`.trim()
-                                : "Cliente sconosciuto",
-                            deviceName: device?.name ?? "Dispositivo sconosciuto",
-                            closed: report.closed,
-                        };
-                    });
-
-                setReportCards(cards);
-            } catch (error) {
-                toast.error(getApiErrorMessage(error, "Impossibile caricare i report del collaboratore"));
+                await loadData();
             } finally {
                 setIsLoading(false);
             }
-        };
-
-        void loadData();
-    }, [collaboratorId, hasValidCollaboratorId, navigate]);
+        })();
+    }, [hasValidCollaboratorId, navigate, loadData]);
 
     if (isLoading) {
         return <LoadingPage />;
@@ -126,6 +133,7 @@ const CollaboratorPage = () => {
                     <TooltipContent>Torna indietro</TooltipContent>
                 </Tooltip>
                 <h1 className="text-2xl font-bold">{collaboratorName}</h1>
+                <RefreshButton onRefresh={loadData} label="Aggiorna report del collaboratore" className="ml-auto" />
             </div>
             <p className="ml-12">Report del collaboratore</p>
             <div className="ml-12">

@@ -3,6 +3,7 @@ import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import { createDevice, deleteDevice, getApiErrorMessage, listDevices, updateDevice } from "@/lib/api";
 import { useEffect, useState } from "react";
@@ -105,7 +106,13 @@ const DevicesPage = () => {
                 title="Dispositivi"
                 description="Gestisci i dispositivi del laboratorio."
                 action={
-                    <CreateEntityButton label="Crea nuovo dispositivo" onClick={() => setIsCreateDialogOpen(true)} />
+                    <div className="flex items-center gap-2">
+                        <RefreshButton onRefresh={loadDevices} isRefreshing={isLoading} />
+                        <CreateEntityButton
+                            label="Crea nuovo dispositivo"
+                            onClick={() => setIsCreateDialogOpen(true)}
+                        />
+                    </div>
                 }
             />
 

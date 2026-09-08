@@ -40,3 +40,14 @@ if (!Element.prototype.hasPointerCapture) {
 if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
 }
+
+// Stessa storia per ResizeObserver, che jsdom non implementa: il Tooltip di Radix lo usa
+// per misurare la freccia quando il contenuto si apre, quindi senza stub un click su un
+// pulsante con tooltip fa fallire il test con "ResizeObserver is not defined".
+if (!globalThis.ResizeObserver) {
+    globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    };
+}

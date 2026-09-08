@@ -2,6 +2,7 @@ import CreateEntityButton from "@/components/create-entity-button";
 import CreateTechnicianDialog from "@/components/dialogs/create/createTechnicianDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import LoadingPage from "@/components/loadingPage";
 import { createTechnician, deleteTechnician, getApiErrorMessage, listTechnicians, updateTechnician } from "@/lib/api";
@@ -116,7 +117,12 @@ const TechniciansPage = () => {
             <PageHeader
                 title="Tecnici"
                 description="Gestisci i tecnici del laboratorio."
-                action={<CreateEntityButton label="Crea nuovo tecnico" onClick={() => setIsCreateDialogOpen(true)} />}
+                action={
+                    <div className="flex items-center gap-2">
+                        <RefreshButton onRefresh={loadTechnicians} isRefreshing={isLoading} />
+                        <CreateEntityButton label="Crea nuovo tecnico" onClick={() => setIsCreateDialogOpen(true)} />
+                    </div>
+                }
             />
 
             <CreateTechnicianDialog

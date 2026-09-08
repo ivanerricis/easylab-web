@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
 import CustomDialog from "@/components/dialogs/customDialog";
+import RefreshButton from "@/components/refresh-button";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CreateUserDialog from "@/components/dialogs/settings/createUserDialog";
 import GeneratedPasswordDialog from "@/components/dialogs/settings/generatedPasswordDialog";
@@ -200,10 +201,18 @@ const UsersSettingsSection = () => {
                 title="Utenti"
                 description="Gestisci gli account che possono accedere all'applicazione."
                 action={
-                    <Button type="button" onClick={() => setIsCreateOpen(true)}>
-                        <UserPlus className="size-4" />
-                        Nuovo utente
-                    </Button>
+                    <>
+                        <RefreshButton
+                            size="icon"
+                            onRefresh={loadUsers}
+                            isRefreshing={isLoading}
+                            label="Aggiorna elenco utenti"
+                        />
+                        <Button type="button" onClick={() => setIsCreateOpen(true)}>
+                            <UserPlus className="size-4" />
+                            Nuovo utente
+                        </Button>
+                    </>
                 }
             >
                 {isLoading ? (

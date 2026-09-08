@@ -1,9 +1,8 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SettingsCard, SettingsEmptyBox, SettingsSection } from "@/components/settings/settingsUi";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import RefreshButton from "@/components/refresh-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SearchInput from "@/components/search-input";
@@ -114,23 +113,12 @@ const LogsSettingsPanel = () => {
                 contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3 pt-4"}
                 action={
                     <>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    disabled={isLoadingEntries || isLoadingFiles}
-                                    onClick={handleRefresh}
-                                    aria-label="Aggiorna elenco log"
-                                >
-                                    <RefreshCw
-                                        className={cn("size-4", (isLoadingEntries || isLoadingFiles) && "animate-spin")}
-                                    />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Aggiorna elenco log</TooltipContent>
-                        </Tooltip>
+                        <RefreshButton
+                            size="icon"
+                            onRefresh={handleRefresh}
+                            isRefreshing={isLoadingEntries || isLoadingFiles}
+                            label="Aggiorna elenco log"
+                        />
 
                         <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
                             Scarica log selezionato

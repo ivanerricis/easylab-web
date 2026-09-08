@@ -3,6 +3,7 @@ import CreateReportDialog from "@/components/dialogs/create/createReportDialog";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import {
     createReportTechnician,
@@ -335,7 +336,10 @@ const ReportsPage = () => {
                     title="Report"
                     description="Gestisci i report del laboratorio."
                     action={
-                        <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
+                        <div className="flex items-center gap-2">
+                            <RefreshButton onRefresh={loadReports} isRefreshing={isLoading} />
+                            <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
+                        </div>
                     }
                 />
 

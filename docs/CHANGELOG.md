@@ -11,6 +11,52 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Pulsante di aggiornamento dati su tutte le pagine che leggono dal server
+
+**Cosa.** Ogni pagina che mostra dati del server ha ora un pulsante con l'icona di
+aggiornamento: elenchi (Dashboard, Report, Interventi, Clienti, Collaboratori, Tecnici,
+Dispositivi, Difetti), pagine di dettaglio (report, intervento, cliente, interventi del
+cliente, tecnico, collaboratore) e l'elenco utenti in Impostazioni. Il componente condiviso è
+[refresh-button.tsx](../frontend/src/components/refresh-button.tsx).
+
+**Il perché.** I dati vengono letti al montaggio della pagina e poi solo quando è la pagina
+stessa a modificarli. In laboratorio però lavorano più persone insieme: se qualcun altro chiude
+un report o sposta un intervento, chi ha la lista aperta continua a vedere lo stato di dieci
+minuti fa, senza alcun segnale che sia successo qualcosa. L'unico rimedio era F5, che ricarica
+tutta l'applicazione e **azzera ricerca, filtri e pagina corrente** — cioè fa pagare un
+aggiornamento con la perdita del contesto di lavoro. Il pulsante rilegge gli stessi dati con i
+parametri già impostati.
+
+**Il pulsante sa aspettare da solo.** `onRefresh` restituisce una promise e il componente si
+disabilita finché non si risolve, facendo girare l'icona. Serve a evitare la raffica di click
+su una lista lenta: senza, ogni click avvia una richiesta in più e l'ultima che arriva vince —
+proprio il tipo di corsa che `usePaginatedRows` scarta con `latestRequestIdRef`. Le pagine che
+già tracciano il proprio caricamento passano anche `isRefreshing`, così il pulsante risulta
+occupato pure durante i caricamenti che non ha avviato lui.
+
+**Sulle pagine di dettaglio il caricamento iniziale è stato separato dall'aggiornamento
+manuale.** Lì `loadData` viveva dentro l'effetto e alzava `isLoading`, che sostituisce l'intera
+pagina con lo spinner: riusarlo per il pulsante avrebbe fatto sparire i dati a ogni click.
+`loadData` è quindi diventata una `useCallback` che non tocca `isLoading`, ed è l'effetto di
+montaggio a gestire lo spinner a tutta pagina. L'aggiornamento manuale lascia il contenuto a
+schermo e segnala l'attesa solo nel pulsante.
+
+**Due pulsanti scritti a mano sono spariti.** L'elenco log
+([logsSettingsPanel.tsx](../frontend/src/components/settings/logsSettingsPanel.tsx)) e
+l'archivio dump ([backupDumpsCard.tsx](../frontend/src/components/settings/backup/backupDumpsCard.tsx))
+avevano già ciascuno la propria copia di `Tooltip` + `Button` + `RefreshCw` con
+`animate-spin`: ora usano il componente condiviso, che è la stessa ragione per cui esiste
+`useSearchableRows`. La taglia dell'icona segue quella del pulsante (20px nelle intestazioni di
+pagina, 16px nelle card delle impostazioni), così le due rese restano identiche a prima.
+
+**Test.** [refresh-button.test.tsx](../frontend/src/components/refresh-button.test.tsx) copre il
+caso che conta, cioè il doppio click durante una richiesta in corso. Ha richiesto uno stub di
+`ResizeObserver` in [test/setup.ts](../frontend/src/test/setup.ts): jsdom non lo implementa e il
+Tooltip di Radix lo usa per misurare la freccia, quindi qualunque test che clicchi un pulsante
+con tooltip falliva per un motivo che non c'entrava con quello che stava verificando.
+
+---
+
 ## 2026-09-08 — Autenticazione a due fattori (TOTP), opzionale per utente
 
 **Cosa.** Ogni utente può attivare da **Impostazioni > Sicurezza** la verifica in due passaggi:

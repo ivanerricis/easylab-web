@@ -3,6 +3,7 @@ import CreateIssueDialog from "@/components/dialogs/create/createIssueDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import { createIssue, deleteIssue, getApiErrorMessage, listIssues, updateIssue } from "@/lib/api";
 import { useEffect, useState } from "react";
@@ -104,7 +105,12 @@ const IssuesPage = () => {
             <PageHeader
                 title="Difetti"
                 description="Gestisci i difetti del laboratorio."
-                action={<CreateEntityButton label="Crea nuovo difetto" onClick={() => setIsCreateDialogOpen(true)} />}
+                action={
+                    <div className="flex items-center gap-2">
+                        <RefreshButton onRefresh={loadIssues} isRefreshing={isLoading} />
+                        <CreateEntityButton label="Crea nuovo difetto" onClick={() => setIsCreateDialogOpen(true)} />
+                    </div>
+                }
             />
             <CreateIssueDialog
                 open={isCreateDialogOpen}

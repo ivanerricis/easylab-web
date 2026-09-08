@@ -6,6 +6,7 @@ import CreateInterventionDialog, {
 } from "@/components/dialogs/create/createInterventionDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -296,6 +297,10 @@ const DashboardPage = () => {
         });
     }, [selectedRevenueMonth]);
 
+    const handleRefreshDashboard = async () => {
+        await Promise.all([loadDashboardMetrics(selectedRevenueMonth), loadCalendarEvents()]);
+    };
+
     const goToReportsPage = (visibilityFilter: "open" | "closed") => {
         navigate(`/reports?visibility=${visibilityFilter}`);
     };
@@ -311,6 +316,10 @@ const DashboardPage = () => {
                 description="Panoramica del laboratorio e stato delle riparazioni."
                 action={
                     <div className="flex flex-wrap items-center gap-2">
+                        <RefreshButton
+                            onRefresh={handleRefreshDashboard}
+                            isRefreshing={isLoading || isCalendarLoading}
+                        />
                         <CreateEntityButton label="Nuovo report" onClick={() => setDialogCreateReportOpen(true)} />
                         <CreateEntityButton
                             label="Nuovo intervento"

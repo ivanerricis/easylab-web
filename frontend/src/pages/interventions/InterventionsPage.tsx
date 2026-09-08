@@ -8,6 +8,7 @@ import EditInterventionDialog, {
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CustomDialog from "@/components/dialogs/customDialog";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import {
     createIntervention,
@@ -278,7 +279,13 @@ const InterventionsPage = () => {
                     title="Interventi"
                     description="Gestisci consegne materiale e interventi in sede o da remoto."
                     action={
-                        <CreateEntityButton label="Crea nuovo intervento" onClick={() => setIsCreateDialogOpen(true)} />
+                        <div className="flex items-center gap-2">
+                            <RefreshButton onRefresh={loadInterventions} isRefreshing={isLoading} />
+                            <CreateEntityButton
+                                label="Crea nuovo intervento"
+                                onClick={() => setIsCreateDialogOpen(true)}
+                            />
+                        </div>
                     }
                 />
 

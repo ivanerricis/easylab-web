@@ -1,4 +1,5 @@
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,6 +142,14 @@ const ReportPage = () => {
         });
     }, [reportId]);
 
+    const handleRefreshReport = async () => {
+        try {
+            await loadDetails();
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile aggiornare il report"));
+        }
+    };
+
     const handleEditReport = async (values: EditReportSubmitValues) => {
         await updateReport(values.reportId, {
             customerId: values.customerId,
@@ -245,6 +254,8 @@ const ReportPage = () => {
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2 self-end lg:self-auto">
+                            <RefreshButton onRefresh={handleRefreshReport} label="Aggiorna report" />
+
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button

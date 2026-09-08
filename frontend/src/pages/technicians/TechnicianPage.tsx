@@ -1,4 +1,5 @@
 import LoadingPage from "@/components/loadingPage";
+import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
@@ -125,7 +126,6 @@ const TechnicianPage = () => {
 
     const loadData = useCallback(async () => {
         try {
-            setIsLoading(true);
             const [reports, reportTechnicians, technicians, customers, devices] = await Promise.all([
                 listReports(),
                 listReportTechnicians(),
@@ -165,8 +165,6 @@ const TechnicianPage = () => {
             setReportCards(cards);
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile caricare i report del tecnico"));
-        } finally {
-            setIsLoading(false);
         }
     }, [technicianId]);
 
@@ -176,7 +174,17 @@ const TechnicianPage = () => {
             navigate("/technicians");
             return;
         }
-        void loadData();
+
+        // Solo il primo caricamento copre la pagina con lo spinner: l'aggiornamento manuale
+        // lascia i dati a schermo e segnala l'attesa nel pulsante.
+        void (async () => {
+            setIsLoading(true);
+            try {
+                await loadData();
+            } finally {
+                setIsLoading(false);
+            }
+        })();
     }, [hasValidTechnicianId, navigate, loadData]);
 
     if (isLoading) {
@@ -195,6 +203,7 @@ const TechnicianPage = () => {
                     <TooltipContent>Torna indietro</TooltipContent>
                 </Tooltip>
                 <h1 className="text-2xl font-bold">{technicianName}</h1>
+                <RefreshButton onRefresh={loadData} label="Aggiorna report del tecnico" className="ml-auto" />
             </div>
 
             <p className="ml-12">Report del tecnico</p>

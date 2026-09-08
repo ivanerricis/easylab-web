@@ -3,6 +3,7 @@ import CreateCollaboratorDialog from "@/components/dialogs/create/createCollabor
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
+import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import {
     createCollaborator,
@@ -117,7 +118,13 @@ const CollaboratorsPage = () => {
                 title="Collaboratori"
                 description="Gestisci i collaboratori del laboratorio."
                 action={
-                    <CreateEntityButton label="Crea nuovo collaboratore" onClick={() => setIsCreateDialogOpen(true)} />
+                    <div className="flex items-center gap-2">
+                        <RefreshButton onRefresh={loadCollaborators} isRefreshing={isLoading} />
+                        <CreateEntityButton
+                            label="Crea nuovo collaboratore"
+                            onClick={() => setIsCreateDialogOpen(true)}
+                        />
+                    </div>
                 }
             />
 

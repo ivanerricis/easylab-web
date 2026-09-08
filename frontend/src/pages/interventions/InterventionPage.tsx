@@ -214,25 +214,23 @@ const InterventionPage = () => {
                             </Tooltip>
                         </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-2 text-sm">
-                        <span className="rounded-full border border-border/70 bg-background px-3 py-2">
-                            Creato: {formatDateTime(details.intervention.created_at)}
-                        </span>
-                        <span className="rounded-full border border-border/70 bg-background px-3 py-2">
-                            Aggiornato:{" "}
-                            {details.intervention.updated_at ? formatDateTime(details.intervention.updated_at) : "-"}
-                        </span>
-                        <span
-                            className={`rounded-full px-3 py-2 font-medium ${statusBadgeClass(details.intervention.status)}`}
-                        >
-                            {formatInterventionStatus(details.intervention.status)}
-                        </span>
-                    </div>
                 </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <Card className="h-fit! gap-2! border-primary/20">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-primary">Stato</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <span
+                            className={`inline-flex rounded-full px-3 py-1 text-2xl font-semibold ${statusBadgeClass(details.intervention.status)}`}
+                        >
+                            {formatInterventionStatus(details.intervention.status)}
+                        </span>
+                    </CardContent>
+                </Card>
+
                 <Card className="h-fit! gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Tipo intervento</CardTitle>

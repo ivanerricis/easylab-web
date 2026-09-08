@@ -11,6 +11,28 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Stato dell'intervento come card, pillole ridondanti rimosse
+
+**Cosa.** `InterventionPage` mostrava sopra la griglia le stesse tre pillole che il 2026-09-07
+sono state tolte da `ReportPage`: "Creato:", "Aggiornato:" e lo stato dell'intervento. Le
+pillole sono state rimosse e lo stato è diventato la prima card della griglia, che passa da
+`xl:grid-cols-4` a `xl:grid-cols-5` per tenere le cinque card su una riga; sotto `xl` resta a
+due colonne. Il badge conserva i colori di `statusBadgeClass` (verde completato, ambra in
+lavorazione, rosso il resto), invariati in tema chiaro e scuro.
+
+**Il perché.** Erano tutte e tre informazioni duplicate poche righe più in basso: le due date
+compaiono tal quali nella card "Dettagli" come "Creato il" e "Ultimo aggiornamento", lo stato
+nella card "Anagrafica". Ripeterle in cima non aggiungeva nulla e rubava una fascia di
+altezza sopra i dati che contano davvero; lo stato, che è l'unico dato di quel gruppo a
+meritare rilievo, ora lo ottiene nel posto dove l'occhio già cerca i numeri della pagina. Le
+copie in basso restano: nelle due card di dettaglio servono a leggere l'intervento per intero
+senza risalire.
+
+**Coerenza tra le due pagine di dettaglio.** Report e intervento hanno la stessa struttura —
+intestazione con azioni, griglia di card numeriche, due card di dettaglio — e ora anche la
+stessa prima card. Chi passa dall'una all'altra trova lo stato sempre nello stesso punto.
+- File: `frontend/src/pages/interventions/InterventionPage.tsx`.
+
 ## 2026-09-08 — Pulsante di aggiornamento dati su tutte le pagine che leggono dal server
 
 **Cosa.** Ogni pagina che mostra dati del server ha ora un pulsante con l'icona di

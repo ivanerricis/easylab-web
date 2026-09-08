@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { KeyRound, ShieldCheck, Trash2, UserPlus, UserX } from "lucide-react";
+import { KeyRound, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
@@ -11,6 +11,7 @@ import GeneratedPasswordDialog from "@/components/dialogs/settings/generatedPass
 import {
     deleteUser,
     disableUser,
+    disableUserTwoFactor,
     enableUser,
     getApiErrorMessage,
     listUsers,
@@ -33,6 +34,8 @@ const UsersSettingsSection = () => {
     const [isTogglingActive, setIsTogglingActive] = useState(false);
     const [userPendingDelete, setUserPendingDelete] = useState<UserDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [userPendingTwoFactorReset, setUserPendingTwoFactorReset] = useState<UserDto | null>(null);
+    const [isResettingTwoFactor, setIsResettingTwoFactor] = useState(false);
 
     const loadUsers = async () => {
         setIsLoading(true);
@@ -130,12 +133,39 @@ const UsersSettingsSection = () => {
         }
     };
 
+    const handleConfirmTwoFactorReset = async () => {
+        if (!userPendingTwoFactorReset || isResettingTwoFactor) {
+            return;
+        }
+
+        try {
+            setIsResettingTwoFactor(true);
+            const updated = await disableUserTwoFactor(userPendingTwoFactorReset.id);
+            setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
+            setUserPendingTwoFactorReset(null);
+            toast.success(`Verifica in due passaggi disattivata per "${updated.username}"`);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi"));
+        } finally {
+            setIsResettingTwoFactor(false);
+        }
+    };
+
     const renderUserActions = (user: UserDto) => (
         <>
             <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
                 <KeyRound className="size-4" />
                 Rigenera password
             </Button>
+            {/* Anche sul proprio account, a differenza di "disabilita" ed "elimina": è
+                l'unico modo che un admin ha di rientrare dopo aver perso il telefono, senza
+                mettere le mani sulla macchina. */}
+            {user.twoFactorEnabled ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingTwoFactorReset(user)}>
+                    <ShieldOff className="size-4" />
+                    Disattiva 2FA
+                </Button>
+            ) : null}
             {user.id !== currentUser?.id ? (
                 <>
                     {user.active ? (
@@ -202,6 +232,9 @@ const UsersSettingsSection = () => {
                                             {!user.active ? (
                                                 <span className="ml-2 text-xs text-destructive">(disabilitato)</span>
                                             ) : null}
+                                            {user.twoFactorEnabled ? (
+                                                <span className="ml-2 text-xs text-muted-foreground">(2FA)</span>
+                                            ) : null}
                                         </TableCell>
                                         <TableCell>{formatDateTime(user.createdAt)}</TableCell>
                                         <TableCell className="text-right">
@@ -226,6 +259,9 @@ const UsersSettingsSection = () => {
                                             ) : null}
                                             {!user.active ? (
                                                 <span className="ml-2 text-xs text-destructive">(disabilitato)</span>
+                                            ) : null}
+                                            {user.twoFactorEnabled ? (
+                                                <span className="ml-2 text-xs text-muted-foreground">(2FA)</span>
                                             ) : null}
                                         </span>
                                         <div className="flex items-baseline justify-between gap-3">
@@ -305,6 +341,28 @@ const UsersSettingsSection = () => {
                 }
                 isDeleting={isDeleting}
                 onConfirm={handleConfirmDelete}
+            />
+
+            <CustomDialog
+                open={userPendingTwoFactorReset != null}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                        setUserPendingTwoFactorReset(null);
+                    }
+                }}
+                title="Disattiva la verifica in due passaggi"
+                description={
+                    userPendingTwoFactorReset
+                        ? `"${userPendingTwoFactorReset.username}" potrà rientrare con la sola password, e i suoi codici di recupero verranno cancellati. Le sessioni aperte verranno terminate. Fallo solo se ti ha chiesto lui di sbloccarlo.`
+                        : undefined
+                }
+                destructive
+                confirmLabel={isResettingTwoFactor ? "Disattivazione..." : "Disattiva"}
+                cancelLabel="Annulla"
+                onCancel={() => setUserPendingTwoFactorReset(null)}
+                onConfirm={() => void handleConfirmTwoFactorReset()}
+                cancelDisabled={isResettingTwoFactor}
+                confirmDisabled={isResettingTwoFactor}
             />
 
             {generatedPasswordResult ? (

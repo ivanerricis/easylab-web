@@ -9,6 +9,7 @@ import {
     text,
     primaryKey,
     index,
+    uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -156,6 +157,14 @@ export const userTable = pgTable("user", {
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     active: boolean("active").notNull().default(true),
+    // Segreto TOTP cifrato con `secretCrypto` (payload `iv:tag:dati`), come la password
+    // SMTP e quella del NAS: chi legge il database non ottiene un secondo fattore
+    // funzionante.
+    totpSecret: varchar("totp_secret", { length: 255 }),
+    /** La 2FA è attiva solo se valorizzato: un segreto generato e mai confermato non conta. */
+    totpConfirmedAt: timestamp("totp_confirmed_at"),
+    /** Ultimo passo temporale accettato, perché ogni codice entri una volta sola. */
+    totpLastStep: integer("totp_last_step"),
     ...timestamps,
 });
 
@@ -173,6 +182,28 @@ export const sessionTable = pgTable(
         createdAt: timestamp("created_at").defaultNow().notNull(),
     },
     (table) => [index("session_user_id_idx").on(table.userId)]
+);
+
+/**
+ * Codici di recupero della 2FA: monouso, otto per utente, rigenerabili in blocco.
+ *
+ * Solo lo sha256, mai il codice: stesso ragionamento dei token di sessione qui sopra.
+ * L'unico indice è quello unico su (utente, hash) — serve alla ricerca del codice
+ * presentato al login, che parte sempre dall'utente già identificato dalla password, e
+ * impedisce due codici uguali nello stesso blocco.
+ */
+export const userRecoveryCodeTable = pgTable(
+    "user_recovery_code",
+    {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        userId: integer("user_id")
+            .notNull()
+            .references(() => userTable.id, { onDelete: "cascade" }),
+        codeHash: varchar("code_hash", { length: 64 }).notNull(),
+        usedAt: timestamp("used_at"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [uniqueIndex("user_recovery_code_user_id_code_hash_idx").on(table.userId, table.codeHash)]
 );
 
 export const notificationSeverities = ["info", "warning"] as const;

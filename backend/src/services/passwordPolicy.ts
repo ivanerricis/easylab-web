@@ -41,7 +41,10 @@ export const generatedPasswordLength = 16;
 
 // Il modulo diretto su un byte favorirebbe i primi caratteri dell'alfabeto, perché 256 non
 // è multiplo della sua lunghezza. Scartando la coda eccedente la distribuzione resta piatta.
-const randomIndex = (max: number): number => {
+// Esportato perché serve identico ai codici di recupero della 2FA (`recoveryCodes.ts`):
+// riscriverlo là avrebbe voluto dire due copie di una correzione sottile, di cui una sola
+// coperta dai test.
+export const randomIndex = (max: number): number => {
     const limit = Math.floor(256 / max) * max;
     let value = crypto.randomBytes(1)[0];
 

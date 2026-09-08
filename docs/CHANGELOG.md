@@ -11,6 +11,119 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Autenticazione a due fattori (TOTP), opzionale per utente
+
+**Cosa.** Ogni utente può attivare da **Impostazioni > Sicurezza** la verifica in due passaggi:
+dopo la password, l'accesso chiede un codice a 6 cifre generato da un'app sul telefono. Con
+l'attivazione arrivano otto **codici di recupero** monouso, mostrati una volta sola. Chi resta
+fuori viene sbloccato da un amministratore (Impostazioni > Utenti > Disattiva 2FA) o, se è
+l'ultimo amministratore, da `./scripts/reset-admin-password.sh --reset-2fa` sulla macchina.
+
+**Il perché adesso.** Finché si entrava dalla LAN, una password rubata richiedeva comunque di
+essere dentro la rete del laboratorio. Da quando l'app risponde sul dominio pubblico via
+Cloudflare Tunnel, il form di login è raggiungibile da chiunque, e fra un estraneo e i dati di
+tutti i clienti c'è una sola stringa — che una persona può riusare da un altro sito o farsi
+rubare con un phishing. Il limitatore per IP
+([loginRateLimit.ts](../backend/src/services/loginRateLimit.ts)) ferma il tentativo a forza
+bruta, non la password già nota. Aggrava il quadro il fatto che l'admin può lanciare
+l'aggiornamento, che **esegue codice sull'host**, e leggere o ripristinare i backup: un account
+admin compromesso non è una fuga di dati, è la macchina. Il piano stava in
+[docs/2FA-PLAN.md](2FA-PLAN.md) da mesi; qui vengono realizzate le fasi 1-4, cioè tutto tranne
+l'obbligo per l'admin, che è meglio imporre a flusso collaudato.
+
+**TOTP scritto a mano invece che con una libreria.** RFC 6238 è un HMAC-SHA1 su un contatore a
+8 byte più un troncamento: [totp.ts](../backend/src/services/totp.ts) sono un centinaio di
+righe con `node:crypto`, Base32 compreso. È la stessa scelta già fatta per scrypt e AES-GCM, e
+il guadagno vero è che si verifica contro i **vettori ufficiali della RFC** — sei casi in
+[totp.test.ts](../backend/src/services/totp.test.ts), che è una garanzia di correttezza più
+forte di "la libreria è popolare", senza aggiungere una dipendenza sul percorso critico del
+login. L'unica dipendenza nuova è `qrcode`, per il QR.
+
+**Lo stato "password ok, manca il codice" sta in memoria, non nel database.**
+[twoFactorChallenge.ts](../backend/src/services/twoFactorChallenge.ts) è calcato su
+`loginRateLimit.ts`: mappa con TTL di 5 minuti, tetto ai tentativi e tetto alle entry.
+L'alternativa — una colonna `pending_totp` su `session` — sopravviverebbe al riavvio, ma
+metterebbe in giro un cookie di sessione **non ancora valido**, da ricontrollare in
+`requireAuth` a ogni richiesta dell'app: molta più superficie per un errore che vale un
+accesso. Costo accettato: al riavvio del backend chi era a metà login ridigita la password.
+
+**Il primo passo non consegna nessun cookie.** È la differenza fra una porta chiusa e una
+schermata da saltare, ed è anche l'errore che un giorno si reintrodurrebbe rifattorizzando
+`login()`. Per questo `login` restituisce un'unione discriminata invece di una sessione, e
+[routes/auth.test.ts](../backend/src/routes/auth.test.ts) asserisce esplicitamente
+`set-cookie` assente sul ramo `twoFactorRequired`.
+
+**410 e non 401 per il challenge morto.** Un codice sbagliato è 401 ("riprova"); un challenge
+scaduto o bruciato dai tentativi è **410** ("non c'è più niente da verificare, ricomincia dalla
+password"). Sono due comportamenti diversi nell'interfaccia, e la prima versione li distingueva
+confrontando il testo italiano del messaggio — che è scritto per le persone e cambierà. Da qui
+`getApiErrorStatus` in [lib/api/errors.ts](../frontend/src/lib/api/errors.ts), accanto a
+`getApiErrorMessage` che invece lo stato lo scarta di proposito.
+
+**Il caso che decideva se il lavoro era fatto bene: il ripristino su una macchina nuova.** Il
+segreto è cifrato con `secretCrypto`, la cui chiave (`data/secret.key`) è **esclusa dai backup
+di proposito**, mentre i segreti cifrati stanno nel dump. Ripristinato altrove, nessuno di essi
+si decifra: trattarlo come un errore avrebbe lasciato fuori dall'app chiunque avesse la 2FA
+attiva — e se era l'admin, senza nessuno che potesse sbloccarlo. `readTotpSecret` quindi azzera
+la 2FA, lascia entrare con la sola password e scrive una notifica in-app, la stessa scelta già
+fatta per la password del NAS in [backupState.ts](../backend/src/services/backupState.ts).
+
+**Tre cose che sembravano dettagli e non lo erano.** *(a)* `totp_last_step` sulla tabella
+`user`: un codice vale trenta secondi, e senza ricordare l'ultimo passo accettato chi lo
+intercetta può rigiocarlo finché è vivo. *(b)* `startTwoFactorSetup` **rifiuta** di generare un
+nuovo segreto se la 2FA è già attiva: senza quel controllo la sola password basterebbe a
+sostituirla, e la 2FA non proteggerebbe dal caso per cui esiste. *(c)*
+`requirePasswordChangeCompleted` è montato su `/api` **dopo** l'auth router, quindi le rotte di
+autenticazione ne sono esenti per costruzione — giusto per login e cambio password, sbagliato
+per le rotte 2FA, dove la guardia è ripetuta a mano e un test la sorveglia.
+
+**Il consumo di un codice di recupero è una query sola.** `UPDATE ... WHERE used_at IS NULL
+RETURNING id` in [queries/recoveryCode.ts](../backend/src/db/queries/recoveryCode.ts): con una
+lettura seguita da una scrittura, due richieste in parallelo spenderebbero due volte lo stesso
+codice. Del codice resta in tabella solo lo sha256, come per i token di sessione — sono già 40
+bit casuali, non c'è niente da indovinare a forza bruta e non serve il costo di scrypt.
+
+**Lato interfaccia** il login diventa a due passi dentro la stessa card, con il challenge nello
+stato della pagina e **non** nel contesto di autenticazione: non è una sessione, e tenerlo lì
+avrebbe significato uno stato di autenticazione a metà visibile a tutta l'app. "Sicurezza" è la
+prima sezione personale delle impostazioni oltre al tema, quindi resta fuori da
+`adminOnlySections`. Il blocco "valore più bottone copia" è stato estratto da
+`generatedPasswordDialog` in [copyableValue.tsx](../frontend/src/components/dialogs/settings/copyableValue.tsx),
+perché ormai serviva in tre punti.
+
+**Cosa resta fuori.** L'obbligo di 2FA per l'admin (fase 5 del piano), da imporre dopo aver
+collaudato il flusso opzionale: è l'account che vale la pena rubare, ma è anche l'unico che può
+sbloccare gli altri. Restano fuori anche WebAuthn/passkey, l'OTP via email e il "ricorda questo
+dispositivo".
+
+**Verificato.** 149 test backend (erano 137) e 51 frontend (erano 45), typecheck e lint puliti
+su entrambi i progetti. I test nuovi coprono i vettori RFC, il rifiuto del passo già usato, la
+morte del challenge dopo cinque tentativi, l'assenza di cookie al primo passo e il rimbalzo del
+frontend alla password sul 410. **Da fare a mano prima di considerarla in produzione:**
+attivazione con un'app reale, login da telefono, e un ripristino di backup con `secret.key`
+diversa.
+
+**File:** [backend/src/services/totp.ts](../backend/src/services/totp.ts),
+[recoveryCodes.ts](../backend/src/services/recoveryCodes.ts),
+[twoFactorChallenge.ts](../backend/src/services/twoFactorChallenge.ts),
+[authManager.ts](../backend/src/services/authManager.ts),
+[db/queries/recoveryCode.ts](../backend/src/db/queries/recoveryCode.ts),
+[db/schema.ts](../backend/src/db/schema.ts),
+[drizzle/0023_add_user_totp.sql](../backend/drizzle/0023_add_user_totp.sql),
+[routes/auth.ts](../backend/src/routes/auth.ts), [routes/users.ts](../backend/src/routes/users.ts),
+[reset-admin-password.js](../backend/reset-admin-password.js),
+[scripts/reset-admin-password.sh](../scripts/reset-admin-password.sh),
+[frontend/src/lib/api/twoFactor.ts](../frontend/src/lib/api/twoFactor.ts),
+[lib/api/auth.ts](../frontend/src/lib/api/auth.ts), [lib/api/errors.ts](../frontend/src/lib/api/errors.ts),
+[components/auth-provider.tsx](../frontend/src/components/auth-provider.tsx),
+[pages/auth/LoginPage.tsx](../frontend/src/pages/auth/LoginPage.tsx),
+[components/settings/securitySettingsSection.tsx](../frontend/src/components/settings/securitySettingsSection.tsx),
+[components/settings/usersSettingsSection.tsx](../frontend/src/components/settings/usersSettingsSection.tsx),
+[pages/settings/SettingsPage.tsx](../frontend/src/pages/settings/SettingsPage.tsx),
+più i dialoghi in `components/dialogs/settings/` e il README.
+
+---
+
 ## 2026-09-08 — Opzione "Tutte" nel selettore delle righe per pagina
 
 **Cosa.** "Righe per pagina" ha ora una quarta voce, **Tutte**, accanto a 10 / 20 / 50. Scelta

@@ -47,7 +47,15 @@ const buildApp = (isAdmin: boolean) => {
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => {
-        req.user = { id: 1, username: "mario", createdAt: "", mustChangePassword: false, active: true, isAdmin };
+        req.user = {
+            id: 1,
+            username: "mario",
+            createdAt: "",
+            mustChangePassword: false,
+            twoFactorEnabled: false,
+            active: true,
+            isAdmin,
+        };
         next();
     });
     app.use("/api/settings", settingsRouter);

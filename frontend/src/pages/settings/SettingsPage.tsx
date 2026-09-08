@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { Building2, Database, Mail, Palette, RefreshCw, ScrollText, Users } from "lucide-react";
+import { Building2, Database, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
 import BackupSettingsPanel from "@/components/settings/backupSettingsPanel";
 import CompanySettingsPanel from "@/components/settings/companySettingsPanel";
 import EmailSettingsPanel from "@/components/settings/emailSettingsPanel";
@@ -8,13 +8,23 @@ import UpdateSettingsPanel from "@/components/settings/updateSettingsPanel";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import SecuritySettingsSection from "@/components/settings/securitySettingsSection";
 import ThemeSettingsSection from "@/components/settings/themeSettingsSection";
 import UsersSettingsSection from "@/components/settings/usersSettingsSection";
 import { useAuth } from "@/components/use-auth";
 
-type SettingsSectionKey = "theme" | "users" | "company" | "email" | "backup" | "update" | "logs";
+type SettingsSectionKey = "theme" | "security" | "users" | "company" | "email" | "backup" | "update" | "logs";
 
-const settingsSectionKeys: SettingsSectionKey[] = ["theme", "users", "company", "email", "backup", "update", "logs"];
+const settingsSectionKeys: SettingsSectionKey[] = [
+    "theme",
+    "security",
+    "users",
+    "company",
+    "email",
+    "backup",
+    "update",
+    "logs",
+];
 
 const settingsSections: Array<{
     key: SettingsSectionKey;
@@ -27,6 +37,12 @@ const settingsSections: Array<{
         label: "Tema",
         description: "Colori, modalità e accenti visivi",
         icon: Palette,
+    },
+    {
+        key: "security",
+        label: "Sicurezza",
+        description: "Verifica in due passaggi del tuo account",
+        icon: ShieldCheck,
     },
     {
         key: "users",
@@ -149,6 +165,8 @@ const SettingsPage = () => {
             <section className="min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-background/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
                 {activeSection === "theme" ? (
                     <ThemeSettingsSection />
+                ) : activeSection === "security" ? (
+                    <SecuritySettingsSection />
                 ) : activeSection === "users" && user?.isAdmin ? (
                     <UsersSettingsSection />
                 ) : activeSection === "company" ? (

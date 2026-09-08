@@ -1,7 +1,14 @@
 // Rigenera la password di un utente direttamente sul database, per i casi in cui
 // nessuno riesca più ad accedere all'app (es. unico utente rimasto e password persa).
-// Eseguito dentro il container backend da scripts/reset-admin-password.{sh,ps1}.
-// Usage: node reset-admin-password.js [username]  (default: admin)
+// Eseguito dentro il container backend da scripts/reset-admin-password.sh.
+// Usage: node reset-admin-password.js [username] [--reset-2fa]  (default: admin)
+//
+// La verifica in due passaggi resta al suo posto se non si chiede `--reset-2fa`: reimpostare
+// la password non è una buona ragione per togliere anche il secondo fattore, e farlo di
+// default significherebbe che chi ruba la password sa già come disinnescarlo. Il flag esiste
+// per l'altro guaio — l'ultimo admin con la 2FA attiva, il telefono perso e nessun codice di
+// recupero rimasto — dove l'unica via è la riga di comando sulla macchina. Chi ci arriva ha
+// comunque già accesso al database, quindi non ottiene niente che non avesse.
 const crypto = require('crypto');
 const { Pool } = require('pg');
 // Dal modulo compilato invece di una copia locale: questo script aveva il proprio alfabeto
@@ -25,7 +32,9 @@ const hashPassword = (password) =>
     });
 
 async function main() {
-    const username = process.argv[2] || 'admin';
+    const args = process.argv.slice(2);
+    const resetTwoFactor = args.includes('--reset-2fa');
+    const username = args.find((arg) => !arg.startsWith('--')) || 'admin';
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
     try {
@@ -47,11 +56,26 @@ async function main() {
         );
         await pool.query('DELETE FROM "session" WHERE user_id = $1', [userId]);
 
+        if (resetTwoFactor) {
+            await pool.query(
+                'UPDATE "user" SET totp_secret = NULL, totp_confirmed_at = NULL, totp_last_step = NULL WHERE id = $1',
+                [userId]
+            );
+            await pool.query('DELETE FROM "user_recovery_code" WHERE user_id = $1', [userId]);
+        }
+
         console.log('============================================================');
         console.log(`Password rigenerata per l'utente "${username}":`);
         console.log(`  password: ${password}`);
         console.log("Dovrà essere cambiata al primo accesso. Eventuali sessioni attive per");
         console.log("questo utente sono state disconnesse.");
+        if (resetTwoFactor) {
+            console.log("La verifica in due passaggi è stata disattivata e i codici di recupero");
+            console.log("cancellati: vanno riattivati dalle impostazioni dopo l'accesso.");
+        } else {
+            console.log("La verifica in due passaggi, se attiva, resta necessaria per accedere:");
+            console.log("aggiungi --reset-2fa se anche quella è irraggiungibile.");
+        }
         console.log('============================================================');
     } finally {
         await pool.end();

@@ -1,6 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
-import { createUser, deleteUser, listUsers, regeneratePassword, setUserActive } from "../services/authManager";
+import {
+    adminDisableTwoFactor,
+    createUser,
+    deleteUser,
+    listUsers,
+    regeneratePassword,
+    setUserActive,
+} from "../services/authManager";
 import { idParamsSchema } from "./crudRouter";
 import { validate } from "./validation";
 
@@ -26,6 +33,19 @@ usersRouter.post("/:id/regenerate-password", validate({ params: idParamsSchema }
     const { id } = req.params as unknown as { id: number };
 
     res.json(await regeneratePassword(id));
+});
+
+/**
+ * Sblocco per il telefono perso senza codici di recupero rimasti.
+ *
+ * A differenza di "disabilita" ed "elimina" non c'è nessun rifiuto su sé stessi: togliersi
+ * la propria 2FA è l'unico modo che l'admin ha di rientrare senza mettere le mani sulla
+ * macchina, ed è comunque un'operazione che richiede già una sessione admin viva.
+ */
+usersRouter.post("/:id/disable-2fa", validate({ params: idParamsSchema }), async (req, res) => {
+    const { id } = req.params as unknown as { id: number };
+
+    res.json(await adminDisableTwoFactor(id));
 });
 
 usersRouter.post("/:id/disable", validate({ params: idParamsSchema }), async (req, res) => {

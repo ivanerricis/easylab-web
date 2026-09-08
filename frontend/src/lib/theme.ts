@@ -49,7 +49,25 @@ export type FontSize = {
     description: string;
 };
 
-export type TableRowsPerPageKey = 10 | 20 | 50;
+/**
+ * "Tutte le righe" espresso come numero, non come valore speciale tipo `"all"`.
+ *
+ * `pageSize` attraversa dodici pagine, i loro hook di caricamento, la query verso l'API e il
+ * calcolo di "Visualizzati X-Y di Z": una stringa in mezzo a quei numeri avrebbe richiesto un
+ * caso a parte in ognuno di quei punti. Con un numero grande non cambia niente a valle —
+ * `totalPages` diventa 1, i controlli di pagina spariscono da soli, il conteggio dice
+ * "Visualizzati 1-16 di 16" — e la risposta resta nella forma paginata `items + totalItems`
+ * invece di quella non paginata (array semplice), che avrebbe voluto dire due forme di
+ * risposta da gestire in ogni tabella.
+ *
+ * Il valore è lo stesso tetto del backend (`maxPageSize`, a sua volta `unpaginatedMaxRows`).
+ * Oltre quelle righe "Tutte" non mostra davvero tutto, ma degrada bene: `totalPages` torna a
+ * 2 e i controlli di pagina riappaiono, quindi le righe restano raggiungibili invece di
+ * sparire in silenzio.
+ */
+export const allTableRowsPageSize = 5000;
+
+export type TableRowsPerPageKey = 10 | 20 | 50 | typeof allTableRowsPageSize;
 
 export type TableRowsPerPage = {
     key: TableRowsPerPageKey;
@@ -140,6 +158,11 @@ export const tableRowsPerPageOptions: TableRowsPerPage[] = [
         key: 50,
         label: "50",
         description: "Più righe per pagina, meno cambi pagina.",
+    },
+    {
+        key: allTableRowsPageSize,
+        label: "Tutte",
+        description: "Una pagina sola: si scorre invece di cambiare pagina.",
     },
 ];
 

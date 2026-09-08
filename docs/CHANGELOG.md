@@ -11,6 +11,58 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-08 — Opzione "Tutte" nel selettore delle righe per pagina
+
+**Cosa.** "Righe per pagina" ha ora una quarta voce, **Tutte**, accanto a 10 / 20 / 50. Scelta
+quella, la tabella mostra l'intero elenco su una pagina sola: i controlli di pagina spariscono
+da soli e il conteggio legge "Visualizzati 1-16 di 16". Come le altre voci, la scelta è
+ricordata per singola tabella.
+
+**Il perché di un numero e non di un valore `"all"`.** La strada apparentemente più pulita era
+aggiungere `"all"` alla `TableRowsPerPageKey`. Ma `pageSize` non vive in un posto solo:
+attraversa dodici pagine, i rispettivi hook di caricamento, i parametri della richiesta e il
+calcolo di "Visualizzati X-Y di Z". Una stringa in mezzo a quei numeri avrebbe richiesto un
+caso speciale in ognuno di quei punti — dodici occasioni di dimenticarne uno. Con
+`allTableRowsPageSize` (un numero) non cambia niente a valle: `totalPages` diventa 1 e la barra
+si adatta da sé, con la logica che c'era già.
+
+**L'altra strada scartata, che era una trappola.** Il backend sa già rispondere senza
+paginazione se si omettono `page`/`pageSize` (`takeUnpaginated`), e sembrava il posto giusto
+dove agganciare "Tutte". Ma in quel caso la risposta cambia **forma** — array semplice invece
+di `items + totalItems` — e ogni tabella avrebbe dovuto gestirle entrambe. Peggio:
+[routes/reports.ts](../backend/src/routes/reports.ts) usa la presenza di quei parametri per
+decidere il `visibility` predefinito (`all` senza paginazione, `open` con), quindi passare a
+"Tutte" sui report avrebbe **cambiato in silenzio quali report si vedono**. Mandare un
+`pageSize` grande evita entrambe le cose: stessa forma di risposta, stessi filtri.
+
+**Il tetto è uno solo, condiviso.** Lo zod delle rotte di lista fermava `pageSize` a 1000, che
+avrebbe respinto "Tutte" con un 400. Ora il tetto è `maxPageSize` in
+[db/queries/pagination.ts](../backend/src/db/queries/pagination.ts), definito come lo stesso
+numero di `unpaginatedMaxRows` (5000): è la stessa domanda ("quante righe può chiedere una
+schermata in un colpo solo") e due costanti diverse si sarebbero prima o poi contraddette.
+Il tetto valeva in due schemi, quello condiviso e quello dei log in `settings.ts`: aggiornati
+entrambi.
+
+**Oltre le 5000 righe "Tutte" non mostra tutto — ma degrada bene.** `totalPages` torna a 2 e i
+controlli di pagina riappaiono, quindi le righe restano raggiungibili invece di sparire senza
+avviso. Da tenere presente che la tabella non è virtualizzata: "Tutte" su una tabella molto
+grande disegna davvero tutte le righe nel DOM.
+
+**Verificato.** Test nuovo in [routes/devices.test.ts](../backend/src/routes/devices.test.ts):
+`pageSize` pari al tetto passa, il valore successivo dà 400 — le due asserzioni insieme
+inchiodano il tetto esatto, così riabbassarlo non passa inosservato. Suite complete verdi (98
+backend, 45 frontend) e typecheck pulito sui due progetti. Misurata poi con Playwright la barra
+con "Tutte" selezionata: il trigger passa da 52px a 71px, ma il bordo destro resta a **0px** dal
+bordo del contenitore — la griglia della voce qui sotto assorbe la differenza.
+
+**File:** [frontend/src/lib/theme.ts](../frontend/src/lib/theme.ts),
+[backend/src/db/queries/pagination.ts](../backend/src/db/queries/pagination.ts),
+[backend/src/routes/crudRouter.ts](../backend/src/routes/crudRouter.ts),
+[backend/src/routes/settings.ts](../backend/src/routes/settings.ts),
+[backend/src/routes/devices.test.ts](../backend/src/routes/devices.test.ts).
+
+---
+
 ## 2026-09-08 — Barra di paginazione a tre zone: conteggio, pagine al centro, selettore a destra
 
 **Cosa.** Sotto ogni tabella la barra ha ora tre zone distinte: il conteggio "Visualizzati

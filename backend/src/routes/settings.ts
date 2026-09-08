@@ -14,6 +14,7 @@ import {
     testSmbConnection,
     updateBackupSettings,
 } from "../services/backupManager";
+import { maxPageSize } from "../db/queries/pagination";
 import { smbPathPattern, smbPathRequirementsMessage } from "../services/backupSmb";
 import { getCompanySettings, updateCompanySettings } from "../services/companyManager";
 import { getEmailSettings, testEmailConnection, updateEmailSettings } from "../services/emailManager";
@@ -125,7 +126,7 @@ const logDayKeyParamsSchema = z
 const logEntriesQuerySchema = z
     .object({
         page: z.coerce.number().int().min(1).optional(),
-        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(maxPageSize).optional(),
         search: z.string().trim().max(255).optional(),
     })
     .strict();

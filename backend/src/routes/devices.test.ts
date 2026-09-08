@@ -14,6 +14,7 @@ vi.mock("../db/queries/device", () => ({
 
 import { createDevice, deleteDeviceById, getDeviceById, listDevices, updateDeviceById } from "../db/queries/device";
 import devicesRouter from "./devices";
+import { maxPageSize } from "../db/queries/pagination";
 import { errorHandler } from "../middleware/errorHandler";
 
 const buildApp = () => {
@@ -55,6 +56,20 @@ describe("devices router", () => {
         const response = await request(buildApp()).get("/api/devices?page=1&pageSize=10");
 
         expect(response.body.totalPages).toBe(1);
+    });
+
+    // L'opzione "Tutte" del selettore righe per pagina manda esattamente `maxPageSize`:
+    // se il tetto venisse riabbassato, quell'opzione smetterebbe di funzionare con un 400
+    // e nient'altro in questa suite se ne accorgerebbe.
+    it("accetta un pageSize pari al tetto e rifiuta quello successivo", async () => {
+        vi.mocked(listDevices).mockResolvedValue({ items: [device], totalItems: 1 } as never);
+
+        const accepted = await request(buildApp()).get(`/api/devices?page=1&pageSize=${maxPageSize}`);
+        const rejected = await request(buildApp()).get(`/api/devices?page=1&pageSize=${maxPageSize + 1}`);
+
+        expect(accepted.status).toBe(200);
+        expect(accepted.body).toMatchObject({ pageSize: maxPageSize, totalPages: 1 });
+        expect(rejected.status).toBe(400);
     });
 
     it("risponde 404 quando il dispositivo non esiste", async () => {

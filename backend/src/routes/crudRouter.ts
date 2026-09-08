@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import { z, type ZodType } from "zod";
 import { validate } from "./validation";
+import { maxPageSize } from "../db/queries/pagination";
 
 export const idParamsSchema = z.object({
     id: z.coerce.number().int().positive(),
@@ -8,7 +9,7 @@ export const idParamsSchema = z.object({
 
 export const listQuerySchema = z.object({
     page: z.coerce.number().int().min(1).optional(),
-    pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+    pageSize: z.coerce.number().int().min(1).max(maxPageSize).optional(),
     search: z.string().trim().max(255).optional(),
     sortBy: z.string().trim().max(64).optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),

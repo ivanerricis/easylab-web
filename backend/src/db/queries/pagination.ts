@@ -13,6 +13,17 @@
  */
 export const unpaginatedMaxRows = 5000;
 
+/**
+ * Tetto del `pageSize` accettato dalle rotte di lista, volutamente lo stesso numero.
+ *
+ * Serve all'opzione "Tutte" del selettore righe per pagina: il client la manda come
+ * `pageSize` grande invece di omettere la paginazione, così la risposta resta nella forma
+ * `items + totalItems` che tutte le tabelle si aspettano. Due tetti diversi per la stessa
+ * domanda ("quante righe può chiedere una schermata in un colpo solo") si sarebbero prima o
+ * poi contraddetti, quindi il numero è uno solo e la motivazione è quella qui sopra.
+ */
+export const maxPageSize = unpaginatedMaxRows;
+
 type LimitableQuery<TRow> = {
     limit: (count: number) => PromiseLike<TRow[]>;
 };

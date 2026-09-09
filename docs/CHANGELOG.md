@@ -11,6 +11,32 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Gli spinner girano anche con le animazioni ridotte
+
+**Cosa.** L'eccezione a `prefers-reduced-motion` in `frontend/src/index.css` ora vale per
+ogni elemento con la classe `animate-spin`, non solo per quelli marcati a mano con
+`data-slot="spinner"`.
+
+**Il perché.** Sulle postazioni che hanno chiesto al sistema operativo di ridurre le
+animazioni (su Windows: Impostazioni > Accessibilità > Effetti visivi > Effetti di
+animazione) la regola generica azzerava anche la rotazione dei caricamenti. L'unico spinner
+esentato era quello di `loadingPage`, perché l'esenzione era legata a un attributo da
+ricordarsi di scrivere: lo spinner del blocco "Aggiornamento in corso" non ce l'aveva e
+restava immobile per tutti i minuti dell'aggiornamento, proprio mentre la pagina chiedeva
+di non chiudere né ricaricare. Uno spinner fermo è il segnale universale di applicazione
+bloccata: sulla macchina da cui si lancia l'aggiornamento dava l'impressione che fosse
+andato storto, mentre dalle altre postazioni — senza motion ridotto — lo stesso blocco
+girava regolarmente.
+
+**Le scelte.** Ancorare l'eccezione alla classe invece che all'attributo la rende valida per
+gli spinner che ci sono oggi (blocco occupato, pulsante di aggiornamento elenchi, toast di
+caricamento) e per quelli che verranno, senza dipendere dalla memoria di chi li scrive.
+`data-slot="spinner"` resta nel selettore per gli indicatori che non usano la utility di
+Tailwind. Il resto della regola non cambia: le animazioni decorative restano azzerate, si
+toglie il movimento inutile, non l'informazione.
+
+---
+
 ## 2026-09-09 — L'email al cliente: data al posto del numero, logo e testo riscritto
 
 **Cosa.** L'email che accompagna il PDF dell'intervento è stata rifatta: niente più numero

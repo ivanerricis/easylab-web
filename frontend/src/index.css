@@ -367,8 +367,12 @@ input[type="search"]::-webkit-search-decoration {
   /* L'eccezione sono gli indicatori di caricamento: lì la rotazione non è decorazione,
      è l'unica cosa che distingue "sto lavorando" da "sono bloccato". Restano girando,
      più lentamente. Motion ridotto vuol dire togliere il movimento inutile, non
-     l'informazione. */
-  [data-slot="spinner"] {
+     l'informazione. La classe `animate-spin` è nell'elenco insieme all'attributo
+     perché legare l'eccezione al solo `data-slot` significava ricordarsi di marcare a
+     mano ogni spinner: quello del blocco aggiornamento era rimasto indietro e restava
+     immobile proprio mentre l'app diceva di non chiudere la pagina. */
+  [data-slot="spinner"],
+  .animate-spin {
     animation-duration: 1.5s !important;
     animation-iteration-count: infinite !important;
   }

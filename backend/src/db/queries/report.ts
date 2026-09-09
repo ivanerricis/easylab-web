@@ -37,15 +37,6 @@ export const listReports = async ({
     sortBy = "createdAt",
     sortOrder = "desc",
 }: ListReportsParams) => {
-    const technicianPriceSubquery = db
-        .select({
-            reportId: reportTechnicianTable.reportId,
-            technicianPrice: sql<number>`coalesce(sum(${reportTechnicianTable.price}), 0)::int`.as("technicianPrice"),
-        })
-        .from(reportTechnicianTable)
-        .groupBy(reportTechnicianTable.reportId)
-        .as("technician_prices");
-
     const trimmedSearch = search?.trim();
     const searchPattern = `%${trimmedSearch ?? ""}%`;
     const idSearch = trimmedSearch ? parseIdSearch(trimmedSearch) : null;
@@ -94,7 +85,7 @@ export const listReports = async ({
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const customerSortExpr = sql<string>`coalesce(nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), ''), '-')`;
-    const totalPriceSortExpr = sql<number>`(${reportTable.price} + coalesce(${technicianPriceSubquery.technicianPrice}, 0))`;
+    const totalPriceSortExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
     const sortColumn =
         sortBy === "customer"
             ? customerSortExpr
@@ -127,7 +118,7 @@ export const listReports = async ({
             issue: IssueTable.description,
             technician: sql<string>`coalesce(nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), ''), '-')`,
             internalPrice: reportTable.price,
-            technicianPrice: sql<number>`coalesce(${technicianPriceSubquery.technicianPrice}, 0)::int`,
+            technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
             totalPrice: sql<number>`${totalPriceSortExpr}::int`,
             closed: reportTable.closed,
             createdAt: reportTable.created_at,
@@ -138,11 +129,47 @@ export const listReports = async ({
         .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
         .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
         .leftJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
-        .leftJoin(technicianPriceSubquery, eq(technicianPriceSubquery.reportId, reportTable.id));
+        /**
+         * Il compenso del tecnico si legge con un join diretto sulla chiave primaria di
+         * `report_technician`, che dalla migration 0004 è il solo `report_id`: un report ha
+         * al massimo una riga qui, quindi non c'è niente da sommare e questo join non può
+         * moltiplicare le righe. Prima al suo posto c'era una sottoquery con
+         * `GROUP BY report_id`, che per restituire le 10 righe di una pagina aggregava
+         * l'intera tabella e poi ne buttava via decine di migliaia.
+         *
+         * Se un giorno tornassero più tecnici per report, la primary key tornerebbe
+         * composta e questo join andrebbe rifatto sottoquery con `sum(price)`.
+         */
+        .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id));
 
     if (page == null || pageSize == null) {
         return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "reports");
     }
+
+    /**
+     * Il totale non porta con sé i join delle righe.
+     *
+     * Le colonne unite servono a *mostrare* un report (nome cliente, dispositivo, difetto) e
+     * a cercarci dentro, non a contarlo: `device_id`, `issue_id` e `customer_id` sono NOT
+     * NULL con vincolo di chiave esterna, quindi le inner join non possono né scartare né
+     * duplicare righe, e quella su `collaborator` è una left join, che per definizione non
+     * cambia un conteggio. Il pianificatore elimina da solo le left join inutilizzate, ma non
+     * le inner join: quelle andavano tolte scrivendole.
+     *
+     * Quando c'è una ricerca libera i join restano, perché le condizioni parlano proprio di
+     * quelle tabelle: lì il conteggio costa quanto prima, ed è la voce 4 del backlog
+     * prestazioni ad occuparsene.
+     */
+    const countSelect = db.select({ total: sql<number>`count(*)` }).from(reportTable);
+    const countQuery =
+        searchConditions.length > 0
+            ? countSelect
+                  .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
+                  .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
+                  .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
+                  .leftJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
+                  .where(whereClause)
+            : countSelect.where(whereClause);
 
     const [items, totalCountRows] = await Promise.all([
         baseQuery
@@ -150,15 +177,7 @@ export const listReports = async ({
             .orderBy(orderByClause)
             .limit(pageSize)
             .offset((page - 1) * pageSize),
-        db
-            .select({ total: sql<number>`count(*)` })
-            .from(reportTable)
-            .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
-            .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
-            .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
-            .leftJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
-            .leftJoin(technicianPriceSubquery, eq(technicianPriceSubquery.reportId, reportTable.id))
-            .where(whereClause),
+        countQuery,
     ]);
 
     return {
@@ -182,15 +201,6 @@ export const getReportStats = async (month?: string) => {
     const earliestMonthKey = [...seriesMonthKeys, targetMonthKey].sort()[0];
     const rangeStartDate = `${earliestMonthKey}-01`;
 
-    const technicianPriceSubquery = db
-        .select({
-            reportId: reportTechnicianTable.reportId,
-            technicianPrice: sql<number>`coalesce(sum(${reportTechnicianTable.price}), 0)::int`.as("technicianPrice"),
-        })
-        .from(reportTechnicianTable)
-        .groupBy(reportTechnicianTable.reportId)
-        .as("technician_prices");
-
     const [statusCountRows, revenueRows] = await Promise.all([
         db
             .select({ closed: reportTable.closed, count: sql<number>`count(*)::int` })
@@ -199,10 +209,12 @@ export const getReportStats = async (month?: string) => {
         db
             .select({
                 month: sql<string>`to_char(${reportTable.created_at}, 'YYYY-MM')`,
-                revenue: sql<number>`coalesce(sum(${reportTable.price} + coalesce(${technicianPriceSubquery.technicianPrice}, 0)), 0)::int`,
+                revenue: sql<number>`coalesce(sum(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0)), 0)::int`,
             })
             .from(reportTable)
-            .leftJoin(technicianPriceSubquery, eq(technicianPriceSubquery.reportId, reportTable.id))
+            // Stesso join diretto sulla chiave primaria usato da `listReports`: vedi lì il
+            // perché il `GROUP BY` non serve.
+            .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id))
             .where(and(eq(reportTable.closed, true), sql`${reportTable.created_at} >= ${rangeStartDate}`))
             .groupBy(sql`to_char(${reportTable.created_at}, 'YYYY-MM')`),
     ]);

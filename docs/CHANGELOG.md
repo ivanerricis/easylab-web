@@ -11,6 +11,239 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Quattro colori principali in più: da cinque a nove
+
+**Cosa.** In Impostazioni > Tema si aggiungono **Oliva**, **Mattone**, **Viola** e
+**Grafite** ([theme.ts](../frontend/src/lib/theme.ts)). L'elenco a schermo non è cambiato:
+legge l'array, quindi bastava aggiungere i preset.
+
+**Il perché.** I cinque colori esistenti lasciavano scoperti tre settori della ruota — niente
+viola, niente rosso pieno, niente verde-giallo — e nessuna opzione neutra per chi preferisce
+un'interfaccia senza un colore dominante. Le nuove tinte sono state scelte proprio per
+riempire quei buchi, non a caso: rispetto alle tinte già presenti stanno a 52°, 51°, 27° e
+(Grafite) fuori discorso, perché con il 17% di saturazione si legge come grigio.
+
+**Il contrasto è stato calcolato, non giudicato a occhio.** Sul colore principale ci va sopra
+il testo bianco dei pulsanti: i quattro nuovi stanno fra 4,65 e 7,53 contro il bianco, tutti
+sopra il migliore dei preesistenti tranne Grafite che è il più alto di tutti. Un test in
+[theme.test.ts](../frontend/src/lib/theme.test.ts) fissa la soglia a 3,5 per l'intera palette,
+così un colore troppo chiaro non può più entrare per distrazione.
+
+**Una cosa da sapere, non toccata:** il preset **Ambra** è il più debole della palette
+(3,64) e non passerebbe la soglia 4,5 richiesta per il testo piccolo — i pulsanti di
+quest'app usano testo grande, dove la soglia è 3, quindi è a norma, ma è il colore meno
+leggibile. È rimasto com'è di proposito: cambiarlo cambierebbe l'aspetto a chi l'ha già
+scelto. Se lo si vuole scurire, è una riga.
+
+**Le scelte.** L'ordine nell'elenco segue la tinta (blu → verde-azzurro → verde → oliva →
+ambra → mattone → rosa → viola), con Grafite in fondo perché è l'unico senza tinta: a schermo
+la griglia si legge come una ruota di colori invece che come un elenco casuale. Grafite tiene
+comunque grafici colorati, con saturazione bassa ma tinte ben separate: un accento neutro non
+è una richiesta di grafici grigi, che sarebbero illeggibili.
+
+**Verificato nel browser:** le nove voci a schermo, i quattro colori nuovi che scrivono le
+variabili giuste e restano salvati dopo un ricaricamento, il ritorno al predefinito che
+rimuove le variabili inline, e il colore effettivamente dipinto su sidebar e pulsanti
+(`rgb(109, 74, 175)` per Viola, cioè esattamente `#6D4AAF`). Tre dei quattro test nuovi sono
+stati verificati mutando il codice.
+
+---
+
+## 2026-09-09 — Le quattro pagine di anagrafica erano quattro copie della stessa pagina
+
+**Cosa.** Tecnici, Collaboratori, Dispositivi e Difetti non hanno più una pagina ciascuna:
+condividono [SimpleEntityPage](../frontend/src/components/simple-entity-page.tsx) e
+[EntityCrudTable](../frontend/src/components/entity-crud-table.tsx), e i quattro file di
+pagina sono diventati una trentina di righe di configurazione l'uno. Spariti anche i quattro
+`*-table.tsx`, identici a meno dell'etichetta di accessibilità. In tutto il ramo di lavoro:
+1248 righe tolte, 496 aggiunte, con dentro dei test in più.
+
+**Il perché.** Erano identiche riga per riga a meno dei nomi dei campi e delle scritte —
+stessa ricerca con debounce, stessa paginazione, stessi tre dialoghi, stessa gestione degli
+errori. È la stessa duplicazione che il backend aveva già tolto con `createCrudRouter` e che
+le tabelle avevano già tolto con `EntityTable`; qui restava la pagina. E stava già facendo
+danno: in tre pagine su quattro c'era un `useEffect` di troppo che ricaricava la lista subito
+dopo il caricamento iniziale — **due richieste a ogni apertura invece di una**, verificato nel
+browser prima e dopo (4 → 2 conteggiando il raddoppio di StrictMode). In `CollaboratorsPage`
+quell'`useEffect` non c'era: nessuno se n'era accorto perché non c'è modo di accorgersene
+guardando una copia alla volta.
+
+**Le scelte.** Restano fuori di proposito Clienti, Report e Interventi: hanno filtri,
+ordinamenti e azioni di riga davvero propri, e ridurli a configurazione costerebbe più di
+quanto farebbe risparmiare. Il pulsante "Apri" è una proprietà facoltativa e non una
+costante, perché solo tecnici e collaboratori hanno una scheda. Le scritte sono passate una
+per una come stringhe invece di essere derivate dal nome dell'entità: in italiano cambiano
+articolo e genere ("il tecnico", "la segnalazione"), e indovinarle sarebbe stato più fragile
+che scriverle.
+
+**Verificato nel browser**, non solo con i test: giro completo crea → cerca → modifica →
+elimina su Dispositivi con controllo delle righe nel database, presenza del pulsante "Apri"
+dove serve e assenza dove non serve, e nessun errore in console.
+
+---
+
+## 2026-09-09 — I valori dei form non passano più da `Record<string, string>`
+
+**Cosa.** Ogni dialogo dichiara il tipo dei valori che consegna (`DeviceSubmitValues`,
+`CustomerSubmitValues`, `CreateReportSubmitValues`, …), come già facevano
+`editReportDialog` e `createInterventionDialog`. Spariti i 56 `String(values.nomeCampo)`
+sparsi nelle pagine, e con loro l'idioma
+`String(values.x).trim() === "" ? null : String(values.x).trim()`, ora
+[trimOrNull](../frontend/src/lib/utils.ts).
+
+**Il perché.** In una codebase per il resto rigorosa — TypeScript strict, zod su ogni rotta —
+i nomi dei campi dei form erano l'unico punto in cui un refuso **non rompeva la
+compilazione**: diventava un `"undefined"` salvato nel database, o un ramo di codice che non
+si esegue mai.
+
+**E infatti ce n'era uno.** Appena messo il tipo, il compilatore ha segnalato che la
+Dashboard leggeva `values.saveIssueInCatalog`, un campo che il dialogo **non manda**. Quel
+ramo era morto: `Boolean(undefined)` è sempre falso, quindi da anni la Dashboard non creava
+mai il difetto scritto a mano e cadeva sempre sul ripiego "Altro". Nessuno poteva vederlo
+leggendo il codice, perché leggerlo non bastava.
+
+---
+
+## 2026-09-09 — Creare un report faceva due cose diverse a seconda della pagina
+
+**Cosa.** La risoluzione di cliente, dispositivo e difetto sta ora in un posto solo,
+[lib/reportCreation.ts](../frontend/src/lib/reportCreation.ts), con il confronto sui nomi dei
+clienti in [lib/customers.ts](../frontend/src/lib/customers.ts). Pagina Report e Dashboard la
+chiamano entrambe.
+
+**Il perché.** Erano due copie della stessa funzione, allontanatesi nel tempo, e la
+differenza non l'aveva decisa nessuno:
+
+- **Il cliente.** La pagina Report lo cercava ignorando accenti, maiuscole e spazi doppi, e
+  segnalava i casi ambigui; la Dashboard faceva un confronto esatto fra stringhe, quindi
+  falliva su "Nicolò" scritto in un modo invece che in un altro.
+- **Il difetto.** La pagina Report metteva a catalogo il testo digitato; la Dashboard puntava
+  alla voce "Altro" (per via del ramo morto della voce qui sopra).
+- **`formatCustomerOption`**, cioè come il cliente viene scritto nella casella, esisteva in
+  **tre** copie identiche — dialogo, pagina Report, Dashboard. Devono per forza restare
+  uguali, perché è la stringa con cui il testo digitato viene poi ricercato: tre copie erano
+  tre occasioni di romperlo in silenzio.
+
+**Le scelte.** Il confronto migliore (quello della pagina Report) vale ora anche sulla
+Dashboard: è un miglioramento netto, e riguarda comunque solo il ramo di ripiego, quello che
+scatta quando il dialogo non è riuscito a risolvere l'id da solo. La differenza sul difetto
+invece **è rimasta**, ma come opzione con un nome — `unknownIssue: "create"` per la pagina
+Report, `"fallbackToAltro"` per la Dashboard — perché quale delle due sia giusta è una
+decisione di prodotto, non una da prendere di nascosto dentro un refactoring. Ora è scritta
+in un posto solo e si vede.
+
+**Verificato nel browser:** creazione di un report da entrambe le pagine, controllando nel
+database che il difetto finisca a catalogo dalla pagina Report e che dalla Dashboard il
+report punti ad "Altro" lasciando il catalogo intatto.
+
+---
+
+## 2026-09-09 — Le liste annullano la richiesta superata, non si limitano a ignorarla
+
+**Cosa.** [usePaginatedRows](../frontend/src/hooks/usePaginatedRows.ts) e
+[useCalendarInterventions](../frontend/src/pages/calendar/hooks/useCalendarInterventions.ts)
+creano un `AbortController` per ogni richiesta e annullano la precedente; il `signal` arriva
+fino ad axios attraverso le funzioni di lista. Viene annullata anche la richiesta ancora in
+volo quando si cambia pagina.
+
+**Il perché.** La guardia sull'id introdotta a luglio scartava le risposte superate, il che
+basta alla correttezza ma non ferma il lavoro già avviato: il server portava a termine ogni
+ricerca, comprese quelle di cui nessuno avrebbe letto il risultato — e una ricerca libera sui
+report è la query più cara dell'applicazione. Cambiare pagina mentre una lista carica è il
+caso più comune di tutti.
+
+**Le scelte.** Il ramo `signal.aborted` nel `catch` non è ridondante con la guardia sull'id:
+la richiesta annullata allo smontaggio **è** ancora la più recente, quindi senza quel
+controllo l'annullamento verrebbe scambiato per un errore di rete e mostrerebbe un avviso
+rosso a chi ha semplicemente cambiato pagina. Due test lo fissano, uno per ciascuno dei due
+casi.
+
+**Quanto rende, onestamente.** Nel browser si vede soprattutto sul cambio pagina, che è
+deterministico: la richiesta in volo risulta `net::ERR_ABORTED` e nessun avviso compare.
+Digitando nella ricerca gli annullamenti sono pochi, perché il debounce da 300 ms fa già la
+maggior parte del lavoro e le richieste raramente si sovrappongono davvero.
+
+---
+
+## 2026-09-09 — Il totale dei report non ripete più i join che non gli servono
+
+**Cosa.** Due modifiche in [report.ts](../backend/src/db/queries/report.ts). Il compenso del
+tecnico si legge con un join diretto sulla chiave primaria di `report_technician` invece che
+con una sottoquery `GROUP BY`; il conteggio totale della pagina non porta con sé i join di
+cliente, dispositivo e difetto quando non c'è una ricerca libera.
+
+**Il perché.** La sottoquery, per restituire le dieci righe di una pagina, aggregava l'intera
+tabella `report_technician` e poi buttava via decine di migliaia di righe. Il `GROUP BY` era
+inutile fin dalla migration 0004, che ha reso `report_id` da solo la chiave primaria: un
+report ha al massimo una riga lì, quindi non c'è niente da sommare. Il conteggio invece
+univa tabelle che servono a *mostrare* un report, non a contarlo — e `device_id`, `issue_id`
+e `customer_id` sono NOT NULL con vincolo di chiave esterna, quindi quelle inner join non
+possono né scartare né duplicare righe. Il pianificatore elimina da solo le left join
+inutilizzate, ma non le inner join: quelle andavano tolte scrivendole.
+
+**Misurato su questa macchina, 20.000 report** (prima/dopo, stesso database, stesso momento):
+query della pagina 16,0 → 2,1 ms; conteggio 25,8 → 3,4 ms. Sull'API, dall'host: pagina Report
+39,4 → 21,9 ms p50, cinquanta righe per pagina 60,8 → 31,6 ms. **Le statistiche della
+dashboard non si sono mosse** (32,5 → 32,3 ms): lì la somma percorre comunque tutti i report,
+quindi il join diverso non cambia niente — la modifica ci sta per coerenza, non per velocità.
+
+**Da ricordare:** se un giorno tornassero più tecnici per report, la chiave primaria tornerebbe
+composta e quel join andrebbe rifatto sottoquery con `sum(price)`. Il conteggio senza join
+vale solo sul ramo senza ricerca: con una ricerca libera le condizioni parlano proprio di
+quelle tabelle, e i join restano.
+
+---
+
+## 2026-09-09 — Test su `authManager`, il file che decide chi entra
+
+**Cosa.** [authManager.test.ts](../backend/src/services/authManager.test.ts): 12 test su
+`login` e `getSessionUser`. Il backend passa da 151 a 163 test.
+
+**Il perché.** Era il file più grande del backend (727 righe) e l'unico davvero critico
+rimasto senza test. Le sue dipendenze erano coperte — `totp`, `recoveryCodes`,
+`twoFactorChallenge`, `loginRateLimit`, `passwordPolicy`, `secretCrypto` — ma non le decisioni
+prese *intorno* a loro, che sono quelle spiegate nei commenti e che quindi nessuno avrebbe
+notato se qualcuno le avesse tolte: la password esca verificata anche quando lo username non
+esiste (senza, il tempo di risposta rivela quali account esistono), il secondo fattore
+annunciato solo a password già valida, il segreto TOTP illeggibile che azzera la 2FA invece di
+chiudere fuori l'utente, la sessione scaduta o dell'utente disattivato cancellata al primo
+accesso, il token salvato solo come hash.
+
+**Le scelte.** `authManager` è l'unico servizio che parla con il database senza passare dal
+query layer, quindi qui il mock è di `db` stesso: un costruttore di query concatenabile che
+restituisce le righe preparate dal test per quella coppia operazione+tabella. Non riproduce
+SQL, e non serve — quello che va fissato non sono le query. La CI continua a non aver bisogno
+di un Postgres.
+
+**I test sono stati verificati mutando il codice**, perché un test con molti mock può passare
+a vuoto: tolta la password esca, salvato il token in chiaro, non cancellata la sessione
+scaduta e reso errore il segreto illeggibile, ogni mutazione ha fatto fallire esattamente il
+test che la riguarda e nessun altro.
+
+---
+
+## 2026-09-09 — La CI era rossa su `main`, e `cloudflared` si aggiornava da solo
+
+**Cosa.** Due correzioni piccole e indipendenti. Una riga di
+[ReportsPage.tsx](../frontend/src/pages/reports/ReportsPage.tsx) non era formattata secondo
+prettier, quindi il passo `npm run format:check` del job frontend **falliva da `78586b2`**;
+e `cloudflared` in [docker-compose.yml](../docker-compose.yml) era fissato a `latest`, ora a
+`2026.8.3`.
+
+**Il perché.** La CI rossa non era stata notata perché in locale, su Windows, `format:check`
+segnala comunque dei file per via dei fine riga, quindi il rumore copriva il segnale. Su
+`latest` invece una versione nuova di cloudflared entrava in produzione da sola al primo
+`up --build` dell'aggiornamento automatico: senza che nessuno l'avesse decisa e senza comparire
+in nessun diff — esattamente il motivo per cui nginx sta su `1.31-alpine`, come argomenta il
+commento in `frontend/Dockerfile`. La stessa attenzione mancava alla riga accanto.
+
+**Le scelte.** cloudflared usa versioni a data e non offre un tag "minore" a cui agganciarsi,
+quindi aggiornarlo è per forza una modifica esplicita di quella riga. È il comportamento
+voluto: il costo è ricordarsene, il guadagno è che nessuna versione entra in produzione senza
+che qualcuno l'abbia scelta.
+
+---
+
 ## 2026-09-09 — Uno stato "running" rimasto appeso non blocca più il programma per sempre
 
 **Cosa.** [check-updates.sh](../scripts/check-updates.sh), che gira 5 minuti dopo l'avvio del

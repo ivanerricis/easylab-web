@@ -60,6 +60,20 @@ type EntityTableProps<TRow> = {
 const actionsColumnKey = "actions";
 
 /**
+ * Quante righe-scheletro disegnare al massimo, qualunque cosa chieda il chiamante.
+ *
+ * Le pagine passano le proprie righe per pagina, che è la cosa giusta finché sono 10 o 50; ma
+ * "Tutte" vale 5000 (`allTableRowsPageSize`), e una riga-scheletro per record voleva dire
+ * 45.000 nodi animati prima ancora che i dati arrivassero: misurato, il thread principale
+ * restava bloccato per oltre tre minuti e la pagina sembrava piantata.
+ *
+ * Lo scheletro serve a occupare lo spazio che si vede, non l'intera pagina di dati: oltre lo
+ * schermo non lo guarda nessuno. Il tetto sta qui e non nei chiamanti perché così vale per
+ * tutte e sette le liste, comprese quelle che verranno.
+ */
+const maxSkeletonRows = 15;
+
+/**
  * Tabella su desktop, elenco di schede su mobile: è la forma che hanno tutte le liste
  * dell'app. Prima ogni entità ne aveva una copia integrale — sette file identici a meno
  * del nome del DTO, del messaggio di lista vuota e dei pulsanti di riga.
@@ -95,6 +109,7 @@ const EntityTable = <TRow,>({
     titleColumnKey,
 }: EntityTableProps<TRow>) => {
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
+    const visibleSkeletonRows = Math.min(skeletonRowCount, maxSkeletonRows);
 
     const { tableRef, isResizable, getColumnWidth, getResizeHandleProps, tableStyle } = useResizableColumns({
         tableKey,
@@ -157,7 +172,7 @@ const EntityTable = <TRow,>({
                 </TableHeader>
                 <TableBody>
                     {isInitialLoading ? (
-                        Array.from({ length: skeletonRowCount }, (_, rowIndex) => (
+                        Array.from({ length: visibleSkeletonRows }, (_, rowIndex) => (
                             <TableRow key={`skeleton-${rowIndex}`}>
                                 {columns.map((column) => (
                                     <TableCell key={`skeleton-${rowIndex}-${column.key}`}>
@@ -225,7 +240,7 @@ const EntityTable = <TRow,>({
                 emptyMessage={emptyMessage}
                 titleColumnKey={titleColumnKey}
                 isInitialLoading={isInitialLoading}
-                skeletonCardCount={Math.min(skeletonRowCount, 4)}
+                skeletonCardCount={Math.min(visibleSkeletonRows, 4)}
             />
         </>
     );

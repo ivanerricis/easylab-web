@@ -101,7 +101,13 @@ services:
   # VM, generati da scripts/install-tunnel.sh. Il dominio si trova in config.yml, quindi
   # cambiarlo è una modifica di configurazione e un riavvio, senza ricostruire immagini.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    # Versione fissata, non `latest`, per lo stesso motivo per cui nginx sta su `1.31-alpine`
+    # (vedi frontend/Dockerfile): con `latest` una versione nuova entrava in produzione da
+    # sola al primo `up --build` dell'aggiornamento automatico, cioè senza che nessuno
+    # l'avesse decisa e senza comparire in nessun diff. cloudflared usa versioni a data e
+    # non ha un tag "minore" a cui agganciarsi, quindi aggiornarlo è per forza una modifica
+    # esplicita di questa riga: è il comportamento voluto, non un effetto collaterale.
+    image: cloudflare/cloudflared:2026.8.3
     container_name: cloudflared
     restart: always
     logging: *default-logging

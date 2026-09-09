@@ -61,7 +61,7 @@ export type CustomerInterventionsPrintData = {
     interventions: CustomerInterventionSummaryItem[];
 };
 
-const formatInterventionType = (value: InterventionType) => {
+export const formatInterventionType = (value: InterventionType) => {
     if (value === "consegna_materiale") {
         return "Consegna materiale";
     }

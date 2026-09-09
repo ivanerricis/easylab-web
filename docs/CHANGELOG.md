@@ -11,6 +11,64 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — L'email al cliente: data al posto del numero, logo e testo riscritto
+
+**Cosa.** L'email che accompagna il PDF dell'intervento è stata rifatta: niente più numero
+interno, l'intervento è identificato dalla sua data nell'oggetto, nel corpo e nel nome del
+file allegato; il corpo è HTML, con il logo del laboratorio in testa e i recapiti in fondo;
+il testo è stato riscritto. `emailManager` ha imparato a mandare HTML e allegati inline.
+
+**Il perché.** `Intervento #42` è un dato del database, non un'informazione per chi legge: il
+cliente non ha modo di sapere cosa sia il 42, mentre la data gli dice subito di quale
+intervento si parla ed è il criterio con cui archivia i documenti. Per lo stesso motivo
+l'allegato ora si chiama `intervento-2026-09-09.pdf` e non `intervento-42.pdf`. Il vecchio
+testo, per intero, era «in allegato trova il riepilogo dell'intervento #42»: nessun saluto
+d'apertura degno di questo nome, nessun recapito, nessuna traccia visiva del laboratorio,
+in un messaggio che è a tutti gli effetti la faccia dell'azienda verso il cliente.
+
+**Le scelte.** Il logo viaggia come allegato inline referenziato via `cid:`, non come URL
+remoto né come `data:`: i client di posta bloccano le prime per privacy e non supportano le
+seconde (Outlook in testa), il `cid:` è l'unica forma che si vede ovunque senza che il
+destinatario debba autorizzare nulla. L'HTML è a tabelle annidate e stili in linea per la
+stessa ragione. `text` resta sempre valorizzato accanto a `html`, così chi legge in solo
+testo riceve le stesse informazioni e non un messaggio vuoto.
+
+La costruzione del messaggio sta in `interventionEmail.ts` e non nella rotta: la rotta
+carica i dati, il modulo decide cosa scrivere: il testo è la parte che verrà ritoccata più
+spesso ed è giusto che si trovi in un posto solo. `loadImageDataUrl` è stata spaccata in
+`loadImage` (scarica) più il vecchio nome (formatta per pdfmake), così l'email riusa lo
+scaricamento invece di dover disfare un data URL.
+
+Quando l'intervento non ha una data pianificata si ripiega su quella di apertura della
+scheda: il messaggio deve poter nominare *una* data comunque, e quella è la migliore
+disponibile.
+
+**File:** `backend/src/services/interventionEmail.ts` (nuovo),
+`backend/src/services/emailManager.ts`, `backend/src/routes/interventions.ts`,
+`backend/src/services/pdf/shared.ts`, `backend/src/services/interventionPdf.ts`.
+
+---
+
+## 2026-09-09 — I due bordi in cima si trovano sulla stessa linea
+
+**Cosa.** L'intestazione della barra laterale ha ora un'altezza fissa `h-13`, la stessa
+dell'intestazione della pagina in `MainLayout`.
+
+**Il perché.** L'altezza della prima era il risultato del suo contenuto (`py-2` più il logo e
+le due righe di testo), quella della seconda era fissata a `h-13`: le due misure coincidevano
+per caso, ma non del tutto. Misurato con Playwright sul CSS dell'applicazione: 53px contro
+52px, cioè i due bordi inferiori — che sono affiancati e a tutta larghezza — disegnavano una
+linea spezzata di un pixel a metà schermo. Dopo la correzione entrambe misurano 52px.
+
+**Le scelte.** L'altezza fissa sta sull'intestazione della barra, non sul contenuto: così
+resta uguale anche in modalità icona, dove il logo cresce a `size-9`. Un commento nel codice
+lega esplicitamente le due `h-13`, perché sono due file diversi e la seconda non si scopre
+leggendo il primo.
+
+**File:** `frontend/src/components/main-sidebar.tsx`.
+
+---
+
 ## 2026-09-09 — Le righe-scheletro non seguono più "Tutte"
 
 **Cosa.** `EntityTable` disegna al massimo 15 righe-scheletro, qualunque numero le passi la

@@ -12,13 +12,21 @@ import {
 import { db } from "../db";
 import { collaboratorTable, customerTable, interventionTable } from "../db/schema";
 import { sendEmail } from "../services/emailManager";
+import { buildInterventionEmail } from "../services/interventionEmail";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
+import { loadImage } from "../services/pdf/shared";
 import { getLabConfig } from "../config/lab";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
 
 const interventionsRouter = Router();
+
+// Riferimento che lega l'allegato inline all'`<img src="cid:...">` del corpo HTML.
+const logoContentId = "logo-laboratorio";
+
+/** La data di creazione arriva come `Date`: nel nome del file serve come YYYY-MM-DD. */
+const toIsoDay = (value: Date) => value.toISOString().slice(0, 10);
 
 const interventionTypes = ["consegna_materiale", "intervento_sede", "intervento_remoto"] as const;
 type InterventionType = (typeof interventionTypes)[number];
@@ -219,6 +227,15 @@ const loadInterventionPrintContext = async (
         customerName,
         customerEmail: intervention.customerEmail?.trim() || null,
         labName,
+        labEmail,
+        labAddress,
+        labPhone,
+        labLogoUrl,
+        type: intervention.type as InterventionType,
+        // Date grezze, per il nome del file allegato: le etichette formattate sono per
+        // gli occhi del cliente, non per un nome di file.
+        interventionDate: intervention.interventionDate,
+        createdAt: intervention.createdAt,
         pdfData: {
             id: intervention.id,
             labName,
@@ -274,16 +291,39 @@ interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema })
         return;
     }
 
-    const pdfBuffer = await createInterventionPdfBuffer(context.pdfData);
+    const [pdfBuffer, logo] = await Promise.all([
+        createInterventionPdfBuffer(context.pdfData),
+        loadImage(context.labLogoUrl),
+    ]);
+
+    const email = buildInterventionEmail({
+        customerName: context.customerName,
+        labName: context.labName,
+        labEmail: context.labEmail,
+        labAddress: context.labAddress,
+        labPhone: context.labPhone,
+        type: context.type,
+        interventionDateLabel: context.pdfData.interventionDateLabel,
+        createdAtLabel: context.pdfData.createdAtLabel,
+        logoCid: logo ? logoContentId : null,
+    });
 
     await sendEmail({
         to: context.customerEmail,
-        subject: `Intervento #${id} - ${context.labName}`,
-        text: `Gentile ${context.customerName},\n\nin allegato trova il riepilogo dell'intervento #${id}.\n\nCordiali saluti,\n${context.labName}`,
-        attachment: {
-            filename: `intervento-${id}.pdf`,
-            content: pdfBuffer,
-        },
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+        attachments: [
+            {
+                // Il cliente archivia il PDF per data, non per numero di pratica.
+                filename: `intervento-${context.interventionDate ?? toIsoDay(context.createdAt)}.pdf`,
+                content: pdfBuffer,
+                contentType: "application/pdf",
+            },
+            ...(logo
+                ? [{ filename: "logo", content: logo.content, contentType: logo.contentType, cid: logoContentId }]
+                : []),
+        ],
     });
 
     res.json({ message: "Email inviata con successo" });

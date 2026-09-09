@@ -196,14 +196,25 @@ export const testEmailConnection = async (config: EmailConnectionTestConfig) => 
     }
 };
 
+export type EmailAttachment = {
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+    /**
+     * Se valorizzato l'allegato non e' un file da scaricare ma un'immagine incorporata
+     * nel corpo HTML (`<img src="cid:...">`): e' l'unico modo di mostrare il logo, dato
+     * che i client di posta bloccano sia le immagini `data:` sia, spesso, quelle remote.
+     */
+    cid?: string;
+};
+
 export type SendEmailInput = {
     to: string;
     subject: string;
     text: string;
-    attachment?: {
-        filename: string;
-        content: Buffer;
-    };
+    /** Corpo HTML: quando c'e', `text` resta come alternativa per i client che non lo mostrano. */
+    html?: string;
+    attachments?: EmailAttachment[];
 };
 
 export const sendEmail = async (input: SendEmailInput) => {
@@ -232,7 +243,14 @@ export const sendEmail = async (input: SendEmailInput) => {
             to: input.to,
             subject: input.subject,
             text: input.text,
-            attachments: input.attachment ? [input.attachment] : undefined,
+            html: input.html,
+            attachments: input.attachments?.map((attachment) => ({
+                filename: attachment.filename,
+                content: attachment.content,
+                contentType: attachment.contentType,
+                cid: attachment.cid,
+                contentDisposition: attachment.cid ? ("inline" as const) : ("attachment" as const),
+            })),
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Invio email non riuscito";

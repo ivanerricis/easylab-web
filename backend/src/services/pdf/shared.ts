@@ -120,7 +120,15 @@ export const dualFieldRow = (label1: string, value1: string, label2: string, val
     { text: value2, style: "value" },
 ];
 
-export const loadImageDataUrl = async (imageUrl: string) => {
+export type LoadedImage = {
+    content: Buffer;
+    contentType: string;
+};
+
+// Il logo serve in due forme diverse: i PDF lo vogliono incorporato come data URL,
+// le email come allegato inline (i client di posta bloccano le immagini `data:`).
+// Lo scaricamento è lo stesso, quindi sta qui una volta sola.
+export const loadImage = async (imageUrl: string): Promise<LoadedImage | null> => {
     try {
         const response = await fetch(imageUrl);
 
@@ -128,12 +136,23 @@ export const loadImageDataUrl = async (imageUrl: string) => {
             return null;
         }
 
-        const contentType = response.headers.get("content-type") ?? "image/png";
-        const buffer = Buffer.from(await response.arrayBuffer());
-        return `data:${contentType};base64,${buffer.toString("base64")}`;
+        return {
+            content: Buffer.from(await response.arrayBuffer()),
+            contentType: response.headers.get("content-type") ?? "image/png",
+        };
     } catch {
         return null;
     }
+};
+
+export const loadImageDataUrl = async (imageUrl: string) => {
+    const image = await loadImage(imageUrl);
+
+    if (!image) {
+        return null;
+    }
+
+    return `data:${image.contentType};base64,${image.content.toString("base64")}`;
 };
 
 /** I campi che i riepiloghi per cliente hanno in comune, qualunque cosa elenchino. */

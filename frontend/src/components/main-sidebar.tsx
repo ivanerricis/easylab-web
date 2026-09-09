@@ -61,7 +61,9 @@ const MainSidebar = () => {
 
     return (
         <Sidebar collapsible="icon">
-            <SidebarHeader className="border-b border-sidebar-border px-3 py-2 group-data-[collapsible=icon]:px-2">
+            {/* Stessa altezza dell'intestazione della pagina (`h-13` in MainLayout): sono
+                affiancate e i due bordi inferiori devono risultare sulla stessa linea. */}
+            <SidebarHeader className="h-13 justify-center border-b border-sidebar-border px-3 py-0 group-data-[collapsible=icon]:px-2">
                 <SidebarMenuItem className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
                     <div className="flex size-8 items-center justify-center overflow-hidden rounded-sm border border-sidebar-border bg-background group-data-[collapsible=icon]:size-9">
                         <img src={logoUrl} alt="Logo laboratorio" className="size-full object-cover" />

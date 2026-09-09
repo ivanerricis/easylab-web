@@ -34,7 +34,12 @@ vi.mock("../services/logManager", () => ({
     readLogEntries: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("../services/updateManager", () => ({
-    getUpdateStatus: vi.fn().mockResolvedValue({ state: "idle" }),
+    getUpdateStatus: vi.fn().mockResolvedValue({
+        state: "idle",
+        currentCommit: "a1b2c3d",
+        lastError: "Aggiornamento fallito (exit 1)",
+        log: "=== git fetch ===",
+    }),
     requestUpdate: vi.fn(),
     requestUpdateCheck: vi.fn(),
 }));
@@ -96,7 +101,7 @@ describe("settings router: permessi", () => {
         expect(response.status).toBe(403);
     });
 
-    it.each(["/api/settings/company", "/api/settings/logo"])(
+    it.each(["/api/settings/company", "/api/settings/logo", "/api/settings/update-state"])(
         "lascia leggere %s a chiunque sia autenticato",
         async (path) => {
             const response = await request(buildApp(false)).get(path);
@@ -104,6 +109,14 @@ describe("settings router: permessi", () => {
             expect(response.status).toBe(200);
         }
     );
+
+    // La rotta esiste perché ogni scheda aperta sappia se un aggiornamento è in corso: deve
+    // dire quello e basta, non diventare la versione libera di /update.
+    it("espone solo lo stato dell'aggiornamento, non commit, log ed errori", async () => {
+        const response = await request(buildApp(false)).get("/api/settings/update-state");
+
+        expect(response.body).toEqual({ state: "idle" });
+    });
 
     it("lascia passare l'amministratore sulle rotte protette", async () => {
         const response = await request(buildApp(true)).get("/api/settings/logs");

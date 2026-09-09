@@ -6,12 +6,15 @@ import { NotificationsMenu } from "@/components/notifications-menu";
 import { UserBadge } from "@/components/user-badge";
 import MainSidebar from "@/components/main-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { useUpdateWatcher } from "@/hooks/useUpdateWatcher";
 
 export const MainLayout = () => {
     const { pathname } = useLocation();
     const hasMountedRef = useRef(false);
     const transitionTimerRef = useRef<number | null>(null);
     const [isRouteTransitioning, setIsRouteTransitioning] = useState(false);
+
+    useUpdateWatcher();
 
     useLayoutEffect(() => {
         if (!hasMountedRef.current) {

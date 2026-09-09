@@ -131,7 +131,7 @@ const logEntriesQuerySchema = z
     })
     .strict();
 
-// Le uniche due letture lasciate a chiunque sia autenticato: sono i dati che l'app mostra
+// Le uniche letture lasciate a chiunque sia autenticato: sono i dati che l'app mostra
 // già in giro per l'interfaccia (nome del laboratorio, presenza di un logo), non
 // contengono nulla di riservato e non permettono di cambiare niente.
 settingsRouter.get("/company", async (_req, res) => {
@@ -140,6 +140,15 @@ settingsRouter.get("/company", async (_req, res) => {
 
 settingsRouter.get("/logo", async (_req, res) => {
     res.json(await getLogoStatus());
+});
+
+// L'aggiornamento lo avvia un amministratore da un solo browser, ma ricostruisce i container
+// per tutti: chi sta lavorando altrove deve fermarsi e ricaricare, quindi ogni sessione
+// autenticata deve poter sapere se è in corso. Esce solo lo stato: commit installato, log e
+// messaggio d'errore restano su /update, riservato all'amministratore.
+settingsRouter.get("/update-state", async (_req, res) => {
+    const { state } = await getUpdateStatus();
+    res.json({ state });
 });
 
 /**

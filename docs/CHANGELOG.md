@@ -11,6 +11,39 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — L'aggiornamento blocca tutte le postazioni, non solo quella che lo avvia
+
+**Cosa.** Ogni scheda autenticata interroga ogni 5 secondi la nuova rotta
+`GET /api/settings/update-state` ([settings.ts](../backend/src/routes/settings.ts)) e, se sul
+server è in corso un aggiornamento, mostra lo stesso blocco a schermo già usato da chi l'ha
+lanciato; quando l'aggiornamento riesce ricarica la pagina da sola. Il tutto sta in
+[useUpdateWatcher](../frontend/src/hooks/useUpdateWatcher.ts), agganciato a
+[MainLayout](../frontend/src/pages/MainLayout.tsx).
+
+**Il perché.** Il blocco era stato React locale del pannello Impostazioni: lo vedeva solo il
+browser che aveva premuto "Aggiorna adesso". Con il programma aperto su due PC, l'altro
+continuava a lavorare mentre i container venivano ricostruiti — scrivendo nel database
+proprio mentre giravano le migrazioni — e a fine aggiornamento restava con il bundle vecchio
+in pagina, che parla con un backend nuovo.
+
+**Le scelte.** La rotta sta sopra il `requireAdmin` del router impostazioni, accanto a
+`/company` e `/logo`: serve a chiunque sia autenticato, perché è chiunque che deve fermarsi.
+Restituisce solo `state` — commit installato, log ed errore restano su `/update`, riservata
+all'amministratore — e un test lo fissa, così non diventa per sbaglio la versione libera di
+`/update`. È in `ignoredPaths` di [requestLogger](../backend/src/middleware/requestLogger.ts)
+per lo stesso motivo di `/api/health`: interrogata ogni 5 secondi da ogni scheda, riempirebbe
+i log senza dire niente. Un errore di rete non toglie il blocco (durante la ricostruzione dei
+container il backend *non risponde*: è la normalità, non la fine dei lavori) e un
+aggiornamento fallito lo toglie senza ricaricare, perché non c'è niente di nuovo da caricare
+e il ricaricamento butterebbe via l'errore mostrato a chi l'ha lanciato.
+
+**Fuori perimetro, di proposito.** Il pannello Impostazioni resta com'era: mostra il blocco
+subito al clic, senza aspettare il giro di interrogazione, e continua a seguire l'esito per
+i suoi avvisi. La sorveglianza globale riafferma il blocco a ogni giro, quindi se il pannello
+lo toglie perché ha smesso di aspettare, entro 5 secondi torna su.
+
+---
+
 ## 2026-09-09 — Pulsante di aggiornamento accanto alla ricerca
 
 **Cosa.** In tutte le pagine con elenco (Clienti, Interventi, Report, Dispositivi, Tecnici,

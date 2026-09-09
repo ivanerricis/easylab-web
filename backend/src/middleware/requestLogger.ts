@@ -13,9 +13,10 @@ import type { NextFunction, Request, Response } from "express";
  * `docker logs` e resta comunque estraibile con grep/awk.
  */
 
-// L'healthcheck del container interroga /api/health di continuo: registrarlo riempirebbe
-// i log senza dire nulla.
-const ignoredPaths = ["/api/health"];
+// L'healthcheck del container interroga /api/health di continuo, e ogni scheda aperta
+// interroga /api/settings/update-state ogni pochi secondi per accorgersi di un aggiornamento
+// in corso: registrarle riempirebbe i log senza dire nulla.
+const ignoredPaths = ["/api/health", "/api/settings/update-state"];
 
 const slowRequestThresholdMs = 1000;
 

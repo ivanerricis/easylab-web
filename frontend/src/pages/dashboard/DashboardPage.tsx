@@ -32,7 +32,7 @@ import {
     listCustomers,
 } from "@/lib/api";
 import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
-import { resolveReportReferences } from "@/lib/reportCreation";
+import { resolveReportReferences } from "@/lib/reportForm";
 import { formatCustomerOption } from "@/lib/customers";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -141,11 +141,7 @@ const DashboardPage = () => {
     };
 
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values, {
-            // Qui il catalogo dei difetti non si tocca: dalla Dashboard si apre un report al
-            // volo, e il difetto scritto resta comunque sul report nel suo campo di testo.
-            unknownIssue: "fallbackToAltro",
-        });
+        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
 
         const createdReport = await createReport({
             deviceId,

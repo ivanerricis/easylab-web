@@ -14,6 +14,7 @@ import {
     listReportTechnicians,
     listTechnicians,
 } from "@/lib/api";
+import { isCatchAllIssue } from "@/lib/issues";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +38,12 @@ export type EditReportSubmitValues = {
     technicianId: number | null;
     existingTechnicianId: number | null;
     technicianPrice: number;
+    /**
+     * Il problema riscontrato, che è quello stampato sulla ricevuta. Vale solo con il
+     * difetto "Altro"; con qualunque altra voce viene azzerato, perché l'etichetta del
+     * catalogo dice già tutto.
+     */
+    issueDescription: string | null;
     serviceDescription: string | null;
     note: string | null;
     password: string | null;
@@ -65,6 +72,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         collaboratorId: "none",
         technicianId: "none",
         technicianPrice: "0",
+        issueDescription: "",
         serviceDescription: "",
         note: "",
         password: "",
@@ -112,6 +120,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                     collaboratorId: report.collaboratorId ? String(report.collaboratorId) : "none",
                     technicianId: reportTechnician ? String(reportTechnician.technicianId) : "none",
                     technicianPrice: String(reportTechnician?.price ?? 0),
+                    issueDescription: report.issueDescription ?? "",
                     serviceDescription: report.serviceDescription ?? "",
                     note: report.note ?? "",
                     password: report.password ?? "",
@@ -135,6 +144,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             void loadData();
         });
     }, [open, reportId, onOpenChange]);
+
+    // Il problema in chiaro esiste solo con "Altro": è lì che l'etichetta del catalogo non
+    // dice niente a chi legge la ricevuta. Vedi lib/issues.ts.
+    const selectedIssue = issues.find((issue) => String(issue.id) === formValues.issueId);
+    const needsProblemText = isCatchAllIssue(selectedIssue?.description);
 
     const handleConfirm = async () => {
         if (!reportId || isSubmitting || isLoading) {
@@ -186,6 +200,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             return;
         }
 
+        if (needsProblemText && formValues.issueDescription.trim() === "") {
+            toast.error('Con il difetto "Altro" va descritto il problema');
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             await onSubmit({
@@ -197,6 +216,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 technicianId,
                 existingTechnicianId,
                 technicianPrice,
+                issueDescription: needsProblemText ? formValues.issueDescription.trim() : null,
                 serviceDescription: formValues.serviceDescription.trim() || null,
                 note: formValues.note.trim() || null,
                 password: formValues.password.trim() || null,
@@ -305,6 +325,26 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                             </SelectContent>
                                         </Select>
                                     </div>
+
+                                    {needsProblemText ? (
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="issueDescription" className="text-lg">
+                                                Problema riscontrato
+                                            </Label>
+                                            <Textarea
+                                                id="issueDescription"
+                                                placeholder="Quello che il cliente legge sulla ricevuta"
+                                                maxLength={255}
+                                                value={formValues.issueDescription}
+                                                onChange={(event) =>
+                                                    setFormValues((prev) => ({
+                                                        ...prev,
+                                                        issueDescription: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                        </div>
+                                    ) : null}
 
                                     <div className="grid gap-1">
                                         <Label htmlFor="collaboratorId" className="text-lg">

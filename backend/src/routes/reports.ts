@@ -10,7 +10,7 @@ import {
     updateReportById,
 } from "../db/queries/report";
 import { db } from "../db";
-import { customerTable, deviceTable, reportTechnicianTable, reportTable } from "../db/schema";
+import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTable } from "../db/schema";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import { getLabConfig } from "../config/lab";
 import { formatDateLabel, formatPhoneLabel } from "./formatting";
@@ -121,6 +121,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
                 note: reportTable.note,
                 password: reportTable.password,
                 issueDescription: reportTable.issueDescription,
+                issueLabel: IssueTable.description,
                 dataBackup: reportTable.dataBackup,
                 charger: reportTable.charger,
                 alerted: reportTable.alerted,
@@ -135,6 +136,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
             .from(reportTable)
             .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
             .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
+            .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
             .where(eq(reportTable.id, id)),
         db
             .select({ technicianPrice: sql<number>`coalesce(sum(${reportTechnicianTable.price}), 0)::int` })
@@ -164,7 +166,13 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         customerName,
         customerPhone: customerPhoneLabel,
         deviceName: report.deviceName,
-        issueDescription: report.issueDescription ?? "-",
+        /**
+         * Sulla ricevuta va scritto il problema, non l'etichetta con cui il laboratorio lo
+         * archivia. Il testo scritto a mano esiste solo con il difetto "Altro", dove
+         * l'etichetta non direbbe niente a chi legge; per tutti gli altri difetti vale
+         * l'etichetta stessa, che è già una descrizione.
+         */
+        issueDescription: report.issueDescription?.trim() || report.issueLabel,
         note: report.note ?? "-",
         password: report.password ?? "-",
         dataBackup: report.dataBackup,

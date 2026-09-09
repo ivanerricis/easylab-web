@@ -1,6 +1,7 @@
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
+import { toReportUpdatePayload } from "@/lib/reportForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -151,21 +152,7 @@ const ReportPage = () => {
     };
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
-        await updateReport(values.reportId, {
-            customerId: values.customerId,
-            deviceId: values.deviceId,
-            issueId: values.issueId,
-            collaboratorId: values.collaboratorId,
-            serviceDescription: values.serviceDescription,
-            note: values.note,
-            password: values.password,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-            alerted: values.alerted,
-            closed: values.closed,
-            paymentMethod: values.paymentMethod,
-            price: values.internalPrice,
-        });
+        await updateReport(values.reportId, toReportUpdatePayload(values));
 
         if (values.technicianId != null) {
             if (values.existingTechnicianId == null) {
@@ -374,7 +361,7 @@ const ReportPage = () => {
                         <CardTitle className="text-primary">Dettagli intervento</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2">
-                        <DetailItem label="Descrizione problema" value={details.report.issueDescription ?? "-"} />
+                        <DetailItem label="Problema riscontrato" value={details.report.issueDescription ?? "-"} />
                         <DetailItem label="Descrizione servizio" value={details.report.serviceDescription ?? "-"} />
                         <DetailItem label="Password" value={details.report.password ?? "-"} />
                         <DetailItem label="Note" value={details.report.note ?? "-"} />

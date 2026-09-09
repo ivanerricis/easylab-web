@@ -11,6 +11,67 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Sulla ricevuta il cliente leggeva "Altro" al posto del suo problema
+
+**Cosa.** Il campo difetto del report diventa due campi. La casella con il **+** resta
+scrivibile ma ora serve solo a **cercare** nel catalogo: quello che si scrive deve
+corrispondere a una voce, e per una voce nuova c'è il pulsante. Quando il difetto scelto è
+**"Altro"** compare sotto una casella "Problema riscontrato", obbligatoria, ed è quella che
+finisce sulla ricevuta. La stessa casella c'è ora anche nel dialogo di modifica.
+
+**Il perché.** Il modo di lavorare del laboratorio era: difetto "Altro", problema vero
+scritto nelle Note. Il risultato, verificato generando un PDF reale, era una ricevuta che
+diceva:
+
+```
+Problema riscontrato
+Altro
+Note
+Si spegne da solo dopo 10 minuti, anche con la batteria carica
+```
+
+Il problema del cliente c'era, ma sotto l'etichetta sbagliata, mentre la riga che prometteva
+di descriverlo diceva "Altro". Il motivo stava nel dialogo: **una casella sola** faceva sia
+da ricerca nel catalogo sia da descrizione, quindi `issueDescription` finiva per essere quasi
+sempre una copia dell'etichetta di catalogo.
+
+**Le scelte.** I due campi hanno destinatari diversi e ora si vede: `issueId` è per il
+laboratorio (la colonna "Difetto" nell'elenco, il raggruppamento), `issueDescription` è per
+il cliente (l'unica cosa che compare sul PDF — la rotta di stampa non faceva nemmeno il join
+con la tabella dei difetti). Fuori da "Altro" `issueDescription` resta vuoto invece di
+duplicare l'etichetta, e il PDF stampa l'etichetta stessa: per un difetto di catalogo è già
+una descrizione, e ripeterla in due colonne non aggiungeva niente.
+
+**Niente migrazione.** I report esistenti hanno `issueDescription` uguale all'etichetta, e la
+regola "stampa il testo se c'è, altrimenti l'etichetta" li lascia identici a prima.
+
+**Cade anche la divergenza fra le due pagine.** Non potendo più scrivere un difetto fuori
+catalogo, non c'è più niente da decidere quando non si trova: `unknownIssue` sparisce, e il
+difetto si comporta come cliente e dispositivo — se non esiste, il salvataggio si ferma e lo
+dice. Le voci di catalogo si creano solo di proposito, col **+**.
+
+**Da sapere:** la regola si regge sul fatto che nel catalogo esista una voce chiamata
+"Altro", riconosciuta dal testo ([lib/issues.ts](../frontend/src/lib/issues.ts)) perché la
+tabella non ha una colonna che la marchi come speciale. Rinominarla o cancellarla dalla
+pagina Difetti farebbe sparire la casella del problema, senza errori.
+
+**Una duplicazione tolta di conseguenza.** Le tre pagine da cui si modifica un report — la
+scheda, l'elenco, la scheda tecnico — costruivano lo stesso payload di aggiornamento in tre
+copie identiche. Aggiungere `issueDescription` voleva dire ricordarsi di tre punti, e
+dimenticarne uno non avrebbe rotto niente in compilazione, perché nel payload i campi sono
+tutti facoltativi: sarebbe stato un campo che non si salva. Ora è `toReportUpdatePayload` in
+[lib/reportForm.ts](../frontend/src/lib/reportForm.ts), con un test che elenca cosa deve
+arrivare all'API.
+
+**Verificato nel browser, e sulle ricevute.** Difetto normale: la casella non compare e
+`issue_description` resta vuoto nel database; "Altro" senza testo: il salvataggio si ferma;
+"Altro" con testo: la ricevuta stampa il problema; difetto fuori catalogo: rifiutato e il
+catalogo non viene toccato; modifica: il testo si corregge e la ricevuta cambia. I due PDF,
+prima e dopo, sono stati generati e guardati. I test nuovi sono stati verificati mutando il
+codice.
+
+---
+
 ## 2026-09-09 — Quattro colori principali in più: da cinque a nove
 
 **Cosa.** In Impostazioni > Tema si aggiungono **Oliva**, **Mattone**, **Viola** e

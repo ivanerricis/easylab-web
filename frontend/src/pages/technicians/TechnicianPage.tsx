@@ -3,6 +3,7 @@ import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
+import { toReportUpdatePayload } from "@/lib/reportForm";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -65,21 +66,7 @@ const TechnicianPage = () => {
     };
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
-        await updateReport(values.reportId, {
-            customerId: values.customerId,
-            deviceId: values.deviceId,
-            issueId: values.issueId,
-            collaboratorId: values.collaboratorId,
-            serviceDescription: values.serviceDescription,
-            note: values.note,
-            password: values.password,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-            alerted: values.alerted,
-            closed: values.closed,
-            paymentMethod: values.paymentMethod,
-            price: values.internalPrice,
-        });
+        await updateReport(values.reportId, toReportUpdatePayload(values));
 
         if (values.technicianId != null) {
             if (values.existingTechnicianId == null) {

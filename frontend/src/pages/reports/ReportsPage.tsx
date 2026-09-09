@@ -1,6 +1,7 @@
 import CreateEntityButton from "@/components/create-entity-button";
 import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
+import { toReportUpdatePayload } from "@/lib/reportForm";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
@@ -27,7 +28,7 @@ import { useReportsRows } from "./hooks/useReportsRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow, trimOrNull } from "@/lib/utils";
-import { resolveReportReferences } from "@/lib/reportCreation";
+import { resolveReportReferences } from "@/lib/reportForm";
 
 const parseVisibilityFilter = (value: string | null): ReportVisibilityFilter => {
     if (value === "all" || value === "open" || value === "closed") {
@@ -77,11 +78,7 @@ const ReportsPage = () => {
 
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
         try {
-            const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values, {
-                // Da qui il difetto scritto a mano entra nel catalogo: è la pagina in cui si
-                // lavora sull'anagrafica dei report, quindi arricchirlo è voluto.
-                unknownIssue: "create",
-            });
+            const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
 
             const createdReport = await createReport({
                 deviceId,
@@ -129,21 +126,7 @@ const ReportsPage = () => {
     const handleEditReport = async (values: EditReportSubmitValues) => {
         const technicianTotal = values.technicianId == null ? 0 : values.technicianPrice;
 
-        await updateReport(values.reportId, {
-            customerId: values.customerId,
-            deviceId: values.deviceId,
-            issueId: values.issueId,
-            collaboratorId: values.collaboratorId,
-            serviceDescription: values.serviceDescription,
-            note: values.note,
-            password: values.password,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-            alerted: values.alerted,
-            closed: values.closed,
-            paymentMethod: values.paymentMethod,
-            price: values.internalPrice,
-        });
+        await updateReport(values.reportId, toReportUpdatePayload(values));
 
         if (values.technicianId != null) {
             if (values.existingTechnicianId == null) {

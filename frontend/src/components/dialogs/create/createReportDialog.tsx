@@ -1,5 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { formatCustomerOption } from "@/lib/customers";
+import { isCatchAllIssue } from "@/lib/issues";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
 import CreateIssueDialog from "@/components/dialogs/create/createIssueDialog";
@@ -34,7 +35,13 @@ import type { ChangeEvent } from "react";
 export type CreateReportSubmitValues = {
     customer: string;
     deviceType: string;
-    issueDescription: string;
+    /** Il difetto scelto dal catalogo, come testo: serve a risolvere `issueId`. */
+    issue: string;
+    /**
+     * Il problema scritto a mano, valorizzato **solo** quando il difetto scelto è "Altro".
+     * Con qualunque altra voce l'etichetta del catalogo dice già tutto e questo resta null.
+     */
+    issueDescription: string | null;
     password: string;
     notes: string;
     charger: boolean;
@@ -54,6 +61,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     const [formValues, setFormValues] = useState({
         customer: "",
         deviceType: "",
+        issue: "",
         issueDescription: "",
         password: "",
         charger: "unset",
@@ -70,6 +78,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     const [issueIdByOption, setIssueIdByOption] = useState<Record<string, number>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({
+        issue: false,
         issueDescription: false,
         charger: false,
         dataBackup: false,
@@ -81,6 +90,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                 setFormValues({
                     customer: "",
                     deviceType: "",
+                    issue: "",
                     issueDescription: "",
                     password: "",
                     charger: "unset",
@@ -88,6 +98,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                     notes: "",
                 });
                 setFieldErrors({
+                    issue: false,
                     issueDescription: false,
                     charger: false,
                     dataBackup: false,
@@ -139,16 +150,31 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
             return;
         }
 
+        // Il difetto deve corrispondere a una voce del catalogo: la casella si scrive per
+        // cercare, non per inventare. Per una voce nuova c'è il pulsante "+" qui accanto.
+        const issueId = issueIdByOption[formValues.issue.trim()] ?? null;
+        const needsProblemText = isCatchAllIssue(formValues.issue);
+
         const nextFieldErrors = {
-            issueDescription: formValues.issueDescription.trim() === "",
+            issue: formValues.issue.trim() === "" || issueId == null,
+            issueDescription: needsProblemText && formValues.issueDescription.trim() === "",
             charger: formValues.charger === "unset",
             dataBackup: formValues.dataBackup === "unset",
         };
 
         setFieldErrors(nextFieldErrors);
 
+        if (nextFieldErrors.issue) {
+            toast.error(
+                formValues.issue.trim() === ""
+                    ? "Seleziona un difetto"
+                    : "Seleziona un difetto esistente, oppure creane uno nuovo con il pulsante +"
+            );
+            return;
+        }
+
         if (nextFieldErrors.issueDescription) {
-            toast.error("La descrizione difetto e obbligatoria");
+            toast.error('Con il difetto "Altro" va descritto il problema');
             return;
         }
 
@@ -178,7 +204,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                 ...formValues,
                 customerId: customerIdByOption[formValues.customer] ?? null,
                 deviceId: deviceIdByOption[formValues.deviceType] ?? null,
-                issueId: issueIdByOption[formValues.issueDescription] ?? null,
+                issueId,
+                // Fuori da "Altro" il problema non si scrive: l'etichetta del catalogo basta.
+                issueDescription: needsProblemText ? formValues.issueDescription.trim() : null,
                 charger: formValues.charger === "yes",
                 dataBackup: formValues.dataBackup === "yes",
             });
@@ -299,15 +327,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
 
                             <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-2">
                                 <div className="grid lg:col-span-2 xl:col-span-1">
-                                    <Label htmlFor="issueDescription" className="text-lg">
-                                        Descrizione difetto
+                                    <Label htmlFor="issue" className="text-lg">
+                                        Difetto
                                     </Label>
                                     <div className="flex">
                                         <InputWithAdd
-                                            id="issueDescription"
-                                            placeholder="Descrivi il difetto"
-                                            inputClassName={`rounded-r-none ${fieldErrors.issueDescription ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
-                                            value={formValues.issueDescription}
+                                            id="issue"
+                                            placeholder="Cerca il difetto"
+                                            inputClassName={`rounded-r-none ${fieldErrors.issue ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            value={formValues.issue}
                                             options={issueOptions}
                                             onCreate={async (value: string) => {
                                                 const createdIssue = await createIssue({ description: value });
@@ -318,9 +346,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                                 }));
                                             }}
                                             onChange={(value: string) => {
-                                                setFormValues((prev) => ({ ...prev, issueDescription: value }));
-                                                if (fieldErrors.issueDescription) {
-                                                    setFieldErrors((prev) => ({ ...prev, issueDescription: false }));
+                                                setFormValues((prev) => ({ ...prev, issue: value }));
+                                                if (fieldErrors.issue) {
+                                                    setFieldErrors((prev) => ({ ...prev, issue: false }));
                                                 }
                                             }}
                                             required
@@ -342,6 +370,36 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                         </Tooltip>
                                     </div>
                                 </div>
+
+                                {/*
+                                    Solo con "Altro": è il caso in cui l'etichetta del catalogo non
+                                    dice niente al cliente, e quello che si scrive qui è ciò che
+                                    compare sulla ricevuta sotto "Problema riscontrato". Con
+                                    qualunque altro difetto la casella non serve e non compare.
+                                */}
+                                {isCatchAllIssue(formValues.issue) ? (
+                                    <div className="grid lg:col-span-2 xl:col-span-2">
+                                        <Label htmlFor="issueDescription" className="text-lg">
+                                            Problema riscontrato
+                                        </Label>
+                                        <Textarea
+                                            id="issueDescription"
+                                            className={`text-lg! ${fieldErrors.issueDescription ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            placeholder="Descrivi il problema: è quello che il cliente legge sulla ricevuta"
+                                            maxLength={255}
+                                            value={formValues.issueDescription}
+                                            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+                                                setFormValues((prev) => ({
+                                                    ...prev,
+                                                    issueDescription: event.target.value,
+                                                }));
+                                                if (fieldErrors.issueDescription) {
+                                                    setFieldErrors((prev) => ({ ...prev, issueDescription: false }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                ) : null}
 
                                 <div className="grid">
                                     <Label htmlFor="password" className="text-lg">
@@ -496,7 +554,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
 
                     setIssueOptions((prev) => Array.from(new Set([...prev, createdIssue.description])));
                     setIssueIdByOption((prev) => ({ ...prev, [createdIssue.description]: createdIssue.id }));
-                    setFormValues((prev) => ({ ...prev, issueDescription: createdIssue.description }));
+                    setFormValues((prev) => ({ ...prev, issue: createdIssue.description }));
                 }}
             />
         </>

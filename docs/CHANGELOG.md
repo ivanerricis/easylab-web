@@ -11,6 +11,33 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Uno stato "running" rimasto appeso non blocca più il programma per sempre
+
+**Cosa.** [check-updates.sh](../scripts/check-updates.sh), che gira 5 minuti dopo l'avvio del
+server e poi ogni 30 minuti, quando trova lo stato su `running` non si limita più a farsi da
+parte: chiede a systemd se `easylab-update.service` sta davvero girando e, se non sta girando,
+chiude quello stato come fallito, con un messaggio che dice cos'è successo.
+
+**Il perché.** `running` lo scrive `update-server.sh` quando parte e lo riscrive alla fine,
+quindi un aggiornamento interrotto di forza — corrente che va via, VM riavviata, processo
+ucciso — lo lasciava lì per sempre: nessuno lo cancellava, né il controllo periodico (che si
+fermava apposta per non disturbare) né l'app (che rifiuta di intervenire mentre risulta un
+aggiornamento in corso). Il difetto c'era già e costava l'impossibilità di lanciare un nuovo
+aggiornamento; da quando ogni sessione mostra il blocco a schermo è diventato caro davvero,
+perché blocca tutte le postazioni finché qualcuno non corregge il file a mano sulla VM.
+
+**Le scelte.** Il recupero sta nello script del controllo periodico e non in una nuova unità
+systemd, così i server già installati lo prendono con il solo aggiornamento del codice, senza
+rifare la procedura di installazione. Chi decide se l'aggiornamento è vivo è systemd e non un
+tempo massimo arbitrario: un'unità `Type=oneshot` resta `activating` per tutta la durata del
+suo script, quindi `activating`, `active`, `reloading` e `deactivating` valgono tutti come
+"in corso" e lo stato non viene toccato. Se `systemctl` non risponde affatto — non c'è
+systemd, oppure l'aggiornamento è stato lanciato a mano fuori dall'unità — non c'è prova che
+lo stato sia un residuo e lo script si tira indietro: meglio un blocco da rimuovere a mano
+che sbloccare tutti nel mezzo di un aggiornamento vero.
+
+---
+
 ## 2026-09-09 — L'aggiornamento blocca tutte le postazioni, non solo quella che lo avvia
 
 **Cosa.** Ogni scheda autenticata interroga ogni 5 secondi la nuova rotta

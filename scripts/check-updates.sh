@@ -18,9 +18,33 @@ if [ -f "$STATUS_FILE" ]; then
     current_state="$(jq -r '.state // "idle"' "$STATUS_FILE" 2>/dev/null || echo idle)"
 fi
 
-# Don't race with an in-progress update.
+# `running` is written by update-server.sh when it starts and overwritten when it ends, so an
+# update killed mid-flight (power cut, VM reboot, SIGKILL) leaves it there forever — and from
+# then on the app blocks every session behind the update overlay and refuses to start a new
+# update. Nothing else ever clears it, so this run does: systemd knows whether the update is
+# really going, since a Type=oneshot unit stays `activating` for as long as its script runs.
 if [ "$current_state" = "running" ]; then
-    exit 0
+    update_unit_state="$(systemctl is-active easylab-update.service 2>/dev/null || true)"
+
+    case "$update_unit_state" in
+        # Empty means systemd did not answer at all (no systemd, update launched by hand):
+        # no evidence the state is stale, so don't race with what might be a real update.
+        active | activating | reloading | deactivating | "")
+            exit 0
+            ;;
+    esac
+
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    stale_error="Aggiornamento interrotto prima della fine (riavvio del server o processo terminato): nessun esito registrato. Verifica lo stato dell'applicazione e, se serve, riprova."
+    tmp_file="$(mktemp "$STATUS_DIR/.status.XXXXXX")"
+
+    jq \
+        --arg now "$now" \
+        --arg lastError "$stale_error" \
+        '. + { state: "failed", lastUpdateAt: $now, lastUpdateStatus: "failed", lastError: $lastError }' \
+        "$STATUS_FILE" > "$tmp_file"
+    mv "$tmp_file" "$STATUS_FILE"
+    chmod 666 "$STATUS_FILE" 2>/dev/null || true
 fi
 
 git fetch --all --prune >/dev/null 2>&1 || exit 0

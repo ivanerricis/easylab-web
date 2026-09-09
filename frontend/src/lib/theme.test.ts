@@ -104,6 +104,92 @@ describe("preferenze di tema salvate", () => {
     });
 });
 
+/**
+ * Contrasto secondo WCAG, calcolato dal valore esadecimale del colore.
+ *
+ * Serve a un test solo, ma è il test che rende sicuro aggiungere un colore nuovo: la scelta
+ * si fa a occhio su uno schermo ben calibrato, e a occhio un colore troppo chiaro sotto il
+ * testo bianco dei pulsanti sembra semplicemente "acceso".
+ */
+const relativeLuminance = (hex: string) => {
+    const channels = [1, 3, 5]
+        .map((index) => parseInt(hex.slice(index, index + 2), 16) / 255)
+        .map((value) => (value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)));
+
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+};
+
+const contrastWithWhite = (hex: string) => (1 + 0.05) / (relativeLuminance(hex) + 0.05);
+
+describe("palette dei colori principali", () => {
+    it("ogni preset ha chiave, etichetta e colore propri", () => {
+        const chiavi = themeAccentPresets.map((preset) => preset.key);
+        const etichette = themeAccentPresets.map((preset) => preset.label);
+        const colori = themeAccentPresets.map((preset) => preset.primary.toLowerCase());
+
+        expect(new Set(chiavi).size).toBe(chiavi.length);
+        expect(new Set(etichette).size).toBe(etichette.length);
+        expect(new Set(colori).size).toBe(colori.length);
+    });
+
+    it("ogni preset è accettato da localStorage e riletto identico", () => {
+        for (const preset of themeAccentPresets) {
+            localStorage.clear();
+            setStoredThemeAccentPreset(preset.key);
+
+            // Il predefinito è l'unico a non salvare niente: è l'assenza di preferenza.
+            expect(getStoredThemeAccentPreset()).toBe(preset.key === "default" ? null : preset.key);
+        }
+    });
+
+    /**
+     * Ogni variabile è confrontata con il campo da cui deve arrivare, non solo con "non
+     * vuota": così il test coglie anche un'assegnazione incrociata dentro
+     * `applyThemeAccentPreset` (per esempio `--chart-4` scritta con `chart3`), che a valore
+     * non vuoto passerebbe inosservata.
+     */
+    it("ogni preset scrive tutte e dieci le variabili CSS con i propri valori", () => {
+        for (const preset of themeAccentPresets.filter((item) => item.key !== "default")) {
+            document.documentElement.removeAttribute("style");
+            applyThemeAccentPreset(preset.key);
+
+            const attese: [string, string][] = [
+                ["--primary", preset.primary],
+                ["--primary-foreground", preset.primaryForeground],
+                ["--sidebar-primary", preset.sidebarPrimary],
+                ["--sidebar-primary-foreground", preset.sidebarPrimaryForeground],
+                ["--ring", preset.ring],
+                ["--chart-1", preset.chart1],
+                ["--chart-2", preset.chart2],
+                ["--chart-3", preset.chart3],
+                ["--chart-4", preset.chart4],
+                ["--chart-5", preset.chart5],
+            ];
+
+            for (const [variabile, atteso] of attese) {
+                expect(document.documentElement.style.getPropertyValue(variabile), `${preset.key} ${variabile}`).toBe(
+                    atteso
+                );
+            }
+        }
+    });
+
+    /**
+     * Sul colore principale ci va sopra il testo bianco dei pulsanti, che in quest'app è
+     * grande (`text-lg`): la soglia WCAG per testo grande e componenti dell'interfaccia è 3.
+     * Qui si tiene 3.5 come margine.
+     *
+     * Nota: il preset "Ambra" è il più debole della palette (3.64) e non passerebbe la soglia
+     * 4.5 richiesta per il testo piccolo. È preesistente e volutamente lasciato com'è —
+     * cambiarlo cambierebbe il colore a chi l'ha già scelto.
+     */
+    it("ogni colore principale regge il testo bianco che ci va sopra", () => {
+        for (const preset of themeAccentPresets) {
+            expect(contrastWithWhite(preset.primary), `${preset.key} (${preset.primary})`).toBeGreaterThanOrEqual(3.5);
+        }
+    });
+});
+
 describe("applicazione del tema al DOM", () => {
     it("scrive le variabili CSS del preset scelto", () => {
         const ocean = themeAccentPresets.find((preset) => preset.key === "ocean");

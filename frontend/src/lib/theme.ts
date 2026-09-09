@@ -1,4 +1,5 @@
-export type ThemeAccentPresetKey = "default" | "ocean" | "forest" | "amber" | "rose";
+export type ThemeAccentPresetKey =
+    "default" | "ocean" | "forest" | "olive" | "amber" | "brick" | "rose" | "violet" | "graphite";
 
 export type ThemeAccentPreset = {
     key: ThemeAccentPresetKey;
@@ -232,6 +233,21 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         chart5: "oklch(0.58 0.12 135)",
     },
     {
+        key: "olive",
+        label: "Oliva",
+        description: "Verde caldo, più chiaro del bosco.",
+        primary: "#57801F",
+        primaryForeground: "oklch(0.985 0 0)",
+        sidebarPrimary: "#57801F",
+        sidebarPrimaryForeground: "oklch(0.985 0 0)",
+        ring: "oklch(0.72 0.16 130)",
+        chart1: "oklch(0.72 0.16 130)",
+        chart2: "oklch(0.7 0.15 100)",
+        chart3: "oklch(0.66 0.13 160)",
+        chart4: "oklch(0.64 0.13 75)",
+        chart5: "oklch(0.58 0.12 140)",
+    },
+    {
         key: "amber",
         label: "Ambra",
         description: "Caldo e molto visibile.",
@@ -247,6 +263,21 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         chart5: "oklch(0.58 0.11 55)",
     },
     {
+        key: "brick",
+        label: "Mattone",
+        description: "Rosso terracotta, molto visibile.",
+        primary: "#B34432",
+        primaryForeground: "oklch(0.985 0 0)",
+        sidebarPrimary: "#B34432",
+        sidebarPrimaryForeground: "oklch(0.985 0 0)",
+        ring: "oklch(0.7 0.16 32)",
+        chart1: "oklch(0.7 0.16 32)",
+        chart2: "oklch(0.72 0.15 62)",
+        chart3: "oklch(0.66 0.14 12)",
+        chart4: "oklch(0.64 0.12 92)",
+        chart5: "oklch(0.58 0.13 22)",
+    },
+    {
         key: "rose",
         label: "Rosa",
         description: "Accento deciso per il laboratorio.",
@@ -260,6 +291,39 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         chart3: "oklch(0.62 0.12 320)",
         chart4: "oklch(0.6 0.12 30)",
         chart5: "oklch(0.56 0.1 355)",
+    },
+    {
+        key: "violet",
+        label: "Viola",
+        description: "Accento freddo e ben riconoscibile.",
+        primary: "#6D4AAF",
+        primaryForeground: "oklch(0.985 0 0)",
+        sidebarPrimary: "#6D4AAF",
+        sidebarPrimaryForeground: "oklch(0.985 0 0)",
+        ring: "oklch(0.72 0.16 296)",
+        chart1: "oklch(0.72 0.16 296)",
+        chart2: "oklch(0.68 0.15 326)",
+        chart3: "oklch(0.66 0.13 266)",
+        chart4: "oklch(0.64 0.12 236)",
+        chart5: "oklch(0.58 0.13 306)",
+    },
+    {
+        key: "graphite",
+        label: "Grafite",
+        description: "Grigio sobrio, senza colore dominante.",
+        primary: "#4A5568",
+        primaryForeground: "oklch(0.985 0 0)",
+        sidebarPrimary: "#4A5568",
+        sidebarPrimaryForeground: "oklch(0.985 0 0)",
+        ring: "oklch(0.68 0.07 261)",
+        // Le serie dei grafici restano distinguibili anche qui: un accento neutro non è una
+        // richiesta di grafici grigi, che sarebbero illeggibili. La saturazione è bassa —
+        // il tono sobrio resta — ma le tinte sono ben separate fra loro.
+        chart1: "oklch(0.7 0.09 261)",
+        chart2: "oklch(0.72 0.1 200)",
+        chart3: "oklch(0.66 0.09 320)",
+        chart4: "oklch(0.62 0.1 150)",
+        chart5: "oklch(0.58 0.08 40)",
     },
 ];
 

@@ -1,4 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,16 +24,6 @@ import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/ty
 import { Plus } from "lucide-react";
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
-const formatCustomerOption = (
-    firstName: string,
-    lastName: string | null,
-    phoneNumber: string | null,
-    phoneNumberSecondary: string | null
-) => {
-    const fullName = `${firstName} ${lastName ?? ""}`.trim();
-    return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
-};
 
 const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
 

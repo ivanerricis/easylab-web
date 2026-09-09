@@ -6,12 +6,20 @@ import type { TechnicianDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/** I valori che questo dialogo consegna a chi lo apre. */
+export type TechnicianSubmitValues = {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    vatNumber: string;
+};
+
 type TechnicianDialogMode = "create" | "edit";
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean>) => Promise<void> | void;
+    onSubmit?: (values: TechnicianSubmitValues) => Promise<void> | void;
     mode?: TechnicianDialogMode;
     initialValues?: TechnicianDto | null;
 };

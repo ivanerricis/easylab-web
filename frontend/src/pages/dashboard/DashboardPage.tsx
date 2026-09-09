@@ -1,6 +1,6 @@
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleDashed, Euro, Loader } from "lucide-react";
 import CardDashboard from "./components/cardDashboard";
-import CreateReportDialog from "@/components/dialogs/create/createReportDialog";
+import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import CreateInterventionDialog, {
     type CreateInterventionSubmitValues,
 } from "@/components/dialogs/create/createInterventionDialog";
@@ -23,7 +23,6 @@ const InterventionsCalendar = lazy(() => import("@/pages/calendar/components/int
 import CreateEntityButton from "@/components/create-entity-button";
 import {
     createIntervention,
-    createIssue,
     createReport,
     getReportPrintUrl,
     getInterventionPrintUrl,
@@ -31,10 +30,10 @@ import {
     getInterventionStats,
     getReportStats,
     listCustomers,
-    listDevices,
-    listIssues,
 } from "@/lib/api";
-import { cn, formatEuro, openPrintWindow } from "@/lib/utils";
+import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
+import { resolveReportReferences } from "@/lib/reportCreation";
+import { formatCustomerOption } from "@/lib/customers";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
@@ -141,101 +140,22 @@ const DashboardPage = () => {
         }
     };
 
-    const formatCustomerOption = (
-        firstName: string,
-        lastName: string | null,
-        phoneNumber: string | null,
-        phoneNumberSecondary: string | null
-    ) => {
-        const fullName = `${firstName} ${lastName ?? ""}`.trim();
-        return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
-    };
-
-    const handleCreateReport = async (values: Record<string, string | boolean | number | null>) => {
-        const issueDescription = String(values.issueDescription).trim();
-
-        if (issueDescription === "") {
-            throw new Error("La descrizione difetto e obbligatoria.");
-        }
-
-        // The dialog already resolves customer/device/issue ids from the catalogs it
-        // loaded on open, so the common path needs no extra network round trip. These
-        // fetches only run as a fallback for values the dialog couldn't map to an id.
-        let customerId = typeof values.customerId === "number" ? values.customerId : null;
-        let deviceId = typeof values.deviceId === "number" ? values.deviceId : null;
-        let issueId = typeof values.issueId === "number" ? values.issueId : null;
-
-        if (customerId == null) {
-            const customers = await listCustomers();
-            const selectedCustomer = customers.find(
-                (customer) =>
-                    formatCustomerOption(
-                        customer.firstName,
-                        customer.lastName,
-                        customer.phoneNumber,
-                        customer.phoneNumberSecondary
-                    ) === String(values.customer)
-            );
-
-            if (!selectedCustomer) {
-                throw new Error("Seleziona un cliente esistente o creane uno nuovo.");
-            }
-
-            customerId = selectedCustomer.id;
-        }
-
-        if (deviceId == null) {
-            const devices = await listDevices();
-            const selectedDevice = devices.find(
-                (device) => device.name.toLowerCase() === String(values.deviceType).trim().toLowerCase()
-            );
-
-            if (!selectedDevice) {
-                throw new Error("Seleziona una tipologia dispositivo esistente o creane una nuova.");
-            }
-
-            deviceId = selectedDevice.id;
-        }
-
-        if (issueId == null) {
-            const issues = await listIssues();
-            let selectedIssue = issues.find(
-                (issue) => issue.description.toLowerCase() === issueDescription.toLowerCase()
-            );
-
-            if (!selectedIssue && Boolean(values.saveIssueInCatalog)) {
-                selectedIssue = await createIssue({ description: issueDescription });
-            }
-
-            if (!selectedIssue) {
-                selectedIssue = issues.find((issue) => issue.description.toLowerCase() === "altro");
-
-                if (!selectedIssue) {
-                    try {
-                        selectedIssue = await createIssue({ description: "Altro" });
-                    } catch {
-                        const refreshedIssues = await listIssues();
-                        selectedIssue = refreshedIssues.find((issue) => issue.description.toLowerCase() === "altro");
-                    }
-                }
-            }
-
-            if (!selectedIssue) {
-                throw new Error("Impossibile risolvere il difetto di riferimento.");
-            }
-
-            issueId = selectedIssue.id;
-        }
+    const handleCreateReport = async (values: CreateReportSubmitValues) => {
+        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values, {
+            // Qui il catalogo dei difetti non si tocca: dalla Dashboard si apre un report al
+            // volo, e il difetto scritto resta comunque sul report nel suo campo di testo.
+            unknownIssue: "fallbackToAltro",
+        });
 
         const createdReport = await createReport({
             deviceId,
             issueId,
             customerId,
-            note: String(values.notes).trim() === "" ? null : String(values.notes).trim(),
-            password: String(values.password).trim() === "" ? null : String(values.password).trim(),
+            note: trimOrNull(values.notes),
+            password: trimOrNull(values.password),
             issueDescription,
-            dataBackup: Boolean(values.dataBackup),
-            charger: Boolean(values.charger),
+            dataBackup: values.dataBackup,
+            charger: values.charger,
         });
 
         await loadDashboardMetrics(selectedRevenueMonth);

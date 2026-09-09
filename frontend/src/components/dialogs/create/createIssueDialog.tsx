@@ -6,12 +6,17 @@ import type { IssueDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/** I valori che questo dialogo consegna a chi lo apre. */
+export type IssueSubmitValues = {
+    description: string;
+};
+
 type IssueDialogMode = "create" | "edit";
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean>) => Promise<void> | void;
+    onSubmit?: (values: IssueSubmitValues) => Promise<void> | void;
     mode?: IssueDialogMode;
     initialValues?: IssueDto | null;
 };

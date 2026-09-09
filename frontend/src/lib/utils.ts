@@ -78,3 +78,15 @@ export function formatEuro(value: number | null | undefined) {
         maximumFractionDigits: 2,
     }).format(amount);
 }
+
+/**
+ * Il campo facoltativo di un form: la casella vuota diventa `null`, non la stringa "".
+ *
+ * Le API distinguono i due casi — `null` è "non compilato", `""` sarebbe un valore vero e
+ * proprio — e ogni pagina lo riscriveva a mano come
+ * `String(values.x).trim() === "" ? null : String(values.x).trim()`, con il `trim` ripetuto
+ * due volte e il nome del campo scritto tre.
+ */
+export function trimOrNull(value: string) {
+    return value.trim() || null;
+}

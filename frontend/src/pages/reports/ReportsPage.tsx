@@ -1,25 +1,21 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import CreateReportDialog from "@/components/dialogs/create/createReportDialog";
+import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
 import {
     createReportTechnician,
-    createIssue,
     createReport,
     deleteReportTechnician,
     deleteReport,
     getApiErrorMessage,
-    listCustomers,
-    listDevices,
-    listIssues,
     getReportPrintUrl,
     updateReport,
     updateReportTechnician,
 } from "@/lib/api";
 import { useState } from "react";
-import type { CustomerDto, ReportDto } from "@/types/dtos";
+import type { ReportDto } from "@/types/dtos";
 import { toast } from "sonner";
 import LoadingPage from "@/components/loadingPage";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -30,7 +26,8 @@ import { DEFAULT_REPORT_SORT_OPTION, type ReportSortOption, type ReportVisibilit
 import { useReportsRows } from "./hooks/useReportsRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
-import { openPrintWindow } from "@/lib/utils";
+import { openPrintWindow, trimOrNull } from "@/lib/utils";
+import { resolveReportReferences } from "@/lib/reportCreation";
 
 const parseVisibilityFilter = (value: string | null): ReportVisibilityFilter => {
     if (value === "all" || value === "open" || value === "closed") {
@@ -38,65 +35,6 @@ const parseVisibilityFilter = (value: string | null): ReportVisibilityFilter => 
     }
 
     return "open";
-};
-
-const formatCustomerOption = (
-    firstName: string,
-    lastName: string | null,
-    phoneNumber: string | null,
-    phoneNumberSecondary: string | null
-) => {
-    const fullName = `${firstName} ${lastName ?? ""}`.trim();
-    return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
-};
-
-const normalizeCustomerText = (value: string) =>
-    value
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
-
-const getCustomerFullName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
-
-const resolveSelectedCustomer = (customers: CustomerDto[], rawValue: string) => {
-    const normalizedRawValue = normalizeCustomerText(rawValue);
-    const rawNameOnly = normalizeCustomerText(rawValue.split(" - ")[0] ?? rawValue);
-
-    const exactMatches = customers.filter(
-        (customer) =>
-            normalizeCustomerText(
-                formatCustomerOption(
-                    customer.firstName,
-                    customer.lastName,
-                    customer.phoneNumber,
-                    customer.phoneNumberSecondary
-                )
-            ) === normalizedRawValue
-    );
-
-    if (exactMatches.length === 1) {
-        return exactMatches[0];
-    }
-
-    if (exactMatches.length > 1) {
-        throw new Error("Il cliente selezionato non è univoco. Seleziona il nominativo completo.");
-    }
-
-    const nameMatches = customers.filter(
-        (customer) => normalizeCustomerText(getCustomerFullName(customer.firstName, customer.lastName)) === rawNameOnly
-    );
-
-    if (nameMatches.length === 1) {
-        return nameMatches[0];
-    }
-
-    if (nameMatches.length > 1) {
-        throw new Error("Esistono più clienti con lo stesso nome. Seleziona quello completo con il telefono.");
-    }
-
-    return null;
 };
 
 const ReportsPage = () => {
@@ -137,78 +75,23 @@ const ReportsPage = () => {
         pageSize,
     });
 
-    const handleCreateReport = async (values: Record<string, string | boolean | number | null>) => {
+    const handleCreateReport = async (values: CreateReportSubmitValues) => {
         try {
-            const issueDescription = String(values.issueDescription).trim();
-
-            if (issueDescription === "") {
-                throw new Error("La descrizione difetto e obbligatoria.");
-            }
-
-            // The dialog already resolves customer/device/issue ids from the catalogs it
-            // loaded on open, so the common path needs no extra network round trip. These
-            // fetches only run as a fallback for values the dialog couldn't map to an id.
-            let customerId = typeof values.customerId === "number" ? values.customerId : null;
-            let deviceId = typeof values.deviceId === "number" ? values.deviceId : null;
-            let issueId = typeof values.issueId === "number" ? values.issueId : null;
-
-            if (customerId == null) {
-                const customers = await listCustomers();
-                const selectedCustomer = resolveSelectedCustomer(customers, String(values.customer));
-
-                if (!selectedCustomer) {
-                    throw new Error("Seleziona un cliente esistente o creane uno nuovo.");
-                }
-
-                customerId = selectedCustomer.id;
-            }
-
-            if (deviceId == null) {
-                const devices = await listDevices();
-                const selectedDevice = devices.find(
-                    (device) => device.name.toLowerCase() === String(values.deviceType).trim().toLowerCase()
-                );
-
-                if (!selectedDevice) {
-                    throw new Error("Seleziona una tipologia dispositivo esistente o creane una nuova.");
-                }
-
-                deviceId = selectedDevice.id;
-            }
-
-            if (issueId == null) {
-                const issues = await listIssues();
-                let selectedIssue = issues.find(
-                    (issue) => issue.description.toLowerCase() === issueDescription.toLowerCase()
-                );
-
-                if (!selectedIssue) {
-                    try {
-                        selectedIssue = await createIssue({ description: issueDescription });
-                    } catch {
-                        const refreshedIssues = await listIssues();
-                        selectedIssue = refreshedIssues.find(
-                            (issue) => issue.description.toLowerCase() === issueDescription.toLowerCase()
-                        );
-                    }
-                }
-
-                if (!selectedIssue) {
-                    throw new Error("Impossibile risolvere il difetto di riferimento.");
-                }
-
-                issueId = selectedIssue.id;
-            }
+            const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values, {
+                // Da qui il difetto scritto a mano entra nel catalogo: è la pagina in cui si
+                // lavora sull'anagrafica dei report, quindi arricchirlo è voluto.
+                unknownIssue: "create",
+            });
 
             const createdReport = await createReport({
                 deviceId,
                 issueId,
                 customerId,
-                note: String(values.notes).trim() === "" ? null : String(values.notes).trim(),
-                password: String(values.password).trim() === "" ? null : String(values.password).trim(),
+                note: trimOrNull(values.notes),
+                password: trimOrNull(values.password),
                 issueDescription,
-                dataBackup: Boolean(values.dataBackup),
-                charger: Boolean(values.charger),
+                dataBackup: values.dataBackup,
+                charger: values.charger,
             });
 
             await loadReports();
@@ -334,7 +217,9 @@ const ReportsPage = () => {
                 <PageHeader
                     title="Report"
                     description="Gestisci i report del laboratorio."
-                    action={<CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />}
+                    action={
+                        <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
+                    }
                 />
 
                 <CreateReportDialog

@@ -1,4 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
 import CreateIssueDialog from "@/components/dialogs/create/createIssueDialog";
@@ -23,20 +24,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus } from "lucide-react";
 import type { ChangeEvent } from "react";
 
-const formatCustomerOption = (
-    firstName: string,
-    lastName: string | null,
-    phoneNumber: string | null,
-    phoneNumberSecondary: string | null
-) => {
-    const fullName = `${firstName} ${lastName ?? ""}`.trim();
-    return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
+/**
+ * I valori che questo dialogo consegna a chi lo apre.
+ *
+ * Gli id sono già risolti qui, dai cataloghi caricati all'apertura: restano `null` solo
+ * quando il testo scritto non corrisponde a nessuna voce, e in quel caso tocca al chiamante
+ * decidere (cercarla di nuovo, o rifiutare).
+ */
+export type CreateReportSubmitValues = {
+    customer: string;
+    deviceType: string;
+    issueDescription: string;
+    password: string;
+    notes: string;
+    charger: boolean;
+    dataBackup: boolean;
+    customerId: number | null;
+    deviceId: number | null;
+    issueId: number | null;
 };
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean | number | null>) => Promise<void> | void;
+    onSubmit?: (values: CreateReportSubmitValues) => Promise<void> | void;
 };
 
 const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {

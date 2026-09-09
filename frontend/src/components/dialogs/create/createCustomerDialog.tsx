@@ -6,12 +6,22 @@ import type { CustomerDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/** I valori che questo dialogo consegna a chi lo apre. */
+export type CustomerSubmitValues = {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    phoneNumberSecondary: string;
+    email: string;
+    city: string;
+};
+
 type CustomerDialogMode = "create" | "edit";
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean>) => Promise<void> | void;
+    onSubmit?: (values: CustomerSubmitValues) => Promise<void> | void;
     mode?: CustomerDialogMode;
     initialValues?: CustomerDto | null;
 };

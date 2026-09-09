@@ -6,12 +6,19 @@ import type { CollaboratorDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/** I valori che questo dialogo consegna a chi lo apre. */
+export type CollaboratorSubmitValues = {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+};
+
 type CollaboratorDialogMode = "create" | "edit";
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean>) => Promise<void> | void;
+    onSubmit?: (values: CollaboratorSubmitValues) => Promise<void> | void;
     mode?: CollaboratorDialogMode;
     initialValues?: CollaboratorDto | null;
 };

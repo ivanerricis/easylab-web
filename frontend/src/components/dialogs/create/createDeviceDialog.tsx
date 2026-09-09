@@ -6,12 +6,17 @@ import type { DeviceDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/** I valori che questo dialogo consegna a chi lo apre. */
+export type DeviceSubmitValues = {
+    name: string;
+};
+
 type DeviceDialogMode = "create" | "edit";
 
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: Record<string, string | boolean>) => Promise<void> | void;
+    onSubmit?: (values: DeviceSubmitValues) => Promise<void> | void;
     mode?: DeviceDialogMode;
     initialValues?: DeviceDto | null;
 };

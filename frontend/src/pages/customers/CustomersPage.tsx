@@ -1,5 +1,5 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
+import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import LoadingPage from "@/components/loadingPage";
@@ -24,7 +24,16 @@ import { DEFAULT_CUSTOMER_SORT_OPTION, type CustomerSortOption } from "./compone
 import { useCustomersRows } from "./hooks/useCustomersRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
-import { openPrintWindow } from "@/lib/utils";
+import { openPrintWindow, trimOrNull } from "@/lib/utils";
+
+const toCustomerPayload = (values: CustomerSubmitValues) => ({
+    firstName: values.firstName.trim(),
+    lastName: trimOrNull(values.lastName),
+    phoneNumber: trimOrNull(values.phoneNumber),
+    phoneNumberSecondary: trimOrNull(values.phoneNumberSecondary),
+    email: trimOrNull(values.email),
+    city: trimOrNull(values.city),
+});
 
 const CustomersPage = () => {
     const navigate = useNavigate();
@@ -49,16 +58,8 @@ const CustomersPage = () => {
         pageSize,
     });
 
-    const handleCreateCustomer = async (values: Record<string, string | boolean>) => {
-        await createCustomer({
-            firstName: String(values.firstName).trim(),
-            lastName: String(values.lastName).trim() === "" ? null : String(values.lastName).trim(),
-            phoneNumber: String(values.phoneNumber).trim() === "" ? null : String(values.phoneNumber).trim(),
-            phoneNumberSecondary:
-                String(values.phoneNumberSecondary).trim() === "" ? null : String(values.phoneNumberSecondary).trim(),
-            email: String(values.email).trim() === "" ? null : String(values.email).trim(),
-            city: String(values.city).trim() === "" ? null : String(values.city).trim(),
-        });
+    const handleCreateCustomer = async (values: CustomerSubmitValues) => {
+        await createCustomer(toCustomerPayload(values));
 
         await loadCustomers();
     };
@@ -80,20 +81,12 @@ const CustomersPage = () => {
         setIsEditDialogOpen(true);
     };
 
-    const handleEditCustomer = async (values: Record<string, string | boolean>) => {
+    const handleEditCustomer = async (values: CustomerSubmitValues) => {
         if (!customerToEdit) {
             return;
         }
 
-        await updateCustomer(customerToEdit.id, {
-            firstName: String(values.firstName).trim(),
-            lastName: String(values.lastName).trim() === "" ? null : String(values.lastName).trim(),
-            phoneNumber: String(values.phoneNumber).trim() === "" ? null : String(values.phoneNumber).trim(),
-            phoneNumberSecondary:
-                String(values.phoneNumberSecondary).trim() === "" ? null : String(values.phoneNumberSecondary).trim(),
-            email: String(values.email).trim() === "" ? null : String(values.email).trim(),
-            city: String(values.city).trim() === "" ? null : String(values.city).trim(),
-        });
+        await updateCustomer(customerToEdit.id, toCustomerPayload(values));
 
         await loadCustomers();
     };

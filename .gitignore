@@ -55,6 +55,9 @@ ops/update/
 # generati da scripts/install-tunnel.sh. Chi le ottiene può pubblicare sul dominio.
 ops/cloudflared/
 
+# Configurazione locale di Claude Code: permessi della singola postazione, non del progetto.
+.claude/settings.local.json
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -62,6 +62,8 @@ type SimpleEntityPageProps<TRow extends { id: number }, TValues> = {
     deleteErrorMessage: string;
     /** Solo per le entità che hanno una scheda propria: dove portare il pulsante "Apri". */
     onOpenRow?: (id: number) => void;
+    /** Righe che il server non lascia modificare né eliminare: vedi `EntityCrudTable`. */
+    isRowLocked?: (row: TRow) => boolean;
 };
 
 /**
@@ -99,6 +101,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     deleteSuccessMessage,
     deleteErrorMessage,
     onOpenRow,
+    isRowLocked,
 }: SimpleEntityPageProps<TRow, TValues>) => {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -220,6 +223,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                         onOpen={onOpenRow}
                         onEdit={handleOpenEditDialog}
                         onDelete={handleOpenDeleteDialog}
+                        isRowLocked={isRowLocked}
                     />
                 </div>
                 <TablePagination

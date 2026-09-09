@@ -21,6 +21,7 @@ import { requireAdmin, requireAuth, requirePasswordChangeCompleted } from "./mid
 import settingsRouter from "./routes/settings";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backupManager";
 import { getLogoFile } from "./services/logoManager";
+import { ensureCatchAllIssue } from "./services/issueCatalog";
 import { ensureDefaultAdmin, startSessionCleanupScheduler, stopSessionCleanupScheduler } from "./services/authManager";
 import { pool } from "./db";
 import { requestLogger } from "./middleware/requestLogger";
@@ -108,6 +109,11 @@ const server = app.listen(3000, "0.0.0.0", () => {
     // deve impedire al server di restare in piedi — l'admin verrà creato al riavvio.
     void ensureDefaultAdmin().catch((error: unknown) => {
         console.error("Creazione dell'utente amministratore iniziale non riuscita:", error);
+    });
+    // Stesso motivo del `.catch` qui sopra: un intoppo non deve impedire l'avvio, la voce
+    // verrà ricreata al riavvio successivo.
+    void ensureCatchAllIssue().catch((error: unknown) => {
+        console.error('Verifica della voce "Altro" nel catalogo difetti non riuscita:', error);
     });
     console.log("Server running on port 3000");
 });

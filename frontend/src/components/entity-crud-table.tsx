@@ -17,6 +17,11 @@ type EntityCrudTableProps<TRow extends { id: number }> = {
     entityLabel: string;
     /** Presente solo per le entità che hanno una scheda propria (tecnici, collaboratori). */
     onOpen?: (id: number) => void;
+    /**
+     * Righe che non si possono modificare né eliminare: i pulsanti spariscono invece di
+     * restare lì a raccogliere un rifiuto del server. "Apri", quando c'è, resta.
+     */
+    isRowLocked?: (row: TRow) => boolean;
     onEdit: (id: number) => void;
     onDelete: (row: TRow) => void;
 };
@@ -38,8 +43,9 @@ const EntityCrudTable = <TRow extends { id: number }>({
     emptyMessage,
     entityLabel,
     onOpen,
-    onEdit,
     onDelete,
+    onEdit,
+    isRowLocked,
 }: EntityCrudTableProps<TRow>) => {
     const renderRowActions = (row: TRow) => (
         <>
@@ -50,23 +56,27 @@ const EntityCrudTable = <TRow extends { id: number }>({
                     aria-label={`Apri ${entityLabel} ${row.id}`}
                 />
             ) : null}
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-primary/10 hover:bg-primary/20"
-                onClick={() => onEdit(row.id)}
-                aria-label={`Modifica ${entityLabel} ${row.id}`}
-            >
-                <Pencil className="size-5 text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => onDelete(row)}
-                aria-label={`Elimina ${entityLabel} ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
+            {isRowLocked?.(row) ? null : (
+                <>
+                    <TableActionButton
+                        variant="default"
+                        size="icon-lg"
+                        className="bg-primary/10 hover:bg-primary/20"
+                        onClick={() => onEdit(row.id)}
+                        aria-label={`Modifica ${entityLabel} ${row.id}`}
+                    >
+                        <Pencil className="size-5 text-primary" />
+                    </TableActionButton>
+                    <TableActionButton
+                        variant="destructive"
+                        size="icon-lg"
+                        onClick={() => onDelete(row)}
+                        aria-label={`Elimina ${entityLabel} ${row.id}`}
+                    >
+                        <Trash2 className="size-5" />
+                    </TableActionButton>
+                </>
+            )}
         </>
     );
 

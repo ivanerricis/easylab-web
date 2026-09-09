@@ -1,6 +1,7 @@
 import CreateIssueDialog, { type IssueSubmitValues } from "@/components/dialogs/create/createIssueDialog";
 import SimpleEntityPage from "@/components/simple-entity-page";
 import { createIssue, deleteIssue, listIssues, updateIssue } from "@/lib/api";
+import { isCatchAllIssue } from "@/lib/issues";
 import type { IssueDto } from "@/types/dtos";
 import { issueColumns } from "./components/issue-columns";
 
@@ -28,6 +29,10 @@ const IssuesPage = () => (
         deleteFallbackDescription="Sei sicuro di voler eliminare questo difetto?"
         deleteSuccessMessage="Difetto eliminato con successo"
         deleteErrorMessage="Impossibile eliminare il difetto"
+        // "Altro" non si modifica né si elimina: è la voce che fa comparire, nel dialogo del
+        // report, la casella con cui si descrive il problema a mano. Il server rifiuta
+        // comunque, ma un pulsante che raccoglie solo rifiuti è peggio di un pulsante assente.
+        isRowLocked={(row) => isCatchAllIssue(row.description)}
     />
 );
 

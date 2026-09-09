@@ -11,6 +11,47 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — La voce "Altro" del catalogo difetti non si può più perdere
+
+**Cosa.** Il difetto "Altro" non si elimina e non si rinomina, non se ne può creare un
+secondo, e se manca viene ricreato all'avvio del server — come già succede per l'utente
+amministratore. Nella pagina Difetti quella riga porta il contrassegno "voce fissa" e non
+mostra i pulsanti di modifica ed eliminazione.
+
+**Il perché.** Con la modifica di poco prima, "Altro" ha smesso di essere una voce come le
+altre: è quella che fa comparire, nel dialogo del report, la casella con cui si descrive il
+problema a mano — e quel testo è l'unico che finisce sulla ricevuta del cliente. Toglierla
+dal catalogo non avrebbe dato nessun errore: il programma avrebbe continuato a funzionare
+stampando ricevute meno utili, e capire perché sarebbe stato tutt'altro che immediato.
+
+**Le scelte.** Il riconoscimento resta sul nome, in
+[issueCatalog.ts](../backend/src/services/issueCatalog.ts) sul server e in
+[lib/issues.ts](../frontend/src/lib/issues.ts) nel client. L'alternativa considerata era
+marcarla nel database — una colonna booleana con un indice unico parziale che ne imponesse
+una sola — che avrebbe permesso anche di rinominarla; è stata scartata perché "Altro" va bene
+com'è, e il nome congelato è esattamente ciò che queste protezioni impongono. Se un giorno
+servisse rinominarla, quella è la strada.
+
+Il confronto è senza maiuscole perché **il vincolo di unicità di Postgres non lo è**: senza,
+"altro" e "Altro" convivrebbero e nel dialogo del report sembrerebbero entrambe la voce
+generica, con l'esito che dipende dall'ordine della lista.
+
+Le guardie stanno in `extraRoutes`, registrate prima delle rotte generate da
+`createCrudRouter`: controllano e proseguono con `next()`, così la logica CRUD resta una
+sola. Un test fissa anche che non si mangino i 400 che spettano a un corpo malformato — un
+errore di battitura del client non deve diventare un 409 incomprensibile.
+
+**In interfaccia i pulsanti spariscono invece di restare a raccogliere rifiuti**, e il
+contrassegno "voce fissa" dice perché: senza una parola lì accanto, una riga senza pulsanti
+sembrerebbe un difetto dell'elenco e non una scelta.
+
+**Verificato davvero:** la voce è stata cancellata dal database e ricreata al riavvio; via
+API sono state respinte l'eliminazione, la rinomina, la creazione di un secondo "altro" e la
+promozione di un difetto qualunque a "ALTRO"; un difetto normale si crea ed elimina come
+prima. I test nuovi sono stati verificati mutando il codice.
+
+---
+
 ## 2026-09-09 — Sulla ricevuta il cliente leggeva "Altro" al posto del suo problema
 
 **Cosa.** Il campo difetto del report diventa due campi. La casella con il **+** resta

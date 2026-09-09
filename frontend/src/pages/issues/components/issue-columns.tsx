@@ -1,3 +1,4 @@
+import { isCatchAllIssue } from "@/lib/issues";
 import { formatDate } from "@/lib/utils";
 import type { IssueDto } from "@/types/dtos";
 import type { ReactNode } from "react";
@@ -18,7 +19,17 @@ export const issueColumns: IssueColumn[] = [
     {
         key: "description",
         header: "Descrizione",
-        render: (row) => row.description,
+        // La voce generica non ha i pulsanti di modifica ed eliminazione: senza una parola
+        // qui accanto sembrerebbe un difetto dell'elenco, non una scelta.
+        render: (row) =>
+            isCatchAllIssue(row.description) ? (
+                <span className="flex items-center gap-2">
+                    {row.description}
+                    <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">voce fissa</span>
+                </span>
+            ) : (
+                row.description
+            ),
     },
     {
         key: "createdAt",

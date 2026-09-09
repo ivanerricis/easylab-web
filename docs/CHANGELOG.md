@@ -11,6 +11,21 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Pulsante di aggiornamento accanto alla ricerca
+
+**Cosa.** In tutte le pagine con elenco (Clienti, Interventi, Report, Dispositivi, Tecnici,
+Collaboratori, Difetti) e nel pannello Log delle impostazioni, il pulsante di aggiornamento
+dati (`RefreshButton`) si è spostato dall'intestazione della pagina alla riga dei filtri,
+subito a sinistra della casella di ricerca. Nell'intestazione resta solo il pulsante di
+creazione.
+
+**Il perché.** Il pulsante viveva accanto ad azioni distruttive/di creazione in alto a destra,
+lontano dalla ricerca e dai filtri che è più naturale voler "far ripartire" insieme a lui.
+Accostarlo alla casella di ricerca lo rende parte del blocco filtri, coerente con il flusso:
+cerca/filtra, poi aggiorna se serve.
+
+---
+
 ## 2026-09-08 — Note sugli interventi, in scheda, dialoghi e PDF
 
 **Cosa.** Gli interventi hanno un campo `note`: testo libero facoltativo, disponibile per

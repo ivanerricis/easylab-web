@@ -112,18 +112,9 @@ const LogsSettingsPanel = () => {
                 className="min-h-0 flex-1"
                 contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3 pt-4"}
                 action={
-                    <>
-                        <RefreshButton
-                            size="icon"
-                            onRefresh={handleRefresh}
-                            isRefreshing={isLoadingEntries || isLoadingFiles}
-                            label="Aggiorna elenco log"
-                        />
-
-                        <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
-                            Scarica log selezionato
-                        </Button>
-                    </>
+                    <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
+                        Scarica log selezionato
+                    </Button>
                 }
             >
                 {isLoadingFiles && logFiles.length === 0 ? (
@@ -145,6 +136,13 @@ const LogsSettingsPanel = () => {
                                     ))}
                                 </SelectContent>
                             </Select>
+
+                            <RefreshButton
+                                size="icon"
+                                onRefresh={handleRefresh}
+                                isRefreshing={isLoadingEntries || isLoadingFiles}
+                                label="Aggiorna elenco log"
+                            />
 
                             <SearchInput
                                 value={searchText}

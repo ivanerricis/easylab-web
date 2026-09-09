@@ -1,5 +1,6 @@
 import DateRangeFilter from "@/components/filters/date-range-filter";
 import FilterSelect from "@/components/filters/filter-select";
+import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
 import { ArrowUpDown, ListFilter } from "lucide-react";
 import { reportSortOptions, type ReportSortOption, type ReportVisibilityFilter } from "./types";
@@ -22,6 +23,8 @@ type ReportsFiltersProps = {
     onDateFromChange: (value: string | undefined) => void;
     dateTo: string | undefined;
     onDateToChange: (value: string | undefined) => void;
+    onRefresh: () => void | Promise<unknown>;
+    isRefreshing?: boolean;
 };
 
 const ReportsFilters = ({
@@ -35,9 +38,12 @@ const ReportsFilters = ({
     onDateFromChange,
     dateTo,
     onDateToChange,
+    onRefresh,
+    isRefreshing,
 }: ReportsFiltersProps) => {
     return (
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
             <SearchInput value={searchText} onValueChange={onSearchTextChange} placeholder="Cerca report..." />
 
             <FilterSelect

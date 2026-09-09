@@ -106,13 +106,7 @@ const DevicesPage = () => {
                 title="Dispositivi"
                 description="Gestisci i dispositivi del laboratorio."
                 action={
-                    <div className="flex items-center gap-2">
-                        <RefreshButton onRefresh={loadDevices} isRefreshing={isLoading} />
-                        <CreateEntityButton
-                            label="Crea nuovo dispositivo"
-                            onClick={() => setIsCreateDialogOpen(true)}
-                        />
-                    </div>
+                    <CreateEntityButton label="Crea nuovo dispositivo" onClick={() => setIsCreateDialogOpen(true)} />
                 }
             />
 
@@ -153,7 +147,10 @@ const DevicesPage = () => {
                 onConfirm={handleDeleteDevice}
             />
 
-            <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca dispositivo..." />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <RefreshButton onRefresh={loadDevices} isRefreshing={isLoading} />
+                <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca dispositivo..." />
+            </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="min-h-0 flex-1 overflow-y-auto">

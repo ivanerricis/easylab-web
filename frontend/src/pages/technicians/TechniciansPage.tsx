@@ -117,12 +117,7 @@ const TechniciansPage = () => {
             <PageHeader
                 title="Tecnici"
                 description="Gestisci i tecnici del laboratorio."
-                action={
-                    <div className="flex items-center gap-2">
-                        <RefreshButton onRefresh={loadTechnicians} isRefreshing={isLoading} />
-                        <CreateEntityButton label="Crea nuovo tecnico" onClick={() => setIsCreateDialogOpen(true)} />
-                    </div>
-                }
+                action={<CreateEntityButton label="Crea nuovo tecnico" onClick={() => setIsCreateDialogOpen(true)} />}
             />
 
             <CreateTechnicianDialog
@@ -162,7 +157,10 @@ const TechniciansPage = () => {
                 onConfirm={handleDeleteTechnician}
             />
 
-            <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca tecnico..." />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <RefreshButton onRefresh={loadTechnicians} isRefreshing={isLoading} />
+                <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca tecnico..." />
+            </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="min-h-0 flex-1 overflow-y-auto">

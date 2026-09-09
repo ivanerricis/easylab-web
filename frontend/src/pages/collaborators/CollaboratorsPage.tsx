@@ -118,13 +118,7 @@ const CollaboratorsPage = () => {
                 title="Collaboratori"
                 description="Gestisci i collaboratori del laboratorio."
                 action={
-                    <div className="flex items-center gap-2">
-                        <RefreshButton onRefresh={loadCollaborators} isRefreshing={isLoading} />
-                        <CreateEntityButton
-                            label="Crea nuovo collaboratore"
-                            onClick={() => setIsCreateDialogOpen(true)}
-                        />
-                    </div>
+                    <CreateEntityButton label="Crea nuovo collaboratore" onClick={() => setIsCreateDialogOpen(true)} />
                 }
             />
 
@@ -165,7 +159,10 @@ const CollaboratorsPage = () => {
                 onConfirm={handleDeleteCollaborator}
             />
 
-            <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca collaboratore..." />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <RefreshButton onRefresh={loadCollaborators} isRefreshing={isLoading} />
+                <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca collaboratore..." />
+            </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="min-h-0 flex-1 overflow-y-auto">

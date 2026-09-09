@@ -105,12 +105,7 @@ const IssuesPage = () => {
             <PageHeader
                 title="Difetti"
                 description="Gestisci i difetti del laboratorio."
-                action={
-                    <div className="flex items-center gap-2">
-                        <RefreshButton onRefresh={loadIssues} isRefreshing={isLoading} />
-                        <CreateEntityButton label="Crea nuovo difetto" onClick={() => setIsCreateDialogOpen(true)} />
-                    </div>
-                }
+                action={<CreateEntityButton label="Crea nuovo difetto" onClick={() => setIsCreateDialogOpen(true)} />}
             />
             <CreateIssueDialog
                 open={isCreateDialogOpen}
@@ -149,7 +144,10 @@ const IssuesPage = () => {
                 onConfirm={handleDeleteIssue}
             />
 
-            <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca difetto..." />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <RefreshButton onRefresh={loadIssues} isRefreshing={isLoading} />
+                <SearchInput value={searchText} onValueChange={setSearchText} placeholder="Cerca difetto..." />
+            </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="min-h-0 flex-1 overflow-y-auto">

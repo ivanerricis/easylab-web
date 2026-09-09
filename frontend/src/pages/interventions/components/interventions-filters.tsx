@@ -1,5 +1,6 @@
 import DateRangeFilter from "@/components/filters/date-range-filter";
 import FilterSelect from "@/components/filters/filter-select";
+import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
 import { interventionTypeOptions, interventionStatusOptions } from "@/lib/interventions";
 import { ArrowUpDown, ListFilter, Tag } from "lucide-react";
@@ -23,6 +24,8 @@ type InterventionsFiltersProps = {
     onDateFromChange: (value: string | undefined) => void;
     dateTo: string | undefined;
     onDateToChange: (value: string | undefined) => void;
+    onRefresh: () => void | Promise<unknown>;
+    isRefreshing?: boolean;
 };
 
 const InterventionsFilters = ({
@@ -38,9 +41,12 @@ const InterventionsFilters = ({
     onDateFromChange,
     dateTo,
     onDateToChange,
+    onRefresh,
+    isRefreshing,
 }: InterventionsFiltersProps) => {
     return (
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
             <SearchInput value={searchText} onValueChange={onSearchTextChange} placeholder="Cerca intervento..." />
 
             <FilterSelect

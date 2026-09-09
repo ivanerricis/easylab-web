@@ -4,7 +4,6 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
-import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import {
     createCustomer,
@@ -155,12 +154,7 @@ const CustomersPage = () => {
             <PageHeader
                 title="Clienti"
                 description="Gestisci i clienti del laboratorio."
-                action={
-                    <div className="flex items-center gap-2">
-                        <RefreshButton onRefresh={loadCustomers} isRefreshing={isLoading} />
-                        <CreateEntityButton label="Crea nuovo cliente" onClick={() => setIsCreateDialogOpen(true)} />
-                    </div>
-                }
+                action={<CreateEntityButton label="Crea nuovo cliente" onClick={() => setIsCreateDialogOpen(true)} />}
             />
 
             {isCreateDialogOpen && (
@@ -233,6 +227,8 @@ const CustomersPage = () => {
                 onSearchTextChange={setSearchText}
                 sortOption={sortOption}
                 onSortOptionChange={setSortOption}
+                onRefresh={loadCustomers}
+                isRefreshing={isLoading}
             />
 
             <div className="flex min-h-0 flex-1 flex-col gap-4">

@@ -34,16 +34,30 @@ const InputWithAdd = ({
     const debouncedValue = useDebouncedValue(value, 250);
 
     const normalizedValue = value.trim().toLowerCase();
+    /**
+     * I suggerimenti partono solo da quando si digita: aprendo un dialogo il campo è vuoto e
+     * un elenco già srotolato coprirebbe il resto del modulo senza aver filtrato nulla.
+     */
+    const hasQuery = normalizedValue.length > 0;
 
     useEffect(() => {
         if (!onSearch) {
             return;
         }
 
+        const query = debouncedValue.trim();
+
+        // Niente query, niente chiamata: evita anche la ricerca "a vuoto" all'apertura.
+        // I risultati precedenti restano in stato ma non si vedono: `filteredOptions` li scarta
+        // finche' il campo e' vuoto.
+        if (query.length === 0) {
+            return;
+        }
+
         let isCancelled = false;
 
         const runSearch = async () => {
-            const results = await onSearch(debouncedValue.trim());
+            const results = await onSearch(query);
 
             if (!isCancelled) {
                 setSearchResults(results);
@@ -58,16 +72,16 @@ const InputWithAdd = ({
     }, [onSearch, debouncedValue]);
 
     const filteredOptions = useMemo(() => {
+        if (!hasQuery) {
+            return [];
+        }
+
         if (onSearch) {
             return searchResults;
         }
 
-        if (normalizedValue.length === 0) {
-            return options.slice(0, 8);
-        }
-
         return options.filter((option) => option.toLowerCase().includes(normalizedValue)).slice(0, 8);
-    }, [onSearch, searchResults, normalizedValue, options]);
+    }, [hasQuery, onSearch, searchResults, normalizedValue, options]);
 
     const hasExactMatch = useMemo(() => {
         if (!normalizedValue) {
@@ -77,7 +91,8 @@ const InputWithAdd = ({
         return options.some((option) => option.toLowerCase() === normalizedValue);
     }, [normalizedValue, options]);
 
-    const canCreate = !onSearch && normalizedValue.length > 0 && !hasExactMatch;
+    const canCreate = !onSearch && hasQuery && !hasExactMatch;
+    const hasSuggestions = filteredOptions.length > 0 || canCreate;
 
     const handleCreate = async () => {
         const trimmed = value.trim();
@@ -118,7 +133,7 @@ const InputWithAdd = ({
                 required={required}
             />
 
-            {isOpen ? (
+            {isOpen && hasSuggestions ? (
                 <div className="absolute z-10 mt-2 w-full rounded-md border bg-background shadow-sm">
                     <div className="max-h-48 overflow-auto">
                         {filteredOptions.map((option) => (

@@ -11,6 +11,37 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — I suggerimenti dei campi con ricerca compaiono solo quando si digita
+
+**Cosa.** Il menu a tendina di [inputWithAdd.tsx](../frontend/src/components/inputWithAdd.tsx)
+non si apre più al solo ricevere il fuoco: resta chiuso finché il campo è vuoto e compare
+alla prima lettera scritta. Con esso sparisce anche la ricerca "a vuoto" che partiva
+all'apertura del dialogo.
+
+**Il perché.** Aprendo il dialogo di creazione di un report il fuoco va sul campo cliente, e
+l'elenco si srotolava subito coprendo i campi sotto: otto nomi presi dal catalogo che non
+hanno ancora filtrato niente, da scavalcare per arrivare al resto del modulo. Lo stesso
+capitava nel dialogo dell'intervento e sui campi dispositivo e difetto del report, che
+pescavano dalle opzioni locali con `options.slice(0, 8)`.
+
+**Le scelte.** Il controllo sta in un unico punto — `hasQuery` nel componente condiviso — così
+vale per tutte e quattro le caselle senza toccare i dialoghi. Il riquadro non viene proprio
+disegnato quando non c'è niente da mostrare (`hasSuggestions`), invece di disegnarne uno
+vuoto alto pochi pixel.
+
+L'effetto di ricerca esce subito quando la query è vuota: i risultati della digitazione
+precedente restano in stato ma non si vedono, perché è `filteredOptions` a scartarli finché
+il campo è vuoto. Scritto così, e non azzerando lo stato dentro l'effetto, perché la regola
+`react-hooks/set-state-in-effect` vieta il `setState` sincrono in un effetto.
+
+Il fuoco continua ad aprire l'elenco quando il campo ha già del testo: serve a chi ci torna
+sopra per correggere una scelta.
+
+**Effetto collaterale utile.** Una chiamata a `GET /customers` in meno per ogni apertura dei
+dialoghi di report e intervento.
+
+---
+
 ## 2026-09-09 — La voce "Altro" del catalogo difetti non si può più perdere
 
 **Cosa.** Il difetto "Altro" non si elimina e non si rinomina, non se ne può creare un

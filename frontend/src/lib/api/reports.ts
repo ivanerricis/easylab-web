@@ -66,6 +66,12 @@ export type ListReportsParams = {
     dateTo?: string;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
+    /**
+     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
+     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
+     * Lo fornisce `usePaginatedRows`.
+     */
+    signal?: AbortSignal;
 };
 
 export function listReports(): Promise<ReportDto[]>;
@@ -87,6 +93,7 @@ export async function listReports(params?: ListReportsParams) {
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },
+        signal: params.signal,
     });
 
     const items = response.data.items.map(normalizeReportDto);

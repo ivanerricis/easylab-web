@@ -22,6 +22,12 @@ export type ListCustomersParams = {
     search?: string;
     sortBy?: CustomerSortBy;
     sortOrder?: "asc" | "desc";
+    /**
+     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
+     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
+     * Lo fornisce `usePaginatedRows`.
+     */
+    signal?: AbortSignal;
 };
 
 export function listCustomers(): Promise<CustomerDto[]>;
@@ -40,6 +46,7 @@ export async function listCustomers(params?: ListCustomersParams) {
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },
+        signal: params.signal,
     });
 
     const items = response.data.items.map((customer) => mapEntityTimestamps(customer));

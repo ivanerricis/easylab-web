@@ -70,6 +70,11 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
     // prima di quello che ha superato, quindi vale solo la risposta più recente.
     const latestRequestIdRef = useRef(0);
 
+    // E, sempre come lì, la richiesta superata viene anche annullata invece che solo
+    // ignorata: sfogliando i mesi in fretta ne partiva una per mese attraversato, e il
+    // server le completava tutte.
+    const inFlightRef = useRef<AbortController | null>(null);
+
     const loadEvents = useCallback(async () => {
         if (!range) {
             return;
@@ -77,6 +82,11 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
 
         const requestId = latestRequestIdRef.current + 1;
         latestRequestIdRef.current = requestId;
+
+        inFlightRef.current?.abort();
+        const controller = new AbortController();
+        inFlightRef.current = controller;
+
         setIsLoading(true);
 
         try {
@@ -84,6 +94,7 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
                 scheduledFrom: range.from,
                 scheduledTo: range.to,
                 pageSize: 1000,
+                signal: controller.signal,
             });
 
             if (requestId !== latestRequestIdRef.current) {
@@ -102,13 +113,15 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
 
             setEvents(interventions.items.map(toCalendarEvent));
         } catch (error) {
-            if (requestId !== latestRequestIdRef.current) {
+            // La richiesta annullata allo smontaggio è ancora la più recente: senza questo
+            // controllo l'annullamento passerebbe per un errore di rete.
+            if (controller.signal.aborted || requestId !== latestRequestIdRef.current) {
                 return;
             }
 
             toast.error(getApiErrorMessage(error, "Impossibile caricare gli interventi"));
         } finally {
-            if (requestId === latestRequestIdRef.current) {
+            if (!controller.signal.aborted && requestId === latestRequestIdRef.current) {
                 setIsLoading(false);
             }
         }
@@ -119,6 +132,13 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
             void loadEvents();
         });
     }, [loadEvents]);
+
+    useEffect(
+        () => () => {
+            inFlightRef.current?.abort();
+        },
+        []
+    );
 
     return { events, isLoading, loadEvents };
 };

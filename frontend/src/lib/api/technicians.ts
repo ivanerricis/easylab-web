@@ -16,6 +16,12 @@ export type ListTechniciansParams = {
     page?: number;
     pageSize?: number;
     search?: string;
+    /**
+     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
+     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
+     * Lo fornisce `usePaginatedRows`.
+     */
+    signal?: AbortSignal;
 };
 
 export function listTechnicians(): Promise<TechnicianDto[]>;
@@ -32,6 +38,7 @@ export async function listTechnicians(params?: ListTechniciansParams) {
             pageSize: params.pageSize ?? 1000,
             search: params.search?.trim() || undefined,
         },
+        signal: params.signal,
     });
 
     const items = response.data.items.map((technician) => mapEntityTimestamps(technician));

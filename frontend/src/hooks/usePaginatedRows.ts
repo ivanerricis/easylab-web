@@ -7,8 +7,12 @@ type UsePaginatedRowsOptions<TRow> = {
     /**
      * Esegue la richiesta per i parametri correnti. Non serve memoizzarla: viene
      * letta da una ref, quindi è sempre la versione dell'ultimo render.
+     *
+     * Il `signal` va inoltrato alla funzione di lista, che lo passa ad axios: è quello che
+     * permette di *annullare* davvero la richiesta superata invece di limitarsi a
+     * ignorarne la risposta (vedi sotto).
      */
-    fetchRows: () => Promise<PaginatedResponse<TRow>>;
+    fetchRows: (signal: AbortSignal) => Promise<PaginatedResponse<TRow>>;
     /** Parametri che identificano la richiesta: al loro cambio la lista si ricarica. */
     queryKey: DependencyList;
     /** Messaggio mostrato se la richiesta fallisce. */
@@ -44,13 +48,33 @@ export const usePaginatedRows = <TRow>({
     // (visibile digitando in fretta nella ricerca).
     const latestRequestIdRef = useRef(0);
 
+    /**
+     * Annulla per davvero la richiesta superata, invece di limitarsi a scartarne la
+     * risposta.
+     *
+     * La guardia sull'id qui sopra basta alla correttezza, ma non ferma il lavoro già
+     * avviato: digitando "mario" partivano cinque ricerche e il server le eseguiva tutte
+     * fino in fondo, comprese le quattro di cui nessuno avrebbe letto il risultato — e una
+     * ricerca libera sui report è, oggi, la query più cara dell'applicazione. Con l'abort
+     * la connessione viene chiusa e Postgres interrompe la query in corso.
+     *
+     * Viene annullata anche la richiesta ancora in volo allo smontaggio del componente:
+     * cambiare pagina mentre una lista sta caricando è il caso più comune di tutti.
+     */
+    const inFlightRef = useRef<AbortController | null>(null);
+
     const reload = useCallback(async () => {
         const requestId = latestRequestIdRef.current + 1;
         latestRequestIdRef.current = requestId;
+
+        inFlightRef.current?.abort();
+        const controller = new AbortController();
+        inFlightRef.current = controller;
+
         setIsLoading(true);
 
         try {
-            const response = await fetchRowsRef.current();
+            const response = await fetchRowsRef.current(controller.signal);
 
             if (requestId !== latestRequestIdRef.current) {
                 return;
@@ -60,13 +84,17 @@ export const usePaginatedRows = <TRow>({
             setTotalItems(response.totalItems);
             setTotalPages(response.totalPages);
         } catch (error) {
-            if (requestId !== latestRequestIdRef.current) {
+            // `signal.aborted` va controllato a parte e non basta l'id: la richiesta
+            // annullata allo smontaggio *è* ancora la più recente, quindi senza questo
+            // ramo l'annullamento verrebbe scambiato per un errore di rete e mostrerebbe
+            // un avviso rosso a chi ha semplicemente cambiato pagina.
+            if (controller.signal.aborted || requestId !== latestRequestIdRef.current) {
                 return;
             }
 
             toast.error(getApiErrorMessage(error, errorMessageRef.current));
         } finally {
-            if (requestId === latestRequestIdRef.current) {
+            if (!controller.signal.aborted && requestId === latestRequestIdRef.current) {
                 setIsLoading(false);
             }
         }
@@ -79,6 +107,13 @@ export const usePaginatedRows = <TRow>({
         // Le dipendenze sono fornite dal chiamante tramite queryKey.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, queryKey);
+
+    useEffect(
+        () => () => {
+            inFlightRef.current?.abort();
+        },
+        []
+    );
 
     const updateRow = useCallback((matches: (row: TRow) => boolean, updater: (row: TRow) => TRow) => {
         setRows((currentRows) => currentRows.map((row) => (matches(row) ? updater(row) : row)));

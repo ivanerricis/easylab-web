@@ -187,6 +187,81 @@ describe("usePaginatedRows", () => {
         expect(fetchRows).toHaveBeenCalledTimes(2);
     });
 
+    /**
+     * La guardia sull'id basta alla correttezza, ma lascia il server a macinare richieste
+     * che nessuno leggerà. Qui si verifica che la richiesta superata venga annullata per
+     * davvero, cioè che il suo signal risulti abortito.
+     */
+    it("annulla la richiesta superata da una più recente", async () => {
+        const signals: AbortSignal[] = [];
+        const first = createDeferred<PaginatedResponse<Row>>();
+        const second = createDeferred<PaginatedResponse<Row>>();
+        const fetchRows = vi.fn().mockImplementation((signal: AbortSignal) => {
+            signals.push(signal);
+            return signals.length === 1 ? first.promise : second.promise;
+        });
+
+        const { result } = renderHook(() =>
+            usePaginatedRows<Row>({
+                fetchRows,
+                queryKey: [],
+                errorMessage: "Errore",
+            })
+        );
+
+        await act(async () => {
+            void result.current.reload();
+        });
+
+        expect(signals).toHaveLength(2);
+        expect(signals[0].aborted).toBe(true);
+        expect(signals[1].aborted).toBe(false);
+
+        await act(async () => {
+            second.resolve(buildResponse([{ id: 2, name: "Recente" }]));
+            await second.promise;
+        });
+
+        expect(result.current.rows).toEqual([{ id: 2, name: "Recente" }]);
+    });
+
+    /**
+     * Cambiare pagina mentre una lista sta caricando annulla la richiesta in volo, che *è*
+     * ancora la più recente: senza il controllo su `signal.aborted` l'annullamento sarebbe
+     * scambiato per un errore di rete e comparirebbe un avviso rosso a schermo.
+     */
+    it("non segnala come errore la richiesta annullata allo smontaggio", async () => {
+        const signals: AbortSignal[] = [];
+        const pending = createDeferred<PaginatedResponse<Row>>();
+        const fetchRows = vi.fn().mockImplementation((signal: AbortSignal) => {
+            signals.push(signal);
+            return pending.promise;
+        });
+
+        const { unmount } = renderHook(() =>
+            usePaginatedRows<Row>({
+                fetchRows,
+                queryKey: [],
+                errorMessage: "Caricamento non riuscito",
+            })
+        );
+
+        await waitFor(() => {
+            expect(fetchRows).toHaveBeenCalledTimes(1);
+        });
+
+        unmount();
+
+        expect(signals[0].aborted).toBe(true);
+
+        await act(async () => {
+            pending.reject(new Error("richiesta annullata"));
+            await pending.promise.catch(() => undefined);
+        });
+
+        expect(toastError).not.toHaveBeenCalled();
+    });
+
     it("updateRow modifica solo le righe che corrispondono", async () => {
         const fetchRows = vi.fn().mockResolvedValue(
             buildResponse([

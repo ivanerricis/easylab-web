@@ -27,7 +27,7 @@ export const useReportsRows = ({
     const debouncedSearchText = useDebouncedValue(searchText);
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer" | "totalPrice", "asc" | "desc"];
     const { rows, totalItems, totalPages, isLoading, reload, updateRow } = usePaginatedRows<ReportDto>({
-        fetchRows: () =>
+        fetchRows: (signal) =>
             listReports({
                 page: currentPage,
                 pageSize,
@@ -37,6 +37,7 @@ export const useReportsRows = ({
                 sortOrder,
                 dateFrom,
                 dateTo,
+                signal,
             }),
         queryKey: [currentPage, pageSize, debouncedSearchText, visibilityFilter, sortOption, dateFrom, dateTo],
         errorMessage: "Impossibile caricare i report",

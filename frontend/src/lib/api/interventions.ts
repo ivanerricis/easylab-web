@@ -49,6 +49,12 @@ export type ListInterventionsParams = {
     scheduledTo?: string;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
+    /**
+     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
+     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
+     * Lo fornisce `usePaginatedRows`.
+     */
+    signal?: AbortSignal;
 };
 
 export function listInterventions(): Promise<InterventionDto[]>;
@@ -74,6 +80,7 @@ export async function listInterventions(params?: ListInterventionsParams) {
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },
+        signal: params.signal,
     });
 
     return response.data;

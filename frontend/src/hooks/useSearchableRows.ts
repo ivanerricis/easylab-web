@@ -6,6 +6,7 @@ type ListParams = {
     page: number;
     pageSize: number;
     search: string;
+    signal: AbortSignal;
 };
 
 type UseSearchableRowsParams<TRow> = {
@@ -38,7 +39,7 @@ export const useSearchableRows = <TRow>({
     const debouncedSearchText = useDebouncedValue(searchText);
 
     return usePaginatedRows<TRow>({
-        fetchRows: () => fetchRows({ page: currentPage, pageSize, search: debouncedSearchText }),
+        fetchRows: (signal) => fetchRows({ page: currentPage, pageSize, search: debouncedSearchText, signal }),
         queryKey: [currentPage, pageSize, debouncedSearchText],
         errorMessage,
     });

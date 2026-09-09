@@ -32,7 +32,7 @@ export const useInterventionsRows = ({
         "asc" | "desc",
     ];
     const { rows, totalItems, totalPages, isLoading, reload, updateRow } = usePaginatedRows<InterventionDto>({
-        fetchRows: () =>
+        fetchRows: (signal) =>
             listInterventions({
                 page: currentPage,
                 pageSize,
@@ -43,6 +43,7 @@ export const useInterventionsRows = ({
                 sortOrder,
                 dateFrom,
                 dateTo,
+                signal,
             }),
         queryKey: [currentPage, pageSize, debouncedSearchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo],
         errorMessage: "Impossibile caricare gli interventi",

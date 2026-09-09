@@ -14,18 +14,21 @@ type UseCustomersRowsParams = {
 export const useCustomersRows = ({ searchText, sortOption, currentPage, pageSize }: UseCustomersRowsParams) => {
     const debouncedSearchText = useDebouncedValue(searchText);
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "name", "asc" | "desc"];
-    const { rows, totalItems, totalPages, isLoading, reload } = usePaginatedRows<CustomerDto>({
-        fetchRows: (signal) =>
-            listCustomers({ page: currentPage, pageSize, search: debouncedSearchText, sortBy, sortOrder, signal }),
-        queryKey: [currentPage, pageSize, debouncedSearchText, sortOption],
-        errorMessage: "Impossibile caricare i clienti",
-    });
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
+        usePaginatedRows<CustomerDto>({
+            fetchRows: (signal) =>
+                listCustomers({ page: currentPage, pageSize, search: debouncedSearchText, sortBy, sortOrder, signal }),
+            queryKey: [currentPage, pageSize, debouncedSearchText, sortOption],
+            errorMessage: "Impossibile caricare i clienti",
+        });
 
     return {
         customerRows: rows,
         totalItems,
         totalPages,
         isLoading,
+        isInitialLoading,
+        isRefetching,
         loadCustomers: reload,
     };
 };

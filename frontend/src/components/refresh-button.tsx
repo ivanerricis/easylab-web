@@ -64,7 +64,10 @@ const RefreshButton = ({
                     onClick={handleClick}
                     {...props}
                 >
-                    <RefreshCw className={cn(iconClassName, isBusy && "animate-spin")} />
+                    <RefreshCw
+                        data-slot={isBusy ? "spinner" : undefined}
+                        className={cn(iconClassName, isBusy && "animate-spin")}
+                    />
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>

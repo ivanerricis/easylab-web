@@ -1,6 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import FormField from "@/components/form-field";
+import { fieldProps } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api";
 import type { DeviceDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
@@ -23,21 +24,26 @@ type Props = {
 
 const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [name, setName] = useState("");
+    const [nameError, setNameError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (open) {
             startTransition(() => {
                 setName(initialValues?.name ?? "");
+                setNameError(undefined);
             });
         }
     }, [open, initialValues]);
 
     const handleConfirm = async () => {
-        if (name === "") {
-            toast.error("Il nome del dispositivo non può essere vuoto");
+        if (name.trim() === "") {
+            setNameError("Il nome del dispositivo non può essere vuoto");
+            document.getElementById("name")?.focus();
             return;
         }
+
+        setNameError(undefined);
 
         if (isSubmitting) {
             return;
@@ -77,18 +83,18 @@ const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", ini
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid">
-                    <Label htmlFor="name" className="text-lg">
-                        Nome dispositivo
-                    </Label>
+                <FormField id="name" label="Nome dispositivo" required error={nameError}>
                     <Input
+                        {...fieldProps("name", { error: nameError, required: true })}
                         className="text-lg!"
-                        id="name"
                         placeholder="iPhone 13"
                         value={name}
-                        onChange={(event) => setName(event.target.value)}
+                        onChange={(event) => {
+                            setName(event.target.value);
+                            setNameError(undefined);
+                        }}
                     />
-                </div>
+                </FormField>
             }
         />
     );

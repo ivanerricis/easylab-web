@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import CardReport from "@/components/cardReport";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
@@ -27,6 +28,7 @@ const CollaboratorPage = () => {
     const collaboratorId = Number(id);
     const [isLoading, setIsLoading] = useState(true);
     const [collaboratorName, setCollaboratorName] = useState("Collaboratore");
+    useDocumentTitle(collaboratorName);
     const [reportCards, setReportCards] = useState<CollaboratorReportCard[]>([]);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("all");
 

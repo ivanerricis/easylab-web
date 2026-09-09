@@ -1,5 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { Label } from "@/components/ui/label";
+import FormField from "@/components/form-field";
+import { fieldProps } from "@/lib/formField";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api";
 import type { IssueDto } from "@/types/dtos";
@@ -23,21 +24,26 @@ type Props = {
 
 const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [description, setDescription] = useState("");
+    const [descriptionError, setDescriptionError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (open) {
             startTransition(() => {
                 setDescription(initialValues?.description ?? "");
+                setDescriptionError(undefined);
             });
         }
     }, [open, initialValues]);
 
     const handleConfirm = async () => {
-        if (description === "") {
-            toast.error("Inserire una descrizione per il problema");
+        if (description.trim() === "") {
+            setDescriptionError("Inserire una descrizione per il problema");
+            document.getElementById("description")?.focus();
             return;
         }
+
+        setDescriptionError(undefined);
 
         if (isSubmitting) {
             return;
@@ -77,18 +83,18 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid">
-                    <Label htmlFor="description" className="text-lg">
-                        Descrizione
-                    </Label>
+                <FormField id="description" label="Descrizione" required error={descriptionError}>
                     <Textarea
+                        {...fieldProps("description", { error: descriptionError, required: true })}
                         className="text-lg!"
-                        id="description"
                         placeholder="Display rotto"
                         value={description}
-                        onChange={(event) => setDescription(event.target.value)}
+                        onChange={(event) => {
+                            setDescription(event.target.value);
+                            setDescriptionError(undefined);
+                        }}
                     />
-                </div>
+                </FormField>
             }
         />
     );

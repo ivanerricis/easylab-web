@@ -1,4 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { FieldError } from "@/components/form-field";
+import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import { isCatchAllIssue } from "@/lib/issues";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
@@ -57,6 +59,11 @@ type Props = {
     onSubmit?: (values: CreateReportSubmitValues) => Promise<void> | void;
 };
 
+type FieldErrors = Partial<Record<"issue" | "issueDescription" | "client" | "charger" | "dataBackup", string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["client", "issue", "issueDescription", "charger", "dataBackup"] as const;
+
 const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     const [formValues, setFormValues] = useState({
         customer: "",
@@ -77,16 +84,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     const [deviceIdByOption, setDeviceIdByOption] = useState<Record<string, number>>({});
     const [issueIdByOption, setIssueIdByOption] = useState<Record<string, number>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [fieldErrors, setFieldErrors] = useState({
-        issue: false,
-        issueDescription: false,
-        charger: false,
-        dataBackup: false,
-    });
+    // Messaggi, non booleani: il bordo rosso c'era già, ma il *perché* viveva solo nel toast
+    // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
+    // qui il testo, l'errore sta sotto il campo e ci resta finché non si corregge.
+    const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
     useEffect(() => {
         if (open) {
             startTransition(() => {
+                setFieldErrors({});
                 setFormValues({
                     customer: "",
                     deviceType: "",
@@ -96,12 +102,6 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                     charger: "unset",
                     dataBackup: "unset",
                     notes: "",
-                });
-                setFieldErrors({
-                    issue: false,
-                    issueDescription: false,
-                    charger: false,
-                    dataBackup: false,
                 });
                 setCustomerIdByOption({});
                 setDeviceIdByOption({});
@@ -155,41 +155,38 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
         const issueId = issueIdByOption[formValues.issue.trim()] ?? null;
         const needsProblemText = isCatchAllIssue(formValues.issue);
 
-        const nextFieldErrors = {
-            issue: formValues.issue.trim() === "" || issueId == null,
-            issueDescription: needsProblemText && formValues.issueDescription.trim() === "",
-            charger: formValues.charger === "unset",
-            dataBackup: formValues.dataBackup === "unset",
-        };
+        // Tutti gli errori in una passata: prima ogni controllo usciva dalla funzione, quindi
+        // con tre campi da sistemare servivano tre salvataggi per scoprirli tutti.
+        const nextFieldErrors: FieldErrors = {};
+
+        if (formValues.customer.trim() === "") {
+            nextFieldErrors.client = "Seleziona un cliente";
+        }
+
+        if (formValues.issue.trim() === "") {
+            nextFieldErrors.issue = "Seleziona un difetto";
+        } else if (issueId == null) {
+            nextFieldErrors.issue = "Seleziona un difetto esistente, oppure creane uno nuovo con il pulsante +";
+        }
+
+        if (needsProblemText && formValues.issueDescription.trim() === "") {
+            nextFieldErrors.issueDescription = 'Con il difetto "Altro" va descritto il problema';
+        }
+
+        if (formValues.charger === "unset") {
+            nextFieldErrors.charger = "Seleziona se l'alimentatore è presente";
+        }
+
+        if (formValues.dataBackup === "unset") {
+            nextFieldErrors.dataBackup = "Seleziona se deve essere effettuato il backup dati";
+        }
 
         setFieldErrors(nextFieldErrors);
 
-        if (nextFieldErrors.issue) {
-            toast.error(
-                formValues.issue.trim() === ""
-                    ? "Seleziona un difetto"
-                    : "Seleziona un difetto esistente, oppure creane uno nuovo con il pulsante +"
-            );
-            return;
-        }
+        const firstInvalidField = fieldOrder.find((field) => nextFieldErrors[field]);
 
-        if (nextFieldErrors.issueDescription) {
-            toast.error('Con il difetto "Altro" va descritto il problema');
-            return;
-        }
-
-        if (formValues.customer.trim() === "") {
-            toast.error("Seleziona un cliente");
-            return;
-        }
-
-        if (nextFieldErrors.charger) {
-            toast.error("Seleziona se l'alimentatore è presente");
-            return;
-        }
-
-        if (nextFieldErrors.dataBackup) {
-            toast.error("Seleziona se deve essere effettuato il backup dati");
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
@@ -249,12 +246,14 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                     <div className="flex">
                                         <InputWithAdd
                                             id="client"
+                                            {...fieldErrorAria("client", fieldErrors.client)}
                                             placeholder="Cliente"
                                             inputClassName="rounded-r-none"
                                             value={formValues.customer}
                                             onSearch={searchCustomers}
                                             onChange={(value: string) => {
                                                 setFormValues((prev) => ({ ...prev, customer: value }));
+                                                setFieldErrors((prev) => ({ ...prev, client: undefined }));
                                             }}
                                             required
                                         />
@@ -274,6 +273,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             <TooltipContent>Crea nuovo cliente</TooltipContent>
                                         </Tooltip>
                                     </div>
+                                    <FieldError id="client" error={fieldErrors.client} />
                                 </div>
 
                                 <div className="grid lg:col-span-2 xl:col-span-1">
@@ -333,8 +333,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                     <div className="flex">
                                         <InputWithAdd
                                             id="issue"
+                                            {...fieldErrorAria("issue", fieldErrors.issue)}
                                             placeholder="Cerca il difetto"
-                                            inputClassName={`rounded-r-none ${fieldErrors.issue ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            inputClassName="rounded-r-none"
                                             value={formValues.issue}
                                             options={issueOptions}
                                             onCreate={async (value: string) => {
@@ -347,9 +348,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             }}
                                             onChange={(value: string) => {
                                                 setFormValues((prev) => ({ ...prev, issue: value }));
-                                                if (fieldErrors.issue) {
-                                                    setFieldErrors((prev) => ({ ...prev, issue: false }));
-                                                }
+                                                setFieldErrors((prev) => ({ ...prev, issue: undefined }));
                                             }}
                                             required
                                         />
@@ -369,6 +368,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             <TooltipContent>Crea nuovo difetto</TooltipContent>
                                         </Tooltip>
                                     </div>
+                                    <FieldError id="issue" error={fieldErrors.issue} />
                                 </div>
 
                                 {/*
@@ -383,8 +383,8 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             Problema riscontrato
                                         </Label>
                                         <Textarea
-                                            id="issueDescription"
-                                            className={`text-lg! ${fieldErrors.issueDescription ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            {...fieldProps("issueDescription", { error: fieldErrors.issueDescription })}
+                                            className="text-lg!"
                                             placeholder="Descrivi il problema: è quello che il cliente legge sulla ricevuta"
                                             maxLength={255}
                                             value={formValues.issueDescription}
@@ -393,11 +393,10 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                                     ...prev,
                                                     issueDescription: event.target.value,
                                                 }));
-                                                if (fieldErrors.issueDescription) {
-                                                    setFieldErrors((prev) => ({ ...prev, issueDescription: false }));
-                                                }
+                                                setFieldErrors((prev) => ({ ...prev, issueDescription: undefined }));
                                             }}
                                         />
+                                        <FieldError id="issueDescription" error={fieldErrors.issueDescription} />
                                     </div>
                                 ) : null}
 
@@ -448,14 +447,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                         value={formValues.charger}
                                         onValueChange={(value) => {
                                             setFormValues((prev) => ({ ...prev, charger: value }));
-                                            if (fieldErrors.charger && value !== "unset") {
-                                                setFieldErrors((prev) => ({ ...prev, charger: false }));
+                                            if (value !== "unset") {
+                                                setFieldErrors((prev) => ({ ...prev, charger: undefined }));
                                             }
                                         }}
                                     >
                                         <SelectTrigger
                                             id="charger"
-                                            className={`w-full ${fieldErrors.charger ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            {...fieldErrorAria("charger", fieldErrors.charger)}
+                                            className="w-full"
                                         >
                                             <SelectValue placeholder="Seleziona" />
                                         </SelectTrigger>
@@ -465,6 +465,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             <SelectItem value="no">No</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <FieldError id="charger" error={fieldErrors.charger} />
                                 </div>
 
                                 <div className="grid gap-2 rounded-md">
@@ -475,14 +476,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                         value={formValues.dataBackup}
                                         onValueChange={(value) => {
                                             setFormValues((prev) => ({ ...prev, dataBackup: value }));
-                                            if (fieldErrors.dataBackup && value !== "unset") {
-                                                setFieldErrors((prev) => ({ ...prev, dataBackup: false }));
+                                            if (value !== "unset") {
+                                                setFieldErrors((prev) => ({ ...prev, dataBackup: undefined }));
                                             }
                                         }}
                                     >
                                         <SelectTrigger
                                             id="dataBackup"
-                                            className={`w-full ${fieldErrors.dataBackup ? "border-destructive focus-visible:ring-destructive/40" : ""}`}
+                                            {...fieldErrorAria("dataBackup", fieldErrors.dataBackup)}
+                                            className="w-full"
                                         >
                                             <SelectValue placeholder="Seleziona" />
                                         </SelectTrigger>
@@ -492,6 +494,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             <SelectItem value="no">No</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <FieldError id="dataBackup" error={fieldErrors.dataBackup} />
                                 </div>
                             </div>
                         </section>

@@ -2,7 +2,6 @@ import CreateEntityButton from "@/components/create-entity-button";
 import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
-import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
 import {
@@ -51,12 +50,13 @@ const CustomersPage = () => {
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [searchText, sortOption, pageSize],
     });
-    const { customerRows, totalItems, totalPages, isLoading, loadCustomers } = useCustomersRows({
-        searchText,
-        sortOption,
-        currentPage,
-        pageSize,
-    });
+    const { customerRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadCustomers } =
+        useCustomersRows({
+            searchText,
+            sortOption,
+            currentPage,
+            pageSize,
+        });
 
     const handleCreateCustomer = async (values: CustomerSubmitValues) => {
         await createCustomer(toCustomerPayload(values));
@@ -227,6 +227,9 @@ const CustomersPage = () => {
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="min-h-0 flex-1 overflow-y-auto">
                     <CustomersTable
+                        isInitialLoading={isInitialLoading}
+                        isRefetching={isRefetching}
+                        skeletonRowCount={pageSize}
                         columns={customerColumns}
                         rows={customerRows}
                         onOpenCustomerReports={handleOpenCustomerReports}
@@ -246,10 +249,6 @@ const CustomersPage = () => {
                     onPageSizeChange={setPageSize}
                 />
             </div>
-
-            {isLoading ? (
-                <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-            ) : null}
         </div>
     );
 };

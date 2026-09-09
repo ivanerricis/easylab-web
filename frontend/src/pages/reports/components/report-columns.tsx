@@ -21,6 +21,15 @@ export const reportColumns: ReportColumn[] = [
         render: (row) => row.customer,
     },
     {
+        // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga
+        // (verde/rosso da reports-table.tsx), quindi l'informazione più importante della
+        // pagina era invisibile a chi non distingue i due colori e spariva in stampa.
+        // Stessa formulazione della scheda cliente, che questa colonna ce l'aveva già.
+        key: "closed",
+        header: "Stato",
+        render: (row) => (row.closed ? "Chiuso" : "Aperto"),
+    },
+    {
         key: "customerPhone",
         header: "Telefono",
         render: (row) => row.customerPhone ?? "-",

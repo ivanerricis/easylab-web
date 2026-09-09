@@ -65,6 +65,7 @@ export type CalendarRange = { from: string; to: string };
 export const useCalendarInterventions = (range: CalendarRange | null) => {
     const [events, setEvents] = useState<InterventionCalendarEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // Come in usePaginatedRows: un reload richiesto dopo una modifica può risolversi
     // prima di quello che ha superato, quindi vale solo la risposta più recente.
@@ -123,6 +124,7 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
         } finally {
             if (!controller.signal.aborted && requestId === latestRequestIdRef.current) {
                 setIsLoading(false);
+                setHasLoadedOnce(true);
             }
         }
     }, [range]);
@@ -140,5 +142,15 @@ export const useCalendarInterventions = (range: CalendarRange | null) => {
         []
     );
 
-    return { events, isLoading, loadEvents };
+    return {
+        events,
+        isLoading,
+        /**
+         * Primo caricamento: solo qui ha senso il velo che copre il calendario, perché sotto non
+         * c'è ancora niente. Dopo, cambiare mese ricarica gli interventi e il velo coprirebbe
+         * anche le frecce con cui si cambia mese.
+         */
+        isInitialLoading: isLoading && !hasLoadedOnce,
+        loadEvents,
+    };
 };

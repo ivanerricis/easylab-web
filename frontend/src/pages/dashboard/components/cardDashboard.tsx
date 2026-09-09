@@ -1,4 +1,3 @@
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -35,7 +34,7 @@ const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClic
             }
         >
             <div className="flex items-start justify-between gap-1">
-                <Label className="text-xs sm:text-base">
+                <span className="text-xs sm:text-base">
                     {mobileText ? (
                         <>
                             <span className="sm:hidden">{mobileText}</span>
@@ -44,10 +43,10 @@ const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClic
                     ) : (
                         text
                     )}
-                </Label>
+                </span>
                 <Icon className={cn("size-4 shrink-0 text-muted-foreground sm:size-5", iconColor)} />
             </div>
-            <Label className="text-lg font-bold sm:text-2xl">{number}</Label>
+            <span className="text-lg font-bold sm:text-2xl">{number}</span>
         </div>
     );
 };

@@ -1,9 +1,9 @@
 import {
     Pagination,
+    PaginationButton,
     PaginationContent,
     PaginationEllipsis,
     PaginationItem,
-    PaginationLink,
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
@@ -62,7 +62,11 @@ const TablePagination = ({
         // paginazione resta centrata sulla tabella anche quando i due lati hanno larghezze
         // diverse (ed è il caso normale: "Visualizzati 1-10 di 16" contro il select).
         <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4">
-            <p className="text-sm text-muted-foreground">
+            {/* `role="status"` fa di questa riga l'annuncio dell'esito per chi usa uno screen
+                reader: cambia da sola a ogni ricerca, filtro e cambio pagina, quindi è già la
+                frase giusta ("Visualizzati 1-10 di 16") nel momento giusto. Senza, il
+                contenuto della tabella si rinnovava in silenzio. */}
+            <p role="status" className="text-sm text-muted-foreground">
                 Visualizzati {startItem}-{endItem} di {totalItems}
             </p>
 
@@ -77,15 +81,8 @@ const TablePagination = ({
                         <PaginationContent>
                             <PaginationItem>
                                 <PaginationPrevious
-                                    href="#"
-                                    aria-disabled={currentPage === 1}
-                                    className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                                    onClick={(event) => {
-                                        event.preventDefault();
-                                        if (currentPage > 1) {
-                                            onPageChange(currentPage - 1);
-                                        }
-                                    }}
+                                    disabled={currentPage === 1}
+                                    onClick={() => onPageChange(currentPage - 1)}
                                 />
                             </PaginationItem>
 
@@ -100,33 +97,21 @@ const TablePagination = ({
 
                                 return (
                                     <PaginationItem key={page}>
-                                        <PaginationLink
-                                            href="#"
+                                        <PaginationButton
                                             isActive={page === currentPage}
-                                            onClick={(event) => {
-                                                event.preventDefault();
-                                                onPageChange(page);
-                                            }}
+                                            aria-label={`Vai alla pagina ${page}`}
+                                            onClick={() => onPageChange(page)}
                                         >
                                             {page}
-                                        </PaginationLink>
+                                        </PaginationButton>
                                     </PaginationItem>
                                 );
                             })}
 
                             <PaginationItem>
                                 <PaginationNext
-                                    href="#"
-                                    aria-disabled={currentPage === totalPages}
-                                    className={
-                                        currentPage === totalPages ? "pointer-events-none opacity-50" : undefined
-                                    }
-                                    onClick={(event) => {
-                                        event.preventDefault();
-                                        if (currentPage < totalPages) {
-                                            onPageChange(currentPage + 1);
-                                        }
-                                    }}
+                                    disabled={currentPage === totalPages}
+                                    onClick={() => onPageChange(currentPage + 1)}
                                 />
                             </PaginationItem>
                         </PaginationContent>

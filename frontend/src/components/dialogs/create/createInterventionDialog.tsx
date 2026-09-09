@@ -1,4 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { FieldError } from "@/components/form-field";
+import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,7 @@ import DatePickerField from "@/components/date-picker-field";
 import { createCustomer, getApiErrorMessage, listCollaborators, listCustomers } from "@/lib/api";
 import {
     getInterventionValidationError,
+    type InterventionField,
     interventionDateLabel,
     interventionDescriptionLabel,
     interventionStatusOptions,
@@ -49,6 +52,19 @@ type Props = {
     initialDate?: string;
 };
 
+type FieldErrors = Partial<Record<"customer" | "collaboratorId" | InterventionField, string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = [
+    "customer",
+    "collaboratorId",
+    "interventionDate",
+    "startTime",
+    "endTime",
+    "problem",
+    "description",
+] as const;
+
 const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }: Props) => {
     const [formValues, setFormValues] = useState({
         type: "consegna_materiale" as InterventionType,
@@ -65,6 +81,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
     const [customerIdByOption, setCustomerIdByOption] = useState<Record<string, number>>({});
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
+    const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const isOnSite = isOnSiteInterventionType(formValues.type);
@@ -78,6 +95,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
         }
 
         startTransition(() => {
+            setErrors({});
             setFormValues({
                 type: "consegna_materiale",
                 status: "programmato",
@@ -132,20 +150,31 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
             return;
         }
 
+        // Tutti gli errori in un colpo solo, ciascuno accanto al proprio campo: prima ogni
+        // controllo usciva dalla funzione con un toast, quindi su un form da dieci campi si
+        // scopriva un problema per salvataggio, e il messaggio non diceva dove fosse.
+        const nextErrors: FieldErrors = {};
+
         if (formValues.customer.trim() === "") {
-            toast.error("Seleziona un cliente");
-            return;
+            nextErrors.customer = "Seleziona un cliente";
         }
 
         if (formValues.collaboratorId === "") {
-            toast.error("Seleziona un collaboratore");
-            return;
+            nextErrors.collaboratorId = "Seleziona un collaboratore";
         }
 
         const validationError = getInterventionValidationError(formValues);
 
         if (validationError) {
-            toast.error(validationError);
+            nextErrors[validationError.field] = validationError.message;
+        }
+
+        setErrors(nextErrors);
+
+        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
@@ -208,13 +237,15 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     <div className="flex">
                                         <InputWithAdd
                                             id="customer"
+                                            {...fieldErrorAria("customer", errors.customer)}
                                             placeholder="Cliente"
                                             inputClassName="rounded-r-none"
                                             value={formValues.customer}
                                             onSearch={searchCustomers}
-                                            onChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, customer: value }))
-                                            }
+                                            onChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, customer: value }));
+                                                setErrors((prev) => ({ ...prev, customer: undefined }));
+                                            }}
                                             required
                                         />
                                         <Tooltip>
@@ -233,6 +264,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                             <TooltipContent>Crea nuovo cliente</TooltipContent>
                                         </Tooltip>
                                     </div>
+                                    <FieldError id="customer" error={errors.customer} />
                                 </div>
 
                                 <div className="grid gap-1">
@@ -241,11 +273,16 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     </Label>
                                     <Select
                                         value={formValues.collaboratorId}
-                                        onValueChange={(value) =>
-                                            setFormValues((prev) => ({ ...prev, collaboratorId: value }))
-                                        }
+                                        onValueChange={(value) => {
+                                            setFormValues((prev) => ({ ...prev, collaboratorId: value }));
+                                            setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
+                                        }}
                                     >
-                                        <SelectTrigger id="collaboratorId" className="w-full">
+                                        <SelectTrigger
+                                            id="collaboratorId"
+                                            {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
+                                            className="w-full"
+                                        >
                                             <SelectValue placeholder="Seleziona collaboratore" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -256,6 +293,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <FieldError id="collaboratorId" error={errors.collaboratorId} />
                                 </div>
                             </div>
                         </section>
@@ -318,11 +356,14 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     </Label>
                                     <DatePickerField
                                         id="interventionDate"
+                                        {...fieldErrorAria("interventionDate", errors.interventionDate)}
                                         value={formValues.interventionDate}
-                                        onValueChange={(value) =>
-                                            setFormValues((prev) => ({ ...prev, interventionDate: value }))
-                                        }
+                                        onValueChange={(value) => {
+                                            setFormValues((prev) => ({ ...prev, interventionDate: value }));
+                                            setErrors((prev) => ({ ...prev, interventionDate: undefined }));
+                                        }}
                                     />
+                                    <FieldError id="interventionDate" error={errors.interventionDate} />
                                 </div>
 
                                 {isOnSite ? (
@@ -338,16 +379,18 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                                 ) : null}
                                             </Label>
                                             <Input
-                                                id="startTime"
+                                                {...fieldProps("startTime", { error: errors.startTime })}
                                                 type="time"
                                                 value={formValues.startTime}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setFormValues((prev) => ({
                                                         ...prev,
                                                         startTime: event.target.value,
-                                                    }))
-                                                }
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, startTime: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="startTime" error={errors.startTime} />
                                         </div>
 
                                         <div className="grid gap-1">
@@ -361,13 +404,15 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                                 ) : null}
                                             </Label>
                                             <Input
-                                                id="endTime"
+                                                {...fieldProps("endTime", { error: errors.endTime })}
                                                 type="time"
                                                 value={formValues.endTime}
-                                                onChange={(event) =>
-                                                    setFormValues((prev) => ({ ...prev, endTime: event.target.value }))
-                                                }
+                                                onChange={(event) => {
+                                                    setFormValues((prev) => ({ ...prev, endTime: event.target.value }));
+                                                    setErrors((prev) => ({ ...prev, endTime: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="endTime" error={errors.endTime} />
                                         </div>
                                     </div>
                                 ) : null}
@@ -378,15 +423,17 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                             Problema
                                         </Label>
                                         <Textarea
-                                            id="problem"
+                                            {...fieldProps("problem", { error: errors.problem })}
                                             className="resize-none text-lg!"
                                             rows={4}
                                             placeholder="Descrivi il problema riscontrato"
                                             value={formValues.problem}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({ ...prev, problem: event.target.value }))
-                                            }
+                                            onChange={(event) => {
+                                                setFormValues((prev) => ({ ...prev, problem: event.target.value }));
+                                                setErrors((prev) => ({ ...prev, problem: undefined }));
+                                            }}
                                         />
+                                        <FieldError id="problem" error={errors.problem} />
                                     </div>
                                 ) : null}
 
@@ -398,7 +445,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                         ) : null}
                                     </Label>
                                     <Textarea
-                                        id="description"
+                                        {...fieldProps("description", { error: errors.description })}
                                         className="resize-none text-lg!"
                                         rows={4}
                                         placeholder={
@@ -407,10 +454,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                                 : "Descrivi l'assistenza effettuata"
                                         }
                                         value={formValues.description}
-                                        onChange={(event) =>
-                                            setFormValues((prev) => ({ ...prev, description: event.target.value }))
-                                        }
+                                        onChange={(event) => {
+                                            setFormValues((prev) => ({ ...prev, description: event.target.value }));
+                                            setErrors((prev) => ({ ...prev, description: undefined }));
+                                        }}
                                     />
+                                    <FieldError id="description" error={errors.description} />
                                 </div>
 
                                 <div className="grid gap-1 lg:col-span-2">

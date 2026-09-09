@@ -6,6 +6,10 @@ import { CalendarDays } from "lucide-react";
 
 type Props = {
     id?: string;
+    /** Segnala il campo come invalido: accende il bordo rosso del pulsante. */
+    "aria-invalid"?: boolean;
+    /** L'id del paragrafo d'errore, così lo screen reader lo legge insieme al campo. */
+    "aria-describedby"?: string;
     value: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
@@ -33,7 +37,15 @@ const formatDateValue = (date: Date) => {
     return `${year}-${month}-${day}`;
 };
 
-const DatePickerField = ({ id, value, onValueChange, placeholder = "Seleziona data", className }: Props) => {
+const DatePickerField = ({
+    id,
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": ariaDescribedBy,
+    value,
+    onValueChange,
+    placeholder = "Seleziona data",
+    className,
+}: Props) => {
     const selectedDate = parseDateValue(value);
     const label = selectedDate
         ? new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(selectedDate)
@@ -44,6 +56,8 @@ const DatePickerField = ({ id, value, onValueChange, placeholder = "Seleziona da
             <PopoverTrigger asChild>
                 <Button
                     id={id}
+                    aria-invalid={ariaInvalid}
+                    aria-describedby={ariaDescribedBy}
                     type="button"
                     variant="outline"
                     className={cn("w-full justify-start gap-2 text-lg! font-normal", className)}

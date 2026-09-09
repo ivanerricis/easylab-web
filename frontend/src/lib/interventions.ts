@@ -46,24 +46,46 @@ type InterventionFormValues = {
     endTime: string;
 };
 
+/** I campi dell'intervento che possono risultare invalidi, cioè avere un errore accanto. */
+export type InterventionField = "description" | "interventionDate" | "problem" | "startTime" | "endTime";
+
+export type InterventionValidationError = {
+    /** Su quale campo va mostrato il messaggio. */
+    field: InterventionField;
+    message: string;
+};
+
 /**
- * Primo messaggio d'errore per i campi comuni ai dialoghi di creazione e modifica, o `null`
- * se sono validi. Vive qui perché le due finestre applicavano la stessa regola ciascuna per
- * conto proprio, ed è comportamento: due copie sono due occasioni perché una cambi da sola.
+ * Primo errore per i campi comuni ai dialoghi di creazione e modifica, o `null` se sono
+ * validi. Vive qui perché le due finestre applicavano la stessa regola ciascuna per conto
+ * proprio, ed è comportamento: due copie sono due occasioni perché una cambi da sola.
  * Il server riapplica gli stessi controlli, questo serve a dirlo prima e in italiano.
+ *
+ * Restituisce il campo insieme al messaggio: prima tornava solo la stringa, che i dialoghi
+ * potevano soltanto mostrare in un toast — un avviso staccato dal campo che lo riguardava, su
+ * un form da dieci campi in cui "Indica il problema riscontrato" non dice dove sia il
+ * problema. Con il campo, lo stesso messaggio va sotto il controllo giusto e il focus può
+ * andarci sopra.
  */
-export const getInterventionValidationError = (values: InterventionFormValues): string | null => {
+export const getInterventionValidationError = (values: InterventionFormValues): InterventionValidationError | null => {
     const scheduled = isScheduledInterventionStatus(values.status);
     const isOnSite = isOnSiteInterventionType(values.type);
 
     if (!scheduled && values.description.trim() === "") {
-        return values.type === "consegna_materiale"
-            ? "Indica i materiali da consegnare"
-            : "Indica il tipo di assistenza effettuata";
+        return {
+            field: "description",
+            message:
+                values.type === "consegna_materiale"
+                    ? "Indica i materiali da consegnare"
+                    : "Indica il tipo di assistenza effettuata",
+        };
     }
 
     if (values.interventionDate.trim() === "") {
-        return isOnSite ? "Seleziona la data dell'intervento" : "Seleziona la data di consegna";
+        return {
+            field: "interventionDate",
+            message: isOnSite ? "Seleziona la data dell'intervento" : "Seleziona la data di consegna",
+        };
     }
 
     if (!isOnSite) {
@@ -71,17 +93,20 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
     }
 
     if (values.problem.trim() === "") {
-        return "Indica il problema riscontrato";
+        return { field: "problem", message: "Indica il problema riscontrato" };
     }
 
     if (!scheduled && (values.startTime.trim() === "" || values.endTime.trim() === "")) {
-        return "Indica l'ora di inizio e di fine assistenza";
+        return {
+            field: values.startTime.trim() === "" ? "startTime" : "endTime",
+            message: "Indica l'ora di inizio e di fine assistenza",
+        };
     }
 
     // Vale anche per un intervento programmato: se gli orari sono stati indicati, devono
     // avere senso fra loro.
     if (values.startTime !== "" && values.endTime !== "" && values.startTime >= values.endTime) {
-        return "L'ora di fine deve essere successiva all'ora di inizio";
+        return { field: "endTime", message: "L'ora di fine deve essere successiva all'ora di inizio" };
     }
 
     return null;

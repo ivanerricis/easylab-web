@@ -13,6 +13,10 @@ type InterventionsTableProps = {
     onPrintIntervention: (id: number) => void;
     onSendEmailIntervention: (id: number) => void;
     onDeleteIntervention: (intervention: InterventionDto) => void;
+    /** Stati di caricamento della lista: vedi `EntityTable`. */
+    isInitialLoading?: boolean;
+    isRefetching?: boolean;
+    skeletonRowCount?: number;
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
@@ -38,6 +42,9 @@ const InterventionsTable = ({
     onPrintIntervention,
     onSendEmailIntervention,
     onDeleteIntervention,
+    isInitialLoading,
+    isRefetching,
+    skeletonRowCount,
 }: InterventionsTableProps) => {
     const renderRowActions = (row: InterventionDto) => (
         <>
@@ -58,20 +65,20 @@ const InterventionsTable = ({
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-yellow-400/20 hover:bg-yellow-400/30"
+                className="bg-action-print/20 hover:bg-action-print/30"
                 onClick={() => onPrintIntervention(row.id)}
                 aria-label={`Stampa intervento ${row.id}`}
             >
-                <Printer className="size-5 text-yellow-400" />
+                <Printer className="size-5 text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-sky-400/20 hover:bg-sky-400/30"
+                className="bg-action-email/20 hover:bg-action-email/30"
                 onClick={() => onSendEmailIntervention(row.id)}
                 aria-label={`Invia email intervento ${row.id}`}
             >
-                <Mail className="size-5 text-sky-500" />
+                <Mail className="size-5 text-action-email" />
             </TableActionButton>
             <TableActionButton
                 variant="destructive"
@@ -95,6 +102,10 @@ const InterventionsTable = ({
             getRowStatusColor={(row) => statusColorByStatus[row.status]}
             getAccentClassName={(row) => accentClassNameByStatus[row.status]}
             onRowOpen={(row) => onOpenIntervention(row.id)}
+            isInitialLoading={isInitialLoading}
+            isRefetching={isRefetching}
+            skeletonRowCount={skeletonRowCount}
+            titleColumnKey={"customer"}
         />
     );
 };

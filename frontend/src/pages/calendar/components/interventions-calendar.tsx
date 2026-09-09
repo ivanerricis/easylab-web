@@ -115,11 +115,24 @@ type Props = Readonly<{
     className?: string;
     events: InterventionCalendarEvent[];
     isLoading: boolean;
+    /**
+     * Primo caricamento: solo qui va il velo che copre il calendario. Dopo, ogni cambio di mese
+     * ricarica gli interventi, e un velo su ogni cambio coprirebbe le frecce stesse con cui si
+     * sta sfogliando.
+     */
+    isInitialLoading: boolean;
     onCreateIntervention: (values: CreateInterventionSubmitValues) => Promise<void> | void;
     onRangeChange: (range: CalendarRange) => void;
 }>;
 
-const InterventionsCalendar = ({ className, events, isLoading, onCreateIntervention, onRangeChange }: Props) => {
+const InterventionsCalendar = ({
+    className,
+    events,
+    isLoading,
+    isInitialLoading,
+    onCreateIntervention,
+    onRangeChange,
+}: Props) => {
     const navigate = useNavigate();
     const [view, setView] = useState<View>(() => getStoredCalendarView());
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -162,8 +175,13 @@ const InterventionsCalendar = ({ className, events, isLoading, onCreateIntervent
     };
 
     return (
-        <Card className={cn("relative flex flex-col", className)}>
-            <CardContent className="h-full overflow-x-auto">
+        <Card className={cn("relative flex flex-col", className)} aria-busy={isLoading}>
+            <CardContent
+                className={cn(
+                    "h-full overflow-x-auto",
+                    isLoading && !isInitialLoading && "opacity-60 transition-opacity"
+                )}
+            >
                 <Calendar
                     localizer={localizer}
                     culture="it"
@@ -189,7 +207,7 @@ const InterventionsCalendar = ({ className, events, isLoading, onCreateIntervent
                 initialDate={initialInterventionDate}
             />
 
-            {isLoading ? (
+            {isInitialLoading ? (
                 <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
             ) : null}
         </Card>

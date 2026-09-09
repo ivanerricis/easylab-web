@@ -92,6 +92,7 @@ const DashboardPage = () => {
     const {
         events: calendarEvents,
         isLoading: isCalendarLoading,
+        isInitialLoading: isCalendarInitialLoading,
         loadEvents: loadCalendarEvents,
     } = useCalendarInterventions(calendarRange);
     const [selectedRevenueMonth, setSelectedRevenueMonth] = useState(() => getMonthKey(new Date()));
@@ -103,6 +104,11 @@ const DashboardPage = () => {
     const [inProgressInterventions, setInProgressInterventions] = useState(0);
     const [completedInterventions, setCompletedInterventions] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    // Come nelle liste: il velo che copre tutto ha senso solo quando non c'è ancora niente
+    // da vedere. Dal secondo caricamento in poi (cambio mese, pulsante Aggiorna) i numeri
+    // precedenti restano leggibili e attenuati, così cliccare due volte la freccia del mese
+    // non finisce contro un velo che intercetta il clic.
+    const [hasLoadedMetricsOnce, setHasLoadedMetricsOnce] = useState(false);
 
     const selectedRevenueLabel = useMemo(() => getMonthLabel(selectedRevenueMonth), [selectedRevenueMonth]);
 
@@ -137,6 +143,7 @@ const DashboardPage = () => {
             toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
         } finally {
             setIsLoading(false);
+            setHasLoadedMetricsOnce(true);
         }
     };
 
@@ -245,7 +252,13 @@ const DashboardPage = () => {
                 }
             />
 
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-start sm:gap-4">
+            <div
+                aria-busy={isLoading}
+                className={cn(
+                    "grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-start sm:gap-4",
+                    isLoading && hasLoadedMetricsOnce && "opacity-60 transition-opacity"
+                )}
+            >
                 <CardDashboard
                     text="Report aperti"
                     mobileText="Aperti"
@@ -276,7 +289,7 @@ const DashboardPage = () => {
                     mobileText="In lavorazione"
                     icon={Loader}
                     number={String(inProgressInterventions)}
-                    iconColor="text-yellow-400"
+                    iconColor="text-action-print"
                     onClick={() => goToInterventionsPage("in_lavorazione")}
                 />
                 <CardDashboard
@@ -299,7 +312,7 @@ const DashboardPage = () => {
                                 <span className="truncate text-xs font-medium text-primary sm:text-base">
                                     Incassi mese
                                 </span>
-                                <Euro className="size-4 shrink-0 text-yellow-400 sm:size-5" />
+                                <Euro className="size-4 shrink-0 text-action-print sm:size-5" />
                             </div>
                             <span
                                 className="text-lg font-bold tracking-widest sm:text-2xl"
@@ -410,12 +423,13 @@ const DashboardPage = () => {
                     className="h-[calc(100vh-16rem)] min-h-[24rem] sm:min-h-[28rem]"
                     events={calendarEvents}
                     isLoading={isCalendarLoading}
+                    isInitialLoading={isCalendarInitialLoading}
                     onCreateIntervention={handleCreateIntervention}
                     onRangeChange={handleCalendarRangeChange}
                 />
             </Suspense>
 
-            {isLoading ? (
+            {isLoading && !hasLoadedMetricsOnce ? (
                 <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
             ) : null}
 

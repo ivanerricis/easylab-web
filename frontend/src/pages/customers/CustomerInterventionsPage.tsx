@@ -1,10 +1,10 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import EntityCardList from "@/components/entity-card-list";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import OpenEntityButton from "@/components/open-entity-button";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import TablePagination from "@/components/table-pagination";
@@ -65,6 +65,7 @@ const CustomerInterventionsPage = () => {
     const customerId = Number(id);
     const [isLoading, setIsLoading] = useState(true);
     const [customerName, setCustomerName] = useState("Cliente");
+    useDocumentTitle(`Interventi di ${customerName}`);
     const [interventionRows, setInterventionRows] = useState<CustomerInterventionRow[]>([]);
     const [statusFilter, setStatusFilter] = useState<InterventionStatusFilter>("all");
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -182,7 +183,7 @@ const CustomerInterventionsPage = () => {
                                 aria-label="Stampa resoconto interventi"
                             >
                                 <Printer className="size-5" />
-                                <Label className="hidden text-lg lg:inline">Stampa</Label>
+                                <span className="hidden text-lg lg:inline">Stampa</span>
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>Stampa resoconto interventi</TooltipContent>

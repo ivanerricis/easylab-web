@@ -12,6 +12,10 @@ type ReportsTableProps = {
     onEditReport: (id: number) => void;
     onPrintReport: (id: number) => void;
     onDeleteReport: (report: ReportDto) => void;
+    /** Stati di caricamento della lista: vedi `EntityTable`. */
+    isInitialLoading?: boolean;
+    isRefetching?: boolean;
+    skeletonRowCount?: number;
 };
 
 const getAccentClassName = (row: ReportDto) => (row.closed ? "border-t-green-500" : "border-t-red-500");
@@ -28,6 +32,9 @@ const ReportsTable = ({
     onEditReport,
     onPrintReport,
     onDeleteReport,
+    isInitialLoading,
+    isRefetching,
+    skeletonRowCount,
 }: ReportsTableProps) => {
     const renderRowActions = (row: ReportDto) => (
         <>
@@ -48,11 +55,11 @@ const ReportsTable = ({
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-yellow-400/20 hover:bg-yellow-400/30"
+                className="bg-action-print/20 hover:bg-action-print/30"
                 onClick={() => onPrintReport(row.id)}
                 aria-label={`Stampa report ${row.id}`}
             >
-                <Printer className="size-5 text-yellow-400" />
+                <Printer className="size-5 text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="destructive"
@@ -76,6 +83,10 @@ const ReportsTable = ({
             getRowStatusColor={getStatusColor}
             getAccentClassName={getAccentClassName}
             onRowOpen={(row) => onOpenReport(row.id)}
+            isInitialLoading={isInitialLoading}
+            isRefetching={isRefetching}
+            skeletonRowCount={skeletonRowCount}
+            titleColumnKey={"customer"}
         />
     );
 };

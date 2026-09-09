@@ -23,6 +23,8 @@ body,
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-action-print: var(--action-print);
+  --color-action-email: var(--action-email);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -70,6 +72,17 @@ body,
   --popover-foreground: oklch(0.141 0.005 285.823);
   --primary: #2A75B9;
   --primary-foreground: oklch(0.977 0.013 236.62);
+  /* Le icone delle azioni di riga (stampa, email) erano scritte a mano nei componenti come
+     text-yellow-400 e text-sky-500. Oltre a essere colori grezzi fuori dal sistema di token,
+     su fondo chiaro non si vedevano: misurati, 1.57:1 il giallo e 2.71:1 l'azzurro, contro il
+     3:1 che WCAG 1.4.11 chiede agli oggetti grafici (la soglia degli oggetti grafici, non i
+     4.5:1 del testo).
+
+     In tema chiaro servono quindi più scuri: 3.26:1 e 4.05:1. Il giallo resta all'hue 85 e
+     non scivola nell'arancione, per la stessa ragione spiegata sotto per le righe di stato.
+     In tema scuro i valori originali vanno benissimo (12.68:1 e 7.33:1) e restano quelli. */
+  --action-print: oklch(0.65 0.15 85);
+  --action-email: oklch(0.58 0.16 237);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
@@ -108,6 +121,10 @@ body,
   --popover-foreground: oklch(0.985 0 0);
   --primary: #2A75B9;
   --primary-foreground: oklch(0.977 0.013 236.62);
+  /* Su fondo scuro i colori vividi originali (yellow-400 e sky-500) hanno già contrasto
+     abbondante: 12.68:1 e 7.33:1. */
+  --action-print: oklch(0.852 0.199 91.936);
+  --action-email: oklch(0.685 0.169 237.323);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
@@ -321,4 +338,38 @@ html[data-font-size="sm"] {
 
 html[data-font-size="lg"] {
   font-size: 18px;
+}
+/* Chrome/Edge aggiungono una loro X dentro input[type="search"], che si sommerebbe al
+   pulsante di pulizia disegnato da search-input.tsx: due X di fila, di cui una fuori
+   dai colori del tema e senza etichetta accessibile. Il tipo "search" resta perché è
+   quello che descrive il campo (e attiva la tastiera con "Cerca" su mobile). */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Chi ha chiesto al sistema operativo di ridurre le animazioni le riceve quasi azzerate:
+   non "un po' più corte", perché il problema di chi soffre di motion sickness non è la
+   durata ma il movimento in sé. Restano 0.01ms invece di 0 perché gli eventi
+   animationend/transitionend continuano a scattare, e il codice che li aspetta non si
+   blocca. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* L'eccezione sono gli indicatori di caricamento: lì la rotazione non è decorazione,
+     è l'unica cosa che distingue "sto lavorando" da "sono bloccato". Restano girando,
+     più lentamente. Motion ridotto vuol dire togliere il movimento inutile, non
+     l'informazione. */
+  [data-slot="spinner"] {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

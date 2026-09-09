@@ -31,24 +31,34 @@ export const useInterventionsRows = ({
         "createdAt" | "interventionDate" | "customer",
         "asc" | "desc",
     ];
-    const { rows, totalItems, totalPages, isLoading, reload, updateRow } = usePaginatedRows<InterventionDto>({
-        fetchRows: (signal) =>
-            listInterventions({
-                page: currentPage,
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
+        usePaginatedRows<InterventionDto>({
+            fetchRows: (signal) =>
+                listInterventions({
+                    page: currentPage,
+                    pageSize,
+                    search: debouncedSearchText,
+                    status: statusFilter,
+                    type: typeFilter,
+                    sortBy,
+                    sortOrder,
+                    dateFrom,
+                    dateTo,
+                    signal,
+                }),
+            queryKey: [
+                currentPage,
                 pageSize,
-                search: debouncedSearchText,
-                status: statusFilter,
-                type: typeFilter,
-                sortBy,
-                sortOrder,
+                debouncedSearchText,
+                statusFilter,
+                typeFilter,
+                sortOption,
                 dateFrom,
                 dateTo,
-                signal,
-            }),
-        queryKey: [currentPage, pageSize, debouncedSearchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo],
-        errorMessage: "Impossibile caricare gli interventi",
-        initialLoading: false,
-    });
+            ],
+            errorMessage: "Impossibile caricare gli interventi",
+            initialLoading: false,
+        });
 
     const updateInterventionRow = useCallback(
         (interventionId: number, updater: (intervention: InterventionDto) => InterventionDto) => {
@@ -62,6 +72,8 @@ export const useInterventionsRows = ({
         totalItems,
         totalPages,
         isLoading,
+        isInitialLoading,
+        isRefetching,
         loadInterventions: reload,
         updateInterventionRow,
     };

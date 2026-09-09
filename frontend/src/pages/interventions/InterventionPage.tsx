@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import EditInterventionDialog, {
@@ -59,6 +60,7 @@ const InterventionPage = () => {
     const interventionId = Number(id);
     const [isLoading, setIsLoading] = useState(true);
     const [details, setDetails] = useState<InterventionPageDetails | null>(null);
+    useDocumentTitle(details ? `Intervento #${details.intervention.id} - ${details.customerName}` : "Intervento");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     const hasValidInterventionId = useMemo(

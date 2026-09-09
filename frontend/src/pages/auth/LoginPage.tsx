@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { useAuth } from "@/components/use-auth";
  * password, che è il comportamento giusto.
  */
 const LoginPage = () => {
+    useDocumentTitle("Accesso");
     const { login, completeTwoFactorLogin } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();

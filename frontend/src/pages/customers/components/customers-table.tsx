@@ -13,6 +13,10 @@ type CustomersTableProps = {
     onPrintCustomerInterventions: (id: number) => void;
     onEditCustomer: (id: number) => void;
     onDeleteCustomer: (customer: CustomerDto) => void;
+    /** Stati di caricamento della lista: vedi `EntityTable`. */
+    isInitialLoading?: boolean;
+    isRefetching?: boolean;
+    skeletonRowCount?: number;
 };
 
 const CustomersTable = ({
@@ -24,44 +28,47 @@ const CustomersTable = ({
     onPrintCustomerInterventions,
     onEditCustomer,
     onDeleteCustomer,
+    isInitialLoading,
+    isRefetching,
+    skeletonRowCount,
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
         <>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-yellow-400/20 hover:bg-yellow-400/30"
+                className="bg-action-print/20 hover:bg-action-print/30"
                 onClick={() => onOpenCustomerReports(row.id)}
                 aria-label={`Apri report cliente ${row.id}`}
             >
-                <ClipboardList className="size-5 text-yellow-400" />
+                <ClipboardList className="size-5 text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-sky-400/20 hover:bg-sky-400/30"
+                className="bg-action-email/20 hover:bg-action-email/30"
                 onClick={() => onOpenCustomerInterventions(row.id)}
                 aria-label={`Apri interventi cliente ${row.id}`}
             >
-                <HardHat className="size-5 text-sky-500" />
+                <HardHat className="size-5 text-action-email" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-yellow-400/20 hover:bg-yellow-400/30"
+                className="bg-action-print/20 hover:bg-action-print/30"
                 onClick={() => onPrintCustomerReports(row.id)}
                 aria-label={`Stampa resoconto report cliente ${row.id}`}
             >
-                <Printer className="size-5 text-yellow-400" />
+                <Printer className="size-5 text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-sky-400/20 hover:bg-sky-400/30"
+                className="bg-action-email/20 hover:bg-action-email/30"
                 onClick={() => onPrintCustomerInterventions(row.id)}
                 aria-label={`Stampa resoconto interventi cliente ${row.id}`}
             >
-                <Printer className="size-5 text-sky-500" />
+                <Printer className="size-5 text-action-email" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
@@ -91,6 +98,9 @@ const CustomersTable = ({
             getRowKey={(row) => row.id}
             emptyMessage="Nessun cliente disponibile."
             renderRowActions={renderRowActions}
+            isInitialLoading={isInitialLoading}
+            isRefetching={isRefetching}
+            skeletonRowCount={skeletonRowCount}
         />
     );
 };

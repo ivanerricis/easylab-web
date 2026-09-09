@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const TechnicianPage = () => {
     const technicianId = Number(id);
     const [isLoading, setIsLoading] = useState(true);
     const [technicianName, setTechnicianName] = useState("Tecnico");
+    useDocumentTitle(technicianName);
     const [reportCards, setReportCards] = useState<TechnicianReportCard[]>([]);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

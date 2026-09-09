@@ -18,7 +18,6 @@ import {
 import { useState } from "react";
 import type { ReportDto } from "@/types/dtos";
 import { toast } from "sonner";
-import LoadingPage from "@/components/loadingPage";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { reportColumns } from "./components/report-columns";
 import ReportsFilters from "./components/reports-filters";
@@ -66,7 +65,16 @@ const ReportsPage = () => {
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [searchText, visibilityFilter, sortOption, dateFrom, dateTo, pageSize],
     });
-    const { reportRows, totalItems, totalPages, isLoading, loadReports, updateReportRow } = useReportsRows({
+    const {
+        reportRows,
+        totalItems,
+        totalPages,
+        isLoading,
+        isInitialLoading,
+        isRefetching,
+        loadReports,
+        updateReportRow,
+    } = useReportsRows({
         searchText,
         visibilityFilter,
         sortOption,
@@ -261,6 +269,9 @@ const ReportsPage = () => {
                 <div className="flex min-h-0 flex-1 flex-col gap-4">
                     <div className="min-h-0 flex-1 overflow-y-auto">
                         <ReportsTable
+                            isInitialLoading={isInitialLoading}
+                            isRefetching={isRefetching}
+                            skeletonRowCount={pageSize}
                             columns={reportColumns}
                             rows={reportRows}
                             onOpenReport={handleOpenReport}
@@ -278,10 +289,6 @@ const ReportsPage = () => {
                         onPageSizeChange={setPageSize}
                     />
                 </div>
-
-                {isLoading ? (
-                    <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-                ) : null}
             </>
         </div>
     );

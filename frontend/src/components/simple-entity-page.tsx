@@ -2,7 +2,6 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import CreateEntityButton from "@/components/create-entity-button";
 import EntityCrudTable from "@/components/entity-crud-table";
 import type { EntityColumn } from "@/components/entity-table";
-import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
 import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
@@ -112,13 +111,21 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     const [isDeleting, setIsDeleting] = useState(false);
     const [pageSize, setPageSize] = useTableRowsPerPage(tableKey);
     const { currentPage, setCurrentPage } = useTablePagination({ resetDependencies: [searchText, pageSize] });
-    const { rows, totalItems, totalPages, isLoading, reload } = useSearchableRows<TRow>({
-        fetchRows: listRows,
-        searchText,
-        currentPage,
-        pageSize,
-        errorMessage: loadErrorMessage,
-    });
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } = useSearchableRows<TRow>(
+        {
+            fetchRows: listRows,
+            searchText,
+            currentPage,
+            pageSize,
+            errorMessage: loadErrorMessage,
+        }
+    );
+
+    // Due vuoti diversi meritano due frasi diverse: una lista vuota è un invito a creare il
+    // primo elemento, una ricerca senza esiti è un vicolo cieco da cui bisogna poter uscire —
+    // e chi cerca "mrio" per errore deve capire che il problema è quello che ha scritto.
+    const resolvedEmptyMessage =
+        searchText.trim() === "" ? emptyMessage : `Nessun risultato per "${searchText.trim()}".`;
 
     const handleCreate = async (values: TValues) => {
         await onCreate(values);
@@ -218,12 +225,15 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                         tableKey={tableKey}
                         columns={columns}
                         rows={rows}
-                        emptyMessage={emptyMessage}
+                        emptyMessage={resolvedEmptyMessage}
                         entityLabel={entityLabel}
                         onOpen={onOpenRow}
                         onEdit={handleOpenEditDialog}
                         onDelete={handleOpenDeleteDialog}
                         isRowLocked={isRowLocked}
+                        isInitialLoading={isInitialLoading}
+                        isRefetching={isRefetching}
+                        skeletonRowCount={pageSize}
                     />
                 </div>
                 <TablePagination
@@ -235,10 +245,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                     onPageSizeChange={setPageSize}
                 />
             </div>
-
-            {isLoading ? (
-                <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-            ) : null}
         </div>
     );
 };

@@ -11,7 +11,6 @@ import {
     DialogTrigger,
 } from "../ui/dialog";
 import { Save, Trash } from "lucide-react";
-import { Label } from "../ui/label";
 
 type Props = Readonly<{
     content?: ReactNode;
@@ -124,7 +123,7 @@ const CustomDialog = ({
                                     disabled={confirmDisabled}
                                 >
                                     {destructive ? <Trash className="size-5" /> : <Save className="size-5" />}
-                                    <Label className="text-lg">{confirmLabel}</Label>
+                                    <span className="text-lg">{confirmLabel}</span>
                                 </Button>
                             )}
                         </DialogFooter>

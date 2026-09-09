@@ -11,6 +11,152 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Revisione UI/UX: accessibilità, stati di caricamento, validazione dei form
+
+**Cosa.** Diciotto correzioni emerse da una revisione dell'interfaccia condotta con la skill
+`ui-ux-pro-max` (database locale di linee guida UX, interrogato per stack React). Le tre più
+sostanziali: il velo di caricamento non copre più la pagina a ogni ricerca, lo stato dei report
+è scritto e non solo colorato, e gli errori di validazione dei dialoghi stanno sotto il campo
+che li riguarda invece che in un toast.
+
+### Caricamenti: primo caricamento e ricarica non sono la stessa cosa
+
+**Il perché.** [usePaginatedRows.ts](../frontend/src/hooks/usePaginatedRows.ts) esponeva un solo
+`isLoading`, e tutte le pagine-lista lo usavano per alzare un `LoadingPage` con
+`absolute inset-0 bg-background/70 backdrop-blur-sm`. Quel velo copriva tutta la pagina — campo
+di ricerca compreso — e siccome `isLoading` è vero anche per le *ricariche*, digitando nella
+ricerca compariva a ogni pausa di battitura (300ms di debounce). Il div non aveva
+`pointer-events-none`, quindi durante quel lampo il campo in cui si stava scrivendo non era
+nemmeno cliccabile.
+
+**Le scelte.** L'hook distingue ora `isInitialLoading` da `isRefetching`:
+
+- **primo caricamento** → righe-scheletro in tabella (`Skeleton`, che il progetto aveva già in
+  `components/ui` e che non usava nessuno) e schede-scheletro su mobile;
+- **ricarica** → i dati precedenti restano visibili e leggibili, appena attenuati
+  (`opacity-60`), con `aria-busy` sulla tabella.
+
+Misurato con Playwright su `/reports`: lo spostamento verticale del layout al primo caricamento
+scende **da 510px a 80px**, perché lo scheletro occupa lo spazio che i dati occuperanno; durante
+la ricerca l'opacità va a 0.6 senza velo e il campo resta cliccabile per tutta la durata.
+
+`isInitialLoading` è `!hasLoadedOnce` e non `isLoading && !hasLoadedOnce`: fra il montaggio e la
+partenza effettiva della richiesta c'è una finestra in cui `isLoading` è ancora falso, e
+sull'elenco report bastava a far lampeggiare "Nessun report disponibile." un istante prima dei
+dati. `hasLoadedOnce` si segna nel `finally`, non solo in caso di successo, altrimenti un primo
+caricamento fallito lascerebbe lo scheletro per sempre.
+
+Stessa logica per il calendario ([useCalendarInterventions.ts](../frontend/src/pages/calendar/hooks/useCalendarInterventions.ts))
+e per le statistiche della dashboard: lì il velo copriva le frecce con cui si cambia mese, ed è
+proprio il cambio mese a ricaricare.
+
+La transizione di rotta finta di [MainLayout.tsx](../frontend/src/pages/MainLayout.tsx) — un velo
+di 150ms fissi a **ogni** navigazione, anche a pagina già pronta — è sostituita da un confine
+`Suspense` attorno all'`Outlet`. Le rotte sono già `lazy` in `App.tsx`, ma quel `Suspense` sta
+sopra le rotte: mentre arrivava il chunk faceva sparire anche barra laterale e intestazione.
+Ora l'attesa si vede solo quando c'è davvero, e la struttura dell'applicazione resta in piedi.
+
+### Accessibilità
+
+**Il perché.** Sull'elenco report aperto/chiuso era comunicato **solo** dal colore della riga
+(WCAG 1.4.1): invisibile a chi non distingue i due colori, e perso in stampa. La scheda cliente
+aveva già una colonna "Stato" con le parole giuste; l'elenco principale no.
+
+**Le scelte e il resto degli interventi.**
+
+- Colonna **Stato** ("Aperto"/"Chiuso") in [report-columns.tsx](../frontend/src/pages/reports/components/report-columns.tsx),
+  con la stessa formulazione della scheda cliente.
+- **Skip link** "Vai al contenuto" come primo elemento focusabile: con nove voci di barra
+  laterale servivano una dozzina di tab per arrivare alla tabella, a ogni pagina.
+- La **paginazione** era fatta di `<a href="#">` con il click annullato. Le voci disabilitate
+  restavano raggiungibili col tab (`opacity-50` e `pointer-events-none` non tolgono il focus da
+  tastiera) e si annunciavano come collegamenti. Ora sono `<button disabled>`, con lo stato
+  disabilitato nativo. La pagina corrente usa la variante piena invece del solo bordo:
+  `outline` contro `ghost` era un pixel di contorno per l'unico elemento che dice dove sei.
+- Il conteggio "Visualizzati 1-10 di 16" diventa `role="status"`: è già la frase giusta nel
+  momento giusto, e copre ricerca, filtri e cambio pagina per chi usa uno screen reader. Prima
+  la tabella si rinnovava in silenzio.
+- **`document.title` per pagina** ([useDocumentTitle.ts](../frontend/src/hooks/useDocumentTitle.ts)):
+  è un gestionale che si usa con più schede aperte, e si chiamavano tutte "EasyLab".
+- **`prefers-reduced-motion`** non compariva in tutta la codebase. La regola azzera animazioni e
+  transizioni, con un'eccezione dichiarata: gli indicatori di caricamento (`data-slot="spinner"`)
+  continuano a girare, più lentamente. Motion ridotto vuol dire togliere il movimento inutile,
+  non l'informazione.
+- `LoadingPage` era un'icona e nient'altro: per uno screen reader la pagina risultava vuota. Ora
+  è `role="status"` con etichetta.
+- `<Label>` usata come testo dentro i pulsanti (e come titolo delle card della dashboard)
+  produceva un `<label>` senza `htmlFor` annidato in `<button>`: HTML non valido, e in alcuni
+  screen reader il pulsante viene letto due volte. Sostituita con `<span>` in sei punti.
+
+### Colori delle azioni
+
+**Il perché.** Le icone stampa/email erano scritte a mano nei componenti come `text-yellow-400`
+e `text-sky-500`. Misurato: **1.57:1** e **2.71:1** su fondo chiaro, contro i **3:1** che WCAG
+1.4.11 chiede agli oggetti grafici.
+
+**Le scelte.** Due token semantici `--action-print` e `--action-email` in
+[index.css](../frontend/src/index.css), più scuri in tema chiaro (3.26:1 e 4.05:1) e coi valori
+vividi originali in tema scuro (12.68:1 e 7.33:1). Il giallo resta all'hue 85 e non scivola
+nell'arancione, per la stessa ragione già annotata sopra le righe di stato.
+
+I colori **delle righe** non sono stati toccati: la scelta del giallo vivo, contrasto compreso, è
+già dichiarata voluta nel commento in `index.css`.
+
+### Form: l'errore accanto al campo
+
+**Il perché.** Tutta la validazione dei dialoghi passava per `toast.error`: un avviso in alto,
+che sparisce da solo dopo qualche secondo e non dice *quale* campo sia il problema. Su
+`editReportDialog` erano dieci controlli in fila, ciascuno con un `return`: con tre campi da
+sistemare servivano tre salvataggi per scoprirli tutti.
+
+**Le scelte.** [FormField](../frontend/src/components/form-field.tsx) e `FieldError`, più gli
+helper in [lib/formField.ts](../frontend/src/lib/formField.ts) (separati perché un file di
+componenti deve esportare solo componenti, altrimenti il refresh rapido di Vite ricarica la
+pagina intera). Applicati a tutti e nove i dialoghi di creazione e modifica:
+
+- il messaggio sta sotto il campo, collegato con `aria-describedby`, e resta finché non si
+  corregge;
+- gli errori si raccolgono **tutti in una passata** invece di uscire al primo;
+- il focus va sul primo campo da correggere;
+- i campi obbligatori portano l'asterisco e "(obbligatorio)" per gli screen reader;
+- i toast restano per gli errori che non appartengono a un campo: il rifiuto del server, la rete.
+
+`getInterventionValidationError` in [lib/interventions.ts](../frontend/src/lib/interventions.ts)
+ora restituisce **quale** campo è invalido insieme al messaggio: era già condiviso fra i due
+dialoghi dell'intervento, e col campo lo stesso messaggio finisce sotto il controllo giusto in
+entrambi. `InputWithAdd` e `DatePickerField` accettano le due proprietà aria necessarie.
+
+Sui campi che contengono dati di **altre** persone (nome e telefono di clienti, tecnici,
+collaboratori) è stato messo `autoComplete="off"`: il completamento automatico proponeva lì i
+dati di chi sta al computer.
+
+### Ricerca ed elenchi
+
+- Il pulsante X della ricerca compariva **anche a campo vuoto**, dove premerlo non faceva niente.
+  Ora appare solo con del testo, Esc svuota il campo e il focus ci torna dentro. Aggiunti
+  `type="search"` (che su mobile porta il tasto "Cerca" sulla tastiera) e `aria-label`; la X
+  nativa di Chrome è nascosta in `index.css` per non averne due. Su mobile il campo prende lo
+  spazio che resta invece di stare fisso a 240px.
+- Una ricerca senza esiti dice ora `Nessun risultato per "..."` invece del generico "Nessun
+  dispositivo disponibile.": sono due vuoti diversi.
+- Il doppio click per aprire la riga funzionava su due tabelle su sette, perché
+  [entity-crud-table.tsx](../frontend/src/components/entity-crud-table.tsx) non inoltrava
+  `onRowOpen`. Ora è uniforme. Resta un'aggiunta per il mouse: da tastiera la scheda si apre col
+  pulsante "Apri", che c'è esattamente dove c'è il doppio click — preferito ad aggiungere un
+  punto di tabulazione per ogni riga.
+- Le schede su mobile riversavano tutte le colonne come coppie etichetta/valore dello stesso
+  peso: su un report sono dieci righe senza un punto da cui iniziare a leggere. Con
+  `titleColumnKey` la colonna del cliente diventa il titolo della scheda (report e interventi;
+  per i clienti il nome è diviso su due colonne, quindi resta com'era).
+
+**Verifica.** 67 test verdi, `tsc`, `eslint` e `prettier --check` puliti; oltre a questo, 18
+controlli condotti sull'applicazione in esecuzione con Playwright (colonna Stato, paginazione a
+pulsanti, `role="status"`, skip link, campo di ricerca cliccabile durante la digitazione, errore
+inline collegato al campo, contrasto delle icone, motion ridotto) e le misure di layout citate
+sopra.
+
+---
+
 ## 2026-09-09 — I suggerimenti dei campi con ricerca compaiono solo quando si digita
 
 **Cosa.** Il menu a tendina di [inputWithAdd.tsx](../frontend/src/components/inputWithAdd.tsx)

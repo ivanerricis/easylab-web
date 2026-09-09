@@ -1,4 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { FieldError } from "@/components/form-field";
+import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -7,6 +9,7 @@ import DatePickerField from "@/components/date-picker-field";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
     getInterventionValidationError,
+    type InterventionField,
     interventionDateLabel,
     interventionDescriptionLabel,
     interventionStatusOptions,
@@ -42,6 +45,11 @@ type EditInterventionDialogProps = {
     onSubmit: (values: EditInterventionSubmitValues) => Promise<void>;
 };
 
+type FieldErrors = Partial<Record<"collaboratorId" | InterventionField, string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["collaboratorId", "interventionDate", "startTime", "endTime", "problem", "description"] as const;
+
 const EditInterventionDialog = ({
     open,
     interventionId,
@@ -50,6 +58,7 @@ const EditInterventionDialog = ({
     onSubmit,
 }: EditInterventionDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadedInterventionId, setLoadedInterventionId] = useState<number | null>(null);
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
@@ -77,6 +86,7 @@ const EditInterventionDialog = ({
         }
 
         startTransition(() => {
+            setErrors({});
             setLoadedInterventionId(null);
         });
 
@@ -121,15 +131,26 @@ const EditInterventionDialog = ({
 
         const collaboratorId = Number(formValues.collaboratorId);
 
+        // Tutti gli errori in un colpo solo, ciascuno accanto al proprio campo: prima ogni
+        // controllo usciva dalla funzione con un toast, che non diceva quale campo correggere.
+        const nextErrors: FieldErrors = {};
+
         if (!Number.isInteger(collaboratorId) || collaboratorId <= 0) {
-            toast.error("Seleziona un collaboratore valido");
-            return;
+            nextErrors.collaboratorId = "Seleziona un collaboratore valido";
         }
 
         const validationError = getInterventionValidationError(formValues);
 
         if (validationError) {
-            toast.error(validationError);
+            nextErrors[validationError.field] = validationError.message;
+        }
+
+        setErrors(nextErrors);
+
+        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
@@ -204,11 +225,16 @@ const EditInterventionDialog = ({
                                         </Label>
                                         <Select
                                             value={formValues.collaboratorId}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }))
-                                            }
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }));
+                                                setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
+                                            }}
                                         >
-                                            <SelectTrigger id="collaboratorId" className="w-full">
+                                            <SelectTrigger
+                                                id="collaboratorId"
+                                                {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
+                                                className="w-full"
+                                            >
                                                 <SelectValue placeholder="Seleziona collaboratore" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -222,6 +248,7 @@ const EditInterventionDialog = ({
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <FieldError id="collaboratorId" error={errors.collaboratorId} />
                                     </div>
                                 </div>
                             </section>
@@ -287,11 +314,14 @@ const EditInterventionDialog = ({
                                         </Label>
                                         <DatePickerField
                                             id="interventionDate"
+                                            {...fieldErrorAria("interventionDate", errors.interventionDate)}
                                             value={formValues.interventionDate}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, interventionDate: value }))
-                                            }
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, interventionDate: value }));
+                                                setErrors((prev) => ({ ...prev, interventionDate: undefined }));
+                                            }}
                                         />
+                                        <FieldError id="interventionDate" error={errors.interventionDate} />
                                     </div>
 
                                     {isOnSite ? (
@@ -301,16 +331,18 @@ const EditInterventionDialog = ({
                                                     Ora inizio
                                                 </Label>
                                                 <Input
-                                                    id="startTime"
+                                                    {...fieldProps("startTime", { error: errors.startTime })}
                                                     type="time"
                                                     value={formValues.startTime}
-                                                    onChange={(event) =>
+                                                    onChange={(event) => {
                                                         setFormValues((prev) => ({
                                                             ...prev,
                                                             startTime: event.target.value,
-                                                        }))
-                                                    }
+                                                        }));
+                                                        setErrors((prev) => ({ ...prev, startTime: undefined }));
+                                                    }}
                                                 />
+                                                <FieldError id="startTime" error={errors.startTime} />
                                             </div>
 
                                             <div className="grid gap-1">
@@ -318,16 +350,18 @@ const EditInterventionDialog = ({
                                                     Ora fine
                                                 </Label>
                                                 <Input
-                                                    id="endTime"
+                                                    {...fieldProps("endTime", { error: errors.endTime })}
                                                     type="time"
                                                     value={formValues.endTime}
-                                                    onChange={(event) =>
+                                                    onChange={(event) => {
                                                         setFormValues((prev) => ({
                                                             ...prev,
                                                             endTime: event.target.value,
-                                                        }))
-                                                    }
+                                                        }));
+                                                        setErrors((prev) => ({ ...prev, endTime: undefined }));
+                                                    }}
                                                 />
+                                                <FieldError id="endTime" error={errors.endTime} />
                                             </div>
                                         </div>
                                     ) : null}
@@ -338,15 +372,17 @@ const EditInterventionDialog = ({
                                                 Problema
                                             </Label>
                                             <Textarea
-                                                id="problem"
+                                                {...fieldProps("problem", { error: errors.problem })}
                                                 className="resize-none text-lg!"
                                                 rows={4}
                                                 placeholder="Descrivi il problema riscontrato"
                                                 value={formValues.problem}
-                                                onChange={(event) =>
-                                                    setFormValues((prev) => ({ ...prev, problem: event.target.value }))
-                                                }
+                                                onChange={(event) => {
+                                                    setFormValues((prev) => ({ ...prev, problem: event.target.value }));
+                                                    setErrors((prev) => ({ ...prev, problem: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="problem" error={errors.problem} />
                                         </div>
                                     ) : null}
 
@@ -358,14 +394,16 @@ const EditInterventionDialog = ({
                                             ) : null}
                                         </Label>
                                         <Textarea
-                                            id="description"
+                                            {...fieldProps("description", { error: errors.description })}
                                             className="resize-none text-lg!"
                                             rows={4}
                                             value={formValues.description}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({ ...prev, description: event.target.value }))
-                                            }
+                                            onChange={(event) => {
+                                                setFormValues((prev) => ({ ...prev, description: event.target.value }));
+                                                setErrors((prev) => ({ ...prev, description: undefined }));
+                                            }}
                                         />
+                                        <FieldError id="description" error={errors.description} />
                                     </div>
 
                                     <div className="grid gap-1 lg:col-span-2">

@@ -7,6 +7,10 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type Props = Readonly<{
     id: string;
+    /** Segnala il campo come invalido: accende il bordo rosso che `Input` ha già. */
+    "aria-invalid"?: boolean;
+    /** L'id del paragrafo d'errore, così lo screen reader lo legge insieme al campo. */
+    "aria-describedby"?: string;
     placeholder?: string;
     value: string;
     onChange: (value: string) => void;
@@ -19,6 +23,8 @@ type Props = Readonly<{
 
 const InputWithAdd = ({
     id,
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": ariaDescribedBy,
     placeholder,
     value,
     onChange,
@@ -120,6 +126,8 @@ const InputWithAdd = ({
             <Input
                 className={cn("group h-full text-lg!", inputClassName)}
                 id={id}
+                aria-invalid={ariaInvalid}
+                aria-describedby={ariaDescribedBy}
                 placeholder={placeholder}
                 value={value}
                 onFocus={() => setIsOpen(true)}

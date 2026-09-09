@@ -24,6 +24,14 @@ type EntityCrudTableProps<TRow extends { id: number }> = {
     isRowLocked?: (row: TRow) => boolean;
     onEdit: (id: number) => void;
     onDelete: (row: TRow) => void;
+    /** Bordo superiore colorato delle schede su mobile: vedi `EntityTable`. */
+    getAccentClassName?: (row: TRow) => string;
+    /** Stati di caricamento della lista: vedi `EntityTable`. */
+    isInitialLoading?: boolean;
+    isRefetching?: boolean;
+    skeletonRowCount?: number;
+    /** La colonna che fa da titolo nelle schede su mobile. */
+    titleColumnKey?: string;
 };
 
 /**
@@ -46,6 +54,11 @@ const EntityCrudTable = <TRow extends { id: number }>({
     onDelete,
     onEdit,
     isRowLocked,
+    getAccentClassName,
+    isInitialLoading,
+    isRefetching,
+    skeletonRowCount,
+    titleColumnKey,
 }: EntityCrudTableProps<TRow>) => {
     const renderRowActions = (row: TRow) => (
         <>
@@ -88,6 +101,16 @@ const EntityCrudTable = <TRow extends { id: number }>({
             getRowKey={(row) => row.id}
             emptyMessage={emptyMessage}
             renderRowActions={renderRowActions}
+            // Il doppio click sulla riga apriva la scheda su report e interventi ma non qui,
+            // perché questo componente non inoltrava `onRowOpen`: lo stesso gesto funzionava su
+            // due tabelle su sette. Resta un'aggiunta per il mouse — da tastiera la scheda si
+            // apre con il pulsante "Apri", che c'è esattamente quando c'è `onOpen`.
+            onRowOpen={onOpen ? (row) => onOpen(row.id) : undefined}
+            getAccentClassName={getAccentClassName}
+            isInitialLoading={isInitialLoading}
+            isRefetching={isRefetching}
+            skeletonRowCount={skeletonRowCount}
+            titleColumnKey={titleColumnKey}
         />
     );
 };

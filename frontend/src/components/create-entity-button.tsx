@@ -3,7 +3,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { PlusCircle } from "lucide-react";
 import type { ComponentProps } from "react";
-import { Label } from "./ui/label";
 
 type CreateEntityButtonProps = Omit<ComponentProps<typeof Button>, "children"> & {
     label: string;
@@ -16,7 +15,7 @@ const CreateEntityButton = ({ label, size = "lg", className, ...props }: CreateE
             <TooltipTrigger asChild>
                 <Button size={size} className={cn("text-lg", className)} aria-label={label} {...props}>
                     <PlusCircle className="size-5" />
-                    <Label className="hidden cursor-pointer text-lg md:inline">{label}</Label>
+                    <span className="hidden text-lg md:inline">{label}</span>
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>

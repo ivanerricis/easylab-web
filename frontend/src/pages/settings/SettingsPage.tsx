@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSearchParams } from "react-router-dom";
 import { Building2, Database, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
 import BackupSettingsPanel from "@/components/settings/backupSettingsPanel";
@@ -93,6 +94,7 @@ const isSettingsSectionKey = (value: string | null): value is SettingsSectionKey
 const adminOnlySections = new Set<SettingsSectionKey>(["users", "company", "email", "backup", "update", "logs"]);
 
 const SettingsPage = () => {
+    useDocumentTitle("Impostazioni");
     const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const sectionFromUrl = searchParams.get("section");

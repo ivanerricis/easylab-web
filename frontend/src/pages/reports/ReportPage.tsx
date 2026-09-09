@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
@@ -26,7 +27,6 @@ import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Label } from "@/components/ui/label";
 
 type ReportPageDetails = {
     report: ReportEntityDto;
@@ -83,6 +83,7 @@ const ReportPage = () => {
     const reportId = Number(id);
     const [isLoading, setIsLoading] = useState(true);
     const [details, setDetails] = useState<ReportPageDetails | null>(null);
+    useDocumentTitle(details ? `Report #${details.report.id} - ${details.customerName}` : "Report");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     const hasValidReportId = useMemo(() => Number.isInteger(reportId) && reportId > 0, [reportId]);
@@ -252,7 +253,7 @@ const ReportPage = () => {
                                         aria-label="Modifica report"
                                     >
                                         <Pencil className="size-5" />
-                                        <Label className="hidden text-lg lg:inline">Modifica</Label>
+                                        <span className="hidden text-lg lg:inline">Modifica</span>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Modifica report</TooltipContent>
@@ -262,7 +263,7 @@ const ReportPage = () => {
                                 <TooltipTrigger asChild>
                                     <Button size={"lg"} onClick={handlePrintReport} aria-label="Stampa report">
                                         <Printer className="size-5" />
-                                        <Label className="hidden text-lg lg:inline">Stampa</Label>
+                                        <span className="hidden text-lg lg:inline">Stampa</span>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Stampa report</TooltipContent>

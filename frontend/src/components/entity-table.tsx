@@ -1,5 +1,6 @@
 import EntityCardList from "@/components/entity-card-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
@@ -37,6 +38,22 @@ type EntityTableProps<TRow> = {
      * pulsante "Apri" tra le azioni (che comunque rimane anche su desktop).
      */
     onRowOpen?: (row: TRow) => void;
+    /**
+     * Primo caricamento, cioè quando non c'è ancora niente da mostrare: al posto delle righe
+     * va il loro scheletro, che tiene lo spazio che i dati occuperanno.
+     */
+    isInitialLoading?: boolean;
+    /**
+     * Ricarica con i dati già in pagina (ricerca, filtri, cambio pagina). Le righe restano
+     * dove sono e leggibili, appena attenuate: prima al loro posto arrivava un velo sfocato
+     * su tutta la pagina, che a ogni pausa di battitura nella ricerca copriva anche il campo
+     * in cui si stava scrivendo.
+     */
+    isRefetching?: boolean;
+    /** Quante righe-scheletro disegnare: di norma le righe per pagina della tabella. */
+    skeletonRowCount?: number;
+    /** La colonna che fa da titolo nelle schede su mobile. */
+    titleColumnKey?: string;
 };
 
 /** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
@@ -72,6 +89,10 @@ const EntityTable = <TRow,>({
     getRowStatusColor,
     getAccentClassName,
     onRowOpen,
+    isInitialLoading = false,
+    isRefetching = false,
+    skeletonRowCount = 5,
+    titleColumnKey,
 }: EntityTableProps<TRow>) => {
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
 
@@ -89,7 +110,19 @@ const EntityTable = <TRow,>({
 
     return (
         <>
-            <Table ref={tableRef} style={tableStyle} className="hidden bg-background sm:table">
+            <Table
+                ref={tableRef}
+                style={tableStyle}
+                aria-busy={isInitialLoading || isRefetching}
+                className={cn(
+                    "hidden bg-background sm:table",
+                    // Attenuare è sufficiente a dire "sto ricaricando" e non impedisce di
+                    // leggere né di cliccare: chi sta cercando vede la lista precedente finché
+                    // non arriva quella nuova. Il conteggio sotto la tabella ha `role="status"`,
+                    // quindi il cambiamento è annunciato anche a chi non vede l'attenuazione.
+                    isRefetching && "opacity-60 transition-opacity"
+                )}
+            >
                 {isResizable ? (
                     <colgroup>
                         {columns.map((column) => (
@@ -123,7 +156,21 @@ const EntityTable = <TRow,>({
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {rows.length === 0 ? (
+                    {isInitialLoading ? (
+                        Array.from({ length: skeletonRowCount }, (_, rowIndex) => (
+                            <TableRow key={`skeleton-${rowIndex}`}>
+                                {columns.map((column) => (
+                                    <TableCell key={`skeleton-${rowIndex}-${column.key}`}>
+                                        {column.key === actionsColumnKey ? (
+                                            <Skeleton className="ml-auto h-8 w-24" />
+                                        ) : (
+                                            <Skeleton className="h-4 w-full" />
+                                        )}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))
+                    ) : rows.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={columns.length} className="py-6 text-center text-muted-foreground">
                                 {emptyMessage}
@@ -169,13 +216,16 @@ const EntityTable = <TRow,>({
             </Table>
 
             <EntityCardList
-                className="sm:hidden"
+                className={cn("sm:hidden", isRefetching && "opacity-60 transition-opacity")}
                 columns={columns.filter((column) => column.key !== actionsColumnKey)}
                 rows={rows}
                 getRowKey={getRowKey}
                 getAccentClassName={getAccentClassName}
                 renderActions={renderRowActions}
                 emptyMessage={emptyMessage}
+                titleColumnKey={titleColumnKey}
+                isInitialLoading={isInitialLoading}
+                skeletonCardCount={Math.min(skeletonRowCount, 4)}
             />
         </>
     );

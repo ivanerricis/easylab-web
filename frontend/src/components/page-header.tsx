@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import type { ReactNode } from "react";
 
 type PageHeaderProps = {
@@ -7,6 +8,10 @@ type PageHeaderProps = {
 };
 
 const PageHeader = ({ title, description, action }: PageHeaderProps) => {
+    // Il titolo della pagina è già qui: da qui finisce anche nella barra delle schede,
+    // senza che ogni pagina debba ripeterlo.
+    useDocumentTitle(title);
+
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">

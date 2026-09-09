@@ -26,23 +26,24 @@ export const useReportsRows = ({
 }: UseReportsRowsParams) => {
     const debouncedSearchText = useDebouncedValue(searchText);
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer" | "totalPrice", "asc" | "desc"];
-    const { rows, totalItems, totalPages, isLoading, reload, updateRow } = usePaginatedRows<ReportDto>({
-        fetchRows: (signal) =>
-            listReports({
-                page: currentPage,
-                pageSize,
-                search: debouncedSearchText,
-                visibility: visibilityFilter,
-                sortBy,
-                sortOrder,
-                dateFrom,
-                dateTo,
-                signal,
-            }),
-        queryKey: [currentPage, pageSize, debouncedSearchText, visibilityFilter, sortOption, dateFrom, dateTo],
-        errorMessage: "Impossibile caricare i report",
-        initialLoading: false,
-    });
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
+        usePaginatedRows<ReportDto>({
+            fetchRows: (signal) =>
+                listReports({
+                    page: currentPage,
+                    pageSize,
+                    search: debouncedSearchText,
+                    visibility: visibilityFilter,
+                    sortBy,
+                    sortOrder,
+                    dateFrom,
+                    dateTo,
+                    signal,
+                }),
+            queryKey: [currentPage, pageSize, debouncedSearchText, visibilityFilter, sortOption, dateFrom, dateTo],
+            errorMessage: "Impossibile caricare i report",
+            initialLoading: false,
+        });
 
     const updateReportRow = useCallback(
         (reportId: number, updater: (report: ReportDto) => ReportDto) => {
@@ -56,6 +57,8 @@ export const useReportsRows = ({
         totalItems,
         totalPages,
         isLoading,
+        isInitialLoading,
+        isRefetching,
         loadReports: reload,
         updateReportRow,
     };

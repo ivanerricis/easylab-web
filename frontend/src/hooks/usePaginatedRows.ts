@@ -31,6 +31,9 @@ export const usePaginatedRows = <TRow>({
     const [totalItems, setTotalItems] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [isLoading, setIsLoading] = useState(initialLoading);
+    // Distingue il primo caricamento dalle ricariche successive: sono due stati che
+    // vogliono due segnali diversi, e prima erano lo stesso `isLoading` per entrambi.
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     const fetchRowsRef = useRef(fetchRows);
     const errorMessageRef = useRef(errorMessage);
@@ -96,6 +99,7 @@ export const usePaginatedRows = <TRow>({
         } finally {
             if (!controller.signal.aborted && requestId === latestRequestIdRef.current) {
                 setIsLoading(false);
+                setHasLoadedOnce(true);
             }
         }
     }, []);
@@ -124,6 +128,25 @@ export const usePaginatedRows = <TRow>({
         totalItems,
         totalPages,
         isLoading,
+        /**
+         * Primo caricamento: non c'è ancora niente in tabella, quindi ci va lo scheletro delle
+         * righe — che occupa lo spazio che i dati occuperanno, invece di lasciare un vuoto che
+         * poi salta.
+         *
+         * Non è `isLoading && !hasLoadedOnce` ma il solo `!hasLoadedOnce`, perché fra il
+         * montaggio e il momento in cui la richiesta parte davvero c'è una finestra in cui
+         * `isLoading` è ancora falso: misurata, dura un fotogramma sull'elenco report, ed è
+         * quanto basta a far comparire "Nessun report disponibile." un istante prima dei dati.
+         * Chi monta con `initialLoading: false` lo fa proprio perché la richiesta parte subito.
+         */
+        isInitialLoading: !hasLoadedOnce,
+        /**
+         * Ricarica con dati già in pagina: ricerca, filtro, cambio pagina, pulsante Aggiorna.
+         * Qui i dati vecchi restano visibili e leggibili. Prima anche questo caso alzava un velo
+         * sfocato su tutta la pagina, campo di ricerca compreso: digitando, il velo compariva a
+         * ogni pausa di battitura (300ms di debounce) e rendeva il campo non cliccabile.
+         */
+        isRefetching: isLoading && hasLoadedOnce,
         reload,
         updateRow,
     };

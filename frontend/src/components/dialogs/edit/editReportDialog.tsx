@@ -1,4 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import { FieldError } from "@/components/form-field";
+import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,8 +57,23 @@ export type EditReportSubmitValues = {
     internalPrice: number;
 };
 
+type FieldErrors = Partial<
+    Record<"deviceId" | "issueId" | "issueDescription" | "collaboratorId" | "technicianPrice" | "internalPrice", string>
+>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = [
+    "deviceId",
+    "issueId",
+    "issueDescription",
+    "collaboratorId",
+    "technicianPrice",
+    "internalPrice",
+] as const;
+
 const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit }: EditReportDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadedReportId, setLoadedReportId] = useState<number | null>(null);
     const [devices, setDevices] = useState<DeviceDto[]>([]);
@@ -90,6 +107,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         }
 
         startTransition(() => {
+            setErrors({});
             setLoadedReportId(null);
         });
 
@@ -163,45 +181,52 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         const technicianPrice = Number(formValues.technicianPrice);
         const internalPrice = Number(formValues.internalPrice);
 
-        if (!Number.isInteger(customerId) || customerId <= 0) {
-            toast.error("Seleziona un cliente valido");
-            return;
-        }
+        // Tutti gli errori in una passata, ciascuno accanto al proprio campo: prima ogni
+        // controllo usciva dalla funzione con un toast, quindi su un form da dodici campi si
+        // scopriva un problema per salvataggio e il messaggio non diceva dove guardare.
+        const nextErrors: FieldErrors = {};
 
         if (!Number.isInteger(deviceId) || deviceId <= 0) {
-            toast.error("Seleziona un dispositivo valido");
-            return;
+            nextErrors.deviceId = "Seleziona un dispositivo valido";
         }
 
         if (!Number.isInteger(issueId) || issueId <= 0) {
-            toast.error("Seleziona un difetto valido");
-            return;
+            nextErrors.issueId = "Seleziona un difetto valido";
         }
 
-        if (!Number.isFinite(technicianPrice) || technicianPrice < 0) {
-            toast.error("Il prezzo del tecnico deve essere maggiore o uguale a zero");
-            return;
-        }
-
-        if (!Number.isFinite(internalPrice) || internalPrice < 0) {
-            toast.error("Il prezzo interno deve essere maggiore o uguale a zero");
-            return;
-        }
-
-        if (formValues.paymentMethod !== "non_paid" && internalPrice <= 0) {
-            toast.error("Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0");
-            return;
+        if (needsProblemText && formValues.issueDescription.trim() === "") {
+            nextErrors.issueDescription = 'Con il difetto "Altro" va descritto il problema';
         }
 
         // Un report chiuso senza collaboratore non dice chi l'ha lavorato: il vincolo vale
         // solo sulla chiusura, quindi il campo resta facoltativo finché il report è aperto.
         if (formValues.closed && collaboratorId == null) {
-            toast.error("Per chiudere un report è necessario selezionare un collaboratore");
+            nextErrors.collaboratorId = "Per chiudere un report è necessario selezionare un collaboratore";
+        }
+
+        if (!Number.isFinite(technicianPrice) || technicianPrice < 0) {
+            nextErrors.technicianPrice = "Il prezzo del tecnico deve essere maggiore o uguale a zero";
+        }
+
+        if (!Number.isFinite(internalPrice) || internalPrice < 0) {
+            nextErrors.internalPrice = "Il prezzo interno deve essere maggiore o uguale a zero";
+        } else if (formValues.paymentMethod !== "non_paid" && internalPrice <= 0) {
+            nextErrors.internalPrice = "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0";
+        }
+
+        setErrors(nextErrors);
+
+        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
-        if (needsProblemText && formValues.issueDescription.trim() === "") {
-            toast.error('Con il difetto "Altro" va descritto il problema');
+        // Il cliente non è modificabile da qui (il suo campo è disabilitato): se l'id non è
+        // valido il problema non è di un campo, è del report che si sta aprendo.
+        if (!Number.isInteger(customerId) || customerId <= 0) {
+            toast.error("Seleziona un cliente valido");
             return;
         }
 
@@ -286,11 +311,16 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Select
                                             value={formValues.deviceId}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, deviceId: value }))
-                                            }
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, deviceId: value }));
+                                                setErrors((prev) => ({ ...prev, deviceId: undefined }));
+                                            }}
                                         >
-                                            <SelectTrigger id="deviceId" className="w-full">
+                                            <SelectTrigger
+                                                id="deviceId"
+                                                {...fieldErrorAria("deviceId", errors.deviceId)}
+                                                className="w-full"
+                                            >
                                                 <SelectValue placeholder="Seleziona dispositivo" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -301,6 +331,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <FieldError id="deviceId" error={errors.deviceId} />
                                     </div>
 
                                     <div className="grid gap-1">
@@ -309,11 +340,16 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Select
                                             value={formValues.issueId}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, issueId: value }))
-                                            }
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, issueId: value }));
+                                                setErrors((prev) => ({ ...prev, issueId: undefined }));
+                                            }}
                                         >
-                                            <SelectTrigger id="issueId" className="w-full">
+                                            <SelectTrigger
+                                                id="issueId"
+                                                {...fieldErrorAria("issueId", errors.issueId)}
+                                                className="w-full"
+                                            >
                                                 <SelectValue placeholder="Seleziona difetto" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -324,6 +360,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <FieldError id="issueId" error={errors.issueId} />
                                     </div>
 
                                     {needsProblemText ? (
@@ -332,17 +369,21 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 Problema riscontrato
                                             </Label>
                                             <Textarea
-                                                id="issueDescription"
+                                                {...fieldProps("issueDescription", {
+                                                    error: errors.issueDescription,
+                                                })}
                                                 placeholder="Quello che il cliente legge sulla ricevuta"
                                                 maxLength={255}
                                                 value={formValues.issueDescription}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setFormValues((prev) => ({
                                                         ...prev,
                                                         issueDescription: event.target.value,
-                                                    }))
-                                                }
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, issueDescription: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="issueDescription" error={errors.issueDescription} />
                                         </div>
                                     ) : null}
 
@@ -352,11 +393,16 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Select
                                             value={formValues.collaboratorId}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }))
-                                            }
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }));
+                                                setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
+                                            }}
                                         >
-                                            <SelectTrigger id="collaboratorId" className="w-full">
+                                            <SelectTrigger
+                                                id="collaboratorId"
+                                                {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
+                                                className="w-full"
+                                            >
                                                 <SelectValue placeholder="Nessun collaboratore" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -371,6 +417,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <FieldError id="collaboratorId" error={errors.collaboratorId} />
                                     </div>
                                 </div>
                             </section>
@@ -468,19 +515,21 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 Prezzo lavoro tecnico
                                             </Label>
                                             <Input
-                                                id="technicianPrice"
+                                                {...fieldProps("technicianPrice", { error: errors.technicianPrice })}
                                                 className="text-lg!"
                                                 type="number"
                                                 min={0}
                                                 step={1}
                                                 value={formValues.technicianPrice}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setFormValues((prev) => ({
                                                         ...prev,
                                                         technicianPrice: event.target.value,
-                                                    }))
-                                                }
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, technicianPrice: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="technicianPrice" error={errors.technicianPrice} />
                                         </div>
 
                                         <div className="grid gap-1">
@@ -488,19 +537,21 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 Prezzo interno
                                             </Label>
                                             <Input
-                                                id="internalPrice"
+                                                {...fieldProps("internalPrice", { error: errors.internalPrice })}
                                                 className="text-lg!"
                                                 type="number"
                                                 min={0}
                                                 step={1}
                                                 value={formValues.internalPrice}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setFormValues((prev) => ({
                                                         ...prev,
                                                         internalPrice: event.target.value,
-                                                    }))
-                                                }
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, internalPrice: undefined }));
+                                                }}
                                             />
+                                            <FieldError id="internalPrice" error={errors.internalPrice} />
                                         </div>
                                     </div>
                                 </div>

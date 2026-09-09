@@ -21,7 +21,6 @@ import {
 import { useState } from "react";
 import type { CustomerDto, InterventionDto } from "@/types/dtos";
 import { toast } from "sonner";
-import LoadingPage from "@/components/loadingPage";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
 import InterventionsFilters from "./components/interventions-filters";
@@ -130,17 +129,25 @@ const InterventionsPage = () => {
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [searchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo, pageSize],
     });
-    const { interventionRows, totalItems, totalPages, isLoading, loadInterventions, updateInterventionRow } =
-        useInterventionsRows({
-            searchText,
-            statusFilter,
-            typeFilter,
-            sortOption,
-            dateFrom,
-            dateTo,
-            currentPage,
-            pageSize,
-        });
+    const {
+        interventionRows,
+        totalItems,
+        totalPages,
+        isLoading,
+        isInitialLoading,
+        isRefetching,
+        loadInterventions,
+        updateInterventionRow,
+    } = useInterventionsRows({
+        searchText,
+        statusFilter,
+        typeFilter,
+        sortOption,
+        dateFrom,
+        dateTo,
+        currentPage,
+        pageSize,
+    });
 
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
         try {
@@ -356,6 +363,9 @@ const InterventionsPage = () => {
                 <div className="flex min-h-0 flex-1 flex-col gap-4">
                     <div className="min-h-0 flex-1 overflow-y-auto">
                         <InterventionsTable
+                            isInitialLoading={isInitialLoading}
+                            isRefetching={isRefetching}
+                            skeletonRowCount={pageSize}
                             columns={interventionColumns}
                             rows={interventionRows}
                             onOpenIntervention={handleOpenIntervention}
@@ -374,10 +384,6 @@ const InterventionsPage = () => {
                         onPageSizeChange={setPageSize}
                     />
                 </div>
-
-                {isLoading ? (
-                    <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-                ) : null}
             </>
         </div>
     );

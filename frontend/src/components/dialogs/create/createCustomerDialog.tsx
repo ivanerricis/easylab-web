@@ -1,6 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import FormField from "@/components/form-field";
+import { fieldProps } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api";
 import type { CustomerDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
@@ -26,6 +27,8 @@ type Props = {
     initialValues?: CustomerDto | null;
 };
 
+type FieldErrors = Partial<Record<"firstName" | "phoneNumber", string>>;
+
 const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [formValues, setFormValues] = useState({
         firstName: "",
@@ -35,6 +38,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
         email: "",
         city: "",
     });
+    const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -48,18 +52,30 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     email: initialValues?.email ?? "",
                     city: initialValues?.city ?? "",
                 });
+                setErrors({});
             });
         }
     }, [open, initialValues]);
 
     const handleConfirm = async () => {
-        if (formValues.firstName === "") {
-            toast.error("Il nome non può essere vuoto");
-            return;
+        const nextErrors: FieldErrors = {};
+
+        if (formValues.firstName.trim() === "") {
+            nextErrors.firstName = "Il nome non può essere vuoto";
         }
 
         if (formValues.phoneNumber.trim() === "" && formValues.phoneNumberSecondary.trim() === "") {
-            toast.error("Almeno un numero di telefono e obbligatorio");
+            // La regola riguarda due campi insieme, quindi il messaggio va sul primo dei due:
+            // è quello su cui si posa il focus e quello che di norma si compila.
+            nextErrors.phoneNumber = "Serve almeno un numero di telefono, il primo o il secondo";
+        }
+
+        setErrors(nextErrors);
+
+        const firstInvalidField = (["firstName", "phoneNumber"] as const).find((field) => nextErrors[field]);
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
@@ -102,85 +118,77 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
             confirmDisabled={isSubmitting}
             content={
                 <div className="grid gap-6">
-                    <div className="grid">
-                        <Label htmlFor="firstName" className="text-lg">
-                            Nome (Nome azienda)
-                        </Label>
+                    <FormField id="firstName" label="Nome (Nome azienda)" required error={errors.firstName}>
                         <Input
+                            {...fieldProps("firstName", { error: errors.firstName, required: true })}
                             className="text-lg!"
-                            id="firstName"
+                            autoComplete="off"
                             placeholder="Mario"
                             value={formValues.firstName}
-                            onChange={(event) => setFormValues((prev) => ({ ...prev, firstName: event.target.value }))}
+                            onChange={(event) => {
+                                setFormValues((prev) => ({ ...prev, firstName: event.target.value }));
+                                setErrors((prev) => ({ ...prev, firstName: undefined }));
+                            }}
                         />
-                    </div>
-                    <div className="grid">
-                        <Label htmlFor="lastName" className="text-lg">
-                            Cognome
-                        </Label>
+                    </FormField>
+                    <FormField id="lastName" label="Cognome">
                         <Input
+                            {...fieldProps("lastName")}
                             className="text-lg!"
-                            id="lastName"
+                            autoComplete="off"
                             placeholder="Rossi"
                             value={formValues.lastName}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, lastName: event.target.value }))}
                         />
-                    </div>
-                    <div className="grid">
-                        <Label htmlFor="phoneNumber" className="text-lg">
-                            Telefono 1
-                        </Label>
+                    </FormField>
+                    <FormField id="phoneNumber" label="Telefono 1" required error={errors.phoneNumber}>
                         <Input
+                            {...fieldProps("phoneNumber", { error: errors.phoneNumber, required: true })}
                             className="text-lg!"
-                            id="phoneNumber"
                             type="tel"
+                            autoComplete="off"
                             placeholder="333 1234567"
                             value={formValues.phoneNumber}
-                            onChange={(event) =>
-                                setFormValues((prev) => ({ ...prev, phoneNumber: event.target.value }))
-                            }
+                            onChange={(event) => {
+                                setFormValues((prev) => ({ ...prev, phoneNumber: event.target.value }));
+                                setErrors((prev) => ({ ...prev, phoneNumber: undefined }));
+                            }}
                         />
-                    </div>
-                    <div className="grid">
-                        <Label htmlFor="phoneNumberSecondary" className="text-lg">
-                            Telefono 2 (opzionale)
-                        </Label>
+                    </FormField>
+                    <FormField id="phoneNumberSecondary" label="Telefono 2">
                         <Input
+                            {...fieldProps("phoneNumberSecondary")}
                             className="text-lg!"
-                            id="phoneNumberSecondary"
                             type="tel"
+                            autoComplete="off"
                             placeholder="333 9876543"
                             value={formValues.phoneNumberSecondary}
                             onChange={(event) =>
                                 setFormValues((prev) => ({ ...prev, phoneNumberSecondary: event.target.value }))
                             }
                         />
-                    </div>
-                    <div className="grid">
-                        <Label htmlFor="email" className="text-lg">
-                            Email (opzionale)
-                        </Label>
+                    </FormField>
+                    <FormField id="email" label="Email">
                         <Input
+                            {...fieldProps("email")}
                             className="text-lg!"
-                            id="email"
                             type="email"
+                            autoComplete="off"
                             placeholder="mario.rossi@email.com"
                             value={formValues.email}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, email: event.target.value }))}
                         />
-                    </div>
-                    <div className="grid">
-                        <Label htmlFor="city" className="text-lg">
-                            Località (opzionale)
-                        </Label>
+                    </FormField>
+                    <FormField id="city" label="Località">
                         <Input
+                            {...fieldProps("city")}
                             className="text-lg!"
-                            id="city"
+                            autoComplete="off"
                             placeholder="Roma"
                             value={formValues.city}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, city: event.target.value }))}
                         />
-                    </div>
+                    </FormField>
                 </div>
             }
         />

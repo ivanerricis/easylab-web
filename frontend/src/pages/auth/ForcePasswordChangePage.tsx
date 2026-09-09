@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
@@ -10,6 +11,7 @@ import { isPasswordCompliant, passwordRequirementsHint } from "@/lib/passwordPol
 import { useAuth } from "@/components/use-auth";
 
 const ForcePasswordChangePage = () => {
+    useDocumentTitle("Cambio password");
     const { user, refresh, logout } = useAuth();
 
     const [currentPassword, setCurrentPassword] = useState("");

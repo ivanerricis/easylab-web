@@ -11,6 +11,32 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-09 — Le righe-scheletro non seguono più "Tutte"
+
+**Cosa.** `EntityTable` disegna al massimo 15 righe-scheletro, qualunque numero le passi la
+pagina.
+
+**Il perché.** Lo scheletro introdotto poche ore prima disegnava una riga per ogni riga per
+pagina. Con 10 o 50 è la cosa giusta — occupa lo spazio che i dati occuperanno — ma "Tutte"
+vale 5000 (`allTableRowsPageSize`), quindi aprire una lista con quella preferenza costruiva
+**45.016 nodi animati prima ancora che i dati arrivassero**. Misurato: thread principale
+bloccato per oltre tre minuti, la pagina sembrava piantata. Valeva per tutte e sette le liste;
+è comparso sui clienti perché è lì che quella preferenza era impostata.
+
+**Le scelte.** Il tetto sta in `EntityTable` e non nei chiamanti, così vale per tutte le liste
+comprese quelle che verranno: passare le proprie righe per pagina resta la cosa giusta da fare
+per chi chiama, ed è il componente a sapere che oltre lo schermo non serve. Dopo la correzione i
+nodi di scheletro sono 151.
+
+**Quello che resta, e che c'era già.** Con "Tutte" la tabella disegna comunque 5000 righe vere,
+cioè circa 540.000 nodi, e il blocco resta di circa tre minuti: quel costo non dipende da questa
+modifica — il diff del percorso che disegna le righe vere è invariato rispetto a 661c68e — ma con
+i volumi attuali (migliaia di record) quella voce del menu è di fatto inutilizzabile. Va
+affrontata a parte, con la virtualizzazione delle righe o abbassando il tetto di
+`allTableRowsPageSize`.
+
+---
+
 ## 2026-09-09 — Revisione UI/UX: accessibilità, stati di caricamento, validazione dei form
 
 **Cosa.** Diciotto correzioni emerse da una revisione dell'interfaccia condotta con la skill

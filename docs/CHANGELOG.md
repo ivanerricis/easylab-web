@@ -11,6 +11,37 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Tre correzioni UI/UX emerse da una revisione con ui-ux-pro-max
+
+**Cosa.**
+- `create-entity-button.tsx`: nuova prop opzionale `mobileLabel`, sul modello del `mobileText`
+  già usato in `CardDashboard`. `DashboardPage.tsx` la passa ai due pulsanti "Nuovo report" /
+  "Nuovo intervento" ("Report" / "Intervento"), che sotto `md` mostravano la sola icona
+  `PlusCircle` — identica per entrambi, quindi indistinguibili al tocco (il tooltip che li
+  spiegherebbe è hover-based e su touch non si apre). Gli altri usi del componente, tutti
+  singoli, restano invariati non passando la prop.
+- `hover-detail-cell.tsx`: sostituito `Tooltip` (hover-only) con `Popover` (click/tap),
+  riusando lo stesso primitivo Radix già in produzione in `date-picker-field.tsx` e
+  `calendar-event-popover.tsx`. Il componente mostra il testo libero dietro "Altro" nelle
+  colonne Difetto/Tipo (report, interventi, collaboratori): con l'hover era irraggiungibile su
+  mobile, dove le stesse colonne diventano righe di scheda in `EntityCardList`.
+- `DashboardPage.tsx`: le icone di "Report chiusi" e "Interventi completati" usavano
+  `text-green-400` non condizionato al tema (~1.74:1 di contrasto su sfondo card chiaro,
+  sotto il 3:1 richiesto da WCAG 1.4.11 per gli oggetti grafici). Allineato al pattern
+  `text-green-700 dark:text-green-400` già usato ovunque nel resto del codebase (~5:1).
+
+**Il perché.** I tre problemi condividono la stessa causa: pattern di interazione o colore
+pensati per il mouse/hover e mai riverificati su touch o contrasto quando riusati altrove.
+Il primo e il secondo sono varianti dello stesso anti-pattern (hover-only su dispositivi
+touch); il terzo è la stessa classe di bug già corretta per le icone stampa/email (vedi
+commento in `index.css` sulle soglie WCAG), semplicemente non applicata qui. Verificato con
+`typecheck`, `lint` e controllo visivo Playwright (CSS/token del tema reale).
+
+**File.** `frontend/src/components/create-entity-button.tsx`,
+`frontend/src/components/hover-detail-cell.tsx`, `frontend/src/pages/dashboard/DashboardPage.tsx`.
+
+---
+
 ## 2026-09-10 — Impaginazione ancorata in fondo nella scheda collaboratore
 
 **Cosa.** Con lo stack verticale sostituito dalle tab (voce precedente), l'area tabella dentro

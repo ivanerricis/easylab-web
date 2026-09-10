@@ -243,9 +243,14 @@ const DashboardPage = () => {
                             onRefresh={handleRefreshDashboard}
                             isRefreshing={isLoading || isCalendarLoading}
                         />
-                        <CreateEntityButton label="Nuovo report" onClick={() => setDialogCreateReportOpen(true)} />
+                        <CreateEntityButton
+                            label="Nuovo report"
+                            mobileLabel="Report"
+                            onClick={() => setDialogCreateReportOpen(true)}
+                        />
                         <CreateEntityButton
                             label="Nuovo intervento"
+                            mobileLabel="Intervento"
                             onClick={() => setDialogCreateInterventionOpen(true)}
                         />
                     </div>
@@ -272,7 +277,7 @@ const DashboardPage = () => {
                     mobileText="Chiusi"
                     icon={CircleCheck}
                     number={String(closedReports)}
-                    iconColor="text-green-400"
+                    iconColor="text-green-700 dark:text-green-400"
                     onClick={() => goToReportsPage("closed")}
                 />
 
@@ -297,7 +302,7 @@ const DashboardPage = () => {
                     mobileText="Completati"
                     icon={CircleCheck}
                     number={String(completedInterventions)}
-                    iconColor="text-green-400"
+                    iconColor="text-green-700 dark:text-green-400"
                     onClick={() => goToInterventionsPage("completato")}
                 />
 

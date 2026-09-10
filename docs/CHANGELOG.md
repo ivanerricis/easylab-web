@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Impaginazione ancorata in fondo nella scheda collaboratore
+
+**Cosa.** Con lo stack verticale sostituito dalle tab (voce precedente), l'area tabella dentro
+ogni `TabsContent` non aveva l'altezza vincolata: "Visualizzati" e "Righe per pagina" finivano
+subito sotto l'ultima riga invece che in fondo alla pagina, comportamento diverso da tutte le
+altre pagine a elenco (che invece pinnano quel controllo). Applicato lo stesso pattern
+`h-full`/`min-h-0`/`flex-1` + area tabella con `overflow-auto` già usato in
+`simple-entity-page.tsx` e `ReportsPage.tsx`.
+
+**Il perché.** Coerenza con il resto dell'applicazione: l'utente ha notato la differenza
+appena vista la nuova scheda. Verificato con Playwright autenticato sia sul dataset pieno
+(1198 report) sia su un filtro che lascia una sola riga in ultima pagina — l'impaginazione
+resta ancorata in fondo in entrambi i casi.
+
+**File.** `frontend/src/pages/collaborators/CollaboratorPage.tsx`.
+
+---
+
 ## 2026-09-10 — Tab per report/interventi nella scheda collaboratore
 
 **Cosa.** La scheda collaboratore (`CollaboratorPage.tsx`) mostrava le tabelle di report e

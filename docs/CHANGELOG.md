@@ -11,6 +11,146 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — La scheda del collaboratore: due sezioni a tabella al posto dei riquadri
+
+**Cosa.** [CollaboratorPage](../frontend/src/pages/collaborators/CollaboratorPage.tsx) ha ora
+due sezioni, "Report del collaboratore" e "Interventi del collaboratore", ciascuna con il
+proprio filtro di stato, la propria impaginazione e le proprie righe per pagina. Le schede
+`CardReport` sono sparite — insieme al componente, che non aveva altri usi — e al loro posto
+ci sono due `EntityTable`, le stesse degli elenchi principali. Le colonne stanno in
+[collaborator-detail-columns.tsx](../frontend/src/pages/collaborators/components/collaborator-detail-columns.tsx).
+
+**Il perché.** Gli interventi mancavano del tutto. Il collaboratore è la persona che li
+esegue — `collaboratorId` è obbligatorio su ogni intervento, non facoltativo come sul report
+— ma la sua scheda mostrava solo i report: per sapere cosa avesse in agenda bisognava tornare
+all'elenco generale e cercarlo a mano. Il dato c'era, la strada per arrivarci no.
+
+I riquadri, poi, erano l'unica lista dell'applicazione a non essere una tabella. Mostravano
+tre campi (cliente, dispositivo, stato) e non potevano mostrarne altri senza diventare
+cartelloni: niente telefono, niente difetto, niente data, e niente colonne da allargare.
+Ognuno occupava un riquadro fisso di 384x200px per tre righe di testo, contro le poche decine
+di pixel di una riga di tabella. Ora le colonne sono sette più le azioni, uguali per nome e
+formato a quelle degli elenchi report e interventi.
+
+**Le scelte.** Le due sezioni impaginano separatamente, con chiavi distinte
+(`collaborator-reports`, `collaborator-interventions`): sfogliare i report non deve riportare
+gli interventi alla prima pagina, e chi guarda venti report per volta non vuole per forza
+venti interventi. Ogni tabella scorre orizzontalmente per conto suo, perché il contenitore
+del layout ha `overflow-x` nascosto e allargando le colonne le taglierebbe.
+
+Filtro e impaginazione sono del server, tramite il nuovo parametro `collaboratorId` (voce
+qui sotto): la pagina non si porta più in memoria l'elenco completo dei report per filtrarlo
+nel browser. Cliente, dispositivo e difetto arrivano già risolti dentro i DTO delle liste,
+quindi non servono più nemmeno `listCustomers` e `listDevices` per ricostruire due nomi. Al
+posto dello spinner a tutta pagina ci sono ora gli scheletri di riga delle due tabelle, come
+in tutti gli altri elenchi; lo spinner resta solo finché non si conosce il nome del
+collaboratore, che è l'intestazione della pagina.
+
+La corrispondenza stato -> colore degli interventi era ricopiata in ogni lista che li mostra
+e sarebbe diventata la terza copia: ora sta in
+[lib/interventions.ts](../frontend/src/lib/interventions.ts) (`interventionStatusColor`,
+`interventionAccentClassName`) e la usano anche l'elenco interventi e gli interventi del
+cliente.
+
+**Ancora da fare.** Le liste dentro le schede di cliente e tecnico restano tabelle scritte a
+mano, senza colonne ridimensionabili: la scheda collaboratore era la terza di quelle elencate
+nella voce dell'8 settembre, e ora è coperta.
+- File: `frontend/src/pages/collaborators/CollaboratorPage.tsx`,
+  `frontend/src/pages/collaborators/components/collaborator-detail-columns.tsx`,
+  `frontend/src/lib/interventions.ts`,
+  `frontend/src/pages/interventions/components/interventions-table.tsx`,
+  `frontend/src/pages/customers/CustomerInterventionsPage.tsx`,
+  `frontend/src/components/cardReport.tsx` (eliminato).
+
+---
+
+## 2026-09-10 — Le liste per collaboratore si filtrano sul server
+
+**Cosa.** Le rotte `GET /api/reports` e `GET /api/interventions` accettano `collaboratorId`,
+che diventa un confronto esatto nel `where` della query. La scheda del collaboratore lo usa
+per entrambe le sezioni e impagina lato server con `usePaginatedRows`, come gli elenchi
+principali.
+
+**Il perché.** La pagina chiedeva l'elenco *completo* e lo filtrava nel browser. Ma "completo"
+senza paginazione si ferma a `unpaginatedMaxRows` — 5000 righe della tabella intera, un tetto
+che esiste apposta per non caricare in memoria l'intero database. Sul database di sviluppo, che
+ha 20000 report, il collaboratore con 1198 report ne mostrava **305**: le prime cinquemila
+righe per data di creazione, filtrate, e in fondo alla pagina il conteggio diceva 305 senza il
+minimo segnale che il resto fosse stato tagliato via. Un numero sbagliato che sembra giusto è
+peggio di un errore: nessuno va a controllarlo.
+
+Il tetto era già stato pensato per questo — tronca e scrive un warning nei log — e infatti il
+warning c'era, a ogni apertura della scheda. Il difetto non era il tetto ma il chiamante:
+filtrare nel client una lista che il server sa filtrare significa scaricare 5000 righe per
+mostrarne dieci, e sbagliare il conteggio appena la tabella cresce.
+
+**Le scelte.** Il parametro sta accanto a `customerId`, che nel livello query esisteva già ma
+non era esposto sulle rotte di lista (lo usavano solo le stampe): stessa forma, stessa
+validazione (`z.coerce.number().int().positive().optional()`), nessun join in più — la colonna
+sta sulla tabella dei report e su quella degli interventi. Le stesse schede di cliente e
+tecnico continuano a filtrare nel browser e hanno lo stesso difetto: sono la prossima voce del
+backlog prestazioni.
+
+**Verificato** contro il database di sviluppo: `collaboratorId=13` risponde `totalItems` 1198
+per i report e 564 per gli interventi, esattamente i valori di `select count(*)`; con
+`visibility=open` risponde 181, di nuovo il conteggio esatto. In pagina: contatori 1198 e 564,
+pagina 2 dei report che non muove la sezione interventi, filtro "Report aperti" che porta il
+contatore a 181 con tutte le righe in stato "Aperto". Quattro test sulle rotte
+(`collaboratorFilter.test.ts`) coprono l'inoltro del parametro e il rifiuto di un id non
+valido.
+- File: `backend/src/db/queries/report.ts`, `backend/src/db/queries/intervention.ts`,
+  `backend/src/routes/reports.ts`, `backend/src/routes/interventions.ts`,
+  `backend/src/routes/collaboratorFilter.test.ts`, `frontend/src/lib/api/reports.ts`,
+  `frontend/src/lib/api/interventions.ts`,
+  `frontend/src/pages/collaborators/CollaboratorPage.tsx`.
+
+---
+
+## 2026-09-10 — Le larghezze delle colonne restano dove le si lascia
+
+**Cosa.** Al primo trascinamento si salva il layout **intero** della tabella e non la sola
+colonna spostata, e la rimisurazione innescata dal caricamento dei font avviene una volta
+sola invece che a ogni `loadingdone`.
+[useResizableColumns](../frontend/src/hooks/useResizableColumns.ts) espone
+`resolveWidthsToPersist`, che è la funzione pura in cui vive la regola (e ha i suoi test).
+
+**Il perché.** Le colonne mai toccate non avevano una voce salvata e ricadevano sulla
+larghezza *naturale*, che non è una costante: la decide il browser sul contenuto della
+pagina che si sta guardando in quel momento. Sistemata una colonna e tornati nella scheda,
+quella restava larga com'era stata lasciata e tutte le altre no — misurate su righe diverse,
+si spostavano da sole. Il risultato era una sistemazione a metà, che è il modo peggiore di
+non funzionare: sembra che il salvataggio non abbia tenuto.
+
+La seconda causa era `loadingdone`, che si ripete a ogni faccia del font che finisce di
+caricare — i sottoinsiemi Unicode di Inter arrivano quando compare il primo carattere che li
+richiede, quindi anche minuti dopo l'apertura. Ogni ripetizione azzerava le larghezze
+naturali e rifaceva il layout sulle righe di quel momento: le colonne si spostavano sotto gli
+occhi di chi stava leggendo. Una sola rimisurazione basta allo scopo per cui era stata
+introdotta (correggere quella fatta con il font di ripiego, vedi la voce dell'8 settembre) e
+si salta del tutto se una misura non c'è ancora, perché in quel caso avverrà già con il font
+giusto.
+
+**Le scelte.** La colonna elastica ("Azioni") resta fuori dal salvataggio: non ha una
+larghezza propria per definizione. Il doppio click sulla maniglia continua a riportare la
+colonna alla larghezza naturale, con la differenza che ora quel valore viene congelato
+insieme al resto del layout invece di restare libero di cambiare: è la stessa scelta di
+fondo, la stabilità vale più dell'adattamento automatico. Le chiavi salvate restano quelle
+delle colonne, quindi una colonna aggiunta o rinominata non eredita per sbaglio la misura di
+un'altra: semplicemente non ha ancora una voce.
+
+**Verificato** con i test della funzione pura (`useResizableColumns.test.ts`) e con Playwright
+su Edge, sulla scheda del collaboratore. Il test in browser include la controprova, senza la
+quale non direbbe niente: ricaricando la stessa pagina con un numero diverso di righe, il
+salvataggio vecchio stile (solo `{customer: 273}`) fa derivare sei colonne su otto —
+"Dispositivo" +16px, "Difetto" -12px, "Telefono" -5px — mentre con il layout completo si
+muove solo la colonna elastica, di 2px, che è il suo mestiere. Dopo il trascinamento la voce
+salvata contiene tutte e sette le colonne non elastiche, e al ricaricamento la deriva è zero
+su tutte.
+- File: `frontend/src/hooks/useResizableColumns.ts`,
+  `frontend/src/hooks/useResizableColumns.test.ts`, `frontend/src/lib/theme.ts`.
+
+---
+
 ## 2026-09-09 — Gli spinner girano anche con le animazioni ridotte
 
 **Cosa.** L'eccezione a `prefers-reduced-motion` in `frontend/src/index.css` ora vale per

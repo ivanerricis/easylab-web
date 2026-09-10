@@ -58,6 +58,43 @@ const measureNaturalWidths = (table: HTMLTableElement, columnKeys: string[]): Re
 };
 
 /**
+ * Il layout completo da salvare: per ogni colonna la larghezza scelta dall'utente, o in sua
+ * assenza quella naturale misurata in questo mount.
+ *
+ * Si salvano anche le colonne mai toccate perché la larghezza naturale non è una costante:
+ * la decide il browser sul contenuto della pagina che si sta guardando. Salvando solo le
+ * colonne trascinate, al rientro nella scheda tutte le altre venivano rimisurate su righe
+ * diverse e cambiavano larghezza da sole — la colonna sistemata restava, il resto della
+ * tabella no. Congelare l'intero layout al primo trascinamento è ciò che rende la
+ * sistemazione stabile invece che parziale.
+ *
+ * La colonna elastica resta fuori: non ha una larghezza propria per definizione, prende
+ * quello che avanza.
+ */
+export const resolveWidthsToPersist = (
+    columnKeys: string[],
+    naturalWidths: Record<string, number> | null,
+    widths: Record<string, number>,
+    elasticColumnKey?: string
+): Record<string, number> => {
+    const resolved: Record<string, number> = {};
+
+    for (const columnKey of columnKeys) {
+        if (columnKey === elasticColumnKey) {
+            continue;
+        }
+
+        const width = widths[columnKey] ?? naturalWidths?.[columnKey];
+
+        if (width !== undefined) {
+            resolved[columnKey] = width;
+        }
+    }
+
+    return resolved;
+};
+
+/**
  * Colonne trascinabili per il bordo destro dell'intestazione.
  *
  * Il punto delicato è che finché la tabella è in `table-layout: auto` — com'è oggi — le
@@ -73,6 +110,9 @@ const measureNaturalWidths = (table: HTMLTableElement, columnKeys: string[]): Re
  * misure vengono dalla prima pagina di dati e poi restano ferme — che è anche il
  * comportamento voluto, perché colonne che ballano a ogni cambio pagina sono peggio di
  * colonne strette.
+ *
+ * Al primo trascinamento viene salvato il layout intero e non la sola colonna spostata: vedi
+ * `resolveWidthsToPersist` per il perché.
  */
 export const useResizableColumns = ({
     tableKey,
@@ -84,11 +124,22 @@ export const useResizableColumns = ({
     const [naturalWidths, setNaturalWidths] = useState<Record<string, number> | null>(null);
     const [widths, setWidths] = useState<Record<string, number>>(() => getStoredTableColumnWidths(tableKey));
 
+    // Le larghezze naturali servono anche fuori dal render (al salvataggio e al termine del
+    // caricamento dei font), dove lo stato React sarebbe quello dell'ultimo render.
+    const naturalWidthsRef = useRef(naturalWidths);
+
+    const applyNaturalWidths = useCallback((nextNaturalWidths: Record<string, number> | null) => {
+        naturalWidthsRef.current = nextNaturalWidths;
+        setNaturalWidths(nextNaturalWidths);
+    }, []);
+
     // Durante il trascinamento lo stato React non è abbastanza fresco: ogni pointermove deve
     // partire dal valore appena scritto, non da quello dell'ultimo render.
     const widthsRef = useRef(widths);
 
     const dragRef = useRef<{ columnKey: string; startX: number; startWidth: number } | null>(null);
+
+    const hasRemeasuredForFontsRef = useRef(false);
 
     /**
      * Misurare mentre Inter sta ancora caricando dà le larghezze del font di ripiego, più
@@ -113,12 +164,24 @@ export const useResizableColumns = ({
             return;
         }
 
-        const handleFontsLoaded = () => setNaturalWidths(null);
+        const handleFontsLoaded = () => {
+            // `loadingdone` si ripete a ogni faccia che finisce di caricare (i sottoinsiemi
+            // Unicode di Inter arrivano quando compare il primo carattere che li richiede).
+            // Rimisurare ogni volta rifaceva il layout su righe diverse da quelle di prima e
+            // le colonne si spostavano sotto le mani di chi stava leggendo: la rimisurazione
+            // serve una volta sola, per correggere quella fatta con il font di ripiego.
+            if (hasRemeasuredForFontsRef.current || naturalWidthsRef.current === null) {
+                return;
+            }
+
+            hasRemeasuredForFontsRef.current = true;
+            applyNaturalWidths(null);
+        };
 
         fontSet.addEventListener("loadingdone", handleFontsLoaded);
 
         return () => fontSet.removeEventListener("loadingdone", handleFontsLoaded);
-    }, []);
+    }, [applyNaturalWidths]);
 
     const tryMeasure = useCallback(() => {
         const table = tableRef.current;
@@ -130,9 +193,9 @@ export const useResizableColumns = ({
         const measured = measureNaturalWidths(table, columnKeys);
 
         if (measured) {
-            setNaturalWidths(measured);
+            applyNaturalWidths(measured);
         }
-    }, [columnKeys]);
+    }, [applyNaturalWidths, columnKeys]);
 
     useLayoutEffect(() => {
         if (naturalWidths || !canMeasure) {
@@ -176,8 +239,11 @@ export const useResizableColumns = ({
     }, []);
 
     const persistWidths = useCallback(() => {
-        setStoredTableColumnWidths(tableKey, widthsRef.current);
-    }, [tableKey]);
+        setStoredTableColumnWidths(
+            tableKey,
+            resolveWidthsToPersist(columnKeys, naturalWidthsRef.current, widthsRef.current, elasticColumnKey)
+        );
+    }, [columnKeys, elasticColumnKey, tableKey]);
 
     /**
      * Props della maniglia, o `null` quando la colonna non è ridimensionabile: prima della
@@ -248,9 +314,10 @@ export const useResizableColumns = ({
                 onDoubleClick: (event: ReactPointerEvent<HTMLElement>) => {
                     event.stopPropagation();
 
-                    // Torna alla larghezza naturale togliendo la voce salvata, invece di
-                    // scriverci sopra la misura di partenza: così la colonna resta libera di
-                    // adattarsi se un domani cambia il contenuto.
+                    // Torna alla larghezza naturale togliendo la voce scelta dall'utente: la
+                    // colonna ricade sulla misura presa in questo mount, che il salvataggio
+                    // successivo congela insieme al resto del layout. Un secondo doppio click,
+                    // più avanti, la riporta alla naturale di allora.
                     const nextWidths = { ...widthsRef.current };
 
                     delete nextWidths[columnKey];

@@ -1,6 +1,7 @@
 import EntityTable from "@/components/entity-table";
 import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
+import { interventionAccentClassName, interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
 import { Mail, Pencil, Printer, Trash2 } from "lucide-react";
 import type { InterventionColumn } from "./intervention-columns";
@@ -21,18 +22,8 @@ type InterventionsTableProps = {
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
 // in Impostazioni > Tema; la cella azioni torna a bg-background/text-foreground per non
-// colorare le icone dei pulsanti.
-const statusColorByStatus: Record<InterventionDto["status"], string> = {
-    programmato: "red",
-    in_lavorazione: "yellow",
-    completato: "green",
-};
-
-const accentClassNameByStatus: Record<InterventionDto["status"], string> = {
-    programmato: "border-t-red-500",
-    in_lavorazione: "border-t-yellow-400",
-    completato: "border-t-green-500",
-};
+// colorare le icone dei pulsanti. La corrispondenza stato -> colore sta in lib/interventions,
+// condivisa con le altre liste di interventi.
 
 const InterventionsTable = ({
     columns,
@@ -99,8 +90,8 @@ const InterventionsTable = ({
             getRowKey={(row) => row.id}
             emptyMessage="Nessun intervento disponibile."
             renderRowActions={renderRowActions}
-            getRowStatusColor={(row) => statusColorByStatus[row.status]}
-            getAccentClassName={(row) => accentClassNameByStatus[row.status]}
+            getRowStatusColor={(row) => interventionStatusColor[row.status]}
+            getAccentClassName={(row) => interventionAccentClassName[row.status]}
             onRowOpen={(row) => onOpenIntervention(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}

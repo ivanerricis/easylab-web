@@ -20,6 +20,7 @@ type ListInterventionsParams = {
     scheduledFrom?: string;
     scheduledTo?: string;
     customerId?: number;
+    collaboratorId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
 };
@@ -36,6 +37,7 @@ export const listInterventions = async ({
     scheduledFrom,
     scheduledTo,
     customerId,
+    collaboratorId,
     sortBy = "createdAt",
     sortOrder = "desc",
 }: ListInterventionsParams) => {
@@ -107,6 +109,7 @@ export const listInterventions = async ({
           )
         : undefined;
     const customerCondition = customerId ? eq(interventionTable.customerId, customerId) : undefined;
+    const collaboratorCondition = collaboratorId ? eq(interventionTable.collaboratorId, collaboratorId) : undefined;
     const searchCondition = searchConditions.length > 0 ? or(...searchConditions) : undefined;
     const whereConditions = [
         statusCondition,
@@ -115,6 +118,7 @@ export const listInterventions = async ({
         scheduledDateCondition,
         scheduledRangeCondition,
         customerCondition,
+        collaboratorCondition,
         searchCondition,
     ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;

@@ -16,6 +16,8 @@ import {
     formatInterventionStatus,
     formatInterventionTime,
     formatInterventionType,
+    interventionAccentClassName,
+    interventionStatusColor,
     interventionStatusOptions,
 } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,18 +35,6 @@ type CustomerInterventionRow = {
     type: string;
     schedule: string;
     status: InterventionStatus;
-};
-
-const accentClassNameByStatus: Record<InterventionStatus, string> = {
-    programmato: "border-t-red-500",
-    in_lavorazione: "border-t-yellow-400",
-    completato: "border-t-green-500",
-};
-
-const statusColorByStatus: Record<InterventionStatus, string> = {
-    programmato: "red",
-    in_lavorazione: "yellow",
-    completato: "green",
 };
 
 const formatSchedule = (interventionDate: string | null, startTime: string | null, endTime: string | null) => {
@@ -234,7 +224,7 @@ const CustomerInterventionsPage = () => {
                                 paginatedInterventionRows.map((intervention) => (
                                     <TableRow
                                         key={intervention.id}
-                                        data-status-color={statusColorByStatus[intervention.status]}
+                                        data-status-color={interventionStatusColor[intervention.status]}
                                     >
                                         <TableCell>{intervention.id}</TableCell>
                                         <TableCell>{intervention.type}</TableCell>
@@ -273,7 +263,7 @@ const CustomerInterventionsPage = () => {
                         ]}
                         rows={paginatedInterventionRows}
                         getRowKey={(row) => row.id}
-                        getAccentClassName={(row) => accentClassNameByStatus[row.status]}
+                        getAccentClassName={(row) => interventionAccentClassName[row.status]}
                         renderActions={(row) => (
                             <OpenEntityButton
                                 size="icon-lg"

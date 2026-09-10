@@ -64,6 +64,8 @@ export type ListReportsParams = {
     visibility?: "all" | "open" | "closed";
     dateFrom?: string;
     dateTo?: string;
+    /** Solo i report di quel collaboratore: lo usa la sua scheda. */
+    collaboratorId?: number;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
     /**
@@ -90,6 +92,7 @@ export async function listReports(params?: ListReportsParams) {
             visibility: params.visibility,
             dateFrom: params.dateFrom,
             dateTo: params.dateTo,
+            collaboratorId: params.collaboratorId,
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },

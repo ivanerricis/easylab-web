@@ -32,6 +32,10 @@ const reportListQuerySchema = listQuerySchema.extend({
     visibility: z.enum(["all", "open", "closed"]).optional(),
     dateFrom: z.string().regex(dateRegex).optional(),
     dateTo: z.string().regex(dateRegex).optional(),
+    // Filtro per collaboratore: lo usa la sua scheda, che prima si portava in pagina le
+    // prime cinquemila righe della tabella e le filtrava nel browser — cioè ne mostrava
+    // una parte, senza dirlo.
+    collaboratorId: z.coerce.number().int().positive().optional(),
     sortBy: z.enum(reportSortFields).optional(),
 });
 
@@ -72,16 +76,18 @@ const reportUpdateBodySchema = reportBodySchema.partial().refine((value) => Obje
 });
 
 reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, res) => {
-    const { page, pageSize, search, visibility, dateFrom, dateTo, sortBy, sortOrder } = req.query as unknown as {
-        page?: number;
-        pageSize?: number;
-        search?: string;
-        visibility?: "all" | "open" | "closed";
-        dateFrom?: string;
-        dateTo?: string;
-        sortBy?: (typeof reportSortFields)[number];
-        sortOrder?: "asc" | "desc";
-    };
+    const { page, pageSize, search, visibility, dateFrom, dateTo, collaboratorId, sortBy, sortOrder } =
+        req.query as unknown as {
+            page?: number;
+            pageSize?: number;
+            search?: string;
+            visibility?: "all" | "open" | "closed";
+            dateFrom?: string;
+            dateTo?: string;
+            collaboratorId?: number;
+            sortBy?: (typeof reportSortFields)[number];
+            sortOrder?: "asc" | "desc";
+        };
 
     const reports = await listReports({
         page,
@@ -90,6 +96,7 @@ reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, r
         visibility: visibility ?? (page == null || pageSize == null ? "all" : "open"),
         dateFrom,
         dateTo,
+        collaboratorId,
         sortBy,
         sortOrder,
     });

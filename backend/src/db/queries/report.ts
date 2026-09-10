@@ -22,6 +22,7 @@ type ListReportsParams = {
     dateFrom?: string;
     dateTo?: string;
     customerId?: number;
+    collaboratorId?: number;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
 };
@@ -34,6 +35,7 @@ export const listReports = async ({
     dateFrom,
     dateTo,
     customerId,
+    collaboratorId,
     sortBy = "createdAt",
     sortOrder = "desc",
 }: ListReportsParams) => {
@@ -78,10 +80,15 @@ export const listReports = async ({
                 ? sql`${reportTable.created_at}::date <= ${dateTo}`
                 : undefined;
     const customerCondition = customerId ? eq(reportTable.customerId, customerId) : undefined;
+    const collaboratorCondition = collaboratorId ? eq(reportTable.collaboratorId, collaboratorId) : undefined;
     const searchCondition = searchConditions.length > 0 ? or(...searchConditions) : undefined;
-    const whereConditions = [visibilityCondition, dateCondition, customerCondition, searchCondition].filter(
-        (condition): condition is NonNullable<typeof condition> => condition != null
-    );
+    const whereConditions = [
+        visibilityCondition,
+        dateCondition,
+        customerCondition,
+        collaboratorCondition,
+        searchCondition,
+    ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const customerSortExpr = sql<string>`coalesce(nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), ''), '-')`;

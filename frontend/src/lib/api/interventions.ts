@@ -47,6 +47,8 @@ export type ListInterventionsParams = {
     /** Intervallo sulla data dell'intervento; `dateFrom`/`dateTo` filtrano invece la data di creazione. */
     scheduledFrom?: string;
     scheduledTo?: string;
+    /** Solo gli interventi assegnati a quel collaboratore: lo usa la sua scheda. */
+    collaboratorId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
     /**
@@ -77,6 +79,7 @@ export async function listInterventions(params?: ListInterventionsParams) {
             scheduledDate: params.scheduledDate,
             scheduledFrom: params.scheduledFrom,
             scheduledTo: params.scheduledTo,
+            collaboratorId: params.collaboratorId,
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },

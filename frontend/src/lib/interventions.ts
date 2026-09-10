@@ -12,6 +12,27 @@ export const interventionStatusOptions: { value: InterventionStatus; label: stri
     { value: "completato", label: "Completato" },
 ];
 
+/**
+ * Colore di stato della riga: lo legge `index.css` da `data-status-color`, insieme
+ * all'intensità scelta in Impostazioni > Tema.
+ *
+ * Sta qui e non accanto alla tabella perché le liste che mostrano interventi sono ormai tre
+ * (elenco interventi, interventi del cliente, scheda del collaboratore) e la mappa era
+ * ricopiata in ognuna: tre occasioni perché un colore cambi in un posto solo.
+ */
+export const interventionStatusColor: Record<InterventionStatus, string> = {
+    programmato: "red",
+    in_lavorazione: "yellow",
+    completato: "green",
+};
+
+/** Bordo superiore colorato delle schede su mobile, stessa corrispondenza di stato. */
+export const interventionAccentClassName: Record<InterventionStatus, string> = {
+    programmato: "border-t-red-500",
+    in_lavorazione: "border-t-yellow-400",
+    completato: "border-t-green-500",
+};
+
 export const formatInterventionType = (value: InterventionType) =>
     interventionTypeOptions.find((option) => option.value === value)?.label ?? value;
 

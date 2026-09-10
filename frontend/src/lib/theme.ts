@@ -529,10 +529,12 @@ export const setStoredTableRowsPerPage = (tableKey: string, pageSize: TableRowsP
  * globale: una larghezza ha senso solo per la colonna che l'ha misurata, e "Cliente" negli
  * interventi non è la stessa colonna di "Cliente" nelle schede.
  *
- * Si salvano **solo** le colonne effettivamente ridimensionate: le altre restano senza voce
- * e ricadono sulla larghezza naturale misurata al primo render. Così una colonna aggiunta o
- * rinominata in seguito non eredita per sbaglio la misura di un'altra, e un `reset` è
- * semplicemente l'assenza della chiave.
+ * Dal primo trascinamento in poi la mappa contiene **tutte** le colonne della tabella, non
+ * solo quelle spostate a mano: la larghezza naturale delle altre dipende dalle righe che
+ * erano a schermo quando è stata misurata, quindi lasciarle senza voce le faceva cambiare da
+ * sole a ogni visita. Le chiavi restano quelle delle colonne, così una colonna aggiunta o
+ * rinominata in seguito non eredita per sbaglio la misura di un'altra: semplicemente non ha
+ * ancora una voce e ricade sulla misura naturale.
  */
 export const getStoredTableColumnWidths = (tableKey: string): Record<string, number> => {
     const rawValue = localStorage.getItem(`${tableColumnWidthsStorageKey}:${tableKey}`);

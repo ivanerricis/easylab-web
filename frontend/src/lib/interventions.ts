@@ -26,13 +26,6 @@ export const interventionStatusColor: Record<InterventionStatus, string> = {
     completato: "green",
 };
 
-/** Bordo superiore colorato delle schede su mobile, stessa corrispondenza di stato. */
-export const interventionAccentClassName: Record<InterventionStatus, string> = {
-    programmato: "border-t-red-500",
-    in_lavorazione: "border-t-yellow-400",
-    completato: "border-t-green-500",
-};
-
 export const formatInterventionType = (value: InterventionType) =>
     interventionTypeOptions.find((option) => option.value === value)?.label ?? value;
 

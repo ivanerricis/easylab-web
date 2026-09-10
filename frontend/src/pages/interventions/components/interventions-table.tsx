@@ -1,7 +1,7 @@
 import EntityTable from "@/components/entity-table";
 import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
-import { interventionAccentClassName, interventionStatusColor } from "@/lib/interventions";
+import { interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
 import { Mail, Pencil, Printer, Trash2 } from "lucide-react";
 import type { InterventionColumn } from "./intervention-columns";
@@ -91,12 +91,10 @@ const InterventionsTable = ({
             emptyMessage="Nessun intervento disponibile."
             renderRowActions={renderRowActions}
             getRowStatusColor={(row) => interventionStatusColor[row.status]}
-            getAccentClassName={(row) => interventionAccentClassName[row.status]}
             onRowOpen={(row) => onOpenIntervention(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}
-            titleColumnKey={"customer"}
         />
     );
 };

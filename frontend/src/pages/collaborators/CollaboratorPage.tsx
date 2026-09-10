@@ -9,7 +9,7 @@ import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getApiErrorMessage, listCollaborators, listInterventions, listReports } from "@/lib/api";
-import { interventionAccentClassName, interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
+import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
@@ -230,12 +230,10 @@ const CollaboratorPage = () => {
                                 />
                             )}
                             getRowStatusColor={(row) => (row.closed ? "green" : "red")}
-                            getAccentClassName={(row) => (row.closed ? "border-t-green-500" : "border-t-red-500")}
                             onRowOpen={(row) => handleOpenReport(row.id)}
                             isInitialLoading={areReportsInitialLoading}
                             isRefetching={areReportsRefetching}
                             skeletonRowCount={reportsPageSize}
-                            titleColumnKey="customer"
                         />
                     </div>
 
@@ -285,12 +283,10 @@ const CollaboratorPage = () => {
                                 />
                             )}
                             getRowStatusColor={(row) => interventionStatusColor[row.status]}
-                            getAccentClassName={(row) => interventionAccentClassName[row.status]}
                             onRowOpen={(row) => handleOpenIntervention(row.id)}
                             isInitialLoading={areInterventionsInitialLoading}
                             isRefetching={areInterventionsRefetching}
                             skeletonRowCount={interventionsPageSize}
-                            titleColumnKey="customer"
                         />
                     </div>
 

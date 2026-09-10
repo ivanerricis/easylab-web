@@ -11,6 +11,95 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Pulsante di creazione quadrato accanto al titolo su mobile; report del tecnico visibili su mobile
+
+**Cosa.**
+- `page-header.tsx`: titolo e azione tornano sulla stessa riga anche sotto `sm`
+  (`flex flex-wrap items-center justify-between`), con a capo solo se non ci stanno. Il
+  `flex-col` introdotto per la dashboard (voce "Header di pagina che non va in overflow sotto
+  `sm`") impilava i due blocchi, e in colonna ogni figlio si stira: su Report, Interventi,
+  Clienti, Tecnici, Collaboratori, Dispositivi e Difetti il singolo pulsante "+" diventava una
+  barra blu larga quanto lo schermo, sotto il titolo.
+- `DashboardPage.tsx`: il gruppo refresh + "Report" + "Intervento" chiede da sé la riga
+  intera sotto `sm` (`w-full sm:w-auto`), quindi la dashboard resta esattamente com'era.
+- `create-entity-button.tsx`: sotto `md`, quando mostra solo l'icona (nessuna `mobileLabel`),
+  il pulsante è esplicitamente quadrato (`max-md:aspect-square max-md:px-0`), 40×40 come il
+  refresh e le azioni di riga; da `md` in su torna il testo ("Crea nuovo report").
+- `TechnicianPage.tsx`: su mobile i report del tecnico **non si vedevano affatto** — la tabella
+  è `hidden sm:table` e al suo posto non c'era alcuna scheda, restava solo il conteggio in
+  fondo ("1-10 di 56" su una lista vuota). Aggiunto `EntityCardList` come nelle schede di
+  cliente e collaboratore (cliente come titolo, stato nel badge, dispositivo, pulsanti Apri e
+  Modifica); il rientro `ml-12` della lista vale ora solo da `sm` in su, così le schede usano
+  tutta la larghezza.
+
+**Il perché.** Richiesta dell'utente: "il tasto per creare un nuovo report non dovrebbe
+prendersi tutta la riga, nome della pagina a sinistra e pulsante quadrato a destra, su tutte
+le pagine con questo problema". Il bug del tecnico è emerso passando in rassegna le pagine per
+questa verifica. Le pagine di dettaglio (report, intervento, cliente) hanno i pulsanti su una
+riga propria ma non a tutta larghezza, e non sono state toccate. Verificato con `typecheck`,
+`lint`, `format:check` e Playwright autenticato: il "+" misura 40×40 alla stessa altezza del
+titolo a 320, 390 e 700px, a 1280px è il pulsante con testo come prima; la dashboard ha le
+stesse posizioni di prima a tutte le larghezze; nessuno scroll orizzontale.
+
+**File.** `frontend/src/components/page-header.tsx`,
+`frontend/src/components/create-entity-button.tsx`,
+`frontend/src/pages/dashboard/DashboardPage.tsx`,
+`frontend/src/pages/technicians/TechnicianPage.tsx`.
+
+---
+
+## 2026-09-10 — Schede delle liste su mobile ridisegnate
+
+**Cosa.** Le schede che sotto `sm` prendono il posto delle tabelle (`EntityCardList`) hanno un
+layout nuovo:
+- **Intestazione**: il titolo in grassetto, sotto l'ID come `#3174` in piccolo, e a destra lo
+  stato in un badge colorato con pallino e testo ("Aperto", "Programmato"...). Prima l'ID
+  occupava una riga intera come qualsiasi altro campo e lo stato stava in mezzo alla lista.
+- **Dettagli su due colonne**, etichetta piccola sopra il valore, invece di una riga
+  etichetta-a-sinistra/valore-a-destra per ogni campo: i valori lunghi andavano a capo
+  allineati a destra, difficili da leggere. I campi che tendono a essere lunghi (difetto,
+  email, orario nella scheda cliente) prendono tutta la larghezza.
+- **Stato** come striscia sottile a sinistra al posto della barra da 8px in alto; niente
+  striscia dove non c'è stato. Prima la barra c'era sempre, grigia e senza significato, su
+  clienti, tecnici, collaboratori, dispositivi e difetti. Bordo da 1px con ombra leggera
+  invece di `border-2`.
+- **Pulsanti** in una fascia in fondo, a dividersi la larghezza della scheda, alti 44px (erano
+  icone da 40px allineate a destra). La fascia sparisce se la riga non ha pulsanti (la voce
+  fissa "Altro" dei difetti mostrava una fascia vuota).
+- **Titolo anche per le anagrafiche**: nome e cognome per clienti, tecnici e collaboratori,
+  nome per i dispositivi, descrizione per i difetti. Prima avevano l'ID come prima riga.
+- Lo scheletro di caricamento ricalca il nuovo layout; le schede utenti in Impostazioni,
+  scritte a mano, adottano lo stesso aspetto.
+
+**Come.** Il posto di una colonna nella scheda lo dichiara la colonna stessa
+(`cardSlot: "title" | "badge" | "wide"`) invece della prop `titleColumnKey`, che andava fatta
+passare per `EntityTable`, `EntityCrudTable` e ogni pagina: è per questo che le quattro
+anagrafiche un titolo non l'avevano. Il colore delle schede viene ora da `getRowStatusColor`,
+lo stesso della riga in tabella: sparisce `getAccentClassName` con la sua mappa di classi
+`border-t-*` (`interventionAccentClassName` in `lib/interventions.ts`), una seconda
+corrispondenza stato → colore da tenere allineata a mano. I colori sono token semantici
+nuovi (`--status-{red,yellow,green}` e `-foreground`, in chiaro e scuro) invece di classi
+Tailwind grezze; il testo del badge è scuro abbastanza da reggere il contrasto sul fondo
+tenue, e il giallo resta all'hue 85 come per le righe. L'orario "13:00-14:30" della colonna
+Data/Orario non va più a capo sul trattino.
+
+**Il perché.** Richiesta dell'utente di sistemare graficamente le schede su mobile. Le
+linee guida consultate (skill ui-ux-pro-max) hanno fissato i vincoli: stato scritto oltre che
+colorato, bersagli touch da 44px, scheletro che ricalca il contenuto. Verificato con
+`typecheck`, `lint`, `format:check` e Playwright autenticato a 390px in chiaro e scuro su
+report, interventi, clienti, scheda cliente, scheda collaboratore, tecnici, difetti e utenti;
+a 320px nessuno scroll orizzontale. Controprova sui pulsanti: togliendo le classi `*:` della
+fascia tornano a 40×40, quindi l'override è quello che li porta a 44px.
+
+**File.** `frontend/src/components/entity-card-list.tsx`, `entity-table.tsx`,
+`entity-crud-table.tsx`, `hover-detail-cell.tsx`, `settings/usersSettingsSection.tsx`,
+`frontend/src/index.css`, `frontend/src/lib/interventions.ts`, le definizioni di colonna in
+`frontend/src/pages/*/components/*-columns.tsx`, `reports-table.tsx`,
+`interventions-table.tsx`, `CollaboratorPage.tsx`, `CustomerPage.tsx`,
+`CustomerInterventionsPage.tsx`.
+
+---
+
 ## 2026-09-10 — Ricerca e paginazione allineate alle altre pagine su mobile
 
 **Cosa.**

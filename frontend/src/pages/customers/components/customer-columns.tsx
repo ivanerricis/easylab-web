@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import { formatDate } from "@/lib/utils";
 import type { CustomerDto } from "@/types/dtos";
 import type { ReactNode } from "react";
@@ -7,6 +8,7 @@ export type CustomerColumn = {
     header: string;
     className?: string;
     render: (row: CustomerDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const customerColumns: CustomerColumn[] = [
@@ -18,11 +20,13 @@ export const customerColumns: CustomerColumn[] = [
     {
         key: "firstName",
         header: "Nome",
+        cardSlot: "title",
         render: (row) => row.firstName,
     },
     {
         key: "lastName",
         header: "Cognome",
+        cardSlot: "title",
         render: (row) => row.lastName ?? "-",
     },
     {
@@ -38,6 +42,7 @@ export const customerColumns: CustomerColumn[] = [
     {
         key: "email",
         header: "Email",
+        cardSlot: "wide",
         render: (row) => row.email ?? "-",
     },
     {

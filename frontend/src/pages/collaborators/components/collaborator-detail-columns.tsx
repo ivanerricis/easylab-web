@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -17,6 +18,7 @@ export type CollaboratorReportColumn = {
     header: string;
     className?: string;
     render: (row: ReportDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export type CollaboratorInterventionColumn = {
@@ -24,6 +26,7 @@ export type CollaboratorInterventionColumn = {
     header: string;
     className?: string;
     render: (row: InterventionDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const collaboratorReportColumns: CollaboratorReportColumn[] = [
@@ -35,6 +38,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
     {
         key: "customer",
         header: "Cliente",
+        cardSlot: "title",
         render: (row) => row.customer,
     },
     {
@@ -50,6 +54,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
     {
         key: "issue",
         header: "Difetto",
+        cardSlot: "wide",
         render: (row) => <HoverDetailCell text={row.issue} detail={row.issueDescription} />,
     },
     {
@@ -57,6 +62,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
         // report, per chi non distingue verde e rosso.
         key: "closed",
         header: "Stato",
+        cardSlot: "badge",
         render: (row) => (row.closed ? "Chiuso" : "Aperto"),
     },
     {
@@ -81,6 +87,7 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
     {
         key: "customer",
         header: "Cliente",
+        cardSlot: "title",
         render: (row) => row.customer,
     },
     {
@@ -105,12 +112,22 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
                 return formatDate(row.interventionDate);
             }
 
-            return `${formatDate(row.interventionDate)} ${formatInterventionTime(row.startTime)}-${formatInterventionTime(row.endTime)}`;
+            // L'orario resta intero: in mezza scheda su mobile andava a capo sul trattino
+            // ("13:00-" / "14:30"). Così a capo va, se serve, fra la data e l'orario.
+            return (
+                <>
+                    {formatDate(row.interventionDate)}{" "}
+                    <span className="whitespace-nowrap">
+                        {formatInterventionTime(row.startTime)}-{formatInterventionTime(row.endTime)}
+                    </span>
+                </>
+            );
         },
     },
     {
         key: "status",
         header: "Stato",
+        cardSlot: "badge",
         render: (row) => formatInterventionStatus(row.status),
     },
     {

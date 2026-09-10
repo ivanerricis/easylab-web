@@ -256,34 +256,55 @@ const UsersSettingsSection = () => {
 
                         <div className="flex flex-col gap-3 sm:hidden">
                             {users.map((user) => (
-                                <div key={user.id} className="rounded-lg border-2 border-t-8 bg-background p-3">
-                                    <div className="flex flex-col gap-1.5 text-sm">
-                                        <span className="font-medium">
+                                // Stesso aspetto delle schede di `EntityCardList`, che qui non si
+                                // usa perché i pulsanti sono con testo e vanno a capo invece di
+                                // dividersi la larghezza.
+                                <article
+                                    key={user.id}
+                                    className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs"
+                                >
+                                    <div className="px-4 pt-3.5 pb-3.5">
+                                        <h3 className="text-base leading-snug font-semibold break-words">
                                             {user.username}
-                                            {user.id === currentUser?.id ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(tu)</span>
-                                            ) : null}
-                                            {user.isAdmin ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(admin)</span>
-                                            ) : null}
-                                            {!user.active ? (
-                                                <span className="ml-2 text-xs text-destructive">(disabilitato)</span>
-                                            ) : null}
-                                            {user.twoFactorEnabled ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(2FA)</span>
-                                            ) : null}
-                                        </span>
-                                        <div className="flex items-baseline justify-between gap-3">
-                                            <span className="text-muted-foreground">Creato il</span>
-                                            <span className="text-right font-medium">
+                                        </h3>
+                                        {user.id === currentUser?.id ||
+                                        user.isAdmin ||
+                                        !user.active ||
+                                        user.twoFactorEnabled ? (
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-medium">
+                                                {user.id === currentUser?.id ? (
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                                                        tu
+                                                    </span>
+                                                ) : null}
+                                                {user.isAdmin ? (
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                                                        admin
+                                                    </span>
+                                                ) : null}
+                                                {!user.active ? (
+                                                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">
+                                                        disabilitato
+                                                    </span>
+                                                ) : null}
+                                                {user.twoFactorEnabled ? (
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                                                        2FA
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        <dl className="mt-3">
+                                            <dt className="text-xs text-muted-foreground">Creato il</dt>
+                                            <dd className="mt-0.5 text-sm font-medium">
                                                 {formatDateTime(user.createdAt)}
-                                            </span>
-                                        </div>
+                                            </dd>
+                                        </dl>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+                                    <div className="flex flex-wrap items-center gap-2 border-t bg-muted/40 px-3 py-2.5">
                                         {renderUserActions(user)}
                                     </div>
-                                </div>
+                                </article>
                             ))}
                         </div>
                     </>

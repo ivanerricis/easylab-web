@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import { formatDate } from "@/lib/utils";
 import type { TechnicianDto } from "@/types/dtos";
 import type { ReactNode } from "react";
@@ -7,6 +8,7 @@ export type TechnicianColumn = {
     header: string;
     className?: string;
     render: (row: TechnicianDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const technicianColumns: TechnicianColumn[] = [
@@ -18,11 +20,13 @@ export const technicianColumns: TechnicianColumn[] = [
     {
         key: "firstName",
         header: "Nome",
+        cardSlot: "title",
         render: (row) => row.firstName,
     },
     {
         key: "lastName",
         header: "Cognome",
+        cardSlot: "title",
         render: (row) => row.lastName ?? "-",
     },
     {

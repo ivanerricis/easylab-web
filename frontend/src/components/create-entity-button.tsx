@@ -20,7 +20,14 @@ const CreateEntityButton = ({ label, mobileLabel, size = "lg", className, ...pro
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button size={size} className={cn("text-lg", className)} aria-label={label} {...props}>
+                <Button
+                    size={size}
+                    // Sotto `md` senza etichetta breve resta solo l'icona: il pulsante è quadrato
+                    // come gli altri pulsanti-icona della pagina (refresh, azioni di riga).
+                    className={cn("text-lg", !mobileLabel && "max-md:aspect-square max-md:px-0", className)}
+                    aria-label={label}
+                    {...props}
+                >
                     <PlusCircle className="size-5" />
                     {mobileLabel ? <span className="text-lg md:hidden">{mobileLabel}</span> : null}
                     <span className="hidden text-lg md:inline">{label}</span>

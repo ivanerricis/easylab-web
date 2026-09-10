@@ -1,4 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import EntityCardList from "@/components/entity-card-list";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ type TechnicianReportCard = {
     deviceName: string;
     closed: boolean;
 };
+
+const getStatusColor = (report: TechnicianReportCard) => (report.closed ? "green" : "red");
 
 const TechnicianPage = () => {
     const navigate = useNavigate();
@@ -211,7 +214,7 @@ const TechnicianPage = () => {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="ml-12">
+            <div className="sm:ml-12">
                 {visibleReportCards.length === 0 ? (
                     <p className="text-muted-foreground">Nessun report associato a questo tecnico.</p>
                 ) : (
@@ -228,7 +231,7 @@ const TechnicianPage = () => {
                             </TableHeader>
                             <TableBody>
                                 {paginatedReportCards.map((report) => (
-                                    <TableRow key={report.id} data-status-color={report.closed ? "green" : "red"}>
+                                    <TableRow key={report.id} data-status-color={getStatusColor(report)}>
                                         <TableCell>#{report.id}</TableCell>
                                         <TableCell>{report.customerName}</TableCell>
                                         <TableCell>{report.deviceName}</TableCell>
@@ -255,6 +258,55 @@ const TechnicianPage = () => {
                                 ))}
                             </TableBody>
                         </Table>
+                        {/* Mancava: la tabella qui sopra è nascosta sotto `sm` e al suo posto non
+                            c'era niente, quindi su mobile i report del tecnico non si vedevano
+                            affatto — restava solo il conteggio in fondo. */}
+                        <EntityCardList
+                            className="sm:hidden"
+                            columns={[
+                                { key: "id", header: "ID", render: (row: TechnicianReportCard) => row.id },
+                                {
+                                    key: "customerName",
+                                    header: "Cliente",
+                                    render: (row: TechnicianReportCard) => row.customerName,
+                                    cardSlot: "title",
+                                },
+                                {
+                                    key: "closed",
+                                    header: "Stato",
+                                    render: (row: TechnicianReportCard) => (row.closed ? "Chiuso" : "Aperto"),
+                                    cardSlot: "badge",
+                                },
+                                {
+                                    key: "deviceName",
+                                    header: "Dispositivo",
+                                    render: (row: TechnicianReportCard) => row.deviceName,
+                                    cardSlot: "wide",
+                                },
+                            ]}
+                            rows={paginatedReportCards}
+                            getRowKey={(row) => row.id}
+                            getStatusColor={getStatusColor}
+                            renderActions={(row) => (
+                                <>
+                                    <OpenEntityButton
+                                        size="icon-lg"
+                                        onClick={() => handleOpenReport(row.id)}
+                                        aria-label={`Apri report ${row.id}`}
+                                    />
+                                    <TableActionButton
+                                        variant="default"
+                                        size="icon-lg"
+                                        className="bg-primary/10 hover:bg-primary/20"
+                                        onClick={() => handleOpenEditDialog(row.id)}
+                                        aria-label={`Modifica report ${row.id}`}
+                                    >
+                                        <Pencil className="size-5 text-primary" />
+                                    </TableActionButton>
+                                </>
+                            )}
+                            emptyMessage="Nessun report associato a questo tecnico."
+                        />
                         <TablePagination
                             currentPage={currentPage}
                             totalPages={totalPages}

@@ -16,7 +16,6 @@ import {
     formatInterventionStatus,
     formatInterventionTime,
     formatInterventionType,
-    interventionAccentClassName,
     interventionStatusColor,
     interventionStatusOptions,
 } from "@/lib/interventions";
@@ -249,21 +248,28 @@ const CustomerInterventionsPage = () => {
                         className="sm:hidden"
                         columns={[
                             { key: "id", header: "ID", render: (row: CustomerInterventionRow) => row.id },
-                            { key: "type", header: "Tipo", render: (row: CustomerInterventionRow) => row.type },
+                            {
+                                key: "type",
+                                header: "Tipo",
+                                render: (row: CustomerInterventionRow) => row.type,
+                                cardSlot: "title",
+                            },
                             {
                                 key: "schedule",
                                 header: "Data/Orario",
                                 render: (row: CustomerInterventionRow) => row.schedule,
+                                cardSlot: "wide",
                             },
                             {
                                 key: "status",
                                 header: "Stato",
                                 render: (row: CustomerInterventionRow) => formatInterventionStatus(row.status),
+                                cardSlot: "badge",
                             },
                         ]}
                         rows={paginatedInterventionRows}
                         getRowKey={(row) => row.id}
-                        getAccentClassName={(row) => interventionAccentClassName[row.status]}
+                        getStatusColor={(row) => interventionStatusColor[row.status]}
                         renderActions={(row) => (
                             <OpenEntityButton
                                 size="icon-lg"

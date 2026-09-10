@@ -238,10 +238,12 @@ const DashboardPage = () => {
                 title="Dashboard"
                 description="Panoramica del laboratorio e stato delle riparazioni."
                 action={
-                    <div className="flex items-center justify-between gap-2 sm:justify-start">
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                         {/* Refresh a sinistra, creazioni (report poi intervento) a destra: sotto
-                            `sm` il gruppo si allarga ai due estremi con `justify-between`, da
-                            `sm` in su torna affiancato nello stesso ordine con `sm:justify-start`. */}
+                            `sm` il gruppo prende una riga intera sotto il titolo (`w-full`, perché
+                            `PageHeader` affianca titolo e azione) e si allarga ai due estremi con
+                            `justify-between`; da `sm` in su torna affiancato al titolo, nello stesso
+                            ordine, con `sm:w-auto sm:justify-start`. */}
                         <RefreshButton
                             onRefresh={handleRefreshDashboard}
                             isRefreshing={isLoading || isCalendarLoading}

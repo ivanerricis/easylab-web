@@ -1,4 +1,4 @@
-import EntityCardList from "@/components/entity-card-list";
+import EntityCardList, { type EntityCardSlot } from "@/components/entity-card-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
@@ -11,6 +11,8 @@ export type EntityColumn<TRow> = {
     header: string;
     className?: string;
     render: (row: TRow) => ReactNode;
+    /** Dove va la colonna nella scheda su mobile: vedi `EntityCardSlot`. */
+    cardSlot?: EntityCardSlot;
 };
 
 type EntityTableProps<TRow> = {
@@ -28,10 +30,12 @@ type EntityTableProps<TRow> = {
      * Colora la riga in base allo stato (`data-status-color`, interpretato da index.css
      * insieme all'intensità scelta in Impostazioni > Tema). Quando è presente, la cella
      * delle azioni torna ai colori neutri per non tingere le icone dei pulsanti.
+     *
+     * Su mobile lo stesso colore dà la striscia laterale e il badge della scheda. Prima le
+     * schede avevano una mappa a parte (`getAccentClassName`, classi `border-t-*`): due
+     * corrispondenze stato -> colore da tenere allineate a mano.
      */
     getRowStatusColor?: (row: TRow) => string;
-    /** Bordo superiore colorato delle schede su mobile (es. "border-t-green-500"). */
-    getAccentClassName?: (row: TRow) => string;
     /**
      * Doppio click sulla riga per aprire la scheda. Solo desktop: su mobile le righe
      * diventano schede e il doppio click non è un gesto disponibile, quindi lì resta il
@@ -52,8 +56,6 @@ type EntityTableProps<TRow> = {
     isRefetching?: boolean;
     /** Quante righe-scheletro disegnare: di norma le righe per pagina della tabella. */
     skeletonRowCount?: number;
-    /** La colonna che fa da titolo nelle schede su mobile. */
-    titleColumnKey?: string;
 };
 
 /** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
@@ -101,12 +103,10 @@ const EntityTable = <TRow,>({
     emptyMessage,
     renderRowActions,
     getRowStatusColor,
-    getAccentClassName,
     onRowOpen,
     isInitialLoading = false,
     isRefetching = false,
     skeletonRowCount = 5,
-    titleColumnKey,
 }: EntityTableProps<TRow>) => {
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
     const visibleSkeletonRows = Math.min(skeletonRowCount, maxSkeletonRows);
@@ -235,10 +235,9 @@ const EntityTable = <TRow,>({
                 columns={columns.filter((column) => column.key !== actionsColumnKey)}
                 rows={rows}
                 getRowKey={getRowKey}
-                getAccentClassName={getAccentClassName}
+                getStatusColor={getRowStatusColor}
                 renderActions={renderRowActions}
                 emptyMessage={emptyMessage}
-                titleColumnKey={titleColumnKey}
                 isInitialLoading={isInitialLoading}
                 skeletonCardCount={Math.min(visibleSkeletonRows, 4)}
             />

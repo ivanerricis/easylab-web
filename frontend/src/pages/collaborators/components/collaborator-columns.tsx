@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import { formatDate } from "@/lib/utils";
 import type { CollaboratorDto } from "@/types/dtos";
 import type { ReactNode } from "react";
@@ -7,6 +8,7 @@ export type CollaboratorColumn = {
     header: string;
     className?: string;
     render: (row: CollaboratorDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const collaboratorColumns: CollaboratorColumn[] = [
@@ -18,11 +20,13 @@ export const collaboratorColumns: CollaboratorColumn[] = [
     {
         key: "firstName",
         header: "Nome",
+        cardSlot: "title",
         render: (row) => row.firstName,
     },
     {
         key: "lastName",
         header: "Cognome",
+        cardSlot: "title",
         render: (row) => row.lastName ?? "-",
     },
     {

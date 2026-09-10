@@ -18,8 +18,6 @@ type ReportsTableProps = {
     skeletonRowCount?: number;
 };
 
-const getAccentClassName = (row: ReportDto) => (row.closed ? "border-t-green-500" : "border-t-red-500");
-
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
 // in Impostazioni > Tema; la cella azioni torna a bg-background/text-foreground per non
 // colorare le icone dei pulsanti.
@@ -81,12 +79,10 @@ const ReportsTable = ({
             emptyMessage="Nessun report disponibile."
             renderRowActions={renderRowActions}
             getRowStatusColor={getStatusColor}
-            getAccentClassName={getAccentClassName}
             onRowOpen={(row) => onOpenReport(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}
-            titleColumnKey={"customer"}
         />
     );
 };

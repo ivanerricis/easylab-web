@@ -25,7 +25,7 @@ type CustomerReportRow = {
     closed: boolean;
 };
 
-const getAccentClassName = (row: CustomerReportRow) => (row.closed ? "border-t-green-500" : "border-t-red-500");
+const getStatusColor = (row: CustomerReportRow) => (row.closed ? "green" : "red");
 
 const CustomerPage = () => {
     const navigate = useNavigate();
@@ -198,7 +198,7 @@ const CustomerPage = () => {
                                 </TableRow>
                             ) : (
                                 paginatedReportRows.map((report) => (
-                                    <TableRow key={report.id} data-status-color={report.closed ? "green" : "red"}>
+                                    <TableRow key={report.id} data-status-color={getStatusColor(report)}>
                                         <TableCell>Report #{report.id}</TableCell>
                                         <TableCell>{report.deviceName}</TableCell>
                                         <TableCell>{report.closed ? "Chiuso" : "Aperto"}</TableCell>
@@ -220,21 +220,23 @@ const CustomerPage = () => {
                     <EntityCardList
                         className="sm:hidden"
                         columns={[
-                            { key: "id", header: "ID", render: (row: CustomerReportRow) => `Report #${row.id}` },
+                            { key: "id", header: "ID", render: (row: CustomerReportRow) => row.id },
                             {
                                 key: "deviceName",
                                 header: "Dispositivo",
                                 render: (row: CustomerReportRow) => row.deviceName,
+                                cardSlot: "title",
                             },
                             {
                                 key: "closed",
                                 header: "Stato",
                                 render: (row: CustomerReportRow) => (row.closed ? "Chiuso" : "Aperto"),
+                                cardSlot: "badge",
                             },
                         ]}
                         rows={paginatedReportRows}
                         getRowKey={(row) => row.id}
-                        getAccentClassName={getAccentClassName}
+                        getStatusColor={getStatusColor}
                         renderActions={(row) => (
                             <OpenEntityButton
                                 size="icon-lg"

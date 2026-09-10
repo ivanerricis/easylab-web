@@ -25,6 +25,12 @@ body,
   --color-sidebar: var(--sidebar);
   --color-action-print: var(--action-print);
   --color-action-email: var(--action-email);
+  --color-status-red: var(--status-red);
+  --color-status-red-foreground: var(--status-red-foreground);
+  --color-status-yellow: var(--status-yellow);
+  --color-status-yellow-foreground: var(--status-yellow-foreground);
+  --color-status-green: var(--status-green);
+  --color-status-green-foreground: var(--status-green-foreground);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -83,6 +89,19 @@ body,
      In tema scuro i valori originali vanno benissimo (12.68:1 e 7.33:1) e restano quelli. */
   --action-print: oklch(0.65 0.15 85);
   --action-email: oklch(0.58 0.16 237);
+  /* Colori di stato delle schede su mobile (striscia laterale, pallino e badge dello stato).
+     Sono separati dai --table-row-*: quelli colorano un'intera riga e seguono l'intensità
+     scelta in Impostazioni, questi disegnano solo un segno piccolo su fondo neutro.
+     Il colore pieno serve alla striscia e al pallino; il -foreground è il testo del badge,
+     che sta sul colore pieno al 12% e deve reggere 4.5:1: per questo in tema chiaro è molto
+     più scuro del pieno. Il giallo resta all'hue 85, come per le righe, invece di scivolare
+     nell'arancione della tavolozza Tailwind. */
+  --status-red: oklch(0.637 0.237 25.331);
+  --status-red-foreground: oklch(0.505 0.213 27.518);
+  --status-yellow: oklch(0.795 0.184 86.047);
+  --status-yellow-foreground: oklch(0.48 0.1 80);
+  --status-green: oklch(0.627 0.194 149.214);
+  --status-green-foreground: oklch(0.48 0.14 150);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
@@ -125,6 +144,12 @@ body,
      abbondante: 12.68:1 e 7.33:1. */
   --action-print: oklch(0.852 0.199 91.936);
   --action-email: oklch(0.685 0.169 237.323);
+  --status-red: oklch(0.637 0.237 25.331);
+  --status-red-foreground: oklch(0.808 0.114 19.571);
+  --status-yellow: oklch(0.852 0.199 91.936);
+  --status-yellow-foreground: oklch(0.9 0.15 92);
+  --status-green: oklch(0.723 0.219 149.579);
+  --status-green-foreground: oklch(0.871 0.15 154.449);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);

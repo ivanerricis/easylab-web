@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import { isCatchAllIssue } from "@/lib/issues";
 import { formatDate } from "@/lib/utils";
 import type { IssueDto } from "@/types/dtos";
@@ -8,6 +9,7 @@ export type IssueColumn = {
     header: string;
     className?: string;
     render: (row: IssueDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const issueColumns: IssueColumn[] = [
@@ -19,6 +21,7 @@ export const issueColumns: IssueColumn[] = [
     {
         key: "description",
         header: "Descrizione",
+        cardSlot: "title",
         // La voce generica non ha i pulsanti di modifica ed eliminazione: senza una parola
         // qui accanto sembrerebbe un difetto dell'elenco, non una scelta.
         render: (row) =>

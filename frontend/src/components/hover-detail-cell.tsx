@@ -24,7 +24,7 @@ const HoverDetailCell = ({ text, detail }: HoverDetailCellProps) => {
             <PopoverTrigger asChild>
                 <button
                     type="button"
-                    className="cursor-pointer underline decoration-muted-foreground decoration-dotted underline-offset-4"
+                    className="cursor-pointer text-left underline decoration-muted-foreground decoration-dotted underline-offset-4"
                 >
                     {text}
                 </button>

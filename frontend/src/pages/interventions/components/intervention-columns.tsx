@@ -1,3 +1,4 @@
+import type { EntityCardSlot } from "@/components/entity-card-list";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatDate } from "@/lib/utils";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
@@ -9,6 +10,7 @@ export type InterventionColumn = {
     header: string;
     className?: string;
     render: (row: InterventionDto) => ReactNode;
+    cardSlot?: EntityCardSlot;
 };
 
 export const interventionColumns: InterventionColumn[] = [
@@ -20,6 +22,7 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "customer",
         header: "Cliente",
+        cardSlot: "title",
         render: (row) => row.customer,
     },
     {
@@ -49,12 +52,22 @@ export const interventionColumns: InterventionColumn[] = [
                 return formatDate(row.interventionDate);
             }
 
-            return `${formatDate(row.interventionDate)} ${formatInterventionTime(row.startTime)}-${formatInterventionTime(row.endTime)}`;
+            // L'orario resta intero: in mezza scheda su mobile andava a capo sul trattino
+            // ("13:00-" / "14:30"). Così a capo va, se serve, fra la data e l'orario.
+            return (
+                <>
+                    {formatDate(row.interventionDate)}{" "}
+                    <span className="whitespace-nowrap">
+                        {formatInterventionTime(row.startTime)}-{formatInterventionTime(row.endTime)}
+                    </span>
+                </>
+            );
         },
     },
     {
         key: "status",
         header: "Stato",
+        cardSlot: "badge",
         render: (row) => formatInterventionStatus(row.status),
     },
     {

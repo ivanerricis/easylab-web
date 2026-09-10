@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getApiErrorMessage, listCollaborators, listInterventions, listReports } from "@/lib/api";
 import { interventionAccentClassName, interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -41,6 +42,11 @@ import { collaboratorInterventionColumns, collaboratorReportColumns } from "./co
  * `unpaginatedMaxRows` (5000) righe della tabella intera: sul database di sviluppo, che ne ha
  * 20000, il collaboratore con 1198 report ne mostrava 305 — e il conteggio in fondo diceva
  * 305, senza alcun segnale che il resto fosse stato tagliato via.
+ *
+ * Le due sezioni stanno in tab invece che una sopra l'altra. Con la paginazione il numero di
+ * righe a schermo non cresce mai, ma la pagina sì: filtro, tabella e impaginazione di
+ * entrambe le liste insieme rendevano la scheda lunga da scorrere anche per un collaboratore
+ * con pochi report. Il tab dei report è quello di default perché è la vista più cercata.
  */
 const CollaboratorPage = () => {
     const navigate = useNavigate();
@@ -181,120 +187,121 @@ const CollaboratorPage = () => {
                 />
             </div>
 
-            <section className="flex flex-col gap-3" aria-labelledby="collaboratore-report">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 id="collaboratore-report" className="text-xl font-semibold">
-                        Report del collaboratore
-                    </h2>
-                    <Select
-                        value={visibilityFilter}
-                        onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
-                    >
-                        <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
-                            <SelectValue placeholder="Filtra per stato" />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                            <SelectItem value="all">Tutti i report</SelectItem>
-                            <SelectItem value="open">Report aperti</SelectItem>
-                            <SelectItem value="closed">Report chiusi</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+            <Tabs defaultValue="reports">
+                <TabsList>
+                    <TabsTrigger value="reports">Report</TabsTrigger>
+                    <TabsTrigger value="interventions">Interventi</TabsTrigger>
+                </TabsList>
 
-                {/* Allargando le colonne la tabella può diventare più larga della pagina:
-                    deve scorrere qui dentro, perché il contenitore principale del layout ha
-                    overflow-x nascosto e la taglierebbe. */}
-                <div className="overflow-x-auto">
-                    <EntityTable
-                        tableKey="collaborator-reports"
-                        columns={collaboratorReportColumns}
-                        rows={reportRows}
-                        getRowKey={(row) => row.id}
-                        emptyMessage="Nessun report associato a questo collaboratore."
-                        renderRowActions={(row) => (
-                            <OpenEntityButton
-                                size="icon-lg"
-                                onClick={() => handleOpenReport(row.id)}
-                                aria-label={`Apri report ${row.id}`}
-                            />
-                        )}
-                        getRowStatusColor={(row) => (row.closed ? "green" : "red")}
-                        getAccentClassName={(row) => (row.closed ? "border-t-green-500" : "border-t-red-500")}
-                        onRowOpen={(row) => handleOpenReport(row.id)}
-                        isInitialLoading={areReportsInitialLoading}
-                        isRefetching={areReportsRefetching}
-                        skeletonRowCount={reportsPageSize}
-                        titleColumnKey="customer"
+                <TabsContent value="reports" aria-label="Report del collaboratore">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                        <Select
+                            value={visibilityFilter}
+                            onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
+                        >
+                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
+                                <SelectValue placeholder="Filtra per stato" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                                <SelectItem value="all">Tutti i report</SelectItem>
+                                <SelectItem value="open">Report aperti</SelectItem>
+                                <SelectItem value="closed">Report chiusi</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Allargando le colonne la tabella può diventare più larga della pagina:
+                        deve scorrere qui dentro, perché il contenitore principale del layout ha
+                        overflow-x nascosto e la taglierebbe. */}
+                    <div className="overflow-x-auto">
+                        <EntityTable
+                            tableKey="collaborator-reports"
+                            columns={collaboratorReportColumns}
+                            rows={reportRows}
+                            getRowKey={(row) => row.id}
+                            emptyMessage="Nessun report associato a questo collaboratore."
+                            renderRowActions={(row) => (
+                                <OpenEntityButton
+                                    size="icon-lg"
+                                    onClick={() => handleOpenReport(row.id)}
+                                    aria-label={`Apri report ${row.id}`}
+                                />
+                            )}
+                            getRowStatusColor={(row) => (row.closed ? "green" : "red")}
+                            getAccentClassName={(row) => (row.closed ? "border-t-green-500" : "border-t-red-500")}
+                            onRowOpen={(row) => handleOpenReport(row.id)}
+                            isInitialLoading={areReportsInitialLoading}
+                            isRefetching={areReportsRefetching}
+                            skeletonRowCount={reportsPageSize}
+                            titleColumnKey="customer"
+                        />
+                    </div>
+
+                    <TablePagination
+                        currentPage={reportsPage}
+                        totalPages={reportsTotalPages}
+                        totalItems={reportsTotalItems}
+                        pageSize={reportsPageSize}
+                        onPageChange={setReportsPage}
+                        onPageSizeChange={setReportsPageSize}
                     />
-                </div>
+                </TabsContent>
 
-                <TablePagination
-                    currentPage={reportsPage}
-                    totalPages={reportsTotalPages}
-                    totalItems={reportsTotalItems}
-                    pageSize={reportsPageSize}
-                    onPageChange={setReportsPage}
-                    onPageSizeChange={setReportsPageSize}
-                />
-            </section>
+                <TabsContent value="interventions" aria-label="Interventi del collaboratore">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                        <Select
+                            value={interventionStatusFilter}
+                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
+                        >
+                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra gli interventi per stato">
+                                <SelectValue placeholder="Filtra per stato" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                                <SelectItem value="all">Tutti gli interventi</SelectItem>
+                                {interventionStatusOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-            <section className="flex flex-col gap-3" aria-labelledby="collaboratore-interventi">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 id="collaboratore-interventi" className="text-xl font-semibold">
-                        Interventi del collaboratore
-                    </h2>
-                    <Select
-                        value={interventionStatusFilter}
-                        onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
-                    >
-                        <SelectTrigger className="w-full sm:w-56" aria-label="Filtra gli interventi per stato">
-                            <SelectValue placeholder="Filtra per stato" />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                            <SelectItem value="all">Tutti gli interventi</SelectItem>
-                            {interventionStatusOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                    {/* Stesso motivo della tabella dei report. */}
+                    <div className="overflow-x-auto">
+                        <EntityTable
+                            tableKey="collaborator-interventions"
+                            columns={collaboratorInterventionColumns}
+                            rows={interventionRows}
+                            getRowKey={(row) => row.id}
+                            emptyMessage="Nessun intervento associato a questo collaboratore."
+                            renderRowActions={(row) => (
+                                <OpenEntityButton
+                                    size="icon-lg"
+                                    onClick={() => handleOpenIntervention(row.id)}
+                                    aria-label={`Apri intervento ${row.id}`}
+                                />
+                            )}
+                            getRowStatusColor={(row) => interventionStatusColor[row.status]}
+                            getAccentClassName={(row) => interventionAccentClassName[row.status]}
+                            onRowOpen={(row) => handleOpenIntervention(row.id)}
+                            isInitialLoading={areInterventionsInitialLoading}
+                            isRefetching={areInterventionsRefetching}
+                            skeletonRowCount={interventionsPageSize}
+                            titleColumnKey="customer"
+                        />
+                    </div>
 
-                {/* Stesso motivo della tabella dei report. */}
-                <div className="overflow-x-auto">
-                    <EntityTable
-                        tableKey="collaborator-interventions"
-                        columns={collaboratorInterventionColumns}
-                        rows={interventionRows}
-                        getRowKey={(row) => row.id}
-                        emptyMessage="Nessun intervento associato a questo collaboratore."
-                        renderRowActions={(row) => (
-                            <OpenEntityButton
-                                size="icon-lg"
-                                onClick={() => handleOpenIntervention(row.id)}
-                                aria-label={`Apri intervento ${row.id}`}
-                            />
-                        )}
-                        getRowStatusColor={(row) => interventionStatusColor[row.status]}
-                        getAccentClassName={(row) => interventionAccentClassName[row.status]}
-                        onRowOpen={(row) => handleOpenIntervention(row.id)}
-                        isInitialLoading={areInterventionsInitialLoading}
-                        isRefetching={areInterventionsRefetching}
-                        skeletonRowCount={interventionsPageSize}
-                        titleColumnKey="customer"
+                    <TablePagination
+                        currentPage={interventionsPage}
+                        totalPages={interventionsTotalPages}
+                        totalItems={interventionsTotalItems}
+                        pageSize={interventionsPageSize}
+                        onPageChange={setInterventionsPage}
+                        onPageSizeChange={setInterventionsPageSize}
                     />
-                </div>
-
-                <TablePagination
-                    currentPage={interventionsPage}
-                    totalPages={interventionsTotalPages}
-                    totalItems={interventionsTotalItems}
-                    pageSize={interventionsPageSize}
-                    onPageChange={setInterventionsPage}
-                    onPageSizeChange={setInterventionsPageSize}
-                />
-            </section>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 };

@@ -11,6 +11,26 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Tab per report/interventi nella scheda collaboratore
+
+**Cosa.** La scheda collaboratore (`CollaboratorPage.tsx`) mostrava le tabelle di report e
+interventi impilate una sopra l'altra, ciascuna con il proprio filtro e la propria
+impaginazione. Sostituito lo stack verticale con un componente `Tabs` (shadcn/radix-ui,
+nuovo `frontend/src/components/ui/tabs.tsx` — non esisteva ancora nel progetto), tab "Report"
+di default.
+
+**Il perché.** Entrambe le liste sono già impaginate lato server, quindi un collaboratore con
+molti report non appesantisce il DOM — a schermo ci sono sempre e solo le righe della pagina
+corrente (testato con un collaboratore da 1198 report / 564 interventi). Il problema segnalato
+dall'utente era la lunghezza della pagina: filtro, tabella e impaginazione di entrambe le
+sezioni insieme obbligavano a scorrere anche per un collaboratore con pochi record. Il tab
+Report è il default perché è la vista più cercata.
+
+**File.** `frontend/src/components/ui/tabs.tsx` (nuovo);
+`frontend/src/pages/collaborators/CollaboratorPage.tsx`.
+
+---
+
 ## 2026-09-10 — Tooltip sulla descrizione libera in tabella report/interventi
 
 **Cosa.** La colonna "Difetto" della tabella report (elenco report e scheda collaboratore)

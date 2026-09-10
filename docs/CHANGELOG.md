@@ -11,6 +11,45 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Copertura di test completa sul backend
+
+**Cosa.** Il backend aveva test solo su un sottoinsieme di rotte e servizi (soprattutto
+autenticazione/sicurezza). Aggiunti 28 nuovi file di test, uno per ogni rotta, servizio e
+middleware che ne era privo: le rotte `collaborators`, `technicians`, `notifications`,
+`users`, `customers`, `reportTechnicians`, `interventions`, `reports`, `formatting`; i
+middleware `requireAuth`, `requestLogger`, `userActionLogger`; e i servizi `companyManager`,
+`notificationManager`, `issueCatalog`, `logoManager`, `logManager`, `emailManager`,
+`interventionEmail`, `updateManager`, l'intera famiglia di backup (`backupLock`,
+`backupFiles`, `backupState`, `backupProcess`, `backupRestore`) e i generatori PDF
+(`interventionPdf`, `reportPdf`, `pdf/shared`). La suite passa da 17 a 45 file, da un centinaio
+a **543 test**, tutti verdi; `tsc --noEmit` ed `eslint` puliti.
+
+**Il perché.** "Abbiamo dei test per tutto?" — no: gran parte della logica di business
+(validazioni, regole di stato, generazione PDF, backup/restore, invio email) non aveva
+nessuna rete di sicurezza contro le regressioni.
+
+**Le scelte.** Stessa convenzione già in uso: query layer e dipendenze esterne (fs,
+child_process, nodemailer, sharp, pdfmake, drizzle `db`) mockate con `vi.mock`, nessun
+Postgres richiesto in CI. Per i generatori PDF (`pdfmake`) non si verifica il rendering
+reale — mockato interamente — ma solo la struttura condizionale del documento (quali sezioni
+compaiono con quali dati) e le stringhe che vi finiscono dentro.
+
+**Trovato nel farlo, e corretto.** `backupRestore.ts`: `performRestore` chiamava
+`prepareRestoreSource` *fuori* dal blocco `try/finally` che circonda l'operazione. Un
+archivio senza `dump.sql` veniva rifiutato prima che il lock di restore potesse essere
+rilasciato da `endRestore()` — il lock restava quindi acquisito indefinitamente e bloccava
+ogni backup/restore successivo finché non si riavviava il processo. Spostata la chiamata
+dentro il `try`: ora anche questo fallimento rilascia il lock e viene registrato in
+`lastRestoreStatus`/`lastRestoreError` come ogni altro errore di ripristino. Il test che lo
+documentava (`backupRestore.test.ts`) ora verifica il comportamento corretto.
+
+**Ancora da fare.** Il frontend resta scoperto quasi ovunque: solo `LoginPage` tra le pagine,
+pochi hook/lib condivisi, 4 componenti su una trentina. Vedi la nota nella memoria del
+progetto (`project_quality_backlog`) per l'elenco completo lasciato per una sessione futura.
+- File: `backend/src/**/*.test.ts` (28 nuovi file, elencati sopra).
+
+---
+
 ## 2026-09-10 — La scheda del collaboratore: due sezioni a tabella al posto dei riquadri
 
 **Cosa.** [CollaboratorPage](../frontend/src/pages/collaborators/CollaboratorPage.tsx) ha ora

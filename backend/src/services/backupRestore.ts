@@ -88,9 +88,11 @@ const performRestore = async (filePath: string, resetSchema: boolean, sourceFile
 
     beginRestore();
     const now = new Date();
-    const source = await prepareRestoreSource(filePath, sourceFileName);
+    let source: Awaited<ReturnType<typeof prepareRestoreSource>> | undefined;
 
     try {
+        source = await prepareRestoreSource(filePath, sourceFileName);
+
         if (resetSchema) {
             await resetPublicSchema();
         }
@@ -130,7 +132,7 @@ const performRestore = async (filePath: string, resetSchema: boolean, sourceFile
         throw error;
     } finally {
         endRestore();
-        await source.cleanup();
+        await source?.cleanup();
     }
 };
 

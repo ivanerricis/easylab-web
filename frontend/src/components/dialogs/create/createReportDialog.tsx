@@ -415,7 +415,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                     />
                                 </div>
 
-                                <div className="grid lg:col-span-2 xl:col-span-3">
+                                <div className="grid lg:col-span-2 xl:col-span-2">
                                     <Label htmlFor="notes" className="text-lg">
                                         Note
                                     </Label>

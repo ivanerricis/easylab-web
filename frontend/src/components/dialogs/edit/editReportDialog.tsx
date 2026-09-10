@@ -364,7 +364,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     </div>
 
                                     {needsProblemText ? (
-                                        <div className="grid gap-1">
+                                        <div className="grid gap-1 lg:col-span-2 xl:col-span-4">
                                             <Label htmlFor="issueDescription" className="text-lg">
                                                 Problema riscontrato
                                             </Label>
@@ -372,6 +372,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 {...fieldProps("issueDescription", {
                                                     error: errors.issueDescription,
                                                 })}
+                                                className="text-lg!"
                                                 placeholder="Quello che il cliente legge sulla ricevuta"
                                                 maxLength={255}
                                                 value={formValues.issueDescription}

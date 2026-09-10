@@ -1,3 +1,4 @@
+import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
 import type { ReactNode } from "react";
@@ -42,7 +43,7 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "issue",
         header: "Difetto",
-        render: (row) => row.issue,
+        render: (row) => <HoverDetailCell text={row.issue} detail={row.issueDescription} />,
     },
     {
         key: "password",

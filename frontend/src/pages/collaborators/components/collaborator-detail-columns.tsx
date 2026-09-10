@@ -1,3 +1,4 @@
+import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
@@ -49,7 +50,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
     {
         key: "issue",
         header: "Difetto",
-        render: (row) => row.issue,
+        render: (row) => <HoverDetailCell text={row.issue} detail={row.issueDescription} />,
     },
     {
         // Lo stato in parole e non solo nel colore della riga: stessa scelta dell'elenco
@@ -90,7 +91,7 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
     {
         key: "type",
         header: "Tipo",
-        render: (row) => formatInterventionType(row.type),
+        render: (row) => <HoverDetailCell text={formatInterventionType(row.type)} detail={row.description} />,
     },
     {
         key: "schedule",

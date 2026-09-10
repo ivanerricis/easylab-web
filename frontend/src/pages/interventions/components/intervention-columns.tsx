@@ -1,3 +1,4 @@
+import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatDate } from "@/lib/utils";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
@@ -34,7 +35,7 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "type",
         header: "Tipo",
-        render: (row) => formatInterventionType(row.type),
+        render: (row) => <HoverDetailCell text={formatInterventionType(row.type)} detail={row.description} />,
     },
     {
         key: "schedule",

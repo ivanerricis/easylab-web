@@ -11,6 +11,29 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Tooltip sulla descrizione libera in tabella report/interventi
+
+**Cosa.** La colonna "Difetto" della tabella report (elenco report e scheda collaboratore)
+mostrava solo l'etichetta del catalogo difetti: con "Altro" il dato utile — cosa ha scritto
+davvero chi ha compilato il report — restava invisibile senza aprire il dettaglio. Stesso
+problema sulla colonna "Tipo" della tabella interventi (elenco interventi e scheda
+collaboratore): il tipo (consegna materiale / intervento sede / intervento remoto) non dice
+cosa è stato fatto o consegnato. Aggiunto un tooltip al passaggio del mouse (nuovo componente
+`hover-detail-cell.tsx`, basato sul `Tooltip` di radix-ui già usato altrove) che mostra
+`issueDescription` sulla colonna Difetto e `description` sulla colonna Tipo, quando presenti.
+
+**Il perché.** Lo stesso identificato per il popover del calendario interventi
+(`calendar-event-popover.tsx`): l'informazione utile c'è già nei dati (`issueDescription` è
+valorizzato solo quando il difetto è "Altro"; `description` dell'intervento porta il lavoro
+svolto o il materiale consegnato) ma prima si vedeva solo aprendo la scheda di dettaglio.
+
+**File.** `frontend/src/components/hover-detail-cell.tsx` (nuovo);
+`frontend/src/pages/reports/components/report-columns.tsx`,
+`frontend/src/pages/interventions/components/intervention-columns.tsx`,
+`frontend/src/pages/collaborators/components/collaborator-detail-columns.tsx`.
+
+---
+
 ## 2026-09-10 — Copertura di test completa sul backend
 
 **Cosa.** Il backend aveva test solo su un sottoinsieme di rotte e servizi (soprattutto

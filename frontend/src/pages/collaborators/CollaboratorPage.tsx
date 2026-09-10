@@ -168,7 +168,7 @@ const CollaboratorPage = () => {
     }
 
     return (
-        <div className="flex w-full flex-col gap-6">
+        <div className="flex h-full min-h-0 w-full flex-col gap-6">
             <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -187,13 +187,13 @@ const CollaboratorPage = () => {
                 />
             </div>
 
-            <Tabs defaultValue="reports">
+            <Tabs defaultValue="reports" className="min-h-0 flex-1">
                 <TabsList>
                     <TabsTrigger value="reports">Report</TabsTrigger>
                     <TabsTrigger value="interventions">Interventi</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="reports" aria-label="Report del collaboratore">
+                <TabsContent value="reports" aria-label="Report del collaboratore" className="min-h-0 flex-1">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                         <Select
                             value={visibilityFilter}
@@ -210,10 +210,12 @@ const CollaboratorPage = () => {
                         </Select>
                     </div>
 
-                    {/* Allargando le colonne la tabella può diventare più larga della pagina:
-                        deve scorrere qui dentro, perché il contenitore principale del layout ha
-                        overflow-x nascosto e la taglierebbe. */}
-                    <div className="overflow-x-auto">
+                    {/* Come nelle altre pagine a elenco: quest'area scorre da sola (in
+                        entrambe le direzioni — il contenitore principale del layout ha
+                        overflow-x nascosto, e allargando le colonne la tabella può diventare
+                        più larga della pagina), lasciando l'impaginazione ferma in fondo
+                        invece di farla scorrere via con la tabella. */}
+                    <div className="min-h-0 flex-1 overflow-auto">
                         <EntityTable
                             tableKey="collaborator-reports"
                             columns={collaboratorReportColumns}
@@ -247,7 +249,7 @@ const CollaboratorPage = () => {
                     />
                 </TabsContent>
 
-                <TabsContent value="interventions" aria-label="Interventi del collaboratore">
+                <TabsContent value="interventions" aria-label="Interventi del collaboratore" className="min-h-0 flex-1">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                         <Select
                             value={interventionStatusFilter}
@@ -268,7 +270,7 @@ const CollaboratorPage = () => {
                     </div>
 
                     {/* Stesso motivo della tabella dei report. */}
-                    <div className="overflow-x-auto">
+                    <div className="min-h-0 flex-1 overflow-auto">
                         <EntityTable
                             tableKey="collaborator-interventions"
                             columns={collaboratorInterventionColumns}

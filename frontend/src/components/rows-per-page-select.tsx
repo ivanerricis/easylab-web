@@ -4,6 +4,8 @@ import { tableRowsPerPageOptions, type TableRowsPerPageKey } from "@/lib/theme";
 type RowsPerPageSelectProps = {
     value: TableRowsPerPageKey;
     onValueChange: (value: TableRowsPerPageKey) => void;
+    /** Nasconde l'etichetta "Righe per pagina": su mobile serve al numero il posto che libera. */
+    compact?: boolean;
 };
 
 /**
@@ -14,10 +16,10 @@ type RowsPerPageSelectProps = {
  * conversione a ogni chiamata. Le classi del trigger restano però le stesse, per non avere
  * due menu a tendina di larghezza diversa nella stessa pagina.
  */
-const RowsPerPageSelect = ({ value, onValueChange }: RowsPerPageSelectProps) => {
+const RowsPerPageSelect = ({ value, onValueChange, compact = false }: RowsPerPageSelectProps) => {
     return (
         <div className="flex items-center gap-2">
-            <span className="text-sm whitespace-nowrap text-muted-foreground">Righe per pagina</span>
+            {compact ? null : <span className="text-sm whitespace-nowrap text-muted-foreground">Righe per pagina</span>}
             <Select value={String(value)} onValueChange={(next) => onValueChange(Number(next) as TableRowsPerPageKey)}>
                 <SelectTrigger className="w-auto px-2" aria-label="Righe per pagina" size="sm">
                     <SelectValue />

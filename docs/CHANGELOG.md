@@ -11,6 +11,42 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Ricerca e paginazione allineate alle altre pagine su mobile
+
+**Cosa.**
+- `reports-filters.tsx` e `interventions-filters.tsx`: sotto `sm`, refresh e campo di ricerca
+  ora stanno in una riga propria (`flex items-center gap-2`, resa trasparente da `sm:contents`
+  sopra `sm` per tornare al `flex-wrap` unico di prima). Prima condividevano la riga con tutti
+  i filtri via un unico `flex-wrap`: la ricerca è `flex-1` e si allarga a riempire lo spazio
+  che resta sulla sua riga, quindi con due o tre filtri compatti accanto (stato, tipo,
+  ordina) restava visibilmente più stretta che nella pagina Clienti, che ne ha uno solo. Ora
+  la sua larghezza dipende solo dal pulsante di refresh accanto, uguale ovunque.
+- `table-pagination.tsx`: sotto `sm` (nuova soglia `PAGINATION_COMPACT_BREAKPOINT`, la stessa
+  di `EntityTable` per tabella/schede) conteggio, paginazione e selettore delle righe stavano
+  impilati su tre righe — corretto per lo spazio, ma diverso dalla riga unica del desktop, e
+  segnalato dall'utente da uno screenshot reale (Report, 637 pagine). Ora stanno su una riga
+  sola anche su mobile: le etichette "Visualizzati" e "Righe per pagina" spariscono lasciando
+  solo i numeri, e la lista numerata di pagine (fino a 7 pulsanti con "…" quando le pagine
+  sono centinaia) diventa un indicatore "pagina/totale" tra le due sole frecce — la lista
+  intera non ci sta su una riga stretta insieme a conteggio e selettore. `RowsPerPageSelect`
+  guadagna una prop `compact` per nascondere la propria etichetta. Il conteggio usa `truncate`
+  invece di andare a capo, così un totale a molte cifre si tronca invece di rompere la riga
+  (il testo integrale resta comunque nell'annuncio `role="status"` per lo screen reader).
+
+**Il perché.** Entrambi i bug condividono la causa della voce precedente (azioni schiacciate
+in uno spazio condiviso con altri elementi) applicata a due punti diversi: la ricerca perde
+alla lotta per lo spazio contro i filtri, la paginazione doveva letteralmente stare su tre
+righe per non farlo. La richiesta esplicita dell'utente — stessa riga del desktop, etichette
+sacrificabili pur di tenerla — ha guidato la scelta di comprimere invece di continuare a
+impilare. Verificato con `typecheck`, `lint`, `format:check` e controllo visivo Playwright
+(markup reale, 320/360/375/900px).
+
+**File.** `frontend/src/pages/reports/components/reports-filters.tsx`,
+`frontend/src/pages/interventions/components/interventions-filters.tsx`,
+`frontend/src/components/table-pagination.tsx`, `frontend/src/components/rows-per-page-select.tsx`.
+
+---
+
 ## 2026-09-10 — Azioni della dashboard e delle card di Impostazioni riordinate/contenute su mobile
 
 **Cosa.**

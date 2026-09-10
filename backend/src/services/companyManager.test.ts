@@ -15,7 +15,12 @@ vi.mock("node:fs", () => {
     return { default: { promises }, promises };
 });
 
-import { CompanyManagerError, getCompanySettings, invalidateCompanySettingsCache, updateCompanySettings } from "./companyManager";
+import {
+    CompanyManagerError,
+    getCompanySettings,
+    invalidateCompanySettingsCache,
+    updateCompanySettings,
+} from "./companyManager";
 
 // Stessi fallback del modulo: letti dall'ambiente invece che ricopiati a mano, così il
 // test non si disallinea se l'ambiente di CI definisce le variabili LAB_*.

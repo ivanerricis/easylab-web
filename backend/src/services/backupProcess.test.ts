@@ -157,7 +157,18 @@ describe("runPsql / resetPublicSchema", () => {
 
         expect(spawnMock).toHaveBeenCalledWith(
             "psql",
-            expect.arrayContaining(["-h", "dbhost", "-U", "dbuser", "-d", "labdb", "-v", "ON_ERROR_STOP=1", "-f", "/tmp/dump.sql"]),
+            expect.arrayContaining([
+                "-h",
+                "dbhost",
+                "-U",
+                "dbuser",
+                "-d",
+                "labdb",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-f",
+                "/tmp/dump.sql",
+            ]),
             expect.objectContaining({ env: expect.objectContaining({ PGPASSWORD: "dbpass" }) })
         );
     });

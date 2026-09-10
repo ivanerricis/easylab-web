@@ -19,7 +19,14 @@ vi.mock("node:fs", () => {
     return { default: { promises }, promises };
 });
 
-import { LogManagerError, appendUserActionLog, getDayKey, getLogFilePath, listLogFiles, readLogEntries } from "./logManager";
+import {
+    LogManagerError,
+    appendUserActionLog,
+    getDayKey,
+    getLogFilePath,
+    listLogFiles,
+    readLogEntries,
+} from "./logManager";
 
 const direntFile = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
 
@@ -101,9 +108,10 @@ describe("readLogEntries", () => {
 
     it("scarta le righe che non seguono il formato atteso", async () => {
         readFile.mockResolvedValue(
-            ["riga completamente illeggibile", "2026-03-05T10:00:00.000Z | ip=1.2.3.4 | action=login | status=200"].join(
-                "\n"
-            )
+            [
+                "riga completamente illeggibile",
+                "2026-03-05T10:00:00.000Z | ip=1.2.3.4 | action=login | status=200",
+            ].join("\n")
         );
 
         const entries = await readLogEntries("2026-03-05");

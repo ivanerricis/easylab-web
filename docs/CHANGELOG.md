@@ -11,6 +11,21 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — CI backend di nuovo verde: formattazione dei test
+
+**Cosa.** Passati con Prettier 14 file di test del backend (`routes/interventions`,
+`reports`, `reportTechnicians` e dodici in `services/`): solo a capo di import e argomenti
+oltre i 120 caratteri, nessun cambiamento di logica.
+
+**Il perché.** Il job "Backend" della CI falliva su `format:check` da `test(backend): fill in
+test coverage…` di stamattina, e ogni push successivo è rimasto rosso. In locale la violazione
+non spiccava: con `core.autocrlf=true` Prettier segnala 28 file, metà dei quali solo per i fine
+riga CRLF. Il controllo che coincide con la CI è
+`npx prettier --check --end-of-line auto "src/**/*.ts"`, che ignora i fine riga e lascia solo
+le violazioni vere. Verificato con `lint`, `typecheck` e i 543 test.
+
+---
+
 ## 2026-09-10 — Elenco completo dei difetti al focus nel dialogo "Nuovo report"
 
 **Cosa.**

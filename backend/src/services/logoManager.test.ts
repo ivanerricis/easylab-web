@@ -143,12 +143,13 @@ describe("saveLogo", () => {
         expect(sharpFactory).toHaveBeenCalledWith(buffer);
         expect(sharpResize).toHaveBeenCalledWith(512, 512, { fit: "inside", withoutEnlargement: true });
         expect(sharpPng).toHaveBeenCalled();
-        expect(writeFile).toHaveBeenCalledWith(
-            expect.stringMatching(/logo\.png$/),
-            Buffer.from("png-ridimensionato")
-        );
+        expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/logo\.png$/), Buffer.from("png-ridimensionato"));
         // Il mimeType salvato è sempre image/png per i raster, a prescindere dal formato in ingresso.
-        expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/meta\.json$/), expect.stringContaining("image/png"), "utf-8");
+        expect(writeFile).toHaveBeenCalledWith(
+            expect.stringMatching(/meta\.json$/),
+            expect.stringContaining("image/png"),
+            "utf-8"
+        );
     });
 
     it("svuota la cartella del logo prima di scrivere il nuovo file", async () => {

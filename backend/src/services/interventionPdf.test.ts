@@ -149,7 +149,9 @@ describe("createInterventionPdfBuffer", () => {
     });
 
     it("mostra 'ORE TECNICI' solo per gli interventi in sede o da remoto, mai per la consegna materiale", async () => {
-        const consegna = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "consegna_materiale" })));
+        const consegna = JSON.stringify(
+            await captureInterventionDoc(buildIntervention({ type: "consegna_materiale" }))
+        );
         const sede = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "intervento_sede" })));
         const remoto = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "intervento_remoto" })));
 
@@ -177,7 +179,9 @@ describe("createInterventionPdfBuffer", () => {
     });
 
     it("mostra 'Problema riscontrato' solo quando l'intervento lo valorizza", async () => {
-        const conProblema = JSON.stringify(await captureInterventionDoc(buildIntervention({ problem: "Non si accende" })));
+        const conProblema = JSON.stringify(
+            await captureInterventionDoc(buildIntervention({ problem: "Non si accende" }))
+        );
         const senzaProblema = JSON.stringify(await captureInterventionDoc(buildIntervention({ problem: null })));
 
         expect(conProblema).toContain("Problema riscontrato");

@@ -291,8 +291,15 @@ describe("interventions router", () => {
                     to: "mario.rossi@example.test",
                     subject: "Oggetto",
                     attachments: [
-                        expect.objectContaining({ filename: "intervento-2026-01-10.pdf", contentType: "application/pdf" }),
-                        expect.objectContaining({ filename: "logo", cid: "logo-laboratorio", contentType: "image/png" }),
+                        expect.objectContaining({
+                            filename: "intervento-2026-01-10.pdf",
+                            contentType: "application/pdf",
+                        }),
+                        expect.objectContaining({
+                            filename: "logo",
+                            cid: "logo-laboratorio",
+                            contentType: "image/png",
+                        }),
                     ],
                 })
             );
@@ -300,7 +307,9 @@ describe("interventions router", () => {
 
         it("senza data intervento e senza logo usa la data di creazione e non allega il logo", async () => {
             vi.mocked(db.select).mockReturnValue(
-                queryResult([{ ...printRow, interventionDate: null, createdAt: new Date("2026-03-05T12:00:00Z") }]) as never
+                queryResult([
+                    { ...printRow, interventionDate: null, createdAt: new Date("2026-03-05T12:00:00Z") },
+                ]) as never
             );
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
@@ -370,19 +379,17 @@ describe("interventions router", () => {
         it("crea un intervento in sede completato con tutti i campi richiesti", async () => {
             vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
 
-            const response = await request(buildApp())
-                .post("/api/interventions")
-                .send({
-                    type: "intervento_sede",
-                    status: "completato",
-                    customerId: 1,
-                    collaboratorId: 1,
-                    interventionDate: "2026-01-10",
-                    description: "Sostituita batteria",
-                    problem: "Non si accende",
-                    startTime: "09:00",
-                    endTime: "10:00",
-                });
+            const response = await request(buildApp()).post("/api/interventions").send({
+                type: "intervento_sede",
+                status: "completato",
+                customerId: 1,
+                collaboratorId: 1,
+                interventionDate: "2026-01-10",
+                description: "Sostituita batteria",
+                problem: "Non si accende",
+                startTime: "09:00",
+                endTime: "10:00",
+            });
 
             expect(response.status).toBe(201);
             expect(createIntervention).toHaveBeenCalledWith(
@@ -482,14 +489,20 @@ describe("interventions router", () => {
 
         it("aggiorna un campo mantenendo il resto della riga esistente", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([storedIntervention] as never);
-            vi.mocked(updateInterventionById).mockResolvedValue([{ ...storedIntervention, note: "Richiamare" }] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([
+                { ...storedIntervention, note: "Richiamare" },
+            ] as never);
 
             const response = await request(buildApp()).put("/api/interventions/1").send({ note: "Richiamare" });
 
             expect(response.status).toBe(200);
             expect(updateInterventionById).toHaveBeenCalledWith(
                 1,
-                expect.objectContaining({ note: "Richiamare", description: storedIntervention.description, problem: null })
+                expect.objectContaining({
+                    note: "Richiamare",
+                    description: storedIntervention.description,
+                    problem: null,
+                })
             );
         });
 

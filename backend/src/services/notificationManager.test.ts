@@ -62,8 +62,14 @@ describe("recordNotification", () => {
         await recordNotification({ dedupeKey: "evento-ripetuto", title: "Seconda" });
 
         expect(upsertNotification).toHaveBeenCalledTimes(2);
-        expect(upsertNotification).toHaveBeenNthCalledWith(1, expect.objectContaining({ dedupeKey: "evento-ripetuto" }));
-        expect(upsertNotification).toHaveBeenNthCalledWith(2, expect.objectContaining({ dedupeKey: "evento-ripetuto" }));
+        expect(upsertNotification).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ dedupeKey: "evento-ripetuto" })
+        );
+        expect(upsertNotification).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ dedupeKey: "evento-ripetuto" })
+        );
     });
 
     it("pota le notifiche chiuse da più di 30 giorni dopo aver registrato", async () => {

@@ -168,7 +168,9 @@ describe("updateEmailSettings", () => {
         // `loadState` farebbe altrimenti al primo accesso, che confonderebbe il conteggio.
         readFile.mockResolvedValue(JSON.stringify(storedState({ enabled: false, passwordEncrypted: null })));
 
-        const result = await updateEmailSettings(enableInput({ enabled: false, host: "  smtp.test  ", username: " u " }));
+        const result = await updateEmailSettings(
+            enableInput({ enabled: false, host: "  smtp.test  ", username: " u " })
+        );
 
         expect(result.enabled).toBe(false);
         expect(result.host).toBe("smtp.test");
@@ -177,12 +179,10 @@ describe("updateEmailSettings", () => {
     });
 
     it("rifiuta l'abilitazione senza host, utente o mittente", async () => {
-        await expect(
-            updateEmailSettings(enableInput({ host: "" }))
-        ).rejects.toMatchObject({ statusCode: 400 });
-        await expect(
-            updateEmailSettings(enableInput({ password: "segreta" }))
-        ).resolves.toMatchObject({ enabled: true });
+        await expect(updateEmailSettings(enableInput({ host: "" }))).rejects.toMatchObject({ statusCode: 400 });
+        await expect(updateEmailSettings(enableInput({ password: "segreta" }))).resolves.toMatchObject({
+            enabled: true,
+        });
     });
 
     it("rifiuta un'email mittente malformata", async () => {

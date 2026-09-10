@@ -115,7 +115,9 @@ beforeEach(() => {
 
 describe("restoreBackupFromExisting", () => {
     it("propaga l'errore di getBackupDumpPath senza acquisire il lock", async () => {
-        backupFilesMock.getBackupDumpPath.mockRejectedValueOnce(new BackupManagerError("File di dump non trovato", 404));
+        backupFilesMock.getBackupDumpPath.mockRejectedValueOnce(
+            new BackupManagerError("File di dump non trovato", 404)
+        );
 
         await expect(restoreBackupFromExisting("db-dump-20260101-000000.sql", false)).rejects.toThrow(
             "File di dump non trovato"
@@ -289,7 +291,10 @@ describe("restoreBackupFromUpload", () => {
 
         await restoreBackupFromUpload(Buffer.from("dump sql"), "vecchio-dump.sql", false);
 
-        expect(fsPromisesMock.writeFile).toHaveBeenCalledWith(expect.stringMatching(/upload-\d+\.sql$/), expect.any(Buffer));
+        expect(fsPromisesMock.writeFile).toHaveBeenCalledWith(
+            expect.stringMatching(/upload-\d+\.sql$/),
+            expect.any(Buffer)
+        );
         expect(fsPromisesMock.unlink).toHaveBeenCalledWith(expect.stringMatching(/upload-\d+\.sql$/));
     });
 

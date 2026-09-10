@@ -78,7 +78,9 @@ describe("reportTechnicians router", () => {
     it("crea un'associazione senza price, che resta opzionale", async () => {
         vi.mocked(createReportTechnician).mockResolvedValue([{ ...reportTechnician, price: 0 }] as never);
 
-        const response = await request(buildApp()).post("/api/report-technicians").send({ reportId: 1, technicianId: 2 });
+        const response = await request(buildApp())
+            .post("/api/report-technicians")
+            .send({ reportId: 1, technicianId: 2 });
 
         expect(response.status).toBe(201);
         expect(createReportTechnician).toHaveBeenCalledWith({ reportId: 1, technicianId: 2 });

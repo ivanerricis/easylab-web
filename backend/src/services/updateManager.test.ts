@@ -19,7 +19,13 @@ vi.mock("node:fs", () => ({
     },
 }));
 
-import { getUpdateStatus, requestUpdate, requestUpdateCheck, UpdateManagerError, type UpdateStatus } from "./updateManager";
+import {
+    getUpdateStatus,
+    requestUpdate,
+    requestUpdateCheck,
+    UpdateManagerError,
+    type UpdateStatus,
+} from "./updateManager";
 
 const storedStatus = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
     state: "idle",
@@ -111,7 +117,11 @@ describe("requestUpdate", () => {
 
         expect(mkdir).toHaveBeenCalledWith(expect.stringContaining("update-signal"), { recursive: true });
         expect(writeFile).toHaveBeenCalledWith(expect.stringContaining("apply.trigger"), "", "utf-8");
-        expect(writeFile).not.toHaveBeenCalledWith(expect.stringContaining("check.trigger"), expect.anything(), expect.anything());
+        expect(writeFile).not.toHaveBeenCalledWith(
+            expect.stringContaining("check.trigger"),
+            expect.anything(),
+            expect.anything()
+        );
     });
 
     it("ritorna lo stato aggiornato dopo aver creato il trigger", async () => {
@@ -137,6 +147,10 @@ describe("requestUpdateCheck", () => {
         await requestUpdateCheck();
 
         expect(writeFile).toHaveBeenCalledWith(expect.stringContaining("check.trigger"), "", "utf-8");
-        expect(writeFile).not.toHaveBeenCalledWith(expect.stringContaining("apply.trigger"), expect.anything(), expect.anything());
+        expect(writeFile).not.toHaveBeenCalledWith(
+            expect.stringContaining("apply.trigger"),
+            expect.anything(),
+            expect.anything()
+        );
     });
 });

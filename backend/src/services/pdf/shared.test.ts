@@ -173,10 +173,7 @@ describe("loadImage", () => {
     });
 
     it("un errore di rete (host irraggiungibile) restituisce null invece di far fallire il PDF", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn().mockRejectedValue(new Error("ENOTFOUND"))
-        );
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ENOTFOUND")));
 
         expect(await loadImage("https://non-esiste.invalid/logo.png")).toBeNull();
     });

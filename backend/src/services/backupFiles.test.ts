@@ -182,10 +182,7 @@ describe("pruneOldBackups", () => {
     });
 
     it("ignora l'errore di cancellazione di un singolo file e non si interrompe", async () => {
-        fsPromisesMock.readdir.mockResolvedValueOnce([
-            "db-dump-20260701-020000.sql",
-            "db-dump-20260702-020000.sql",
-        ]);
+        fsPromisesMock.readdir.mockResolvedValueOnce(["db-dump-20260701-020000.sql", "db-dump-20260702-020000.sql"]);
         fsPromisesMock.unlink.mockRejectedValueOnce(new Error("EPERM"));
 
         await expect(pruneOldBackups("backups", 1)).resolves.toBeUndefined();

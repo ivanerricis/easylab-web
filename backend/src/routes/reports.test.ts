@@ -291,9 +291,7 @@ describe("reports router", () => {
             const response = await request(buildApp()).post("/api/reports").send(minimalBody);
 
             expect(response.status).toBe(201);
-            expect(createReport).toHaveBeenCalledWith(
-                expect.objectContaining({ paymentMethod: "non_paid", price: 0 })
-            );
+            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ paymentMethod: "non_paid", price: 0 }));
         });
 
         it("rifiuta di chiudere un report senza indicare un collaboratore", async () => {
@@ -375,7 +373,9 @@ describe("reports router", () => {
         // Il pagamento resta "cash" perché non viene toccato dal corpo: solo il prezzo
         // arriva a zero, e la combinazione risultante va comunque rifiutata.
         it("rifiuta un prezzo a zero quando il metodo di pagamento esistente è già 'cash'", async () => {
-            vi.mocked(getReportById).mockResolvedValue([{ ...storedReport, paymentMethod: "cash", price: 50 }] as never);
+            vi.mocked(getReportById).mockResolvedValue([
+                { ...storedReport, paymentMethod: "cash", price: 50 },
+            ] as never);
 
             const response = await request(buildApp()).put("/api/reports/1").send({ price: 0 });
 
@@ -396,9 +396,7 @@ describe("reports router", () => {
         // `collaboratorId: null` è un valore esplicito ("svuota il campo"), non l'assenza
         // del campo: deve contare come tale anche se il report resta chiuso da prima.
         it("rifiuta di svuotare il collaboratore di un report già chiuso", async () => {
-            vi.mocked(getReportById).mockResolvedValue(
-                [{ ...storedReport, closed: true, collaboratorId: 3 }] as never
-            );
+            vi.mocked(getReportById).mockResolvedValue([{ ...storedReport, closed: true, collaboratorId: 3 }] as never);
 
             const response = await request(buildApp()).put("/api/reports/1").send({ collaboratorId: null });
 

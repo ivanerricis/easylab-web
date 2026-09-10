@@ -11,6 +11,29 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Header di pagina che non va in overflow sotto `sm`
+
+**Cosa.** `page-header.tsx`: la riga che affianca titolo e azioni era `flex items-center
+justify-between` senza `flex-wrap`. Con più di un pulsante nell'azione (es. "Nuovo report" +
+"Nuovo intervento" in `DashboardPage.tsx`) e viewport sotto i 640px, la riga non aveva spazio
+per entrambi ma non poteva nemmeno andare a capo: il blocco delle azioni veniva schiacciato in
+una colonna stretta accanto al titolo, e il secondo pulsante — che wrappava dentro il proprio
+contenitore `flex-wrap` — restava agganciato lì invece di scendere su una riga piena.
+Cambiato in `flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between`: sotto `sm`
+titolo e azioni si impilano, ognuno con tutta la larghezza; da `sm` in su il layout affiancato
+è invariato.
+
+**Il perché.** Bug segnalato dall'utente ("il layout dei due pulsanti nella dashboard su
+mobile è completamente sballato"); la causa non era nei pulsanti ma nel contenitore comune a
+tutte le pagine che usano `PageHeader` (Dashboard, Reports, Interventions, Customers), quindi
+il fix si applica a tutte. Verificato con screenshot Playwright a 375px e 320px, prima e dopo,
+iniettando il markup reale nella pagina di login (nessun dato necessario, il bug è puramente
+strutturale).
+
+**File.** `frontend/src/components/page-header.tsx`.
+
+---
+
 ## 2026-09-10 — Tre correzioni UI/UX emerse da una revisione con ui-ux-pro-max
 
 **Cosa.**

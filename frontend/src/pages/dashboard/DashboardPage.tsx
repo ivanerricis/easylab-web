@@ -238,21 +238,28 @@ const DashboardPage = () => {
                 title="Dashboard"
                 description="Panoramica del laboratorio e stato delle riparazioni."
                 action={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <RefreshButton
-                            onRefresh={handleRefreshDashboard}
-                            isRefreshing={isLoading || isCalendarLoading}
-                        />
-                        <CreateEntityButton
-                            label="Nuovo report"
-                            mobileLabel="Report"
-                            onClick={() => setDialogCreateReportOpen(true)}
-                        />
-                        <CreateEntityButton
-                            label="Nuovo intervento"
-                            mobileLabel="Intervento"
-                            onClick={() => setDialogCreateInterventionOpen(true)}
-                        />
+                    <div className="flex items-center justify-between gap-2 sm:justify-start">
+                        {/* Su mobile i pulsanti di creazione stanno a sinistra e il refresh da
+                            solo a destra: separati in due gruppi con `order` così da `sm` in su
+                            tornano nell'ordine originale (refresh, report, intervento). */}
+                        <div className="order-1 flex flex-wrap items-center gap-2 sm:order-2">
+                            <CreateEntityButton
+                                label="Nuovo report"
+                                mobileLabel="Report"
+                                onClick={() => setDialogCreateReportOpen(true)}
+                            />
+                            <CreateEntityButton
+                                label="Nuovo intervento"
+                                mobileLabel="Intervento"
+                                onClick={() => setDialogCreateInterventionOpen(true)}
+                            />
+                        </div>
+                        <div className="order-2 sm:order-1">
+                            <RefreshButton
+                                onRefresh={handleRefreshDashboard}
+                                isRefreshing={isLoading || isCalendarLoading}
+                            />
+                        </div>
                     </div>
                 }
             />

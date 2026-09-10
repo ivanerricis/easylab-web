@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 // Elementi condivisi da tutte le sezioni di Impostazioni: card, riquadri, tessere di stato
@@ -47,9 +47,16 @@ export const SettingsCard = ({
                 destructive ? "border-destructive/15 bg-destructive/5" : "border-primary/10 bg-muted/20"
             )}
         >
-            <CardTitle>{title}</CardTitle>
-            {description ? <CardDescription>{description}</CardDescription> : null}
-            {action ? <CardAction className="flex flex-wrap justify-end gap-2">{action}</CardAction> : null}
+            {/* Il layout a due colonne di CardHeader (via CardAction) manda l'azione fuori
+                dalla card quando il testo dei pulsanti non ci sta accanto al titolo: qui la
+                riga è nostra, quindi sotto `sm` scende sotto invece di sovrapporsi. */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-1">
+                    <CardTitle>{title}</CardTitle>
+                    {description ? <CardDescription>{description}</CardDescription> : null}
+                </div>
+                {action ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{action}</div> : null}
+            </div>
         </CardHeader>
         <CardContent className={cn("grid gap-3 pt-4", contentClassName)}>{children}</CardContent>
     </Card>

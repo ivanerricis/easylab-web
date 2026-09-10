@@ -11,6 +11,39 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Azioni della dashboard e delle card di Impostazioni riordinate/contenute su mobile
+
+**Cosa.**
+- `DashboardPage.tsx`: sotto `sm` i due pulsanti di creazione ("Nuovo report" / "Nuovo
+  intervento") stavano insieme al refresh nello stesso `flex-wrap`, in ordine
+  refresh-report-intervento. Separati in due gruppi con `order` (`order-1`/`order-2`,
+  invertiti da `sm:`) dentro un contenitore `justify-between`: sotto `sm` i due pulsanti di
+  creazione stanno a sinistra e il refresh da solo a destra; da `sm` in su l'ordine
+  originale (refresh, report, intervento) resta invariato.
+- `settingsUi.tsx` (`SettingsCard`): l'azione della card (`CardAction`) sfruttava il layout a
+  due colonne `grid-cols-[1fr_auto]` di `CardHeader`, pensato per un'unica azione compatta.
+  Con più pulsanti e testo lungo (es. "Verifica aggiornamenti" / "Aggiorna adesso" in
+  `updateSettingsPanel.tsx`) la colonna `auto` non si riduceva: i pulsanti uscivano dal bordo
+  della card invece di andare a capo, sovrapponendosi al titolo. Sostituita la coppia
+  `CardTitle`/`CardDescription` + `CardAction` con una riga propria
+  (`flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between`), lo stesso pattern già
+  usato in `PageHeader` (voce successiva): sotto `sm` l'azione scende sotto testo e
+  descrizione invece di condividerne la riga.
+
+**Il perché.** Bug segnalati dall'utente controllando la dashboard su mobile, con richiesta
+esplicita di verificare anche altre pagine e dialog. Le altre pagine/dialog sono risultati a
+posto: i dettagli (Report/Intervento/Cliente) impilano già testata e azioni con lo stesso
+pattern mobile-first (`flex-col ... lg:flex-row`), e tutti i dialog passano da `CustomDialog`,
+che usa `DialogFooter` di shadcn (`flex-col-reverse gap-2 sm:flex-row`) — già corretto. Il
+problema era isolato ai due punti sopra, entrambi contenitori `flex`/`grid` che non lasciavano
+spazio alle azioni di andare a capo sotto il titolo quando il contenuto non ci stava affiancato.
+Verificato con `typecheck`, `lint`, `format:check` e controllo visivo Playwright (markup reale,
+320/375/900px, prima e dopo).
+
+**File.** `frontend/src/pages/dashboard/DashboardPage.tsx`, `frontend/src/components/settings/settingsUi.tsx`.
+
+---
+
 ## 2026-09-10 — Header di pagina che non va in overflow sotto `sm`
 
 **Cosa.** `page-header.tsx`: la riga che affianca titolo e azioni era `flex items-center

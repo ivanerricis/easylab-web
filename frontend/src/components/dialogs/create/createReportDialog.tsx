@@ -338,6 +338,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             inputClassName="rounded-r-none"
                                             value={formValues.issue}
                                             options={issueOptions}
+                                            showAllOnFocus
                                             onCreate={async (value: string) => {
                                                 const createdIssue = await createIssue({ description: value });
                                                 setIssueOptions((prev) => Array.from(new Set([...prev, value])));

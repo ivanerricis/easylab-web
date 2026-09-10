@@ -19,6 +19,12 @@ type Props = Readonly<{
     onCreate?: (value: string) => Promise<void> | void;
     required?: boolean;
     inputClassName?: string;
+    /**
+     * Col campo vuoto, al focus srotola l'intero elenco di `options` invece di aspettare che
+     * si digiti. Pensato per i cataloghi corti (i difetti) in cui scorrere è più rapido che
+     * indovinare la parola giusta; non ha effetto con `onSearch`, dove l'elenco sta sul server.
+     */
+    showAllOnFocus?: boolean;
 }>;
 
 const InputWithAdd = ({
@@ -33,6 +39,7 @@ const InputWithAdd = ({
     onCreate,
     required,
     inputClassName,
+    showAllOnFocus = false,
 }: Props) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
@@ -42,9 +49,11 @@ const InputWithAdd = ({
     const normalizedValue = value.trim().toLowerCase();
     /**
      * I suggerimenti partono solo da quando si digita: aprendo un dialogo il campo è vuoto e
-     * un elenco già srotolato coprirebbe il resto del modulo senza aver filtrato nulla.
+     * un elenco già srotolato coprirebbe il resto del modulo senza aver filtrato nulla. Fa
+     * eccezione `showAllOnFocus`, dove l'elenco intero è proprio ciò che si vuole vedere.
      */
     const hasQuery = normalizedValue.length > 0;
+    const showsFullList = showAllOnFocus && !onSearch && !hasQuery;
 
     useEffect(() => {
         if (!onSearch) {
@@ -78,6 +87,10 @@ const InputWithAdd = ({
     }, [onSearch, debouncedValue]);
 
     const filteredOptions = useMemo(() => {
+        if (showsFullList) {
+            return options;
+        }
+
         if (!hasQuery) {
             return [];
         }
@@ -87,7 +100,7 @@ const InputWithAdd = ({
         }
 
         return options.filter((option) => option.toLowerCase().includes(normalizedValue)).slice(0, 8);
-    }, [hasQuery, onSearch, searchResults, normalizedValue, options]);
+    }, [showsFullList, hasQuery, onSearch, searchResults, normalizedValue, options]);
 
     const hasExactMatch = useMemo(() => {
         if (!normalizedValue) {

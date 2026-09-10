@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-10 — Elenco completo dei difetti al focus nel dialogo "Nuovo report"
+
+**Cosa.**
+- `inputWithAdd.tsx`: nuova prop opzionale `showAllOnFocus`. Col campo vuoto il menu mostra
+  tutte le `options` appena la casella prende il focus (scorrevole, come prima); appena si
+  digita torna il filtro di sempre. Non ha effetto con `onSearch` (clienti), dove il catalogo
+  sta sul server e la ricerca a vuoto resta evitata di proposito.
+- `createReportDialog.tsx`: la prop è attiva solo sul campo "Difetto".
+
+**Il perché.** Richiesta dell'utente: al focus sul campo dei difetti va mostrata subito tutta
+la lista. Il catalogo dei difetti è corto e chi apre il report spesso non sa con quale parola
+è stata registrata la voce: scorrere l'elenco è più rapido che provare a indovinarla. La regola
+generale del componente ("i suggerimenti partono solo digitando", per non coprire il modulo
+con un elenco non filtrato) resta invariata per dispositivi, clienti e il dialogo
+dell'intervento: l'eccezione è opt-in.
+
+---
+
 ## 2026-09-10 — Pulsante di creazione quadrato accanto al titolo su mobile; report del tecnico visibili su mobile
 
 **Cosa.**

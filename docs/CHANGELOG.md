@@ -11,6 +11,26 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Incasso netto (senza il compenso dei tecnici esterni) nella dashboard
+
+**Cosa.** La card "Incassi mese" della dashboard, oltre all'incasso totale del mese già
+mostrato, ora riporta anche l'incasso al netto del compenso pagato ai tecnici esterni.
+`getReportStats` (`backend/src/db/queries/report.ts`) somma separatamente il compenso dei
+tecnici esterni (`report_technician.price`) per ogni mese della serie e lo sottrae
+dall'incasso totale, restituendo `monthlyNetRevenue` e, per ogni punto della serie a 6 mesi,
+`netValue`.
+
+*Perché:* l'incasso mostrato finora (`report.price + report_technician.price`) è quanto
+pagato dal cliente, ma la parte destinata al tecnico esterno non resta al laboratorio — senza
+questo numero, valutare la redditività reale del mese richiedeva un calcolo a mano fuori
+dall'app.
+
+→ [backend/src/db/queries/report.ts](../backend/src/db/queries/report.ts),
+[frontend/src/lib/api/reports.ts](../frontend/src/lib/api/reports.ts),
+[frontend/src/pages/dashboard/DashboardPage.tsx](../frontend/src/pages/dashboard/DashboardPage.tsx)
+
+---
+
 ## 2026-09-11 — Asterisco sui campi obbligatori, in tutti i dialoghi
 
 **Cosa.** I dialoghi con etichette scritte a mano (`create`/`editReportDialog`,

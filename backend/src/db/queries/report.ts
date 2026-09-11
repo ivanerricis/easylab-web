@@ -233,6 +233,10 @@ export const getReportStats = async (month?: string) => {
             .select({
                 month: sql<string>`to_char(${reportTable.created_at}, 'YYYY-MM')`,
                 revenue: sql<number>`coalesce(sum(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0)), 0)::int`,
+                // Compenso pagato ai tecnici esterni: l'incasso netto è il totale meno questa
+                // spesa, non un'altra colonna della riga (`report.price` da solo non basta
+                // perché un report può non avere alcun tecnico esterno assegnato).
+                technicianCost: sql<number>`coalesce(sum(coalesce(${reportTechnicianTable.price}, 0)), 0)::int`,
             })
             .from(reportTable)
             // Stesso join diretto sulla chiave primaria usato da `listReports`: vedi lì il
@@ -243,14 +247,19 @@ export const getReportStats = async (month?: string) => {
     ]);
 
     const revenueByMonth = new Map(revenueRows.map((row) => [row.month, Number(row.revenue)]));
+    const technicianCostByMonth = new Map(revenueRows.map((row) => [row.month, Number(row.technicianCost)]));
+    const netRevenueOf = (monthKey: string) =>
+        (revenueByMonth.get(monthKey) ?? 0) - (technicianCostByMonth.get(monthKey) ?? 0);
 
     return {
         openCount: Number(statusCountRows.find((row) => !row.closed)?.count ?? 0),
         closedCount: Number(statusCountRows.find((row) => row.closed)?.count ?? 0),
         monthlyRevenue: revenueByMonth.get(targetMonthKey) ?? 0,
+        monthlyNetRevenue: netRevenueOf(targetMonthKey),
         series: seriesMonthKeys.map((monthKey) => ({
             monthKey,
             value: revenueByMonth.get(monthKey) ?? 0,
+            netValue: netRevenueOf(monthKey),
         })),
     };
 };

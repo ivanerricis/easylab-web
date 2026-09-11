@@ -99,7 +99,10 @@ const DashboardPage = () => {
     const [openReports, setOpenReports] = useState(0);
     const [closedReports, setClosedReports] = useState(0);
     const [monthlyRevenue, setMonthlyRevenue] = useState(0);
-    const [monthlyRevenueSeries, setMonthlyRevenueSeries] = useState<{ monthKey: string; value: number }[]>([]);
+    const [monthlyNetRevenue, setMonthlyNetRevenue] = useState(0);
+    const [monthlyRevenueSeries, setMonthlyRevenueSeries] = useState<
+        { monthKey: string; value: number; netValue: number }[]
+    >([]);
     const [scheduledInterventions, setScheduledInterventions] = useState(0);
     const [inProgressInterventions, setInProgressInterventions] = useState(0);
     const [completedInterventions, setCompletedInterventions] = useState(0);
@@ -135,6 +138,7 @@ const DashboardPage = () => {
             setOpenReports(reportStats.openCount);
             setClosedReports(reportStats.closedCount);
             setMonthlyRevenue(reportStats.monthlyRevenue);
+            setMonthlyNetRevenue(reportStats.monthlyNetRevenue);
             setMonthlyRevenueSeries(reportStats.series);
             setScheduledInterventions(interventionStats.programmatoCount);
             setInProgressInterventions(interventionStats.inLavorazioneCount);
@@ -327,6 +331,12 @@ const DashboardPage = () => {
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">{formatEuro(monthlyRevenue)}</div>
                                     <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                        Al netto tecnici esterni:{" "}
+                                        <span className="font-semibold text-foreground">
+                                            {formatEuro(monthlyNetRevenue)}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <Tooltip>

@@ -138,7 +138,9 @@ export type ReportStatsDto = {
     openCount: number;
     closedCount: number;
     monthlyRevenue: number;
-    series: { monthKey: string; value: number }[];
+    /** Incasso al netto del compenso pagato ai tecnici esterni. */
+    monthlyNetRevenue: number;
+    series: { monthKey: string; value: number; netValue: number }[];
 };
 
 export const getReportStats = async (month?: string) =>

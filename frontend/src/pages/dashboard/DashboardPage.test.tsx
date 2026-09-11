@@ -92,9 +92,10 @@ const reportStats = {
     openCount: 12,
     closedCount: 30,
     monthlyRevenue: 1520.5,
+    monthlyNetRevenue: 1320.5,
     series: [
-        { monthKey: "2026-08", value: 900 },
-        { monthKey: "2026-09", value: 1520.5 },
+        { monthKey: "2026-08", value: 900, netValue: 800 },
+        { monthKey: "2026-09", value: 1520.5, netValue: 1320.5 },
     ],
 };
 
@@ -173,6 +174,7 @@ describe("DashboardPage", () => {
         const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
         // In it-IT le migliaia si separano solo da cinque cifre in su: 1520,50 è corretto.
         expect(within(dialog).getByText(/1520,50/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/1320,50/)).toBeInTheDocument();
         expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
         // Il mese corrente è l'ultimo: non si va nel futuro.
         expect(within(dialog).getByRole("button", { name: "Mese successivo" })).toBeDisabled();

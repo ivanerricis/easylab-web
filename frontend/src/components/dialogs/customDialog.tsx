@@ -10,7 +10,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "../ui/dialog";
-import { Save, Trash } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 type Props = Readonly<{
     content?: ReactNode;
@@ -26,6 +26,17 @@ type Props = Readonly<{
 
     cancelLabel?: ReactNode;
     confirmLabel?: ReactNode;
+    /**
+     * L'icona del pulsante di conferma, come componente (`confirmIcon={Save}`): la misura la
+     * decide questo dialogo, uguale per tutti.
+     *
+     * Senza, il pulsante non ha icona. Prima il default era il floppy di "Salva", o il cestino
+     * con `destructive`: giusti per i moduli e per "Elimina", ma finivano anche su "Invia"
+     * (che manda un'email al cliente), "Attiva", "Aggiorna adesso", "Ripristina", "Disabilita"
+     * — l'icona prometteva un'azione e il pulsante ne faceva un'altra. Con il default vuoto un
+     * dialogo nuovo può al più non avere icona, non averne una sbagliata.
+     */
+    confirmIcon?: LucideIcon;
 
     onCancel?: () => void;
     onConfirm?: () => void;
@@ -50,6 +61,7 @@ const CustomDialog = ({
     description,
     cancelLabel = "Annulla",
     confirmLabel = "Conferma",
+    confirmIcon: ConfirmIcon,
     onCancel,
     onConfirm,
     cancelDisabled = false,
@@ -122,7 +134,7 @@ const CustomDialog = ({
                                     variant={destructive ? "destructive" : "default"}
                                     disabled={confirmDisabled}
                                 >
-                                    {destructive ? <Trash className="size-5" /> : <Save className="size-5" />}
+                                    {ConfirmIcon ? <ConfirmIcon className="size-5" /> : null}
                                     <span className="text-lg">{confirmLabel}</span>
                                 </Button>
                             )}

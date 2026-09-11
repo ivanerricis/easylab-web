@@ -19,7 +19,6 @@ const InterventionsPage = lazy(() => import("@/pages/interventions/Interventions
 const InterventionPage = lazy(() => import("./pages/interventions/InterventionPage"));
 const CustomersPage = lazy(() => import("@/pages/customers/CustomersPage"));
 const CustomerPage = lazy(() => import("./pages/customers/CustomerPage"));
-const CustomerInterventionsPage = lazy(() => import("./pages/customers/CustomerInterventionsPage"));
 const CollaboratorsPage = lazy(() => import("@/pages/collaborators/CollaboratorsPage"));
 const CollaboratorPage = lazy(() => import("./pages/collaborators/CollaboratorPage"));
 const TechnicianPage = lazy(() => import("@/pages/technicians/TechniciansPage"));
@@ -48,10 +47,8 @@ export function App() {
                                                 <Route path="interventions/:id" element={<InterventionPage />} />
                                                 <Route path="clients" element={<CustomersPage />} />
                                                 <Route path="clients/:id" element={<CustomerPage />} />
-                                                <Route
-                                                    path="clients/:id/interventions"
-                                                    element={<CustomerInterventionsPage />}
-                                                />
+                                                {/* Stessa pagina, tab degli interventi: vedi `CustomerPage`. */}
+                                                <Route path="clients/:id/interventions" element={<CustomerPage />} />
                                                 <Route path="collaborators" element={<CollaboratorsPage />} />
                                                 <Route path="collaborators/:id" element={<CollaboratorPage />} />
                                                 <Route path="technicians" element={<TechnicianPage />} />

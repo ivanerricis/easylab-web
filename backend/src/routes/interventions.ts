@@ -55,6 +55,8 @@ const interventionListQuerySchema = listQuerySchema.extend({
     // Filtro per collaboratore: è la persona che esegue l'intervento, e la sua scheda
     // elenca quelli assegnati a lui. Vedi la stessa voce sulla rotta dei report.
     collaboratorId: z.coerce.number().int().positive().optional(),
+    // E per cliente, per la sua pagina degli interventi: stesso problema dei report.
+    customerId: z.coerce.number().int().positive().optional(),
     sortBy: z.enum(interventionSortFields).optional(),
 });
 
@@ -147,6 +149,7 @@ interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), a
         scheduledFrom,
         scheduledTo,
         collaboratorId,
+        customerId,
         sortBy,
         sortOrder,
     } = req.query as unknown as {
@@ -161,6 +164,7 @@ interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), a
         scheduledFrom?: string;
         scheduledTo?: string;
         collaboratorId?: number;
+        customerId?: number;
         sortBy?: (typeof interventionSortFields)[number];
         sortOrder?: "asc" | "desc";
     };
@@ -177,6 +181,7 @@ interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), a
         scheduledFrom,
         scheduledTo,
         collaboratorId,
+        customerId,
         sortBy,
         sortOrder,
     });

@@ -49,6 +49,10 @@ export async function listTechnicians(params?: ListTechniciansParams) {
     };
 }
 
+/** Un tecnico solo, per id: la sua scheda non ha bisogno dell'elenco intero. */
+export const getTechnician = async (id: number) =>
+    mapEntityTimestamps((await api.get<EntityWithRawTimestamps<TechnicianDto>>(`/technicians/${id}`)).data);
+
 export const createTechnician = async (payload: TechnicianCreateInput) =>
     mapEntityTimestamps((await api.post<EntityWithRawTimestamps<TechnicianDto>>("/technicians", payload)).data);
 

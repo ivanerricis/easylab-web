@@ -2,6 +2,7 @@ import { useState } from "react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Printer } from "lucide-react";
 
 type PrintRangeDialogProps = {
     open: boolean;
@@ -56,26 +57,36 @@ const PrintRangeDialog = ({
                 title={title}
                 description={description}
                 confirmLabel="Stampa"
+                confirmIcon={Printer}
                 cancelLabel="Annulla"
                 onCancel={() => onOpenChange(false)}
                 onConfirm={handleConfirm}
                 content={
-                    <div className="flex items-center gap-3">
-                        <div className="grid flex-1 gap-1.5">
-                            <Label htmlFor="print-range-date-from">Da</Label>
+                    // Etichette e campi alla stessa misura degli altri dialoghi, e un po' d'aria
+                    // sotto la descrizione, a cui prima le etichette stavano attaccate. Sotto sm
+                    // le due date vanno una sotto l'altra: affiancate non ci stavano.
+                    <div className="grid gap-4 py-4 sm:grid-cols-2">
+                        <div className="grid gap-1">
+                            <Label htmlFor="print-range-date-from" className="text-lg">
+                                Da
+                            </Label>
                             <Input
                                 id="print-range-date-from"
                                 type="date"
+                                className="text-lg!"
                                 value={dateFrom}
                                 max={dateTo || undefined}
                                 onChange={(event) => setDateFrom(event.target.value)}
                             />
                         </div>
-                        <div className="grid flex-1 gap-1.5">
-                            <Label htmlFor="print-range-date-to">A</Label>
+                        <div className="grid gap-1">
+                            <Label htmlFor="print-range-date-to" className="text-lg">
+                                A
+                            </Label>
                             <Input
                                 id="print-range-date-to"
                                 type="date"
+                                className="text-lg!"
                                 value={dateTo}
                                 min={dateFrom || undefined}
                                 onChange={(event) => setDateTo(event.target.value)}
@@ -93,6 +104,7 @@ const PrintRangeDialog = ({
                 title="Stampare tutto lo storico?"
                 description="Non hai specificato un intervallo di date: verrà stampato tutto lo storico disponibile."
                 confirmLabel="Stampa tutto"
+                confirmIcon={Printer}
                 cancelLabel="Annulla"
                 onCancel={() => setConfirmingAll(false)}
                 onConfirm={() => confirmAndClose({ dateFrom: undefined, dateTo: undefined })}

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../index";
 import {
     collaboratorTable,
@@ -23,6 +23,8 @@ type ListReportsParams = {
     dateTo?: string;
     customerId?: number;
     collaboratorId?: number;
+    /** I report affidati a un tecnico esterno: li elenca la sua scheda. */
+    technicianId?: number;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
 };
@@ -36,6 +38,7 @@ export const listReports = async ({
     dateTo,
     customerId,
     collaboratorId,
+    technicianId,
     sortBy = "createdAt",
     sortOrder = "desc",
 }: ListReportsParams) => {
@@ -81,12 +84,25 @@ export const listReports = async ({
                 : undefined;
     const customerCondition = customerId ? eq(reportTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(reportTable.collaboratorId, collaboratorId) : undefined;
+    // Sottoquery e non condizione sul join qui sotto: il conteggio della paginazione non porta
+    // con sé i join (vedi il commento su `countSelect`), quindi una condizione su
+    // `report_technician` lì non avrebbe la tabella a cui riferirsi.
+    const technicianCondition = technicianId
+        ? inArray(
+              reportTable.id,
+              db
+                  .select({ reportId: reportTechnicianTable.reportId })
+                  .from(reportTechnicianTable)
+                  .where(eq(reportTechnicianTable.technicianId, technicianId))
+          )
+        : undefined;
     const searchCondition = searchConditions.length > 0 ? or(...searchConditions) : undefined;
     const whereConditions = [
         visibilityCondition,
         dateCondition,
         customerCondition,
         collaboratorCondition,
+        technicianCondition,
         searchCondition,
     ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;

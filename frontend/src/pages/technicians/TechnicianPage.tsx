@@ -1,8 +1,10 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import EntityCardList from "@/components/entity-card-list";
+import DetailItem from "@/components/detail-item";
+import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import { toReportUpdatePayload } from "@/lib/reportForm";
@@ -11,47 +13,49 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
     createReportTechnician,
     getApiErrorMessage,
-    listCustomers,
-    listDevices,
-    listReportTechnicians,
+    getTechnician,
     listReports,
-    listTechnicians,
     deleteReportTechnician,
     updateReport,
     updateReportTechnician,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil } from "lucide-react";
+import type { ReportDto, TechnicianDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
+import { technicianReportColumns } from "./components/technician-detail-columns";
 
-type TechnicianReportCard = {
-    id: number;
-    customerName: string;
-    deviceName: string;
-    closed: boolean;
-};
-
-const getStatusColor = (report: TechnicianReportCard) => (report.closed ? "green" : "red");
-
+/**
+ * La scheda del tecnico esterno: i suoi dati e i report che gli sono stati affidati.
+ *
+ * Stessa forma della scheda del collaboratore e di quella del cliente: riquadro con i dati
+ * (prima mancava, e telefono e partita IVA si leggevano solo dall'elenco tecnici), poi una
+ * `EntityTable` con filtro a destra e impaginazione in fondo. La tabella di prima aveva
+ * quattro colonne, rientrata di 48px, e non diceva quanto andava pagato il tecnico per
+ * ciascun report: la colonna del prezzo è l'aggiunta che conta.
+ *
+ * Filtro e impaginazione sono del server (`technicianId` sulla lista dei report): l'elenco
+ * completo senza paginazione si ferma a 5000 righe, e sul database di sviluppo un tecnico con
+ * 179 report aperti ne mostrava 43.
+ */
 const TechnicianPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const technicianId = Number(id);
-    const [isLoading, setIsLoading] = useState(true);
-    const [technicianName, setTechnicianName] = useState("Tecnico");
+    const [isTechnicianLoading, setIsTechnicianLoading] = useState(true);
+    const [technician, setTechnician] = useState<TechnicianDto | null>(null);
+    const technicianName = technician ? `${technician.firstName} ${technician.lastName ?? ""}`.trim() : "Tecnico";
     useDocumentTitle(technicianName);
-    const [reportCards, setReportCards] = useState<TechnicianReportCard[]>([]);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [reportIdToEdit, setReportIdToEdit] = useState<number | null>(null);
-    const [reportCustomerNameToEdit, setReportCustomerNameToEdit] = useState("");
+    const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
 
     const hasValidTechnicianId = useMemo(() => Number.isInteger(technicianId) && technicianId > 0, [technicianId]);
 
@@ -63,12 +67,31 @@ const TechnicianPage = () => {
         navigate(`/reports/${reportId}`);
     };
 
-    const handleOpenEditDialog = (reportId: number) => {
-        const report = reportCards.find((item) => item.id === reportId);
-        setReportIdToEdit(reportId);
-        setReportCustomerNameToEdit(report?.customerName ?? "");
+    const handleOpenEditDialog = (report: ReportDto) => {
+        setReportToEdit(report);
         setIsEditDialogOpen(true);
     };
+
+    const [pageSize, setPageSize] = useTableRowsPerPage("technician-reports");
+    const { currentPage, setCurrentPage } = useTablePagination({
+        resetDependencies: [visibilityFilter, pageSize],
+    });
+
+    const {
+        rows: reports,
+        totalItems,
+        totalPages,
+        isInitialLoading: areReportsInitialLoading,
+        isRefetching: areReportsRefetching,
+        isLoading: areReportsLoading,
+        reload: reloadReports,
+    } = usePaginatedRows<ReportDto>({
+        fetchRows: (signal) =>
+            listReports({ page: currentPage, pageSize, visibility: visibilityFilter, technicianId, signal }),
+        queryKey: [technicianId, currentPage, pageSize, visibilityFilter],
+        errorMessage: "Impossibile caricare i report del tecnico",
+        initialLoading: false,
+    });
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
         await updateReport(values.reportId, toReportUpdatePayload(values));
@@ -94,71 +117,20 @@ const TechnicianPage = () => {
             await deleteReportTechnician(values.reportId, values.existingTechnicianId);
         }
 
-        await loadData();
+        await reloadReports();
     };
 
-    const visibleReportCards = useMemo(() => {
-        if (visibilityFilter === "open") {
-            return reportCards.filter((report) => !report.closed);
-        }
-
-        if (visibilityFilter === "closed") {
-            return reportCards.filter((report) => report.closed);
-        }
-
-        return reportCards;
-    }, [reportCards, visibilityFilter]);
-    const [pageSize, setPageSize] = useTableRowsPerPage("technician-reports");
-    const { currentPage, setCurrentPage } = useTablePagination({
-        resetDependencies: [visibilityFilter, pageSize],
-    });
-    const totalItems = visibleReportCards.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const paginatedReportCards = visibleReportCards.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-    const loadData = useCallback(async () => {
+    const loadTechnician = useCallback(async () => {
         try {
-            const [reports, reportTechnicians, technicians, customers, devices] = await Promise.all([
-                listReports(),
-                listReportTechnicians(),
-                listTechnicians(),
-                listCustomers(),
-                listDevices(),
-            ]);
-
-            const technician = technicians.find((item) => item.id === technicianId);
-            if (technician) {
-                setTechnicianName(`${technician.firstName} ${technician.lastName ?? ""}`.trim());
-            }
-
-            const reportIdsForTechnician = new Set(
-                reportTechnicians.filter((item) => item.technicianId === technicianId).map((item) => item.reportId)
-            );
-
-            const customerById = new Map(customers.map((customer) => [customer.id, customer]));
-            const deviceById = new Map(devices.map((device) => [device.id, device]));
-
-            const cards = reports
-                .filter((report) => reportIdsForTechnician.has(report.id))
-                .map((report) => {
-                    const customer = customerById.get(report.customerId);
-                    const device = deviceById.get(report.deviceId);
-
-                    return {
-                        id: report.id,
-                        customerName: customer
-                            ? `${customer.firstName} ${customer.lastName ?? ""}`.trim()
-                            : "Cliente sconosciuto",
-                        deviceName: device?.name ?? "Dispositivo sconosciuto",
-                        closed: report.closed,
-                    };
-                });
-
-            setReportCards(cards);
+            setTechnician(await getTechnician(technicianId));
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare i report del tecnico"));
+            toast.error(getApiErrorMessage(error, "Impossibile caricare il tecnico"));
         }
     }, [technicianId]);
+
+    const handleRefresh = useCallback(async () => {
+        await Promise.all([loadTechnician(), reloadReports()]);
+    }, [loadTechnician, reloadReports]);
 
     useEffect(() => {
         if (!hasValidTechnicianId) {
@@ -167,24 +139,23 @@ const TechnicianPage = () => {
             return;
         }
 
-        // Solo il primo caricamento copre la pagina con lo spinner: l'aggiornamento manuale
-        // lascia i dati a schermo e segnala l'attesa nel pulsante.
+        // Si aspettano solo i dati del tecnico, che sono l'intestazione: la lista si carica da sé.
         void (async () => {
-            setIsLoading(true);
+            setIsTechnicianLoading(true);
             try {
-                await loadData();
+                await loadTechnician();
             } finally {
-                setIsLoading(false);
+                setIsTechnicianLoading(false);
             }
         })();
-    }, [hasValidTechnicianId, navigate, loadData]);
+    }, [hasValidTechnicianId, loadTechnician, navigate]);
 
-    if (isLoading) {
+    if (isTechnicianLoading) {
         return <LoadingPage />;
     }
 
     return (
-        <div className="flex h-full w-full flex-col gap-4">
+        <div className="flex h-full min-h-0 w-full flex-col gap-4">
             <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -194,140 +165,96 @@ const TechnicianPage = () => {
                     </TooltipTrigger>
                     <TooltipContent>Torna indietro</TooltipContent>
                 </Tooltip>
-                <h1 className="text-2xl font-bold">{technicianName}</h1>
-                <RefreshButton onRefresh={loadData} label="Aggiorna report del tecnico" className="ml-auto" />
+                <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{technicianName}</h1>
+                <RefreshButton
+                    onRefresh={handleRefresh}
+                    isRefreshing={areReportsLoading}
+                    label="Aggiorna i dati del tecnico"
+                    className="ml-auto"
+                />
             </div>
 
-            <p className="ml-12">Report del tecnico</p>
-            <div className="ml-12">
-                <Select
-                    value={visibilityFilter}
-                    onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
-                >
-                    <SelectTrigger className="w-full sm:w-56">
-                        <SelectValue placeholder="Filtra per stato" />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                        <SelectItem value="all">Tutti i report</SelectItem>
-                        <SelectItem value="open">Report aperti</SelectItem>
-                        <SelectItem value="closed">Report chiusi</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="sm:ml-12">
-                {visibleReportCards.length === 0 ? (
-                    <p className="text-muted-foreground">Nessun report associato a questo tecnico.</p>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                        <Table className="hidden bg-background sm:table">
-                            <TableHeader className="w-full">
-                                <TableRow>
-                                    <TableHead>Report</TableHead>
-                                    <TableHead>Cliente</TableHead>
-                                    <TableHead>Dispositivo</TableHead>
-                                    <TableHead>Stato</TableHead>
-                                    <TableHead className="text-right">Azioni</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paginatedReportCards.map((report) => (
-                                    <TableRow key={report.id} data-status-color={getStatusColor(report)}>
-                                        <TableCell>#{report.id}</TableCell>
-                                        <TableCell>{report.customerName}</TableCell>
-                                        <TableCell>{report.deviceName}</TableCell>
-                                        <TableCell>{report.closed ? "Chiuso" : "Aperto"}</TableCell>
-                                        <TableCell className="bg-background text-foreground">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <OpenEntityButton
-                                                    size="icon-lg"
-                                                    onClick={() => handleOpenReport(report.id)}
-                                                    aria-label={`Apri report ${report.id}`}
-                                                />
-                                                <TableActionButton
-                                                    variant="default"
-                                                    size="icon-lg"
-                                                    className="bg-primary/10 hover:bg-primary/20"
-                                                    onClick={() => handleOpenEditDialog(report.id)}
-                                                    aria-label={`Modifica report ${report.id}`}
-                                                >
-                                                    <Pencil className="size-5 text-primary" />
-                                                </TableActionButton>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                        {/* Mancava: la tabella qui sopra è nascosta sotto `sm` e al suo posto non
-                            c'era niente, quindi su mobile i report del tecnico non si vedevano
-                            affatto — restava solo il conteggio in fondo. */}
-                        <EntityCardList
-                            className="sm:hidden"
-                            columns={[
-                                { key: "id", header: "ID", render: (row: TechnicianReportCard) => row.id },
-                                {
-                                    key: "customerName",
-                                    header: "Cliente",
-                                    render: (row: TechnicianReportCard) => row.customerName,
-                                    cardSlot: "title",
-                                },
-                                {
-                                    key: "closed",
-                                    header: "Stato",
-                                    render: (row: TechnicianReportCard) => (row.closed ? "Chiuso" : "Aperto"),
-                                    cardSlot: "badge",
-                                },
-                                {
-                                    key: "deviceName",
-                                    header: "Dispositivo",
-                                    render: (row: TechnicianReportCard) => row.deviceName,
-                                    cardSlot: "wide",
-                                },
-                            ]}
-                            rows={paginatedReportCards}
-                            getRowKey={(row) => row.id}
-                            getStatusColor={getStatusColor}
-                            renderActions={(row) => (
-                                <>
-                                    <OpenEntityButton
-                                        size="icon-lg"
-                                        onClick={() => handleOpenReport(row.id)}
-                                        aria-label={`Apri report ${row.id}`}
-                                    />
-                                    <TableActionButton
-                                        variant="default"
-                                        size="icon-lg"
-                                        className="bg-primary/10 hover:bg-primary/20"
-                                        onClick={() => handleOpenEditDialog(row.id)}
-                                        aria-label={`Modifica report ${row.id}`}
-                                    >
-                                        <Pencil className="size-5 text-primary" />
-                                    </TableActionButton>
-                                </>
-                            )}
-                            emptyMessage="Nessun report associato a questo tecnico."
-                        />
-                        <TablePagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={totalItems}
-                            pageSize={pageSize}
-                            onPageChange={setCurrentPage}
-                            onPageSizeChange={setPageSize}
-                        />
-                    </div>
-                )}
+            {technician ? (
+                <Card className="gap-1">
+                    <CardHeader>
+                        <CardTitle className="text-primary">Dati del tecnico</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                        <DetailItem label="Telefono" value={technician.phoneNumber ?? "-"} />
+                        <DetailItem label="Partita IVA" value={technician.vatNumber ?? "-"} />
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-lg font-semibold">Report affidati</h2>
+                    <Select
+                        value={visibilityFilter}
+                        onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
+                    >
+                        <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
+                            <SelectValue placeholder="Filtra per stato" />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                            <SelectItem value="all">Tutti i report</SelectItem>
+                            <SelectItem value="open">Report aperti</SelectItem>
+                            <SelectItem value="closed">Report chiusi</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-auto">
+                    <EntityTable
+                        tableKey="technician-reports"
+                        columns={technicianReportColumns}
+                        rows={reports}
+                        getRowKey={(row) => row.id}
+                        emptyMessage="Nessun report associato a questo tecnico."
+                        renderRowActions={(row) => (
+                            <>
+                                <OpenEntityButton
+                                    size="icon-lg"
+                                    onClick={() => handleOpenReport(row.id)}
+                                    aria-label={`Apri report ${row.id}`}
+                                />
+                                <TableActionButton
+                                    variant="default"
+                                    size="icon-lg"
+                                    className="bg-primary/10 hover:bg-primary/20"
+                                    onClick={() => handleOpenEditDialog(row)}
+                                    aria-label={`Modifica report ${row.id}`}
+                                >
+                                    <Pencil className="size-5 text-primary" />
+                                </TableActionButton>
+                            </>
+                        )}
+                        getRowStatusColor={(row) => (row.closed ? "green" : "red")}
+                        onRowOpen={(row) => handleOpenReport(row.id)}
+                        isInitialLoading={areReportsInitialLoading}
+                        isRefetching={areReportsRefetching}
+                        skeletonRowCount={pageSize}
+                    />
+                </div>
+
+                <TablePagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                />
             </div>
 
             <EditReportDialog
                 open={isEditDialogOpen}
-                reportId={reportIdToEdit}
-                customerName={reportCustomerNameToEdit}
+                reportId={reportToEdit?.id ?? null}
+                customerName={reportToEdit?.customer ?? ""}
                 onOpenChange={(open) => {
                     setIsEditDialogOpen(open);
                     if (!open) {
-                        setReportIdToEdit(null);
-                        setReportCustomerNameToEdit("");
+                        setReportToEdit(null);
                     }
                 }}
                 onSubmit={handleEditReport}

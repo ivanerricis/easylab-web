@@ -1,4 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import DetailItem from "@/components/detail-item";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import EditInterventionDialog, {
@@ -9,10 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     getApiErrorMessage,
+    getCustomer,
     getIntervention,
     getInterventionPrintUrl,
     listCollaborators,
-    listCustomers,
     type InterventionEntityDto,
     updateIntervention,
 } from "@/lib/api";
@@ -47,13 +48,6 @@ const statusBadgeClass = (status: InterventionEntityDto["status"]) => {
     return "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
 };
 
-const DetailItem = ({ label, value }: { label: string; value: string }) => (
-    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
-        <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
-        <p className="mt-1 text-sm font-medium wrap-break-word">{value}</p>
-    </div>
-);
-
 const InterventionPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -81,13 +75,11 @@ const InterventionPage = () => {
     };
 
     const loadDetails = useCallback(async () => {
-        const [intervention, customers, collaborators] = await Promise.all([
-            getIntervention(interventionId),
-            listCustomers(),
-            listCollaborators(),
-        ]);
+        const [intervention, collaborators] = await Promise.all([getIntervention(interventionId), listCollaborators()]);
 
-        const customer = customers.find((item) => item.id === intervention.customerId);
+        // Per id e non dentro `listCustomers()`, che senza paginazione si ferma a 5000 righe:
+        // stesso motivo della pagina del report.
+        const customer = await getCustomer(intervention.customerId).catch(() => null);
         const collaborator = collaborators.find((item) => item.id === intervention.collaboratorId);
 
         setDetails({
@@ -220,8 +212,13 @@ const InterventionPage = () => {
                 </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <Card className="h-fit! gap-2! border-primary/20">
+            {/*
+                Sotto xl solo i due orari stanno affiancati: stato, tipo e data prendono la riga
+                intera, perché "In lavorazione" o "Intervento da remoto" in mezza card uscivano
+                dal bordo. Prima erano cinque card una per riga, circa 650px su mobile.
+            */}
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Stato</CardTitle>
                     </CardHeader>
@@ -234,7 +231,7 @@ const InterventionPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Tipo intervento</CardTitle>
                     </CardHeader>
@@ -243,7 +240,7 @@ const InterventionPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Data intervento</CardTitle>
                     </CardHeader>
@@ -252,7 +249,7 @@ const InterventionPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Ora inizio</CardTitle>
                     </CardHeader>
@@ -263,7 +260,7 @@ const InterventionPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Ora fine</CardTitle>
                     </CardHeader>
@@ -284,7 +281,6 @@ const InterventionPage = () => {
                         <DetailItem label="Cliente" value={details.customerName} />
                         <DetailItem label="Telefono" value={details.customerPhone ?? "-"} />
                         <DetailItem label="Collaboratore" value={details.collaboratorName} />
-                        <DetailItem label="Stato" value={formatInterventionStatus(details.intervention.status)} />
                     </CardContent>
                 </Card>
 

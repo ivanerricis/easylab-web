@@ -5,6 +5,13 @@ import type { NewReportTechnician, UpdateReportTechnician } from "../types";
 
 export const listReportTechnicians = () => db.select().from(reportTechnicianTable);
 
+/**
+ * Il tecnico di un solo report. `report_id` è l'intera chiave primaria (migration 0004), quindi
+ * torna al più una riga.
+ */
+export const getReportTechnicianByReportId = (reportId: number) =>
+    db.select().from(reportTechnicianTable).where(eq(reportTechnicianTable.reportId, reportId));
+
 export const getReportTechnicianByIds = (reportId: number, technicianId: number) =>
     db
         .select()

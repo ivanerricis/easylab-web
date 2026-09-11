@@ -66,6 +66,10 @@ export type ListReportsParams = {
     dateTo?: string;
     /** Solo i report di quel collaboratore: lo usa la sua scheda. */
     collaboratorId?: number;
+    /** Solo i report di quel cliente: lo usa la sua scheda. */
+    customerId?: number;
+    /** Solo i report affidati a quel tecnico esterno: lo usa la sua scheda. */
+    technicianId?: number;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
     /**
@@ -93,6 +97,8 @@ export async function listReports(params?: ListReportsParams) {
             dateFrom: params.dateFrom,
             dateTo: params.dateTo,
             collaboratorId: params.collaboratorId,
+            customerId: params.customerId,
+            technicianId: params.technicianId,
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },
@@ -107,7 +113,16 @@ export async function listReports(params?: ListReportsParams) {
     };
 }
 
-export const getReport = async (id: number) => (await api.get<ReportEntityDto>(`/reports/${id}`)).data;
+/**
+ * Il report singolo, con il suo tecnico esterno: `technicianId` è null e `technicianPrice` 0
+ * se non ce l'ha. Solo `GET /reports/:id` li restituisce, per questo il tipo è a parte.
+ */
+export type ReportDetailDto = ReportEntityDto & {
+    technicianId: number | null;
+    technicianPrice: number;
+};
+
+export const getReport = async (id: number) => (await api.get<ReportDetailDto>(`/reports/${id}`)).data;
 
 export const createReport = async (payload: ReportCreateInput) =>
     (await api.post<ReportEntityDto>("/reports", payload)).data;

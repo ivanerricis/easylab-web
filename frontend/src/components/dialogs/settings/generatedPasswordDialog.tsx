@@ -1,5 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import CopyableValue from "@/components/dialogs/settings/copyableValue";
+import { Check } from "lucide-react";
 
 type Props = {
     open: boolean;
@@ -16,6 +17,7 @@ const GeneratedPasswordDialog = ({ open, onOpenChange, username, password }: Pro
         description={`Questa password per "${username}" viene mostrata una sola volta: copiala ora e conservala in un posto sicuro. Al primo accesso verrà chiesto di impostarne una nuova.`}
         showCancelButton={false}
         confirmLabel="Ho copiato la password, chiudi"
+        confirmIcon={Check}
         onConfirm={() => onOpenChange(false)}
         preventOutsideClose
         content={

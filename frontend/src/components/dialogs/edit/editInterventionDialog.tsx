@@ -20,6 +20,7 @@ import {
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Save } from "lucide-react";
 
 const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
 
@@ -182,10 +183,11 @@ const EditInterventionDialog = ({
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
-            title="Modifica intervento"
+            title={interventionId ? `Modifica intervento #${interventionId}` : "Modifica intervento"}
             contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
             preventOutsideClose
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+            confirmIcon={Save}
             cancelLabel="Annulla"
             onCancel={() => onOpenChange(false)}
             onConfirm={() => void handleConfirm()}
@@ -332,6 +334,7 @@ const EditInterventionDialog = ({
                                                 </Label>
                                                 <Input
                                                     {...fieldProps("startTime", { error: errors.startTime })}
+                                                    className="text-lg!"
                                                     type="time"
                                                     value={formValues.startTime}
                                                     onChange={(event) => {
@@ -351,6 +354,7 @@ const EditInterventionDialog = ({
                                                 </Label>
                                                 <Input
                                                     {...fieldProps("endTime", { error: errors.endTime })}
+                                                    className="text-lg!"
                                                     type="time"
                                                     value={formValues.endTime}
                                                     onChange={(event) => {

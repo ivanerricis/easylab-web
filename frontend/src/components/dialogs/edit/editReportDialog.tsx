@@ -7,21 +7,51 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import PaymentMethodSelector from "@/components/payment-method-selector";
-import {
-    getApiErrorMessage,
-    getReport,
-    listCollaborators,
-    listDevices,
-    listIssues,
-    listReportTechnicians,
-    listTechnicians,
-} from "@/lib/api";
+import { getApiErrorMessage, getReport, listCollaborators, listDevices, listIssues, listTechnicians } from "@/lib/api";
 import { isCatchAllIssue } from "@/lib/issues";
+import { cn } from "@/lib/utils";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { toast } from "sonner";
+import { Save } from "lucide-react";
 
 const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
+
+/**
+ * Un riquadro del dialogo. `content-start` tiene i campi in alto quando la sezione si allunga
+ * per pareggiare le vicine nella riga in fondo: senza, la griglia distribuirebbe lo spazio in
+ * più fra le righe e i campi finirebbero sparsi.
+ */
+const FormSection = ({ title, className, children }: { title: string; className?: string; children: ReactNode }) => (
+    <section className={cn("grid content-start gap-3 rounded-md border border-primary/15 bg-muted/20 p-4", className)}>
+        <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
+        {children}
+    </section>
+);
+
+/** Un campo prezzo con il simbolo dell'euro davanti: prima era un numero nudo. */
+const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
+    <div className="relative">
+        <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-lg text-muted-foreground"
+        >
+            €
+        </span>
+        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
+    </div>
+);
+
+/**
+ * Le spunte di stato, nell'ordine in cui contano: le due dell'accettazione (le stesse del dialogo
+ * di creazione), poi le due della riconsegna.
+ */
+const statusOptions = [
+    { id: "charger", label: "Alimentatore presente" },
+    { id: "dataBackup", label: "Backup dati" },
+    { id: "alerted", label: "Avvisato" },
+    { id: "closed", label: "Report chiuso" },
+] as const;
 
 type EditReportDialogProps = {
     open: boolean;
@@ -64,9 +94,9 @@ type FieldErrors = Partial<
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 const fieldOrder = [
     "deviceId",
+    "collaboratorId",
     "issueId",
     "issueDescription",
-    "collaboratorId",
     "technicianPrice",
     "internalPrice",
 ] as const;
@@ -114,30 +144,28 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const [report, devicesData, issuesData, collaboratorsData, techniciansData, reportTechnicians] =
-                    await Promise.all([
-                        getReport(reportId),
-                        listDevices(),
-                        listIssues(),
-                        listCollaborators(),
-                        listTechnicians(),
-                        listReportTechnicians(),
-                    ]);
-
-                const reportTechnician = reportTechnicians.find((item) => item.reportId === report.id) ?? null;
+                // Il tecnico arriva con il report. Prima si scaricava l'intera tabella
+                // report-tecnico (376 KB con 8000 righe, e cresce con l'archivio) per trovarne una.
+                const [report, devicesData, issuesData, collaboratorsData, techniciansData] = await Promise.all([
+                    getReport(reportId),
+                    listDevices(),
+                    listIssues(),
+                    listCollaborators(),
+                    listTechnicians(),
+                ]);
 
                 setDevices(devicesData);
                 setIssues(issuesData);
                 setCollaborators(collaboratorsData);
                 setTechnicians(techniciansData);
-                setExistingTechnicianId(reportTechnician?.technicianId ?? null);
+                setExistingTechnicianId(report.technicianId);
                 setFormValues({
                     customerId: String(report.customerId),
                     deviceId: String(report.deviceId),
                     issueId: String(report.issueId),
                     collaboratorId: report.collaboratorId ? String(report.collaboratorId) : "none",
-                    technicianId: reportTechnician ? String(reportTechnician.technicianId) : "none",
-                    technicianPrice: String(reportTechnician?.price ?? 0),
+                    technicianId: report.technicianId != null ? String(report.technicianId) : "none",
+                    technicianPrice: String(report.technicianPrice),
                     issueDescription: report.issueDescription ?? "",
                     serviceDescription: report.serviceDescription ?? "",
                     note: report.note ?? "",
@@ -266,10 +294,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
-            title="Modifica report"
-            contentClassName="sm:max-w-4xl lg:max-w-6xl xl:max-w-[88rem]"
+            title={reportId ? `Modifica report #${reportId}` : "Modifica report"}
+            contentClassName="sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
             preventOutsideClose
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+            confirmIcon={Save}
             cancelLabel="Annulla"
             onCancel={() => onOpenChange(false)}
             onConfirm={() => void handleConfirm()}
@@ -282,15 +311,18 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                             Caricamento dati del report...
                         </div>
                     ) : (
-                        <div className="grid max-h-[70vh] gap-2 overflow-y-auto pr-1">
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                        Anagrafica
-                                    </h3>
-                                </div>
-
-                                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+                        // L'altezza segue lo schermo invece di un 70vh fisso: intestazione e
+                        // pulsanti occupano sempre gli stessi pixel, e su un monitor alto il
+                        // modulo sta tutto senza barra di scorrimento. Su mobile i pulsanti
+                        // vanno uno sotto l'altro, quindi resta un po' più di margine.
+                        <div className="grid max-h-[calc(100dvh-15rem)] gap-4 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
+                            <FormSection title="Anagrafica">
+                                {/*
+                                    `items-start` in tutte le griglie di campi: quando un campo
+                                    mostra l'errore sotto di sé la riga si allunga, e senza le celle
+                                    vicine si stiravano con lei spingendo in giù le etichette.
+                                */}
+                                <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     <div className="grid gap-1">
                                         <Label htmlFor="customerId" className="text-lg">
                                             Cliente
@@ -334,61 +366,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         <FieldError id="deviceId" error={errors.deviceId} />
                                     </div>
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="issueId" className="text-lg">
-                                            Difetto catalogo
-                                        </Label>
-                                        <Select
-                                            value={formValues.issueId}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, issueId: value }));
-                                                setErrors((prev) => ({ ...prev, issueId: undefined }));
-                                            }}
-                                        >
-                                            <SelectTrigger
-                                                id="issueId"
-                                                {...fieldErrorAria("issueId", errors.issueId)}
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Seleziona difetto" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {issues.map((issue) => (
-                                                    <SelectItem key={issue.id} value={String(issue.id)}>
-                                                        {issue.description}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FieldError id="issueId" error={errors.issueId} />
-                                    </div>
-
-                                    {needsProblemText ? (
-                                        <div className="grid gap-1 lg:col-span-2 xl:col-span-4">
-                                            <Label htmlFor="issueDescription" className="text-lg">
-                                                Problema riscontrato
-                                            </Label>
-                                            <Textarea
-                                                {...fieldProps("issueDescription", {
-                                                    error: errors.issueDescription,
-                                                })}
-                                                className="text-lg!"
-                                                placeholder="Quello che il cliente legge sulla ricevuta"
-                                                maxLength={255}
-                                                value={formValues.issueDescription}
-                                                onChange={(event) => {
-                                                    setFormValues((prev) => ({
-                                                        ...prev,
-                                                        issueDescription: event.target.value,
-                                                    }));
-                                                    setErrors((prev) => ({ ...prev, issueDescription: undefined }));
-                                                }}
-                                            />
-                                            <FieldError id="issueDescription" error={errors.issueDescription} />
-                                        </div>
-                                    ) : null}
-
-                                    <div className="grid gap-1">
+                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
                                         <Label htmlFor="collaboratorId" className="text-lg">
                                             Collaboratore
                                         </Label>
@@ -421,72 +399,132 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         <FieldError id="collaboratorId" error={errors.collaboratorId} />
                                     </div>
                                 </div>
-                            </section>
+                            </FormSection>
 
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                        Intervento
-                                    </h3>
-                                </div>
-
-                                <div className="grid gap-4">
-                                    <div className="grid gap-4 lg:grid-cols-2">
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="serviceDescription" className="text-lg">
-                                                Descrizione intervento
-                                            </Label>
-                                            <Textarea
-                                                id="serviceDescription"
-                                                className="resize-none text-lg!"
-                                                placeholder="Descrivi l'intervento"
-                                                rows={4}
-                                                value={formValues.serviceDescription}
-                                                onChange={(event) =>
-                                                    setFormValues((prev) => ({
-                                                        ...prev,
-                                                        serviceDescription: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                        </div>
-
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="note" className="text-lg">
-                                                Note
-                                            </Label>
-                                            <Textarea
-                                                id="note"
-                                                className="resize-none text-lg!"
-                                                placeholder="Note"
-                                                rows={4}
-                                                value={formValues.note}
-                                                onChange={(event) =>
-                                                    setFormValues((prev) => ({ ...prev, note: event.target.value }))
-                                                }
-                                            />
-                                        </div>
+                            <FormSection title="Intervento">
+                                <div className="grid items-start gap-4 sm:grid-cols-2">
+                                    {/*
+                                        Il difetto ha almeno mezza riga e non un quarto: è la voce
+                                        con il testo più lungo del modulo, e in un quarto di riga le
+                                        descrizioni del catalogo arrivavano troncate. Sotto lg anche
+                                        mezza riga non basta, quindi lì la prende tutta (e la
+                                        password con lui, per non lasciare mezza riga vuota).
+                                    */}
+                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
+                                        <Label htmlFor="issueId" className="text-lg">
+                                            Difetto catalogo
+                                        </Label>
+                                        <Select
+                                            value={formValues.issueId}
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, issueId: value }));
+                                                setErrors((prev) => ({ ...prev, issueId: undefined }));
+                                            }}
+                                        >
+                                            <SelectTrigger
+                                                id="issueId"
+                                                {...fieldErrorAria("issueId", errors.issueId)}
+                                                className="w-full"
+                                            >
+                                                <SelectValue placeholder="Seleziona difetto" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {issues.map((issue) => (
+                                                    <SelectItem key={issue.id} value={String(issue.id)}>
+                                                        {issue.description}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="issueId" error={errors.issueId} />
                                     </div>
 
-                                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="password" className="text-lg">
-                                                Password sblocco
-                                            </Label>
-                                            <Input
-                                                id="password"
-                                                className="text-lg!"
-                                                placeholder="Password dispositivo"
-                                                value={formValues.password}
-                                                onChange={(event) =>
-                                                    setFormValues((prev) => ({ ...prev, password: event.target.value }))
-                                                }
-                                            />
-                                        </div>
+                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
+                                        <Label htmlFor="password" className="text-lg">
+                                            Password sblocco
+                                        </Label>
+                                        <Input
+                                            id="password"
+                                            className="text-lg!"
+                                            placeholder="Password dispositivo"
+                                            value={formValues.password}
+                                            onChange={(event) =>
+                                                setFormValues((prev) => ({ ...prev, password: event.target.value }))
+                                            }
+                                        />
+                                    </div>
 
+                                    {needsProblemText ? (
+                                        <div className="grid gap-1 sm:col-span-2">
+                                            <Label htmlFor="issueDescription" className="text-lg">
+                                                Problema riscontrato
+                                            </Label>
+                                            <Textarea
+                                                {...fieldProps("issueDescription", {
+                                                    error: errors.issueDescription,
+                                                })}
+                                                className="text-lg!"
+                                                placeholder="Quello che il cliente legge sulla ricevuta"
+                                                maxLength={255}
+                                                value={formValues.issueDescription}
+                                                onChange={(event) => {
+                                                    setFormValues((prev) => ({
+                                                        ...prev,
+                                                        issueDescription: event.target.value,
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, issueDescription: undefined }));
+                                                }}
+                                            />
+                                            <FieldError id="issueDescription" error={errors.issueDescription} />
+                                        </div>
+                                    ) : null}
+
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="serviceDescription" className="text-lg">
+                                            Descrizione intervento
+                                        </Label>
+                                        <Textarea
+                                            id="serviceDescription"
+                                            className="min-h-24 resize-none text-lg!"
+                                            placeholder="Descrivi l'intervento"
+                                            value={formValues.serviceDescription}
+                                            onChange={(event) =>
+                                                setFormValues((prev) => ({
+                                                    ...prev,
+                                                    serviceDescription: event.target.value,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="note" className="text-lg">
+                                            Note
+                                        </Label>
+                                        <Textarea
+                                            id="note"
+                                            className="min-h-24 resize-none text-lg!"
+                                            placeholder="Note"
+                                            value={formValues.note}
+                                            onChange={(event) =>
+                                                setFormValues((prev) => ({ ...prev, note: event.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            </FormSection>
+
+                            {/*
+                                Tre riquadri affiancati da lg in su, alti uguali: dentro, i campi
+                                tornano uno sotto l'altro perché la colonna è stretta. Sotto lg i
+                                riquadri si impilano e i campi si rimettono in riga.
+                            */}
+                            <div className="grid gap-4 lg:grid-cols-3">
+                                <FormSection title="Tecnico esterno">
+                                    <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-1">
                                         <div className="grid gap-1">
                                             <Label htmlFor="technicianId" className="text-lg">
-                                                Tecnico esterno
+                                                Tecnico
                                             </Label>
                                             <Select
                                                 value={formValues.technicianId}
@@ -515,12 +553,8 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                             <Label htmlFor="technicianPrice" className="text-lg">
                                                 Prezzo lavoro tecnico
                                             </Label>
-                                            <Input
+                                            <EuroInput
                                                 {...fieldProps("technicianPrice", { error: errors.technicianPrice })}
-                                                className="text-lg!"
-                                                type="number"
-                                                min={0}
-                                                step={1}
                                                 value={formValues.technicianPrice}
                                                 onChange={(event) => {
                                                     setFormValues((prev) => ({
@@ -532,116 +566,74 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                             />
                                             <FieldError id="technicianPrice" error={errors.technicianPrice} />
                                         </div>
-
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="internalPrice" className="text-lg">
-                                                Prezzo interno
-                                            </Label>
-                                            <Input
-                                                {...fieldProps("internalPrice", { error: errors.internalPrice })}
-                                                className="text-lg!"
-                                                type="number"
-                                                min={0}
-                                                step={1}
-                                                value={formValues.internalPrice}
-                                                onChange={(event) => {
-                                                    setFormValues((prev) => ({
-                                                        ...prev,
-                                                        internalPrice: event.target.value,
-                                                    }));
-                                                    setErrors((prev) => ({ ...prev, internalPrice: undefined }));
-                                                }}
-                                            />
-                                            <FieldError id="internalPrice" error={errors.internalPrice} />
-                                        </div>
                                     </div>
-                                </div>
-                            </section>
+                                </FormSection>
 
-                            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-                                <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                            Stato
-                                        </h3>
+                                {/*
+                                    Prezzo e metodo stanno nello stesso riquadro perché dipendono
+                                    l'uno dall'altro: "Non pagato" riporta il prezzo a zero, e con
+                                    contanti o carta il prezzo non può restare a zero.
+                                */}
+                                <FormSection title="Pagamento">
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="internalPrice" className="text-lg">
+                                            Prezzo interno
+                                        </Label>
+                                        <EuroInput
+                                            {...fieldProps("internalPrice", { error: errors.internalPrice })}
+                                            value={formValues.internalPrice}
+                                            onChange={(event) => {
+                                                setFormValues((prev) => ({
+                                                    ...prev,
+                                                    internalPrice: event.target.value,
+                                                }));
+                                                setErrors((prev) => ({ ...prev, internalPrice: undefined }));
+                                            }}
+                                        />
+                                        <FieldError id="internalPrice" error={errors.internalPrice} />
                                     </div>
-
-                                    <div className="grid gap-3 lg:grid-cols-2">
-                                        <div className="flex w-full items-center gap-3 rounded-md border border-primary/15 bg-background px-3 py-2">
-                                            <Checkbox
-                                                id="charger"
-                                                className="size-5"
-                                                checked={formValues.charger}
-                                                onCheckedChange={(checked) =>
-                                                    setFormValues((prev) => ({ ...prev, charger: checked === true }))
-                                                }
-                                            />
-                                            <Label htmlFor="charger" className="w-full cursor-pointer text-lg">
-                                                Alimentatore presente
-                                            </Label>
-                                        </div>
-
-                                        <div className="flex w-full items-center gap-3 rounded-md border border-primary/15 bg-background px-3 py-2">
-                                            <Checkbox
-                                                id="alerted"
-                                                className="size-5"
-                                                checked={formValues.alerted}
-                                                onCheckedChange={(checked) =>
-                                                    setFormValues((prev) => ({ ...prev, alerted: checked === true }))
-                                                }
-                                            />
-                                            <Label htmlFor="alerted" className="w-full cursor-pointer text-lg">
-                                                Avvisato
-                                            </Label>
-                                        </div>
-
-                                        <div className="flex w-full items-center gap-3 rounded-md border border-primary/15 bg-background px-3 py-2">
-                                            <Checkbox
-                                                id="dataBackup"
-                                                className="size-5"
-                                                checked={formValues.dataBackup}
-                                                onCheckedChange={(checked) =>
-                                                    setFormValues((prev) => ({ ...prev, dataBackup: checked === true }))
-                                                }
-                                            />
-                                            <Label htmlFor="dataBackup" className="w-full cursor-pointer text-lg">
-                                                Backup dati
-                                            </Label>
-                                        </div>
-
-                                        <div className="flex w-full items-center gap-3 rounded-md border border-primary/15 bg-background px-3 py-2">
-                                            <Checkbox
-                                                id="closed"
-                                                className="size-5"
-                                                checked={formValues.closed}
-                                                onCheckedChange={(checked) =>
-                                                    setFormValues((prev) => ({ ...prev, closed: checked === true }))
-                                                }
-                                            />
-                                            <Label htmlFor="closed" className="w-full cursor-pointer text-lg">
-                                                Report chiuso
-                                            </Label>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                    <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                        Pagamento
-                                    </h3>
 
                                     <PaymentMethodSelector
                                         value={formValues.paymentMethod}
-                                        onValueChange={(paymentMethod) =>
+                                        onValueChange={(paymentMethod) => {
                                             setFormValues((prev) => ({
                                                 ...prev,
                                                 paymentMethod,
                                                 internalPrice: paymentMethod === "non_paid" ? "0" : prev.internalPrice,
-                                            }))
-                                        }
-                                        className="grid-cols-1"
+                                            }));
+                                            setErrors((prev) => ({ ...prev, internalPrice: undefined }));
+                                        }}
+                                        className="lg:grid-cols-1"
                                     />
-                                </section>
+                                </FormSection>
+
+                                <FormSection title="Stato">
+                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                                        {statusOptions.map((option) => (
+                                            // Tutto il riquadro è l'etichetta, quindi tutto il
+                                            // riquadro è cliccabile: prima lo era solo la scritta,
+                                            // e un clic sul bordo interno andava a vuoto.
+                                            <Label
+                                                key={option.id}
+                                                htmlFor={option.id}
+                                                className="w-full cursor-pointer gap-3 rounded-md border border-primary/15 bg-background px-3 py-2.5 text-lg transition-colors hover:bg-muted/60 has-[[aria-checked=true]]:border-primary/50 has-[[aria-checked=true]]:bg-primary/5"
+                                            >
+                                                <Checkbox
+                                                    id={option.id}
+                                                    className="size-5"
+                                                    checked={formValues[option.id]}
+                                                    onCheckedChange={(checked) =>
+                                                        setFormValues((prev) => ({
+                                                            ...prev,
+                                                            [option.id]: checked === true,
+                                                        }))
+                                                    }
+                                                />
+                                                {option.label}
+                                            </Label>
+                                        ))}
+                                    </div>
+                                </FormSection>
                             </div>
                         </div>
                     )}

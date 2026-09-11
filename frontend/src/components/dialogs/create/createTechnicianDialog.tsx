@@ -6,6 +6,7 @@ import { getApiErrorMessage } from "@/lib/api";
 import type { TechnicianDto } from "@/types/dtos";
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Save } from "lucide-react";
 
 /** I valori che questo dialogo consegna a chi lo apre. */
 export type TechnicianSubmitValues = {
@@ -108,6 +109,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                     : "Inserisci i dati del tecnico e conferma per salvare."
             }
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+            confirmIcon={Save}
             cancelLabel="Annulla"
             onCancel={() => onOpenChange(false)}
             onConfirm={() => void handleConfirm()}

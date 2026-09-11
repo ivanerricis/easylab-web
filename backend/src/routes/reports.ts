@@ -9,6 +9,7 @@ import {
     listReports,
     updateReportById,
 } from "../db/queries/report";
+import { getReportTechnicianByReportId } from "../db/queries/reportTechnician";
 import { db } from "../db";
 import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTable } from "../db/schema";
 import { createReportPdfBuffer } from "../services/reportPdf";
@@ -36,6 +37,11 @@ const reportListQuerySchema = listQuerySchema.extend({
     // prime cinquemila righe della tabella e le filtrava nel browser — cioè ne mostrava
     // una parte, senza dirlo.
     collaboratorId: z.coerce.number().int().positive().optional(),
+    // Stesso motivo, per le schede del cliente e del tecnico esterno: filtravano nel
+    // browser le prime cinquemila righe, e un cliente i cui report stavano oltre risultava
+    // "senza report".
+    customerId: z.coerce.number().int().positive().optional(),
+    technicianId: z.coerce.number().int().positive().optional(),
     sortBy: z.enum(reportSortFields).optional(),
 });
 
@@ -76,18 +82,31 @@ const reportUpdateBodySchema = reportBodySchema.partial().refine((value) => Obje
 });
 
 reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, res) => {
-    const { page, pageSize, search, visibility, dateFrom, dateTo, collaboratorId, sortBy, sortOrder } =
-        req.query as unknown as {
-            page?: number;
-            pageSize?: number;
-            search?: string;
-            visibility?: "all" | "open" | "closed";
-            dateFrom?: string;
-            dateTo?: string;
-            collaboratorId?: number;
-            sortBy?: (typeof reportSortFields)[number];
-            sortOrder?: "asc" | "desc";
-        };
+    const {
+        page,
+        pageSize,
+        search,
+        visibility,
+        dateFrom,
+        dateTo,
+        collaboratorId,
+        customerId,
+        technicianId,
+        sortBy,
+        sortOrder,
+    } = req.query as unknown as {
+        page?: number;
+        pageSize?: number;
+        search?: string;
+        visibility?: "all" | "open" | "closed";
+        dateFrom?: string;
+        dateTo?: string;
+        collaboratorId?: number;
+        customerId?: number;
+        technicianId?: number;
+        sortBy?: (typeof reportSortFields)[number];
+        sortOrder?: "asc" | "desc";
+    };
 
     const reports = await listReports({
         page,
@@ -97,6 +116,8 @@ reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, r
         dateFrom,
         dateTo,
         collaboratorId,
+        customerId,
+        technicianId,
         sortBy,
         sortOrder,
     });
@@ -194,16 +215,28 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
     res.send(pdfBuffer);
 });
 
+/**
+ * Il report con il suo tecnico esterno e il compenso (`technicianId` null e `technicianPrice` 0
+ * se non ce l'ha).
+ *
+ * Il tecnico viaggia con il report perché chi apre un report lo vuole sempre: prima il dialogo
+ * di modifica e la pagina di dettaglio lo cercavano scaricando l'intera `report_technician`
+ * (8000 righe, 376 KB sul database di sviluppo) per usarne una, a ogni apertura.
+ */
 reportsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
-    const report = await getReportById(id);
+    const [report, reportTechnician] = await Promise.all([getReportById(id), getReportTechnicianByReportId(id)]);
 
     if (report.length === 0) {
         res.status(404).json({ message: "Report not found" });
         return;
     }
 
-    res.json(report[0]);
+    res.json({
+        ...report[0],
+        technicianId: reportTechnician[0]?.technicianId ?? null,
+        technicianPrice: reportTechnician[0]?.price ?? 0,
+    });
 });
 
 reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, res) => {

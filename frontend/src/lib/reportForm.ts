@@ -1,7 +1,7 @@
 import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import { listCustomers, listDevices, listIssues } from "@/lib/api";
-import { resolveSelectedCustomer } from "@/lib/customers";
+import { listDevices, listIssues } from "@/lib/api";
+import { resolveCustomerId } from "@/lib/customerLookup";
 
 export type ResolvedReportReferences = {
     customerId: number;
@@ -24,20 +24,10 @@ export type ResolvedReportReferences = {
  * Adesso le voci di catalogo si creano solo di proposito, col pulsante "+" accanto al campo.
  */
 export const resolveReportReferences = async (values: CreateReportSubmitValues): Promise<ResolvedReportReferences> => {
-    let customerId = values.customerId;
+    // Il cliente si cerca sul server, non dentro l'elenco intero: vedi `findCustomerByText`.
+    const customerId = await resolveCustomerId(values.customerId, values.customer);
     let deviceId = values.deviceId;
     let issueId = values.issueId;
-
-    if (customerId == null) {
-        const customers = await listCustomers();
-        const selectedCustomer = resolveSelectedCustomer(customers, values.customer);
-
-        if (!selectedCustomer) {
-            throw new Error("Seleziona un cliente esistente o creane uno nuovo.");
-        }
-
-        customerId = selectedCustomer.id;
-    }
 
     if (deviceId == null) {
         const devices = await listDevices();

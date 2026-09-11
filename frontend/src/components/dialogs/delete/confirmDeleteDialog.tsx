@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Trash } from "lucide-react";
 
 const deleteConfirmKeyword = "ELIMINA";
 
@@ -49,6 +50,7 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
                 </div>
             }
             confirmLabel={isDeleting ? "Eliminazione..." : "Elimina"}
+            confirmIcon={Trash}
             cancelLabel="Annulla"
             onCancel={() => onOpenChange(false)}
             onConfirm={() => void onConfirm()}

@@ -34,13 +34,15 @@ const paymentMethodOptions: PaymentMethodOption[] = [
 ];
 
 const PaymentMethodSelector = ({ value, onValueChange, className, orientation = "horizontal" }: Props) => {
+    // Una griglia vera, non `flex flex-wrap`: con il flex le classi `grid-cols-*` non facevano
+    // nulla, e le tre voci andavano a capo come capitava, larghe ciascuna quanto la propria scritta.
     const layoutClassName = orientation === "vertical" ? "grid-cols-1" : "md:grid-cols-3";
 
     return (
         <div
             role="radiogroup"
             aria-label="Metodo di pagamento"
-            className={cn("flex flex-wrap gap-2", layoutClassName, className)}
+            className={cn("grid gap-2", layoutClassName, className)}
         >
             {paymentMethodOptions.map((option) => {
                 const isSelected = value === option.value;
@@ -66,7 +68,7 @@ const PaymentMethodSelector = ({ value, onValueChange, className, orientation = 
                         />
 
                         <span className="flex flex-col gap-0.5">
-                            <span className="font-medium text-foreground">{option.label}</span>
+                            <span className="text-base font-medium text-foreground">{option.label}</span>
                         </span>
 
                         <span

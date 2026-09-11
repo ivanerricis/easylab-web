@@ -49,6 +49,8 @@ export type ListInterventionsParams = {
     scheduledTo?: string;
     /** Solo gli interventi assegnati a quel collaboratore: lo usa la sua scheda. */
     collaboratorId?: number;
+    /** Solo gli interventi di quel cliente: lo usa la sua pagina degli interventi. */
+    customerId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
     /**
@@ -80,6 +82,7 @@ export async function listInterventions(params?: ListInterventionsParams) {
             scheduledFrom: params.scheduledFrom,
             scheduledTo: params.scheduledTo,
             collaboratorId: params.collaboratorId,
+            customerId: params.customerId,
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },

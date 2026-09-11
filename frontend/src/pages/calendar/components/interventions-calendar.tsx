@@ -10,6 +10,7 @@ import { addDays, endOfMonth, endOfWeek, format, getDay, parse, startOfMonth, st
 import { it } from "date-fns/locale";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+    type AgendaTimeProps,
     Calendar,
     dateFnsLocalizer,
     type EventPropGetter,
@@ -60,7 +61,33 @@ const statusEventStyle: Record<InterventionStatus, { backgroundColor: string; co
     programmato: { backgroundColor: "var(--color-red-500)", color: "#fff" },
 };
 
-const components = { event: CalendarEventPopover };
+/**
+ * L'orario nella vista agenda. Le consegne materiale non hanno un orario, e la libreria
+ * scriveva "tutto il giorno" su ognuna: su un elenco fatto quasi solo di consegne era la
+ * stessa scritta ripetuta a ogni riga, in una colonna che su mobile toglieva spazio al nome.
+ * Il trattino dice lo stesso ("nessun orario") e lo dice anche agli screen reader.
+ *
+ * Gli orari sono due blocchi che non si spezzano: su mobile la cella va a capo (vedi
+ * `calendar-theme.css`) e senza questa divisione il trattino finiva da solo su una riga.
+ */
+const AgendaTime = ({ event, label }: AgendaTimeProps) => {
+    if (event.allDay) {
+        return <span aria-label="Senza orario">—</span>;
+    }
+
+    if (!event.start || !event.end) {
+        return <>{label}</>;
+    }
+
+    return (
+        <span className="inline-flex flex-wrap gap-x-1">
+            <span className="whitespace-nowrap">{format(event.start, "HH:mm")}</span>
+            <span className="whitespace-nowrap">– {format(event.end, "HH:mm")}</span>
+        </span>
+    );
+};
+
+const components = { event: CalendarEventPopover, agenda: { time: AgendaTime } };
 
 /**
  * Giorni effettivamente disegnati dalla vista corrente, che non coincidono con il mese di

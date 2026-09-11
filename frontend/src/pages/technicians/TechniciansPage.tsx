@@ -20,8 +20,8 @@ const TechniciansPage = () => {
 
     return (
         <SimpleEntityPage<TechnicianDto, TechnicianSubmitValues>
-            title="Tecnici"
-            description="Gestisci i tecnici del laboratorio."
+            title="Tecnici esterni"
+            description="Gestisci i tecnici esterni a cui il laboratorio affida i lavori."
             createLabel="Crea nuovo tecnico"
             searchPlaceholder="Cerca tecnico..."
             entityLabel="tecnico"

@@ -14,6 +14,10 @@ vi.mock("../db/queries/report", () => ({
     getReportStats: vi.fn(),
 }));
 
+vi.mock("../db/queries/reportTechnician", () => ({
+    getReportTechnicianByReportId: vi.fn(),
+}));
+
 // `/:id/print` interroga `db` direttamente (join su cliente, dispositivo, difetto e prezzo
 // tecnico), senza passare dal query layer: va mockato a parte con un costruttore
 // concatenabile, come già fa `authManager.test.ts` per lo stesso motivo.
@@ -54,6 +58,7 @@ import {
     listReports,
     updateReportById,
 } from "../db/queries/report";
+import { getReportTechnicianByReportId } from "../db/queries/reportTechnician";
 import { db } from "../db";
 import { getLabConfig } from "../config/lab";
 import { createReportPdfBuffer } from "../services/reportPdf";
@@ -265,6 +270,7 @@ describe("reports router", () => {
     describe("GET /:id", () => {
         it("risponde 404 quando il report non esiste", async () => {
             vi.mocked(getReportById).mockResolvedValue([] as never);
+            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/reports/999");
 
@@ -272,13 +278,34 @@ describe("reports router", () => {
             expect(response.body.message).toBe("Report not found");
         });
 
-        it("restituisce il report trovato", async () => {
+        it("restituisce il report trovato, senza tecnico", async () => {
             vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/reports/1");
 
             expect(response.status).toBe(200);
             expect(response.body.id).toBe(1);
+            expect(response.body).toMatchObject({ technicianId: null, technicianPrice: 0 });
+        });
+
+        /**
+         * Il tecnico viaggia con il report: è ciò che permette al dialogo di modifica e alla
+         * pagina di dettaglio di non scaricare l'intera tabella report-tecnico per usarne una
+         * riga. Se il campo sparisse, il dialogo mostrerebbe "Nessuno" e al salvataggio
+         * cancellerebbe l'abbinamento esistente.
+         */
+        it("porta con sé il tecnico e il suo compenso, chiesti per quel solo report", async () => {
+            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([
+                { reportId: 1, technicianId: 12, price: 110 },
+            ] as never);
+
+            const response = await request(buildApp()).get("/api/reports/1");
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({ id: 1, technicianId: 12, technicianPrice: 110 });
+            expect(getReportTechnicianByReportId).toHaveBeenCalledWith(1);
         });
     });
 

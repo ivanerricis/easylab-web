@@ -4,6 +4,7 @@ import CustomDialog from "@/components/dialogs/customDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createUser, getApiErrorMessage, type CreatedUserResult } from "@/lib/api";
+import { UserPlus } from "lucide-react";
 
 type Props = {
     open: boolean;
@@ -51,6 +52,7 @@ const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
             title="Nuovo utente"
             description="La password viene generata automaticamente e mostrata una sola volta dopo la creazione."
             confirmLabel={isSubmitting ? "Creazione..." : "Crea utente"}
+            confirmIcon={UserPlus}
             cancelLabel="Annulla"
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleConfirm()}

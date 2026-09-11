@@ -24,7 +24,7 @@ import {
     getTodayDateString,
 } from "@/lib/interventions";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
-import { Plus } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -217,6 +217,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
                 preventOutsideClose
                 confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+                confirmIcon={Save}
                 cancelLabel="Annulla"
                 onCancel={() => onOpenChange(false)}
                 onConfirm={() => void handleConfirm()}
@@ -380,6 +381,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                             </Label>
                                             <Input
                                                 {...fieldProps("startTime", { error: errors.startTime })}
+                                                className="text-lg!"
                                                 type="time"
                                                 value={formValues.startTime}
                                                 onChange={(event) => {
@@ -405,6 +407,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                             </Label>
                                             <Input
                                                 {...fieldProps("endTime", { error: errors.endTime })}
+                                                className="text-lg!"
                                                 type="time"
                                                 value={formValues.endTime}
                                                 onChange={(event) => {

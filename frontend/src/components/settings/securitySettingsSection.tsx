@@ -171,6 +171,7 @@ const SecuritySettingsSection = () => {
                 title="Disattiva la verifica in due passaggi"
                 description="Da quel momento per entrare basterà la password. Conferma con la password e con un codice, dell'app o di recupero."
                 confirmLabel="Disattiva"
+                confirmIcon={ShieldOff}
                 submittingLabel="Disattivazione..."
                 destructive
                 onConfirm={handleDisable}
@@ -182,6 +183,7 @@ const SecuritySettingsSection = () => {
                 title="Rigenera i codici di recupero"
                 description="I codici attuali smetteranno tutti di funzionare e ne riceverai otto nuovi. Conferma con la password e con un codice, dell'app o di recupero."
                 confirmLabel="Rigenera"
+                confirmIcon={RefreshCw}
                 submittingLabel="Rigenerazione..."
                 onConfirm={handleRegenerate}
             />

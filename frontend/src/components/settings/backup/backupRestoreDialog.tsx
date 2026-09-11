@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { restoreConfirmKeyword, type BackupPanel } from "./useBackupPanel";
+import { ArchiveRestore } from "lucide-react";
 
 const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
     const { pendingRestore } = panel;
@@ -56,6 +57,7 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                 </div>
             }
             confirmLabel={panel.isRestoring ? "Ripristino in corso..." : "Ripristina"}
+            confirmIcon={ArchiveRestore}
             cancelLabel="Annulla"
             onCancel={panel.closeRestoreConfirm}
             onConfirm={() => void panel.handleConfirmRestore()}

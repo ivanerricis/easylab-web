@@ -11,6 +11,199 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Requisiti della password mostrati come lista, non come frase fissa
+
+**Cosa.** Nel dialogo "Cambia password", sotto il campo della nuova password, la frase
+statica dei requisiti (`passwordRequirementsHint`) è sostituita da una lista che si aggiorna a
+ogni carattere digitato: un requisito non soddisfatto è rosso con una ✕, uno soddisfatto è
+verde con una ✓ e il testo barrato. `lib/passwordPolicy.ts` espone ora `passwordRequirements`,
+un array di `{ label, isSatisfied }` da cui `isPasswordCompliant` deriva (prima duplicava la
+stessa logica in un'unica espressione booleana).
+
+**Il perché.** Richiesta dell'utente: sapere subito quali requisiti mancano invece di scoprirli
+tutti insieme dal toast di errore al momento del salvataggio.
+
+`tsc --noEmit` sul frontend passa.
+
+---
+
+## 2026-09-11 — Icone giuste sui pulsanti di conferma; il report porta con sé il suo tecnico
+
+Le due voci erano in [BACKLOG.md](BACKLOG.md) dalla mattina; da lì sono state tolte.
+
+**Cosa.**
+- **Icone.** `CustomDialog` non mette più un'icona predefinita sul pulsante di conferma: la
+  prop `confirmIcon` riceve il componente (`confirmIcon={Save}`) e la misura la decide il
+  dialogo. Ogni dialogo dichiara la sua: floppy per i dieci moduli che salvano, cestino per
+  "Elimina", stampante per "Stampa", aereo di carta per "Invia", `UserPlus` per "Crea utente",
+  `ShieldCheck`/`ShieldOff` per attivare e disattivare la 2FA, `RefreshCw` e `KeyRound` per le
+  due "Rigenera", `UserX` per "Disabilita", `ArchiveRestore` per "Ripristina", `Download` per
+  "Aggiorna adesso", la spunta per "Ho copiato… / Ho salvato…, chiudi". "Continua" (passaggio
+  intermedio dell'attivazione 2FA) resta senza. `TwoFactorConfirmDialog` inoltra la prop.
+- **Tecnico con il report.** `GET /api/reports/:id` restituisce anche `technicianId` e
+  `technicianPrice` (nuova `getReportTechnicianByReportId`, una riga al più perché `report_id` è
+  l'intera chiave primaria). Il dialogo "Modifica report" e la pagina di dettaglio li usano e non
+  chiamano più `listReportTechnicians()`, tolta dal frontend. Nuovo tipo `ReportDetailDto`, perché
+  le risposte di creazione e modifica quei campi non li hanno.
+
+**Il perché.**
+- *Icone.* Il default era il floppy, o il cestino con `destructive`. Così nove pulsanti che non
+  salvano niente mostravano il floppy (il caso peggiore: "Invia", che manda un'email al cliente)
+  e quattro che non eliminano niente il cestino ("Ripristina", "Disabilita", due "Disattiva").
+  L'icona prometteva un'azione e il pulsante ne faceva un'altra. Correggerli uno per uno non
+  bastava: il dialogo successivo avrebbe ereditato di nuovo il floppy. Con il default vuoto un
+  dialogo nuovo può al più non avere icona, mai averne una sbagliata. Verificato nel browser
+  leggendo l'icona effettiva di "Invia", "Elimina" e "Salva".
+- *Tecnico.* Per sapere il tecnico di un report, dialogo e pagina scaricavano l'intera
+  `report_technician`: 8000 righe, 376 KB sul database di sviluppo, a ogni apertura, ed era il 97%
+  di quello che il dialogo caricava. Misurato nel browser dopo la modifica: l'apertura del dialogo
+  fa 5 richieste per 15,8 KB (prima circa 392 KB), e il costo non cresce più con l'archivio.
+  Tecnico e prezzo mostrati coincidono con il database (report 20000: tecnico 9, 110 €; report 1:
+  tecnico 8, 47 €).
+
+Test: due casi nuovi su `GET /:id` (report con e senza tecnico). `tsc`, `eslint`, Prettier, 550
+test backend e 81 frontend passano.
+
+---
+
+## 2026-09-11 — Schede di cliente e tecnico come quella del collaboratore; cliente cercato sul server alla creazione; `BACKLOG.md`
+
+**Cosa.**
+- **Scheda cliente.** `CustomerPage` ha la forma della scheda collaboratore: intestazione,
+  riquadro "Dati del cliente" (telefoni, email, località, cliente dal), due tab Report e
+  Interventi con `EntityTable`, filtro a destra, impaginazione in fondo. Le colonne
+  (`customer-detail-columns.tsx`) sono quelle del collaboratore meno nome e telefono del
+  cliente, che stanno già nel riquadro; ci sono in più difetto, prezzo totale e data. L'indirizzo
+  segue il tab (`/clients/:id` e `/clients/:id/interventions`), quindi i due pulsanti
+  dell'elenco clienti portano dove portavano. `CustomerInterventionsPage` è stata eliminata; la
+  stampa del resoconto segue il tab attivo.
+- **Scheda tecnico.** Stessa forma: riquadro "Dati del tecnico" (telefono, partita IVA) e
+  `EntityTable` con la colonna **Prezzo tecnico**, che prima mancava ed è il motivo per cui la
+  scheda si apre.
+- `DetailItem` è diventato un componente condiviso (`components/detail-item.tsx`): era copiato in
+  `ReportPage` e `InterventionPage`, e le schede nuove ne avrebbero fatte quattro copie.
+- **Cliente scritto a mano alla creazione.** Nuovo `lib/customerLookup.ts`: quando il cliente non
+  è stato scelto dai suggerimenti, lo si cerca sul server, prima per telefono e poi per la parola
+  più lunga del nome, e fra i candidati decide la stessa `resolveSelectedCustomer` di prima. Lo
+  usano la creazione dei report (`resolveReportReferences`) e degli interventi, sia dalla
+  dashboard sia dalla pagina Interventi. Se i candidati sono più di 1000, non sceglie e chiede di
+  prendere il cliente dai suggerimenti.
+- **`docs/BACKLOG.md`**, nuovo: il posto unico per le cose da fare. Ci sono il contrasto delle
+  righe gialle e verdi (misure, due strade, raccomandazione), l'icona del floppy sui pulsanti che
+  non salvano, il costo del dialogo "Modifica report", e un indice delle voci che prima stavano
+  nei paragrafi "Ancora da fare" di questo file, nel piano della 2FA, nel README o fuori dal
+  repository.
+
+**Il perché.**
+- *Schede.* Nel giro visivo cliente e tecnico erano le sole schede ancora diverse dalle altre:
+  nessun dato di contatto, tabelle a tre o quattro colonne scritte a mano, filtro ed etichetta
+  rientrati di 48px. Questo chiude l'"Ancora da fare" della voce del 2026-09-10 sulla scheda
+  collaboratore, e per le schede quello del 2026-09-08 sulle colonne ridimensionabili; restano
+  le tabelle di Impostazioni.
+- *Tab che non ricaricano la pagina.* Cambiare tab cambia l'indirizzo, e `useNavigate` cambia
+  identità a ogni cambio di indirizzo: con `navigate` fra le dipendenze dell'effetto di
+  caricamento, ogni cambio di tab richiedeva di nuovo il cliente e copriva la pagina con lo
+  spinner. Il redirect per id non valido ora sta in un effetto a parte. Verificato dalle
+  richieste di rete: il cambio di tab non ne fa nessuna.
+- *Creazione.* Le tre copie cercavano il cliente dentro `listCustomers()`, che senza
+  paginazione si ferma a 5000 righe: con un cliente in più, uno scritto a mano risultava "non
+  esistente". Una delle tre, quella della dashboard, confrontava anche il testo in modo diverso
+  dalle altre due (uguaglianza esatta, senza tolleranza su maiuscole e accenti). La
+  pagina Interventi aveva inoltre una copia locale di `resolveSelectedCustomer` e
+  `formatCustomerOption`, ora rimossa. Verificato dal vivo senza scrivere nel database: nuovo
+  intervento con il cliente scritto a mano, la creazione intercettata e rifiutata dal test;
+  una sola ricerca (per telefono) e `customerId` corretto nel corpo della richiesta.
+
+Test: 11 nuovi in `customerLookup.test.ts` (scelta dei termini, ripiego sul nome, omonimi,
+candidati troppi, id già risolto). `tsc`, `eslint`, Prettier, 549 test backend e 81 frontend
+passano.
+
+---
+
+## 2026-09-11 — Schede di cliente e tecnico filtrate dal server; ritocchi alle pagine di dettaglio
+
+Esito di un giro visivo su tutte le pagine e i dialoghi, a 1920 e 400 px.
+
+**Cosa.**
+- **Schede filtrate dal server.** `GET /api/reports` accetta `customerId` e `technicianId`,
+  `GET /api/interventions` accetta `customerId` (nelle query `customerId` c'era già, mancava
+  nelle rotte; `technicianId` è una sottoquery su `report_technician`). `CustomerPage`,
+  `CustomerInterventionsPage` e `TechnicianPage` usano `usePaginatedRows` come la scheda del
+  collaboratore, e leggono nome del cliente/tecnico con i nuovi `getCustomer`/`getTechnician`.
+  Anche `ReportPage` e `InterventionPage` leggono il cliente per id.
+- **Dettaglio report.** Tolti i doppioni (stato e metodo di pagamento stavano sia nelle card
+  in alto sia nelle schede sotto), aggiunto "Avvisato", che non compariva da nessuna parte;
+  "Descrizione servizio" diventa "Descrizione intervento", come nel dialogo. Nel dettaglio
+  intervento tolto lo "Stato" ripetuto in Anagrafica.
+- **Mobile.** Le card in alto di report e intervento vanno due per riga invece di una (su
+  400 px da circa 650 a circa 400 px prima dei dati); nell'intervento stato, tipo e data
+  prendono la riga intera perché "In lavorazione" in mezza card usciva dal bordo. Le card non
+  hanno più `h-fit!`, quindi in una riga sono tutte alte uguali.
+- **Agenda della dashboard.** Il titolo va a capo invece di allargare la tabella oltre il
+  riquadro; "tutto il giorno" diventa un trattino; su mobile l'orario va su due righe
+  ("09:00" / "– 10:30") e la colonna scende da circa 108 a 64 px.
+- **Rifiniture.** `CustomDialog` accetta `confirmIcon`: i dialoghi di stampa mostrano la
+  stampante invece del floppy di "Salva". Nel dialogo di stampa etichette e date sono
+  `text-lg` come negli altri, staccate dalla descrizione e impilate sotto `sm`. Nei dialoghi
+  dell'intervento gli orari hanno la stessa misura della data, e il titolo di modifica porta
+  il numero. La pagina "Tecnici" si chiama "Tecnici esterni", come nel menu.
+
+**Il perché.** Le tre schede scaricavano elenchi interi e filtravano nel browser, ma senza
+paginazione le liste si fermano a `unpaginatedMaxRows` (5000): sul DB di sviluppo il cliente
+4260 ha 5 report e la sua scheda diceva "Nessun report associato"; il tecnico 12 ha 179 report
+aperti e ne mostrava 43. Verificato dopo la correzione: 5, 179, e 2 interventi per il cliente
+1246, uguali ai conteggi SQL. Il nome del cliente nelle pagine di dettaglio aveva lo stesso
+limite: i clienti sono esattamente 5000, quindi dal prossimo sarebbe comparso "Cliente
+sconosciuto". Il resto sono incoerenze trovate guardando le pagine.
+
+Nota per chi prova in locale: dopo aver cambiato file del backend va fatto
+`docker restart backend_dev`, altrimenti il container continua a servire il codice vecchio
+(qui i nuovi filtri venivano ignorati e le liste tornavano tutte le righe).
+
+Test: quattro casi nuovi in `collaboratorFilter.test.ts` (inoltro dei due filtri e rifiuto di
+id non validi). `tsc`, `eslint`, Prettier, 549 test backend e 70 frontend passano.
+
+---
+
+## 2026-09-11 — Dialogo "Modifica report" riorganizzato
+
+**Cosa.**
+- `editReportDialog.tsx`: i campi sono raggruppati come nella pagina di dettaglio del report.
+  *Anagrafica*: cliente, dispositivo, collaboratore. *Intervento*: difetto e password, poi
+  problema (solo con "Altro"), descrizione e note. In fondo tre riquadri affiancati da `lg`,
+  alti uguali: *Tecnico esterno* (tecnico e suo prezzo), *Pagamento* (prezzo interno e metodo),
+  *Stato* (le quattro spunte). Il titolo riporta il numero del report; il dialogo passa da
+  `xl:max-w-[88rem]` a `xl:max-w-6xl`; l'altezza del modulo segue lo schermo
+  (`calc(100dvh-12rem)`) invece di un `70vh` fisso.
+- I prezzi hanno il simbolo € davanti (`EuroInput`), le spunte di stato sono riquadri
+  cliccabili per intero con evidenza quando sono attive, e le griglie dei campi usano
+  `items-start`.
+- `fieldOrder` segue il nuovo ordine: il focus va sul primo campo in errore *come appare*.
+- Cambiare metodo di pagamento cancella l'errore del prezzo interno, che dipende dal metodo.
+- `payment-method-selector.tsx`: il contenitore è una griglia vera (`grid`, tre colonne da
+  `md`) e le voci hanno il corpo del testo a `text-base`.
+
+**Il perché.** Richiesta dell'utente di sistemare il dialogo a vista. Con i problemi trovati
+guardandolo:
+- il difetto aveva un quarto di riga ed era troncato a quasi ogni larghezza, pur essendo il
+  testo più lungo del modulo;
+- il collaboratore stava in "Anagrafica" ma password e prezzi in "Intervento", e il prezzo
+  interno era lontano dal metodo di pagamento pur dipendendone ("Non pagato" lo azzera, con
+  contanti o carta non può restare a zero);
+- nel selettore del pagamento le classi `grid-cols-*` erano applicate a un contenitore
+  `flex flex-wrap`, dove non fanno nulla: "Non pagato" finiva da solo su una riga e le card
+  avevano larghezze diverse;
+- nelle spunte era cliccabile solo la scritta, non il bordo interno del riquadro;
+- quando un campo mostrava l'errore sotto di sé, la riga si allungava e le celle vicine si
+  stiravano: etichetta e controllo scendevano di 12 e 24 px. Verificato con test di controllo
+  (misura con `items-start`, poi senza a runtime): allineati con, disallineati senza.
+
+Controllato con Playwright a 1920, 1366, 1024, 820 e 400 px, in tema chiaro e scuro, con
+difetto "Altro" ed errori di validazione attivi. `tsc`, `eslint`, Prettier e i 70 test del
+frontend passano.
+
+---
+
 ## 2026-09-10 — CI backend di nuovo verde: formattazione dei test
 
 **Cosa.** Passati con Prettier 14 file di test del backend (`routes/interventions`,

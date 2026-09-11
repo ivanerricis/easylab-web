@@ -327,6 +327,7 @@ const UsersSettingsSection = () => {
                         : undefined
                 }
                 confirmLabel={isRegenerating ? "Rigenerazione..." : "Rigenera"}
+                confirmIcon={KeyRound}
                 cancelLabel="Annulla"
                 onCancel={() => setUserPendingRegeneration(null)}
                 onConfirm={() => void handleConfirmRegenerate()}
@@ -349,6 +350,7 @@ const UsersSettingsSection = () => {
                 }
                 destructive
                 confirmLabel={isTogglingActive ? "Disabilitazione..." : "Disabilita"}
+                confirmIcon={UserX}
                 cancelLabel="Annulla"
                 onCancel={() => setUserPendingDisable(null)}
                 onConfirm={() => void handleConfirmDisable()}
@@ -388,6 +390,7 @@ const UsersSettingsSection = () => {
                 }
                 destructive
                 confirmLabel={isResettingTwoFactor ? "Disattivazione..." : "Disattiva"}
+                confirmIcon={ShieldOff}
                 cancelLabel="Annulla"
                 onCancel={() => setUserPendingTwoFactorReset(null)}
                 onConfirm={() => void handleConfirmTwoFactorReset()}

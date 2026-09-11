@@ -10,7 +10,21 @@
 
 export const passwordMinLength = 8;
 
+export type PasswordRequirement = {
+    label: string;
+    isSatisfied: (password: string) => boolean;
+};
+
+export const passwordRequirements: PasswordRequirement[] = [
+    {
+        label: `Almeno ${passwordMinLength} caratteri`,
+        isSatisfied: (password) => password.length >= passwordMinLength,
+    },
+    { label: "Almeno un numero", isSatisfied: (password) => /\d/.test(password) },
+    { label: "Almeno un carattere speciale", isSatisfied: (password) => /[^A-Za-z0-9]/.test(password) },
+];
+
 export const passwordRequirementsHint = "Almeno 8 caratteri, con almeno un numero e un carattere speciale";
 
 export const isPasswordCompliant = (password: string): boolean =>
-    password.length >= passwordMinLength && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
+    passwordRequirements.every((requirement) => requirement.isSatisfied(password));

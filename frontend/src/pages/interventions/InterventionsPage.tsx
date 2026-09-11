@@ -14,12 +14,12 @@ import {
     deleteIntervention,
     getApiErrorMessage,
     getInterventionPrintUrl,
-    listCustomers,
     sendInterventionEmail,
     updateIntervention,
 } from "@/lib/api";
 import { useState } from "react";
-import type { CustomerDto, InterventionDto } from "@/types/dtos";
+import type { InterventionDto } from "@/types/dtos";
+import { resolveCustomerId } from "@/lib/customerLookup";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
@@ -35,60 +35,7 @@ import { useInterventionsRows } from "./hooks/useInterventionsRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow } from "@/lib/utils";
-
-const formatCustomerOption = (
-    firstName: string,
-    lastName: string | null,
-    phoneNumber: string | null,
-    phoneNumberSecondary: string | null
-) => {
-    const fullName = `${firstName} ${lastName ?? ""}`.trim();
-    return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
-};
-
-const normalizeCustomerText = (value: string) =>
-    value.normalize("NFKD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
-
-const getCustomerFullName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
-
-const resolveSelectedCustomer = (customers: CustomerDto[], rawValue: string) => {
-    const normalizedRawValue = normalizeCustomerText(rawValue);
-    const rawNameOnly = normalizeCustomerText(rawValue.split(" - ")[0] ?? rawValue);
-
-    const exactMatches = customers.filter(
-        (customer) =>
-            normalizeCustomerText(
-                formatCustomerOption(
-                    customer.firstName,
-                    customer.lastName,
-                    customer.phoneNumber,
-                    customer.phoneNumberSecondary
-                )
-            ) === normalizedRawValue
-    );
-
-    if (exactMatches.length === 1) {
-        return exactMatches[0];
-    }
-
-    if (exactMatches.length > 1) {
-        throw new Error("Il cliente selezionato non è univoco. Seleziona il nominativo completo.");
-    }
-
-    const nameMatches = customers.filter(
-        (customer) => normalizeCustomerText(getCustomerFullName(customer.firstName, customer.lastName)) === rawNameOnly
-    );
-
-    if (nameMatches.length === 1) {
-        return nameMatches[0];
-    }
-
-    if (nameMatches.length > 1) {
-        throw new Error("Esistono più clienti con lo stesso nome. Seleziona quello completo con il telefono.");
-    }
-
-    return null;
-};
+import { Send } from "lucide-react";
 
 const parseStatusFilter = (value: string | null): InterventionStatusFilter => {
     if (value === "all" || value === "programmato" || value === "in_lavorazione" || value === "completato") {
@@ -151,18 +98,7 @@ const InterventionsPage = () => {
 
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
         try {
-            let customerId = values.customerId;
-
-            if (customerId == null) {
-                const customers = await listCustomers();
-                const selectedCustomer = resolveSelectedCustomer(customers, values.customer);
-
-                if (!selectedCustomer) {
-                    throw new Error("Seleziona un cliente esistente o creane uno nuovo.");
-                }
-
-                customerId = selectedCustomer.id;
-            }
+            const customerId = await resolveCustomerId(values.customerId, values.customer);
 
             const createdIntervention = await createIntervention({
                 type: values.type,
@@ -337,6 +273,7 @@ const InterventionsPage = () => {
                     title="Invia email intervento"
                     description={`Sei sicuro di voler inviare l'email per l'intervento ID ${interventionIdToEmail}?`}
                     confirmLabel="Invia"
+                    confirmIcon={Send}
                     cancelLabel="Annulla"
                     confirmDisabled={isSendingEmail}
                     onCancel={() => setInterventionIdToEmail(null)}

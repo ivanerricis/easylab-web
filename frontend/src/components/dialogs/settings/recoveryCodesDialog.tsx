@@ -49,6 +49,7 @@ const RecoveryCodesDialog = ({ open, onOpenChange, codes }: Props) => {
             description="Servono a entrare quando non hai con te il telefono. Ognuno vale una volta sola, e non verranno mostrati di nuovo: stampali o salvali in un posto sicuro, lontano dal telefono stesso."
             showCancelButton={false}
             confirmLabel="Ho salvato i codici, chiudi"
+            confirmIcon={Check}
             confirmDisabled={!isSaved}
             onConfirm={() => onOpenChange(false)}
             preventOutsideClose

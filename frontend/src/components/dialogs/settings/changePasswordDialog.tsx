@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, Save, X } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { changeOwnPassword, getApiErrorMessage } from "@/lib/api";
-import { isPasswordCompliant, passwordRequirementsHint } from "@/lib/passwordPolicy";
+import { isPasswordCompliant, passwordRequirements, passwordRequirementsHint } from "@/lib/passwordPolicy";
+import { cn } from "@/lib/utils";
 
 type Props = {
     open: boolean;
@@ -70,6 +71,7 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             title="Cambia password"
             description="Inserisci la password attuale e quella nuova."
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+            confirmIcon={Save}
             cancelLabel="Annulla"
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleConfirm()}
@@ -115,7 +117,27 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
                                 </Button>
                             </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">{passwordRequirementsHint}</p>
+                        <ul className="grid gap-1">
+                            {passwordRequirements.map((requirement) => {
+                                const satisfied = requirement.isSatisfied(formValues.newPassword);
+                                return (
+                                    <li
+                                        key={requirement.label}
+                                        className={cn(
+                                            "flex items-center gap-1.5 text-xs",
+                                            satisfied ? "text-green-600 line-through" : "text-red-600"
+                                        )}
+                                    >
+                                        {satisfied ? (
+                                            <Check className="size-3.5 shrink-0" />
+                                        ) : (
+                                            <X className="size-3.5 shrink-0" />
+                                        )}
+                                        {requirement.label}
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     </div>
 
                     <div className="grid gap-2">

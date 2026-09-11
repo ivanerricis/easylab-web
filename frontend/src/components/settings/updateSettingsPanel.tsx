@@ -22,6 +22,7 @@ import {
     type UpdateStatusDto,
 } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { Download } from "lucide-react";
 
 const POLL_INTERVAL_MS = 3000;
 const CHECK_MAX_ATTEMPTS = 20; // ~1 minute
@@ -277,6 +278,7 @@ const UpdateSettingsPanel = () => {
                     </div>
                 }
                 confirmLabel="Aggiorna adesso"
+                confirmIcon={Download}
                 cancelLabel="Annulla"
                 onCancel={() => setIsConfirmOpen(false)}
                 onConfirm={() => void handleUpdate()}

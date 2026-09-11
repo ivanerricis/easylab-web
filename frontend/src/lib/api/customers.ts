@@ -57,6 +57,13 @@ export async function listCustomers(params?: ListCustomersParams) {
     };
 }
 
+/**
+ * Un cliente solo, per id. Le schede lo cercavano dentro `listCustomers()`, che senza
+ * paginazione si ferma alle prime cinquemila righe: oltre quelle, il nome non si trovava.
+ */
+export const getCustomer = async (id: number) =>
+    mapEntityTimestamps((await api.get<EntityWithRawTimestamps<CustomerDto>>(`/customers/${id}`)).data);
+
 export const createCustomer = async (payload: CustomerCreateInput) =>
     mapEntityTimestamps((await api.post<EntityWithRawTimestamps<CustomerDto>>("/customers", payload)).data);
 

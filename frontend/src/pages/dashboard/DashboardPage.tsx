@@ -29,11 +29,10 @@ import {
     getApiErrorMessage,
     getInterventionStats,
     getReportStats,
-    listCustomers,
 } from "@/lib/api";
 import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
 import { resolveReportReferences } from "@/lib/reportForm";
-import { formatCustomerOption } from "@/lib/customers";
+import { resolveCustomerId } from "@/lib/customerLookup";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
@@ -170,26 +169,7 @@ const DashboardPage = () => {
 
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
         try {
-            let customerId = values.customerId;
-
-            if (customerId == null) {
-                const customers = await listCustomers();
-                const selectedCustomer = customers.find(
-                    (customer) =>
-                        formatCustomerOption(
-                            customer.firstName,
-                            customer.lastName,
-                            customer.phoneNumber,
-                            customer.phoneNumberSecondary
-                        ) === values.customer
-                );
-
-                if (!selectedCustomer) {
-                    throw new Error("Seleziona un cliente esistente o creane uno nuovo.");
-                }
-
-                customerId = selectedCustomer.id;
-            }
+            const customerId = await resolveCustomerId(values.customerId, values.customer);
 
             const createdIntervention = await createIntervention({
                 type: values.type,

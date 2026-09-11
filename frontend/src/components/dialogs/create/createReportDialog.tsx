@@ -24,7 +24,7 @@ import InputWithAdd from "@/components/inputWithAdd";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 import type { ChangeEvent } from "react";
 
 /**
@@ -226,6 +226,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
                 preventOutsideClose
                 confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
+                confirmIcon={Save}
                 cancelLabel="Annulla"
                 onCancel={() => onOpenChange(false)}
                 onConfirm={() => void handleConfirm()}

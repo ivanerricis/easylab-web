@@ -1,4 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import DetailItem from "@/components/detail-item";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
@@ -10,13 +11,12 @@ import {
     createReportTechnician,
     deleteReportTechnician,
     getApiErrorMessage,
+    getCustomer,
     getReport,
     getReportPrintUrl,
     listCollaborators,
-    listCustomers,
     listDevices,
     listIssues,
-    listReportTechnicians,
     listTechnicians,
     type ReportEntityDto,
     updateReport,
@@ -58,13 +58,6 @@ const statusBadgeClass = (value: boolean) =>
         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
         : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
 
-const DetailItem = ({ label, value }: { label: string; value: string }) => (
-    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
-        <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
-        <p className="mt-1 text-sm font-medium wrap-break-word">{value}</p>
-    </div>
-);
-
 const TableHeaderCell = ({ children }: { children: string }) => (
     <th className="border border-border/70 bg-muted/40 px-3 py-2 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {children}
@@ -101,34 +94,36 @@ const ReportPage = () => {
     };
 
     const loadDetails = useCallback(async () => {
-        const [report, customers, devices, issues, collaborators, reportTechnicians, technicians] = await Promise.all([
+        const [report, devices, issues, collaborators, technicians] = await Promise.all([
             getReport(reportId),
-            listCustomers(),
             listDevices(),
             listIssues(),
             listCollaborators(),
-            listReportTechnicians(),
             listTechnicians(),
         ]);
 
-        const customer = customers.find((item) => item.id === report.customerId);
+        // Il cliente si legge per id, non cercandolo in `listCustomers()`: quell'elenco senza
+        // paginazione si ferma a 5000 righe, e da lì in poi il report diceva "Cliente sconosciuto".
+        const customer = await getCustomer(report.customerId).catch(() => null);
         const device = devices.find((item) => item.id === report.deviceId);
         const issue = issues.find((item) => item.id === report.issueId);
         const collaborator = collaborators.find((item) => item.id === report.collaboratorId);
 
-        const technicianById = new Map(technicians.map((technician) => [technician.id, technician]));
-        const reportTechnicianRows = reportTechnicians.filter((item) => item.reportId === report.id);
-
-        const technicianDetails = reportTechnicianRows.map((item) => {
-            const technician = technicianById.get(item.technicianId);
-            return {
-                id: item.technicianId,
-                name: technician
-                    ? `${technician.firstName} ${technician.lastName ?? ""}`.trim()
-                    : `Tecnico #${item.technicianId}`,
-                price: item.price,
-            };
-        });
+        // Il tecnico arriva con il report (`technicianId`, `technicianPrice`): prima lo si cercava
+        // scaricando l'intera tabella report-tecnico. Qui serve solo il nome, dal catalogo dei tecnici.
+        const technician = technicians.find((item) => item.id === report.technicianId);
+        const technicianDetails =
+            report.technicianId == null
+                ? []
+                : [
+                      {
+                          id: report.technicianId,
+                          name: technician
+                              ? `${technician.firstName} ${technician.lastName ?? ""}`.trim()
+                              : `Tecnico #${report.technicianId}`,
+                          price: report.technicianPrice,
+                      },
+                  ];
 
         const techniciansTotal = technicianDetails.reduce((total, item) => total + item.price, 0);
 
@@ -273,8 +268,13 @@ const ReportPage = () => {
                 </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <Card className="h-fit! gap-2! border-primary/20">
+            {/*
+                Due per riga sotto xl invece di una: su mobile le cinque card impilate occupavano
+                circa 650px prima di arrivare ai dati. Il pagamento, ultimo e dispari, prende la
+                riga intera.
+            */}
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Stato</CardTitle>
                     </CardHeader>
@@ -287,7 +287,7 @@ const ReportPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Prezzo interno</CardTitle>
                     </CardHeader>
@@ -296,7 +296,7 @@ const ReportPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Prezzo tecnici</CardTitle>
                     </CardHeader>
@@ -305,7 +305,7 @@ const ReportPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="gap-2! border-primary/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Totale</CardTitle>
                     </CardHeader>
@@ -314,7 +314,7 @@ const ReportPage = () => {
                     </CardContent>
                 </Card>
 
-                <Card className="h-fit! gap-2! border-primary/20">
+                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-primary">Pagamento</CardTitle>
                     </CardHeader>
@@ -335,7 +335,6 @@ const ReportPage = () => {
                         <DetailItem label="Collaboratore" value={details.collaboratorName} />
                         <DetailItem label="Dispositivo" value={details.deviceName} />
                         <DetailItem label="Difetto catalogo" value={details.issueName} />
-                        <DetailItem label="Metodo pagamento" value={paymentMethodLabel(details.report.paymentMethod)} />
                     </CardContent>
                 </Card>
 
@@ -343,10 +342,15 @@ const ReportPage = () => {
                     <CardHeader>
                         <CardTitle className="text-primary">Stato e gestione</CardTitle>
                     </CardHeader>
+                    {/*
+                        Stato (aperto/chiuso) e metodo di pagamento non si ripetono qui: stanno già
+                        nelle card in alto. C'è invece "Avvisato", che si imposta dal dialogo di
+                        modifica ma in questa pagina non compariva da nessuna parte.
+                    */}
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem label="Chiuso" value={yesNo(details.report.closed)} />
-                        <DetailItem label="Backup dati" value={yesNo(details.report.dataBackup)} />
                         <DetailItem label="Alimentatore" value={yesNo(details.report.charger)} />
+                        <DetailItem label="Backup dati" value={yesNo(details.report.dataBackup)} />
+                        <DetailItem label="Avvisato" value={yesNo(details.report.alerted)} />
                         <DetailItem label="Creato il" value={formatDateTime(details.report.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"
@@ -363,7 +367,7 @@ const ReportPage = () => {
                     </CardHeader>
                     <CardContent className="grid gap-2">
                         <DetailItem label="Problema riscontrato" value={details.report.issueDescription ?? "-"} />
-                        <DetailItem label="Descrizione servizio" value={details.report.serviceDescription ?? "-"} />
+                        <DetailItem label="Descrizione intervento" value={details.report.serviceDescription ?? "-"} />
                         <DetailItem label="Password" value={details.report.password ?? "-"} />
                         <DetailItem label="Note" value={details.report.note ?? "-"} />
                     </CardContent>

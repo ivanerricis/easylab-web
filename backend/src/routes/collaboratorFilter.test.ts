@@ -84,3 +84,49 @@ describe("filtro per collaboratore sulle liste", () => {
         expect(vi.mocked(listReports).mock.calls[0][0].collaboratorId).toBeUndefined();
     });
 });
+
+/**
+ * Gli stessi filtri per le schede del cliente e del tecnico esterno, che avevano lo stesso
+ * difetto: sul database di sviluppo un cliente con cinque report risultava non averne nessuno.
+ */
+describe("filtri per cliente e tecnico sulle liste", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("inoltra customerId alla query dei report", async () => {
+        vi.mocked(listReports).mockResolvedValue({ items: [], totalItems: 0 } as never);
+
+        const response = await request(buildApp()).get("/api/reports?page=1&pageSize=10&customerId=4260");
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(listReports).mock.calls[0][0]).toMatchObject({ customerId: 4260 });
+    });
+
+    it("inoltra technicianId alla query dei report", async () => {
+        vi.mocked(listReports).mockResolvedValue({ items: [], totalItems: 0 } as never);
+
+        const response = await request(buildApp()).get("/api/reports?page=1&pageSize=10&technicianId=12");
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(listReports).mock.calls[0][0]).toMatchObject({ technicianId: 12 });
+    });
+
+    it("inoltra customerId alla query degli interventi", async () => {
+        vi.mocked(listInterventions).mockResolvedValue({ items: [], totalItems: 0 } as never);
+
+        const response = await request(buildApp()).get("/api/interventions?page=1&pageSize=10&customerId=4260");
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({ customerId: 4260 });
+    });
+
+    it.each(["customerId=0", "customerId=abc", "technicianId=-1"])("rifiuta %s sui report", async (param) => {
+        vi.mocked(listReports).mockResolvedValue({ items: [], totalItems: 0 } as never);
+
+        const response = await request(buildApp()).get(`/api/reports?page=1&pageSize=10&${param}`);
+
+        expect(response.status).toBe(400);
+        expect(listReports).not.toHaveBeenCalled();
+    });
+});

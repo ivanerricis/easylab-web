@@ -75,6 +75,17 @@
     color: var(--foreground);
 }
 
+/*
+ * Nell'agenda il titolo dell'evento va a capo invece di troncarsi. `CalendarEventPopover` lo
+ * rende con `truncate`, che nelle celle del mese serve; ma la tabella dell'agenda non ha
+ * larghezze fisse, quindi una riga che non può andare a capo allargava la colonna oltre il
+ * riquadro e su mobile il nome dell'intervento usciva tagliato a destra.
+ */
+.rbc-agenda-view .rbc-agenda-event-cell > span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
     .rbc-month-view,
     .rbc-time-view {
@@ -92,5 +103,16 @@
     .rbc-header {
         padding: 0.25rem 0;
         font-size: 0.7rem;
+    }
+
+    /* Data e ora occupano meno: lo spazio va al nome dell'intervento. */
+    .rbc-agenda-view table.rbc-agenda-table tbody > tr > td,
+    .rbc-agenda-view table.rbc-agenda-table .rbc-agenda-time-cell {
+        padding: 0.375rem 0.5rem;
+    }
+
+    /* "09:00 – 10:30" va su due righe invece di allargare la colonna per tutto l'elenco. */
+    .rbc-agenda-view .rbc-agenda-time-cell {
+        white-space: normal;
     }
 }

@@ -5,6 +5,7 @@ import CopyableValue from "@/components/dialogs/settings/copyableValue";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { enableTwoFactor, getApiErrorMessage, startTwoFactorSetup } from "@/lib/api";
+import { ShieldCheck } from "lucide-react";
 
 /**
  * Attivazione della verifica in due passaggi, in due schermate dentro lo stesso dialogo:
@@ -111,6 +112,7 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             title="Inquadra il codice QR"
             description="Aggiungi l'account nella tua app di autenticazione, poi digita qui sotto il codice a 6 cifre che ti mostra."
             confirmLabel={isSubmitting ? "Verifica in corso..." : "Attiva"}
+            confirmIcon={ShieldCheck}
             confirmDisabled={isSubmitting}
             cancelDisabled={isSubmitting}
             onCancel={() => handleOpenChange(false)}

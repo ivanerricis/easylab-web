@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,8 @@ type Props = {
     description: string;
     confirmLabel: string;
     submittingLabel: string;
+    /** Diversa per le due richieste: disattivare e rigenerare non sono la stessa azione. */
+    confirmIcon?: LucideIcon;
     destructive?: boolean;
     onConfirm: (password: string, code: string) => Promise<void>;
 };
@@ -29,6 +32,7 @@ const TwoFactorConfirmDialog = ({
     description,
     confirmLabel,
     submittingLabel,
+    confirmIcon,
     destructive = false,
     onConfirm,
 }: Props) => {
@@ -69,6 +73,7 @@ const TwoFactorConfirmDialog = ({
             description={description}
             destructive={destructive}
             confirmLabel={isSubmitting ? submittingLabel : confirmLabel}
+            confirmIcon={confirmIcon}
             confirmDisabled={isSubmitting}
             cancelDisabled={isSubmitting}
             onCancel={() => handleOpenChange(false)}

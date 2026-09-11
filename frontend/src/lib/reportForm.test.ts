@@ -6,7 +6,7 @@ const listDevices = vi.fn();
 const listIssues = vi.fn();
 
 vi.mock("@/lib/api", () => ({
-    listCustomers: () => listCustomers() as Promise<unknown>,
+    listCustomers: (params: unknown) => listCustomers(params) as Promise<unknown>,
     listDevices: () => listDevices() as Promise<unknown>,
     listIssues: () => listIssues() as Promise<unknown>,
 }));

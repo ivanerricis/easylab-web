@@ -11,6 +11,78 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Correzioni di sicurezza da audit: limiti sul login, sulla 2FA e sul logo
+
+**Cosa.** Cinque correzioni emerse da un audit di sicurezza dell'intero codebase:
+
+1. **Tentativi illimitati sul secondo fattore** (`authManager.ts`). `login` azzerava il contatore
+   dei tentativi dell'IP appena la password risultava giusta, *prima* della 2FA. Chi conosceva
+   la password poteva alternare un login e quattro codici sbagliati all'infinito: il limite di
+   cinque tentativi per challenge non serviva a nulla, perché un challenge nuovo si otteneva
+   rifacendo il login. Ora il contatore dell'IP si azzera solo quando nasce davvero una
+   sessione (anche un account disabilitato non lo azzera più), e c'è un secondo contatore **per
+   utente** sul secondo fattore (`utente:<id>:secondo-fattore`), che segue l'account da
+   qualunque IP e da qualunque rotta arrivino i codici: login, disattivazione della 2FA,
+   rigenerazione dei codici di recupero.
+2. **L'admin poteva rigenerarsi la propria password** (`routes/users.ts`). La rotta consegna una
+   password nuova in chiaro senza chiedere quella attuale: una sessione admin rubata bastava a
+   prendersi l'account per sempre e a chiudere fuori il proprietario. Ora sul proprio account
+   risponde 400, come "disabilita" ed "elimina", e il pulsante non compare più sulla propria
+   riga. Togliersi la 2FA da amministratore resta possibile (è la via d'uscita per il
+   telefono perso), ma sul proprio account ora chiede la password (`assertOwnPassword`). Il
+   codice no, dato che il telefono è ciò che manca.
+3. **Nessun limite sulle password richieste di nuovo** (`authManager.ts`). Cambio password e
+   attivazione/disattivazione della 2FA verificavano la password senza limitatore: con una
+   sessione rubata la si poteva indovinare a forza bruta, frenati solo da scrypt. Ora passano
+   tutte da `assertCurrentPassword`, con un contatore per utente (`utente:<id>:password`).
+4. **Path traversal sul logo tramite archivio ripristinato** (`logoManager.ts`). `getLogoFile`
+   usava `meta.fileName` alla lettera, e `meta.json` arriva anche da un archivio di backup
+   ripristinato: un archivio con `"fileName": "../secret.key"` avrebbe fatto servire la chiave di
+   cifratura su `/assets/logo.jpg`, che è pubblico. Ora sono accettati solo `logo.png` e
+   `logo.svg`, e il tipo MIME si deriva dal nome, non dai metadati.
+
+5. **Un login riuscito azzerava il contatore dell'intero IP** (`authManager.ts`,
+   `loginRateLimit.ts`). Chi aveva un account valido poteva provare quattro password su quello
+   dell'admin, entrare con il proprio per ripartire da zero, e ricominciare all'infinito. Ora i
+   contatori della password al login sono due:
+   - uno per coppia IP + nome utente (`accesso:<nome>@<ip>`, 5 tentativi), l'unico che un login
+     riuscito azzera, e solo per chi è appena entrato;
+   - un tetto complessivo per IP (`loginRateLimitMaxAttemptsPerIp`, 20 tentativi) che non si
+     azzera mai e scade solo con la finestra di 15 minuti.
+
+   Il tetto per IP è più alto di prima (20 invece di 5) perché dietro l'IP pubblico del
+   laboratorio ci sono tutti i colleghi: con 5 errori complessivi e senza azzeramento,
+   qualche errore di battitura sparso fra loro avrebbe chiuso fuori tutti. Resta però
+   indispensabile, perché senza di esso da un solo indirizzo si potrebbero provare cinque
+   password su *ogni* nome utente.
+
+In `loginRateLimit.ts` i parametri si chiamano ora `key` invece di `ip`, perché la stessa mappa
+ospita chiavi di tipo diverso. I prefissi `utente:` e `accesso:` non possono coincidere con un
+indirizzo, nemmeno IPv6, perché contengono lettere che non sono cifre esadecimali.
+
+**Dipendenze.** `npm audit fix` su entrambi i package, solo aggiornamenti minori e patch dentro
+gli intervalli di `package.json` (cambia solo `package-lock.json`):
+- backend: nodemailer 9.1.1, sharp 0.35.4 (libheif), multer 2.3.0, qs 6.16.0;
+- frontend: react-router 7.18.3, nanoid 3.3.19, js-yaml 4.3.2, qs.
+
+`npm audit --omit=dev` dà ora 0 vulnerabilità in entrambi. Restano 4 segnalazioni "moderate"
+nel backend, tutte su esbuild dentro drizzle-kit: è una dipendenza di sviluppo, e la falla
+riguarda solo il suo server di sviluppo, mai avviato in produzione. `npm audit fix --force`
+le toglierebbe riportando drizzle-kit alla 0.18.1, un downgrade incompatibile: non applicato.
+
+**Il perché.** Il primo punto è il più serio: la 2FA esiste proprio per il caso "password
+rubata", ed era aggirabile esattamente in quel caso. Gli altri tre stringono ciò che una
+sessione rubata o un archivio manipolato permettono di fare. Costo accettato: chi conosce la
+password può tenere un utente fuori dal secondo passo sbagliando codici apposta (15 minuti per
+volta). È il male minore rispetto a indovinare il codice, e resta visibile: la password è
+compromessa e va cambiata comunque.
+
+Test aggiunti in `authManager.test.ts`, `loginRateLimit.test.ts`, `users.test.ts` e
+`logoManager.test.ts`: 571 test backend e 81 frontend verdi, `tsc`, `eslint` e `prettier` puliti,
+build di produzione riuscita per entrambi i package dopo l'aggiornamento delle dipendenze.
+
+---
+
 ## 2026-09-11 — Pulizia codice morto (frontend e backend)
 
 **Cosa.** Analisi con `knip` (dependency/export graph) su entrambi i package, verificata a mano

@@ -11,7 +11,12 @@ import {
     deleteRecoveryCodes,
     replaceRecoveryCodes,
 } from "../db/queries/recoveryCode";
-import { isLoginRateLimited, registerFailedLogin, registerSuccessfulLogin } from "./loginRateLimit";
+import {
+    isIpLoginRateLimited,
+    isLoginRateLimited,
+    registerFailedLogin,
+    registerSuccessfulLogin,
+} from "./loginRateLimit";
 import { generateCompliantPassword } from "./passwordPolicy";
 import { generateRecoveryCodes, hashRecoveryCode, looksLikeRecoveryCode } from "./recoveryCodes";
 import { buildOtpauthUri, generateTotpSecret, verifyTotp } from "./totp";
@@ -159,10 +164,55 @@ export const ensureDefaultAdmin = async (): Promise<void> => {
     }
 };
 
-const assertLoginRateLimit = (ip: string): void => {
-    if (isLoginRateLimited(ip)) {
-        throw new AuthManagerError("Troppi tentativi di accesso falliti. Riprova più tardi.", 429);
+const tooManyAttemptsMessage = "Troppi tentativi di accesso falliti. Riprova più tardi.";
+
+const assertLoginRateLimit = (key: string): void => {
+    if (isLoginRateLimited(key)) {
+        throw new AuthManagerError(tooManyAttemptsMessage, 429);
     }
+};
+
+const assertIpLoginRateLimit = (ip: string): void => {
+    if (isIpLoginRateLimited(ip)) {
+        throw new AuthManagerError(tooManyAttemptsMessage, 429);
+    }
+};
+
+/**
+ * Il contatore della password al login è per coppia IP + nome utente, ed è l'unico che un
+ * login riuscito azzera. Prima era per solo IP e lo azzerava *qualunque* login riuscito: chi
+ * aveva un account valido poteva provare quattro password su quello dell'admin, entrare con il
+ * proprio per ripartire da zero, e ricominciare all'infinito. Ora entrare con il proprio
+ * account azzera soltanto il proprio contatore; sopra resta il tetto complessivo per IP
+ * (`loginRateLimitMaxAttemptsPerIp`), che non si azzera mai.
+ */
+const loginAttemptRateLimitKey = (ip: string, username: string) => `accesso:${username}@${ip}`;
+
+/**
+ * Chiavi per utente, accanto a quelle per IP nello stesso limitatore. Il limite per IP da solo
+ * non basta dove il bersaglio è un account preciso: chi ha la password può cambiare IP a ogni
+ * giro e continuare a provare codici, e chi ha rubato una sessione può provare password
+ * all'infinito sulle rotte che la richiedono di nuovo. Il prefisso `utente:` non può essere
+ * scambiato per un indirizzo: "u" non è una cifra esadecimale, quindi nemmeno un IPv6.
+ */
+const secondFactorRateLimitKey = (userId: number) => `utente:${userId}:secondo-fattore`;
+const passwordCheckRateLimitKey = (userId: number) => `utente:${userId}:password`;
+
+/**
+ * La password richiesta di nuovo a chi è già dentro (cambio password, attivazione e
+ * disattivazione della 2FA). Senza limite, una sessione rubata bastava a indovinare la
+ * password a forza bruta: l'unico freno era il costo di scrypt.
+ */
+const assertCurrentPassword = async (user: UserRow, password: string, errorMessage: string): Promise<void> => {
+    const rateLimitKey = passwordCheckRateLimitKey(user.id);
+    assertLoginRateLimit(rateLimitKey);
+
+    if (!(await verifyPassword(password, user.passwordHash))) {
+        registerFailedLogin(rateLimitKey);
+        throw new AuthManagerError(errorMessage, 400);
+    }
+
+    registerSuccessfulLogin(rateLimitKey);
 };
 
 export type LoginResult =
@@ -183,7 +233,9 @@ const createSessionForUser = async (user: UserRow): Promise<LoginResult> => {
 };
 
 export const login = async (username: string, password: string, ip: string): Promise<LoginResult> => {
-    assertLoginRateLimit(ip);
+    const accountRateLimitKey = loginAttemptRateLimitKey(ip, username);
+    assertIpLoginRateLimit(ip);
+    assertLoginRateLimit(accountRateLimitKey);
 
     const invalidCredentialsError = new AuthManagerError("Nome utente o password non validi", 401);
     const rows = await db.select().from(userTable).where(eq(userTable.username, username)).limit(1);
@@ -195,11 +247,14 @@ export const login = async (username: string, password: string, ip: string): Pro
 
     if (!user || !isPasswordValid) {
         registerFailedLogin(ip);
+        registerFailedLogin(accountRateLimitKey);
         throw invalidCredentialsError;
     }
 
-    registerSuccessfulLogin(ip);
-
+    // Il contatore si azzera solo quando nasce davvero una sessione, non a password
+    // verificata: con la 2FA attiva azzerarlo qui permetteva a chi conosce la password di
+    // alternare un login e quattro codici sbagliati, cioè tentativi illimitati sul secondo
+    // fattore. Per lo stesso motivo non lo azzera un account disabilitato.
     if (!user.active) {
         throw new AuthManagerError("Questo account è stato disabilitato. Contatta un amministratore.", 403);
     }
@@ -220,9 +275,11 @@ export const login = async (username: string, password: string, ip: string): Pro
         // mano è di un istante prima: senza questa copia corretta la risposta direbbe al
         // client che la 2FA è ancora attiva, e l'interfaccia mostrerebbe uno stato che non
         // esiste più finché qualcuno non ricarica la pagina.
+        registerSuccessfulLogin(accountRateLimitKey);
         return createSessionForUser({ ...user, totpConfirmedAt: null });
     }
 
+    registerSuccessfulLogin(accountRateLimitKey);
     return createSessionForUser(user);
 };
 
@@ -310,8 +367,7 @@ export const stopSessionCleanupScheduler = () => {
     sessionCleanupTimer = null;
 };
 
-const deleteAllSessionsForUser = (userId: number) =>
-    db.delete(sessionTable).where(eq(sessionTable.userId, userId));
+const deleteAllSessionsForUser = (userId: number) => db.delete(sessionTable).where(eq(sessionTable.userId, userId));
 
 const deleteOtherSessionsForUser = (userId: number, currentToken: string) =>
     db
@@ -398,9 +454,7 @@ export const changeOwnPassword = async (
         throw new AuthManagerError("Utente non trovato", 404);
     }
 
-    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
-        throw new AuthManagerError("La password attuale non è corretta", 400);
-    }
+    await assertCurrentPassword(user, currentPassword, "La password attuale non è corretta");
 
     const passwordHash = await hashPassword(newPassword);
     await db.update(userTable).set({ passwordHash, mustChangePassword: false }).where(eq(userTable.id, userId));
@@ -485,7 +539,7 @@ type SecondFactorResult = { valid: false } | { valid: true; usedRecoveryCode: bo
  * decide da solo quale dei due: otto caratteri dell'alfabeto dei codici di recupero contro
  * sei cifre, quindi nessuna ambiguità e nessuna scelta da chiedere a chi sta entrando.
  */
-const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFactorResult> => {
+const checkSecondFactorCode = async (user: UserRow, code: string): Promise<SecondFactorResult> => {
     const trimmedCode = code.trim();
 
     if (looksLikeRecoveryCode(trimmedCode)) {
@@ -511,8 +565,33 @@ const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFa
     return { valid: true, usedRecoveryCode: false };
 };
 
+/**
+ * Il limite sul secondo fattore è per account, non solo per IP e per challenge: il challenge
+ * muore dopo cinque codici ma se ne apre un altro rifacendo il login, e l'IP si cambia. Il
+ * contatore dell'utente invece segue il bersaglio, da qualunque strada arrivino i tentativi —
+ * il login e le rotte che chiedono password e codice passano tutte da qui.
+ *
+ * Costo accettato: chi conosce la password può tenere l'utente fuori dal secondo passo
+ * sbagliando codici di proposito. È il male minore rispetto a indovinarlo, e resta visibile:
+ * la password è compromessa e va cambiata comunque.
+ */
+const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFactorResult> => {
+    const rateLimitKey = secondFactorRateLimitKey(user.id);
+    assertLoginRateLimit(rateLimitKey);
+
+    const result = await checkSecondFactorCode(user, code);
+
+    if (result.valid) {
+        registerSuccessfulLogin(rateLimitKey);
+    } else {
+        registerFailedLogin(rateLimitKey);
+    }
+
+    return result;
+};
+
 export const completeTwoFactorLogin = async (challengeId: string, code: string, ip: string): Promise<LoginResult> => {
-    assertLoginRateLimit(ip);
+    assertIpLoginRateLimit(ip);
 
     // 410 e non 401: 401 è "questo codice è sbagliato, riprova", 410 è "non c'è più niente
     // da verificare, ricomincia dalla password". Il client deve poter distinguere i due casi
@@ -536,8 +615,9 @@ export const completeTwoFactorLogin = async (challengeId: string, code: string, 
     const result = await verifySecondFactor(user, code);
 
     if (!result.valid) {
-        // Due limiti insieme: i tentativi su questo challenge e quelli complessivi dell'IP.
-        // Un milione di combinazioni si esaurisce in fretta, se si può provare all'infinito.
+        // Tre limiti insieme: i tentativi su questo challenge, quelli dell'utente (contati in
+        // `verifySecondFactor`) e quelli complessivi dell'IP. Un milione di combinazioni si
+        // esaurisce in fretta, se si può provare all'infinito.
         registerFailedLogin(ip);
         const challengeStillOpen = registerFailedTwoFactorAttempt(challengeId);
 
@@ -547,7 +627,9 @@ export const completeTwoFactorLogin = async (challengeId: string, code: string, 
     }
 
     deleteTwoFactorChallenge(challengeId);
-    registerSuccessfulLogin(ip);
+    // Come al primo passo: si azzera il contatore di questo nome utente da questo IP, mai
+    // quello complessivo dell'IP.
+    registerSuccessfulLogin(loginAttemptRateLimitKey(ip, user.username));
 
     if (result.usedRecoveryCode) {
         // Il registro delle azioni non può attribuire questa richiesta, che arriva senza
@@ -586,9 +668,7 @@ export type TwoFactorSetup = { secretBase32: string; otpauthUri: string; qrDataU
 export const startTwoFactorSetup = async (userId: number, password: string): Promise<TwoFactorSetup> => {
     const user = await requireUserById(userId);
 
-    if (!(await verifyPassword(password, user.passwordHash))) {
-        throw new AuthManagerError("La password non è corretta", 400);
-    }
+    await assertCurrentPassword(user, password, "La password non è corretta");
 
     // Senza questo controllo la sola password basterebbe a sostituire un secondo fattore
     // attivo con uno nuovo: chi l'avesse rubata rientrerebbe, e la 2FA non proteggerebbe
@@ -671,9 +751,7 @@ export const confirmTwoFactorSetup = async (
 const assertPasswordAndSecondFactor = async (userId: number, password: string, code: string): Promise<UserRow> => {
     const user = await requireUserById(userId);
 
-    if (!(await verifyPassword(password, user.passwordHash))) {
-        throw new AuthManagerError("La password non è corretta", 400);
-    }
+    await assertCurrentPassword(user, password, "La password non è corretta");
 
     if (!isTwoFactorActive(user)) {
         throw new AuthManagerError("L'autenticazione a due fattori non è attiva", 400);
@@ -724,4 +802,16 @@ export const adminDisableTwoFactor = async (userId: number): Promise<PublicUser>
 
     const adminId = await getAdminUserId();
     return toPublicUser({ ...user, totpConfirmedAt: null }, user.id === adminId);
+};
+
+/**
+ * Per le azioni da amministratore rivolte al *proprio* account: una sessione admin rubata
+ * non deve bastare a togliere il secondo fattore a chi l'ha aperta. Il codice non si chiede —
+ * il caso per cui la rotta esiste è proprio il telefono perso — ma la password sì, con lo
+ * stesso limite di tentativi delle altre rotte che la richiedono.
+ */
+export const assertOwnPassword = async (userId: number, password: string): Promise<void> => {
+    const user = await requireUserById(userId);
+
+    await assertCurrentPassword(user, password, "La password non è corretta");
 };

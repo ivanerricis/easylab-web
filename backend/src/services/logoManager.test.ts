@@ -103,6 +103,35 @@ describe("getLogoFile", () => {
         expect(result.mimeType).toBe("image/svg+xml");
         expect(result.filePath).toMatch(/logo\.svg$/);
     });
+
+    /**
+     * `meta.json` arriva anche da un archivio di backup ripristinato, quindi può essere
+     * scritto da chiunque abbia preparato l'archivio. /assets/logo.jpg è pubblico: un nome
+     * di file preso alla lettera avrebbe servito a chiunque la chiave di cifratura.
+     */
+    it("ignora un nome di file che esce dalla cartella del logo e ripiega sul default", async () => {
+        readFile.mockResolvedValue(
+            JSON.stringify({ fileName: "../secret.key", mimeType: "image/png", updatedAt: "2026-01-01T00:00:00.000Z" })
+        );
+        access.mockResolvedValue(undefined);
+
+        const result = await getLogoFile();
+
+        expect(result.filePath).toMatch(/logo-placeholder\.png$/);
+        expect(access).not.toHaveBeenCalled();
+    });
+
+    it("serve il logo con il tipo deciso dal nome del file, non da quello scritto nei metadati", async () => {
+        readFile.mockResolvedValue(
+            JSON.stringify({ fileName: "logo.png", mimeType: "text/html", updatedAt: "2026-01-01T00:00:00.000Z" })
+        );
+        access.mockResolvedValue(undefined);
+
+        const result = await getLogoFile();
+
+        expect(result.mimeType).toBe("image/png");
+        expect(result.filePath).toMatch(/logo\.png$/);
+    });
 });
 
 describe("saveLogo", () => {

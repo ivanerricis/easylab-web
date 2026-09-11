@@ -57,15 +57,32 @@ export const getLogoStatus = async () => {
     return { hasCustomLogo: true, updatedAt: meta.updatedAt };
 };
 
+/**
+ * Gli unici file che `saveLogo` scrive, con il tipo con cui vanno serviti.
+ *
+ * `meta.json` non è un dato di cui fidarsi: un ripristino da archivio lo sostituisce con
+ * quello contenuto nell'archivio. Usarne `fileName` così com'è permetteva a un archivio
+ * preparato apposta (`"fileName": "../secret.key"`) di far servire qualunque file del
+ * container su /assets/logo.jpg, che è pubblico perché serve alla pagina di login. Anche il
+ * tipo si prende da qui e non dai metadati: un tipo a scelta sarebbe un modo per far
+ * interpretare il file al browser come qualcos'altro.
+ */
+const storedLogoMimeTypes: Record<string, string> = {
+    "logo.png": "image/png",
+    "logo.svg": "image/svg+xml",
+};
+
 export const getLogoFile = async (): Promise<{ filePath: string; mimeType: string }> => {
     const meta = await readMeta();
+    const mimeType =
+        meta && Object.hasOwn(storedLogoMimeTypes, meta.fileName) ? storedLogoMimeTypes[meta.fileName] : null;
 
-    if (meta) {
+    if (meta && mimeType) {
         const filePath = path.join(logoDir, meta.fileName);
 
         try {
             await fs.promises.access(filePath);
-            return { filePath, mimeType: meta.mimeType };
+            return { filePath, mimeType };
         } catch {
             // Il file referenziato nei metadati non esiste piu, uso il logo di default.
         }

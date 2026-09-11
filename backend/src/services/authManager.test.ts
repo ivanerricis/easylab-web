@@ -80,14 +80,16 @@ vi.mock("../db", () => ({
     },
 }));
 
-const isLoginRateLimited = vi.fn<(ip: string) => boolean>(() => false);
+const isLoginRateLimited = vi.fn<(key: string) => boolean>(() => false);
+const isIpLoginRateLimited = vi.fn<(ip: string) => boolean>(() => false);
 const registerFailedLogin = vi.fn();
 const registerSuccessfulLogin = vi.fn();
 
 vi.mock("./loginRateLimit", () => ({
-    isLoginRateLimited: (ip: string) => isLoginRateLimited(ip) as boolean,
-    registerFailedLogin: (ip: string) => registerFailedLogin(ip),
-    registerSuccessfulLogin: (ip: string) => registerSuccessfulLogin(ip),
+    isLoginRateLimited: (key: string) => isLoginRateLimited(key) as boolean,
+    isIpLoginRateLimited: (ip: string) => isIpLoginRateLimited(ip) as boolean,
+    registerFailedLogin: (key: string) => registerFailedLogin(key),
+    registerSuccessfulLogin: (key: string) => registerSuccessfulLogin(key),
 }));
 
 const decryptSecret = vi.fn();
@@ -98,19 +100,21 @@ vi.mock("./secretCrypto", () => ({
 }));
 
 const createTwoFactorChallenge = vi.fn<(userId: number) => string>(() => "challenge-1");
+const getTwoFactorChallengeUserId = vi.fn<(challengeId: string) => number | null>(() => null);
+const registerFailedTwoFactorAttempt = vi.fn<(challengeId: string) => boolean>(() => true);
 
 vi.mock("./twoFactorChallenge", () => ({
     createTwoFactorChallenge: (userId: number) => createTwoFactorChallenge(userId) as string,
     deleteTwoFactorChallenge: vi.fn(),
-    getTwoFactorChallengeUserId: vi.fn(),
-    registerFailedTwoFactorAttempt: vi.fn(),
+    getTwoFactorChallengeUserId: (challengeId: string) => getTwoFactorChallengeUserId(challengeId) as number | null,
+    registerFailedTwoFactorAttempt: (challengeId: string) => registerFailedTwoFactorAttempt(challengeId) as boolean,
 }));
 
 const deleteRecoveryCodes = vi.fn();
 
 vi.mock("../db/queries/recoveryCode", () => ({
     consumeRecoveryCode: vi.fn(),
-    countUnusedRecoveryCodes: vi.fn(),
+    countUnusedRecoveryCodes: vi.fn(() => Promise.resolve(0)),
     deleteRecoveryCodes: (userId: number) => deleteRecoveryCodes(userId),
     replaceRecoveryCodes: vi.fn(),
 }));
@@ -125,7 +129,15 @@ vi.mock("./companyManager", () => ({
     getCompanySettings: vi.fn(() => Promise.resolve({ name: "Laboratorio" })),
 }));
 
-import { AuthManagerError, getSessionUser, login } from "./authManager";
+import {
+    AuthManagerError,
+    changeOwnPassword,
+    completeTwoFactorLogin,
+    disableTwoFactor,
+    getSessionUser,
+    login,
+} from "./authManager";
+import { generateTotpCode } from "./totp";
 
 /** Nello stesso formato prodotto da `hashPassword`: `salt:derivata`, scrypt a 64 byte. */
 const hashLikeTheAppDoes = (password: string) => {
@@ -158,12 +170,26 @@ beforeEach(() => {
     queuedRows.clear();
     vi.clearAllMocks();
     isLoginRateLimited.mockReturnValue(false);
+    isIpLoginRateLimited.mockReturnValue(false);
     createTwoFactorChallenge.mockReturnValue("challenge-1");
+    getTwoFactorChallengeUserId.mockReturnValue(null);
+    registerFailedTwoFactorAttempt.mockReturnValue(true);
 });
 
+/** Un segreto Base32 valido: `verifyTotp` non è mockato, i codici si calcolano davvero. */
+const totpSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+
+const buildTwoFactorUser = (overrides: Record<string, unknown> = {}) =>
+    buildUser({ totpSecret: "cifrato", totpConfirmedAt: new Date("2026-02-01T00:00:00Z"), ...overrides });
+
+/** Le chiavi del limitatore, per distinguerle nelle asserzioni da quella del solo IP. */
+const secondFactorKey = "utente:7:secondo-fattore";
+const passwordKey = "utente:7:password";
+const accountKey = "accesso:mario@1.2.3.4";
+
 describe("login", () => {
-    it("rifiuta con 429 senza nemmeno cercare l'utente quando l'IP ha già sbagliato troppe volte", async () => {
-        isLoginRateLimited.mockReturnValue(true);
+    it("rifiuta con 429 senza nemmeno cercare l'utente quando l'IP ha superato il tetto complessivo", async () => {
+        isIpLoginRateLimited.mockReturnValue(true);
 
         await expect(login("mario", "password-giusta", "1.2.3.4")).rejects.toMatchObject({
             statusCode: 429,
@@ -171,6 +197,26 @@ describe("login", () => {
 
         expect(dbCalls).toHaveLength(0);
         expect(registerFailedLogin).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta con 429 senza nemmeno cercare l'utente quando quel nome utente ha sbagliato troppe volte da quell'IP", async () => {
+        isLoginRateLimited.mockImplementation((key) => key === accountKey);
+
+        await expect(login("mario", "password-giusta", "1.2.3.4")).rejects.toMatchObject({
+            statusCode: 429,
+        });
+
+        expect(isLoginRateLimited).toHaveBeenCalledWith(accountKey);
+        expect(dbCalls).toHaveLength(0);
+    });
+
+    it("una password sbagliata conta sia per l'IP sia per il nome utente da quell'IP", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(login("mario", "password-sbagliata", "1.2.3.4")).rejects.toMatchObject({ statusCode: 401 });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith("1.2.3.4");
+        expect(registerFailedLogin).toHaveBeenCalledWith(accountKey);
     });
 
     /**
@@ -202,7 +248,10 @@ describe("login", () => {
         expect((utenteInesistente as AuthManagerError).statusCode).toBe(
             (passwordSbagliata as AuthManagerError).statusCode
         );
-        expect(registerFailedLogin).toHaveBeenCalledTimes(2);
+        // Ognuno dei due conta sia per l'IP sia per il nome utente da quell'IP: nemmeno il
+        // limitatore tratta diversamente chi non esiste.
+        expect(registerFailedLogin).toHaveBeenCalledTimes(4);
+        expect(registerFailedLogin).toHaveBeenCalledWith("accesso:nessuno@1.2.3.4");
 
         scrypt.mockRestore();
     });
@@ -212,10 +261,43 @@ describe("login", () => {
 
         await expect(login("mario", "password-giusta", "1.2.3.4")).rejects.toMatchObject({ statusCode: 403 });
 
-        // La password era giusta: il tentativo non conta come fallito e nessuna sessione nasce.
-        expect(registerSuccessfulLogin).toHaveBeenCalledOnce();
+        // La password era giusta: il tentativo non conta come fallito, ma nemmeno azzera il
+        // contatore dell'IP, perché nessuna sessione nasce.
+        expect(registerSuccessfulLogin).not.toHaveBeenCalled();
         expect(registerFailedLogin).not.toHaveBeenCalled();
         expect(dbCalls.some((call) => call.op === "insert" && call.table === sessionTable)).toBe(false);
+    });
+
+    /**
+     * Il buco che questo test chiude: prima un login riuscito azzerava il contatore dell'IP,
+     * quindi chi aveva un account valido poteva provare quattro password su quello dell'admin,
+     * entrare con il proprio per ripartire da zero, e ricominciare all'infinito. Ora si azzera
+     * solo il contatore di chi è appena entrato: quello dell'IP e degli altri nomi restano.
+     */
+    it("un login riuscito azzera solo il contatore di quel nome utente, mai quello dell'IP", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        await login("mario", "password-giusta", "1.2.3.4");
+
+        expect(registerSuccessfulLogin).toHaveBeenCalledOnce();
+        expect(registerSuccessfulLogin).toHaveBeenCalledWith(accountKey);
+        expect(registerSuccessfulLogin).not.toHaveBeenCalledWith("1.2.3.4");
+    });
+
+    /**
+     * Il buco che questo test chiude: azzerare il contatore già a password giusta lasciava a
+     * chi la conosce un ciclo infinito — login, quattro codici sbagliati, di nuovo login —
+     * cioè tentativi illimitati sul secondo fattore.
+     */
+    it("con la 2FA attiva la sola password non azzera il contatore dell'IP", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        decryptSecret.mockResolvedValue(totpSecret);
+
+        const result = await login("mario", "password-giusta", "1.2.3.4");
+
+        expect(result.status).toBe("twoFactorRequired");
+        expect(registerSuccessfulLogin).not.toHaveBeenCalled();
     });
 
     it("salva nella sessione l'hash del token, mai il token che finisce nel cookie", async () => {
@@ -355,5 +437,134 @@ describe("getSessionUser", () => {
 
         expect(user).toBeNull();
         expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
+    });
+});
+
+/** Un codice a sei cifre che non è valido in nessuno dei tre passi accettati adesso. */
+const wrongTotpCode = () => {
+    const nearbyCodes = [-30_000, 0, 30_000].map((offset) => generateTotpCode(totpSecret, Date.now() + offset));
+    return ["000000", "111111", "222222", "333333"].find((code) => !nearbyCodes.includes(code))!;
+};
+
+describe("completeTwoFactorLogin", () => {
+    beforeEach(() => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        decryptSecret.mockResolvedValue(totpSecret);
+    });
+
+    it("con il codice giusto crea la sessione e azzera i contatori dell'utente, non quello dell'IP", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        queueAdminIdLookup(1);
+
+        const result = await completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4");
+
+        expect(result.status).toBe("authenticated");
+        expect(registerSuccessfulLogin).toHaveBeenCalledWith(accountKey);
+        expect(registerSuccessfulLogin).toHaveBeenCalledWith(secondFactorKey);
+        expect(registerSuccessfulLogin).not.toHaveBeenCalledWith("1.2.3.4");
+    });
+
+    it("rifiuta con 429 senza cercare il challenge quando l'IP ha superato il tetto complessivo", async () => {
+        isIpLoginRateLimited.mockReturnValue(true);
+
+        await expect(
+            completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4")
+        ).rejects.toMatchObject({ statusCode: 429 });
+
+        expect(getTwoFactorChallengeUserId).not.toHaveBeenCalled();
+    });
+
+    it("un codice sbagliato conta contro l'IP e contro l'utente", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(completeTwoFactorLogin("challenge-1", wrongTotpCode(), "1.2.3.4")).rejects.toMatchObject({
+            statusCode: 401,
+        });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith("1.2.3.4");
+        expect(registerFailedLogin).toHaveBeenCalledWith(secondFactorKey);
+        expect(registerFailedTwoFactorAttempt).toHaveBeenCalledWith("challenge-1");
+    });
+
+    /**
+     * Il limite che conta: segue l'account, non l'IP né il challenge. Cambiare indirizzo o
+     * rifare il login per ottenere un challenge nuovo non restituisce tentativi.
+     */
+    it("rifiuta con 429 senza nemmeno verificare il codice quando l'utente ha esaurito i tentativi", async () => {
+        isLoginRateLimited.mockImplementation((key) => key === secondFactorKey);
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(
+            completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "9.9.9.9")
+        ).rejects.toMatchObject({ statusCode: 429 });
+
+        expect(decryptSecret).not.toHaveBeenCalled();
+        expect(dbCalls.some((call) => call.op === "insert" && call.table === sessionTable)).toBe(false);
+    });
+});
+
+describe("changeOwnPassword", () => {
+    it("con la password attuale giusta la cambia e azzera il contatore dell'utente", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await changeOwnPassword(7, "password-giusta", "Nuova-password-1!", "token-corrente");
+
+        expect(registerSuccessfulLogin).toHaveBeenCalledWith(passwordKey);
+        expect(dbCalls.some((call) => call.op === "update" && call.table === userTable)).toBe(true);
+    });
+
+    it("una password attuale sbagliata conta contro l'utente", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(
+            changeOwnPassword(7, "password-sbagliata", "Nuova-password-1!", "token-corrente")
+        ).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith(passwordKey);
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+    });
+
+    /** Una sessione rubata non deve bastare a indovinare la password a forza bruta. */
+    it("rifiuta con 429 senza verificare la password quando l'utente ha esaurito i tentativi", async () => {
+        isLoginRateLimited.mockImplementation((key) => key === passwordKey);
+        const scrypt = vi.spyOn(crypto, "scrypt");
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(
+            changeOwnPassword(7, "password-giusta", "Nuova-password-1!", "token-corrente")
+        ).rejects.toMatchObject({ statusCode: 429 });
+
+        expect(scrypt).not.toHaveBeenCalled();
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+
+        scrypt.mockRestore();
+    });
+});
+
+describe("disableTwoFactor", () => {
+    beforeEach(() => {
+        decryptSecret.mockResolvedValue(totpSecret);
+    });
+
+    it("password giusta ma codice sbagliato: conta contro l'utente e non tocca la 2FA", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(disableTwoFactor(7, "password-giusta", wrongTotpCode())).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith(secondFactorKey);
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta con 429 anche un codice giusto quando l'utente ha esaurito i tentativi sul secondo fattore", async () => {
+        isLoginRateLimited.mockImplementation((key) => key === secondFactorKey);
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(disableTwoFactor(7, "password-giusta", generateTotpCode(totpSecret))).rejects.toMatchObject({
+            statusCode: 429,
+        });
+
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
     });
 });

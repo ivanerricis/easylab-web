@@ -7,12 +7,15 @@ vi.mock("../services/authManager", () => ({
     createUser: vi.fn(),
     regeneratePassword: vi.fn(),
     adminDisableTwoFactor: vi.fn(),
+    assertOwnPassword: vi.fn(),
     setUserActive: vi.fn(),
     deleteUser: vi.fn(),
 }));
 
+import { ApiError } from "../services/apiError";
 import {
     adminDisableTwoFactor,
+    assertOwnPassword,
     createUser,
     deleteUser,
     listUsers,
@@ -77,13 +80,54 @@ describe("users router", () => {
         expect(regeneratePassword).toHaveBeenCalledWith(2);
     });
 
-    it("disabilita la 2FA di un utente da amministratore", async () => {
+    /**
+     * Una password nuova in chiaro senza chiedere quella attuale: sul proprio account vorrebbe
+     * dire che una sessione admin rubata basta a prendersi l'account e chiudere fuori chi lo
+     * possiede.
+     */
+    it("rifiuta di rigenerare la propria stessa password", async () => {
+        const response = await request(buildApp(2)).post("/api/users/2/regenerate-password");
+
+        expect(response.status).toBe(400);
+        expect(regeneratePassword).not.toHaveBeenCalled();
+    });
+
+    it("disabilita la 2FA di un altro utente senza chiedere password", async () => {
         vi.mocked(adminDisableTwoFactor).mockResolvedValue(user as never);
 
-        const response = await request(buildApp()).post("/api/users/2/disable-2fa");
+        const response = await request(buildApp(1)).post("/api/users/2/disable-2fa");
 
         expect(response.status).toBe(200);
         expect(adminDisableTwoFactor).toHaveBeenCalledWith(2);
+        expect(assertOwnPassword).not.toHaveBeenCalled();
+    });
+
+    it("sulla propria 2FA pretende la password prima di disattivarla", async () => {
+        const response = await request(buildApp(2)).post("/api/users/2/disable-2fa");
+
+        expect(response.status).toBe(400);
+        expect(adminDisableTwoFactor).not.toHaveBeenCalled();
+    });
+
+    it("sulla propria 2FA, con la password giusta, la verifica e poi la disattiva", async () => {
+        vi.mocked(assertOwnPassword).mockResolvedValue(undefined);
+        vi.mocked(adminDisableTwoFactor).mockResolvedValue(user as never);
+
+        const response = await request(buildApp(2)).post("/api/users/2/disable-2fa").send({ password: "segreta" });
+
+        expect(response.status).toBe(200);
+        expect(assertOwnPassword).toHaveBeenCalledWith(2, "segreta");
+        expect(adminDisableTwoFactor).toHaveBeenCalledWith(2);
+    });
+
+    it("sulla propria 2FA, con la password sbagliata, non la disattiva", async () => {
+        vi.mocked(assertOwnPassword).mockRejectedValue(new ApiError("La password non è corretta", 400));
+
+        const response = await request(buildApp(2)).post("/api/users/2/disable-2fa").send({ password: "sbagliata" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toBe("La password non è corretta");
+        expect(adminDisableTwoFactor).not.toHaveBeenCalled();
     });
 
     it("disabilita un altro utente", async () => {

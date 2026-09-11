@@ -2,6 +2,8 @@ import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { KeyRound, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
 import CustomDialog from "@/components/dialogs/customDialog";
@@ -37,6 +39,14 @@ const UsersSettingsSection = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [userPendingTwoFactorReset, setUserPendingTwoFactorReset] = useState<UserDto | null>(null);
     const [isResettingTwoFactor, setIsResettingTwoFactor] = useState(false);
+    const [twoFactorResetPassword, setTwoFactorResetPassword] = useState("");
+    const isResettingOwnTwoFactor =
+        userPendingTwoFactorReset != null && userPendingTwoFactorReset.id === currentUser?.id;
+
+    const closeTwoFactorReset = () => {
+        setUserPendingTwoFactorReset(null);
+        setTwoFactorResetPassword("");
+    };
 
     const loadUsers = async () => {
         setIsLoading(true);
@@ -139,11 +149,19 @@ const UsersSettingsSection = () => {
             return;
         }
 
+        if (isResettingOwnTwoFactor && !twoFactorResetPassword) {
+            toast.error("Inserisci la tua password");
+            return;
+        }
+
         try {
             setIsResettingTwoFactor(true);
-            const updated = await disableUserTwoFactor(userPendingTwoFactorReset.id);
+            const updated = await disableUserTwoFactor(
+                userPendingTwoFactorReset.id,
+                isResettingOwnTwoFactor ? twoFactorResetPassword : undefined
+            );
             setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
-            setUserPendingTwoFactorReset(null);
+            closeTwoFactorReset();
             toast.success(`Verifica in due passaggi disattivata per "${updated.username}"`);
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi"));
@@ -154,13 +172,17 @@ const UsersSettingsSection = () => {
 
     const renderUserActions = (user: UserDto) => (
         <>
-            <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
-                <KeyRound className="size-4" />
-                Rigenera password
-            </Button>
+            {/* Non sul proprio account: il backend lo rifiuta, perché consegnerebbe una
+                password nuova senza chiedere quella attuale. Per sé c'è "Cambia password". */}
+            {user.id !== currentUser?.id ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
+                    <KeyRound className="size-4" />
+                    Rigenera password
+                </Button>
+            ) : null}
             {/* Anche sul proprio account, a differenza di "disabilita" ed "elimina": è
                 l'unico modo che un admin ha di rientrare dopo aver perso il telefono, senza
-                mettere le mani sulla macchina. */}
+                mettere le mani sulla macchina. Su di sé il dialogo chiede la password. */}
             {user.twoFactorEnabled ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingTwoFactorReset(user)}>
                     <ShieldOff className="size-4" />
@@ -379,20 +401,36 @@ const UsersSettingsSection = () => {
                 open={userPendingTwoFactorReset != null}
                 onOpenChange={(nextOpen) => {
                     if (!nextOpen) {
-                        setUserPendingTwoFactorReset(null);
+                        closeTwoFactorReset();
                     }
                 }}
                 title="Disattiva la verifica in due passaggi"
                 description={
                     userPendingTwoFactorReset
-                        ? `"${userPendingTwoFactorReset.username}" potrà rientrare con la sola password, e i suoi codici di recupero verranno cancellati. Le sessioni aperte verranno terminate. Fallo solo se ti ha chiesto lui di sbloccarlo.`
+                        ? isResettingOwnTwoFactor
+                            ? "Potrai rientrare con la sola password, e i tuoi codici di recupero verranno cancellati. Tutte le sessioni aperte verranno terminate, compresa questa. Conferma con la tua password."
+                            : `"${userPendingTwoFactorReset.username}" potrà rientrare con la sola password, e i suoi codici di recupero verranno cancellati. Le sessioni aperte verranno terminate. Fallo solo se ti ha chiesto lui di sbloccarlo.`
                         : undefined
+                }
+                content={
+                    isResettingOwnTwoFactor ? (
+                        <div className="grid gap-2 py-2">
+                            <Label htmlFor="ownTwoFactorResetPassword">Password</Label>
+                            <Input
+                                id="ownTwoFactorResetPassword"
+                                type="password"
+                                autoComplete="current-password"
+                                value={twoFactorResetPassword}
+                                onChange={(event) => setTwoFactorResetPassword(event.target.value)}
+                            />
+                        </div>
+                    ) : undefined
                 }
                 destructive
                 confirmLabel={isResettingTwoFactor ? "Disattivazione..." : "Disattiva"}
                 confirmIcon={ShieldOff}
                 cancelLabel="Annulla"
-                onCancel={() => setUserPendingTwoFactorReset(null)}
+                onCancel={closeTwoFactorReset}
                 onConfirm={() => void handleConfirmTwoFactorReset()}
                 cancelDisabled={isResettingTwoFactor}
                 confirmDisabled={isResettingTwoFactor}

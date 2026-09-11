@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+    isIpLoginRateLimited,
     isLoginRateLimited,
     loginRateLimitMaxAttempts,
+    loginRateLimitMaxAttemptsPerIp,
     loginRateLimitMaxEntries,
     loginRateLimitSize,
     loginRateLimitWindowMs,
@@ -51,6 +53,35 @@ describe("loginRateLimit", () => {
 
         registerSuccessfulLogin("1.2.3.4");
         expect(isLoginRateLimited("1.2.3.4")).toBe(false);
+    });
+
+    /**
+     * Il tetto per IP è più alto di quello per chiave: dietro l'IP pubblico del laboratorio
+     * ci sono tutti i colleghi, e qualche errore di battitura sparso fra loro non deve
+     * chiudere fuori nessuno.
+     */
+    it("il tetto complessivo per IP scatta solo dopo più tentativi di quello per chiave", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttemptsPerIp - 1; attempt += 1) {
+            registerFailedLogin("1.2.3.4");
+        }
+
+        expect(loginRateLimitMaxAttemptsPerIp).toBeGreaterThan(loginRateLimitMaxAttempts);
+        expect(isIpLoginRateLimited("1.2.3.4")).toBe(false);
+
+        registerFailedLogin("1.2.3.4");
+        expect(isIpLoginRateLimited("1.2.3.4")).toBe(true);
+    });
+
+    it("azzerare una chiave non tocca il contatore dell'IP né quello degli altri nomi utente", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttempts; attempt += 1) {
+            registerFailedLogin("1.2.3.4");
+            registerFailedLogin("accesso:admin@1.2.3.4");
+        }
+
+        registerSuccessfulLogin("accesso:mario@1.2.3.4");
+
+        expect(isLoginRateLimited("accesso:admin@1.2.3.4")).toBe(true);
+        expect(isLoginRateLimited("1.2.3.4")).toBe(true);
     });
 
     // Il caso che conta una volta esposti su internet: senza tetto, ogni IP sorgente

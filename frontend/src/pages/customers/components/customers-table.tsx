@@ -1,16 +1,15 @@
-﻿import EntityTable from "@/components/entity-table";
+import EntityTable from "@/components/entity-table";
+import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
 import type { CustomerDto } from "@/types/dtos";
-import { ClipboardList, HardHat, Pencil, Printer, Trash2 } from "lucide-react";
+import { Pencil, Printer, Trash2 } from "lucide-react";
 import type { CustomerColumn } from "./customer-columns";
 
 type CustomersTableProps = {
     columns: CustomerColumn[];
     rows: CustomerDto[];
-    onOpenCustomerReports: (id: number) => void;
-    onOpenCustomerInterventions: (id: number) => void;
-    onPrintCustomerReports: (id: number) => void;
-    onPrintCustomerInterventions: (id: number) => void;
+    onOpenCustomer: (id: number) => void;
+    onPrintCustomer: (id: number) => void;
     onEditCustomer: (id: number) => void;
     onDeleteCustomer: (customer: CustomerDto) => void;
     /** Stati di caricamento della lista: vedi `EntityTable`. */
@@ -22,10 +21,8 @@ type CustomersTableProps = {
 const CustomersTable = ({
     columns,
     rows,
-    onOpenCustomerReports,
-    onOpenCustomerInterventions,
-    onPrintCustomerReports,
-    onPrintCustomerInterventions,
+    onOpenCustomer,
+    onPrintCustomer,
     onEditCustomer,
     onDeleteCustomer,
     isInitialLoading,
@@ -34,41 +31,19 @@ const CustomersTable = ({
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
         <>
+            <OpenEntityButton
+                size="icon-lg"
+                onClick={() => onOpenCustomer(row.id)}
+                aria-label={`Apri cliente ${row.id}`}
+            />
             <TableActionButton
                 variant="default"
                 size="icon-lg"
                 className="bg-action-print/20 hover:bg-action-print/30"
-                onClick={() => onOpenCustomerReports(row.id)}
-                aria-label={`Apri report cliente ${row.id}`}
-            >
-                <ClipboardList className="size-5 text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-action-email/20 hover:bg-action-email/30"
-                onClick={() => onOpenCustomerInterventions(row.id)}
-                aria-label={`Apri interventi cliente ${row.id}`}
-            >
-                <HardHat className="size-5 text-action-email" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-action-print/20 hover:bg-action-print/30"
-                onClick={() => onPrintCustomerReports(row.id)}
-                aria-label={`Stampa resoconto report cliente ${row.id}`}
+                onClick={() => onPrintCustomer(row.id)}
+                aria-label={`Stampa resoconto cliente ${row.id}`}
             >
                 <Printer className="size-5 text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-action-email/20 hover:bg-action-email/30"
-                onClick={() => onPrintCustomerInterventions(row.id)}
-                aria-label={`Stampa resoconto interventi cliente ${row.id}`}
-            >
-                <Printer className="size-5 text-action-email" />
             </TableActionButton>
             <TableActionButton
                 variant="default"

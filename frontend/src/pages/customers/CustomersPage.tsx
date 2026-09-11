@@ -4,6 +4,8 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     createCustomer,
     deleteCustomer,
@@ -25,6 +27,8 @@ import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow, trimOrNull } from "@/lib/utils";
 
+type CustomerPrintKind = "reports" | "interventions";
+
 const toCustomerPayload = (values: CustomerSubmitValues) => ({
     firstName: values.firstName.trim(),
     lastName: trimOrNull(values.lastName),
@@ -44,8 +48,8 @@ const CustomersPage = () => {
     const [customerToEdit, setCustomerToEdit] = useState<CustomerDto | null>(null);
     const [customerToDelete, setCustomerToDelete] = useState<CustomerDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [printReportsCustomerId, setPrintReportsCustomerId] = useState<number | null>(null);
-    const [printInterventionsCustomerId, setPrintInterventionsCustomerId] = useState<number | null>(null);
+    const [printCustomerId, setPrintCustomerId] = useState<number | null>(null);
+    const [printKind, setPrintKind] = useState<CustomerPrintKind>("reports");
     const [pageSize, setPageSize] = useTableRowsPerPage("customers");
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [searchText, sortOption, pageSize],
@@ -91,36 +95,25 @@ const CustomersPage = () => {
         await loadCustomers();
     };
 
-    const handleOpenCustomerReports = (id: number) => {
+    const handleOpenCustomer = (id: number) => {
         navigate(`/clients/${id}`);
     };
 
-    const handleOpenCustomerInterventions = (id: number) => {
-        navigate(`/clients/${id}/interventions`);
+    const handlePrintCustomer = (id: number) => {
+        setPrintKind("reports");
+        setPrintCustomerId(id);
     };
 
-    const handlePrintCustomerReports = (id: number) => {
-        setPrintReportsCustomerId(id);
-    };
-
-    const handleConfirmPrintCustomerReports = (range: { dateFrom?: string; dateTo?: string }) => {
-        if (printReportsCustomerId == null) {
+    const handleConfirmPrintCustomer = (range: { dateFrom?: string; dateTo?: string }) => {
+        if (printCustomerId == null) {
             return;
         }
 
-        openPrintWindow(getCustomerReportsPrintUrl(printReportsCustomerId, range));
-    };
-
-    const handlePrintCustomerInterventions = (id: number) => {
-        setPrintInterventionsCustomerId(id);
-    };
-
-    const handleConfirmPrintCustomerInterventions = (range: { dateFrom?: string; dateTo?: string }) => {
-        if (printInterventionsCustomerId == null) {
-            return;
-        }
-
-        openPrintWindow(getCustomerInterventionsPrintUrl(printInterventionsCustomerId, range));
+        openPrintWindow(
+            printKind === "interventions"
+                ? getCustomerInterventionsPrintUrl(printCustomerId, range)
+                : getCustomerReportsPrintUrl(printCustomerId, range)
+        );
     };
 
     const handleDeleteCustomer = async () => {
@@ -174,25 +167,30 @@ const CustomersPage = () => {
             )}
 
             <PrintRangeDialog
-                open={printReportsCustomerId != null}
+                open={printCustomerId != null}
                 onOpenChange={(open) => {
                     if (!open) {
-                        setPrintReportsCustomerId(null);
+                        setPrintCustomerId(null);
                     }
                 }}
-                title="Stampa resoconto report"
-                onConfirm={handleConfirmPrintCustomerReports}
-            />
-
-            <PrintRangeDialog
-                open={printInterventionsCustomerId != null}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setPrintInterventionsCustomerId(null);
-                    }
-                }}
-                title="Stampa resoconto interventi"
-                onConfirm={handleConfirmPrintCustomerInterventions}
+                title="Stampa resoconto cliente"
+                onConfirm={handleConfirmPrintCustomer}
+                extraFields={
+                    <div className="grid gap-1">
+                        <Label htmlFor="print-customer-kind" className="text-lg">
+                            Cosa stampare
+                        </Label>
+                        <Select value={printKind} onValueChange={(value) => setPrintKind(value as CustomerPrintKind)}>
+                            <SelectTrigger id="print-customer-kind" className="w-full text-lg!">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                                <SelectItem value="reports">Report</SelectItem>
+                                <SelectItem value="interventions">Interventi</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                }
             />
 
             {isDeleteDialogOpen && (
@@ -232,10 +230,8 @@ const CustomersPage = () => {
                         skeletonRowCount={pageSize}
                         columns={customerColumns}
                         rows={customerRows}
-                        onOpenCustomerReports={handleOpenCustomerReports}
-                        onOpenCustomerInterventions={handleOpenCustomerInterventions}
-                        onPrintCustomerReports={handlePrintCustomerReports}
-                        onPrintCustomerInterventions={handlePrintCustomerInterventions}
+                        onOpenCustomer={handleOpenCustomer}
+                        onPrintCustomer={handlePrintCustomer}
                         onEditCustomer={handleOpenEditDialog}
                         onDeleteCustomer={handleOpenDeleteDialog}
                     />

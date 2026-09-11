@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,8 @@ type PrintRangeDialogProps = {
     onOpenChange: (open: boolean) => void;
     title: string;
     description?: string;
+    /** Campi in più prima dell'intervallo di date, es. la scelta di cosa stampare. */
+    extraFields?: ReactNode;
     onConfirm: (range: { dateFrom?: string; dateTo?: string }) => void;
 };
 
@@ -17,6 +19,7 @@ const PrintRangeDialog = ({
     onOpenChange,
     title,
     description = "Specifica un intervallo di date oppure lascia i campi vuoti per stampare tutto lo storico.",
+    extraFields,
     onConfirm,
 }: PrintRangeDialogProps) => {
     const [dateFrom, setDateFrom] = useState("");
@@ -65,32 +68,35 @@ const PrintRangeDialog = ({
                     // Etichette e campi alla stessa misura degli altri dialoghi, e un po' d'aria
                     // sotto la descrizione, a cui prima le etichette stavano attaccate. Sotto sm
                     // le due date vanno una sotto l'altra: affiancate non ci stavano.
-                    <div className="grid gap-4 py-4 sm:grid-cols-2">
-                        <div className="grid gap-1">
-                            <Label htmlFor="print-range-date-from" className="text-lg">
-                                Da
-                            </Label>
-                            <Input
-                                id="print-range-date-from"
-                                type="date"
-                                className="text-lg!"
-                                value={dateFrom}
-                                max={dateTo || undefined}
-                                onChange={(event) => setDateFrom(event.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-1">
-                            <Label htmlFor="print-range-date-to" className="text-lg">
-                                A
-                            </Label>
-                            <Input
-                                id="print-range-date-to"
-                                type="date"
-                                className="text-lg!"
-                                value={dateTo}
-                                min={dateFrom || undefined}
-                                onChange={(event) => setDateTo(event.target.value)}
-                            />
+                    <div className="grid gap-4 py-4">
+                        {extraFields}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-1">
+                                <Label htmlFor="print-range-date-from" className="text-lg">
+                                    Da
+                                </Label>
+                                <Input
+                                    id="print-range-date-from"
+                                    type="date"
+                                    className="text-lg!"
+                                    value={dateFrom}
+                                    max={dateTo || undefined}
+                                    onChange={(event) => setDateFrom(event.target.value)}
+                                />
+                            </div>
+                            <div className="grid gap-1">
+                                <Label htmlFor="print-range-date-to" className="text-lg">
+                                    A
+                                </Label>
+                                <Input
+                                    id="print-range-date-to"
+                                    type="date"
+                                    className="text-lg!"
+                                    value={dateTo}
+                                    min={dateFrom || undefined}
+                                    onChange={(event) => setDateTo(event.target.value)}
+                                />
+                            </div>
                         </div>
                     </div>
                 }

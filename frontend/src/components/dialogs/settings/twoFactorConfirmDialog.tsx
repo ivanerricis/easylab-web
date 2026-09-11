@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
+import { RequiredMark } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -86,7 +87,10 @@ const TwoFactorConfirmDialog = ({
             content={
                 <div className="grid gap-3 py-2">
                     <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmPassword">Password</Label>
+                        <Label htmlFor="twoFactorConfirmPassword">
+                            Password
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="twoFactorConfirmPassword"
                             type="password"
@@ -97,7 +101,10 @@ const TwoFactorConfirmDialog = ({
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmCode">Codice di verifica o di recupero</Label>
+                        <Label htmlFor="twoFactorConfirmCode">
+                            Codice di verifica o di recupero
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="twoFactorConfirmCode"
                             autoComplete="one-time-code"

@@ -87,9 +87,9 @@ describe("CreateInterventionDialog", () => {
     };
 
     const fillCustomerAndCollaborator = async () => {
-        await userEvent.type(screen.getByLabelText("Cliente"), "mario");
+        await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
         await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }));
-        await chooseOption("Collaboratore", "Luca Bianchi");
+        await chooseOption(/^Collaboratore/, "Luca Bianchi");
     };
 
     it("parte da una consegna programmata per oggi", async () => {
@@ -120,7 +120,7 @@ describe("CreateInterventionDialog", () => {
             "Seleziona un cliente",
             "Seleziona un collaboratore",
         ]);
-        expect(screen.getByLabelText("Cliente")).toHaveFocus();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
@@ -155,7 +155,7 @@ describe("CreateInterventionDialog", () => {
         await fillCustomerAndCollaborator();
         await chooseOption("Tipo intervento", "Intervento in sede");
         await chooseOption("Stato", "Completato");
-        await userEvent.type(screen.getByLabelText("Problema"), "Stampante bloccata");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Stampante bloccata");
         setTime(/^Ora inizio/, "11:00");
         setTime(/^Ora fine/, "10:00");
         await save();
@@ -199,7 +199,7 @@ describe("CreateInterventionDialog", () => {
 
         await chooseOption("Stato", "In lavorazione");
 
-        expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName("Ora inizio");
+        expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName("Ora inizio(obbligatorio)");
     });
 
     /** Tornando a una consegna gli orari già scritti non vanno spediti: non hanno senso. */
@@ -208,7 +208,7 @@ describe("CreateInterventionDialog", () => {
 
         await fillCustomerAndCollaborator();
         await chooseOption("Tipo intervento", "Intervento in sede");
-        await userEvent.type(screen.getByLabelText("Problema"), "Rete lenta");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Rete lenta");
         setTime(/^Ora inizio/, "09:00");
         await chooseOption("Tipo intervento", "Consegna materiale");
         await save();
@@ -248,7 +248,7 @@ describe("EditInterventionDialog", () => {
                 onSubmit={onSubmit}
             />
         );
-        await screen.findByLabelText("Problema");
+        await screen.findByLabelText(/^Problema/);
         return onSubmit;
     };
 
@@ -263,8 +263,8 @@ describe("EditInterventionDialog", () => {
         expect(screen.getByRole("dialog", { name: "Modifica intervento #9" })).toBeInTheDocument();
         expect(screen.getByLabelText(/^Ora inizio/)).toHaveValue("09:00");
         expect(screen.getByLabelText(/^Ora fine/)).toHaveValue("10:15");
-        expect(screen.getByLabelText("Problema")).toHaveValue("Rete assente");
-        expect(screen.getByRole("combobox", { name: "Collaboratore" })).toHaveTextContent("Luca Bianchi");
+        expect(screen.getByLabelText(/^Problema/)).toHaveValue("Rete assente");
+        expect(screen.getByRole("combobox", { name: /^Collaboratore/ })).toHaveTextContent("Luca Bianchi");
     });
 
     it("salva le modifiche", async () => {

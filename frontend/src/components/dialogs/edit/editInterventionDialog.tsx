@@ -1,5 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError } from "@/components/form-field";
+import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -224,6 +224,7 @@ const EditInterventionDialog = ({
                                     <div className="grid gap-1">
                                         <Label htmlFor="collaboratorId" className="text-lg">
                                             Collaboratore
+                                            <RequiredMark />
                                         </Label>
                                         <Select
                                             value={formValues.collaboratorId}
@@ -313,6 +314,7 @@ const EditInterventionDialog = ({
                                     <div className="grid gap-1">
                                         <Label htmlFor="interventionDate" className="text-lg">
                                             {interventionDateLabel(formValues.type)}
+                                            <RequiredMark />
                                         </Label>
                                         <DatePickerField
                                             id="interventionDate"
@@ -331,6 +333,14 @@ const EditInterventionDialog = ({
                                             <div className="grid gap-1">
                                                 <Label htmlFor="startTime" className="text-lg">
                                                     Ora inizio
+                                                    {isScheduled ? (
+                                                        <span className="text-base text-muted-foreground">
+                                                            {" "}
+                                                            (facoltativa)
+                                                        </span>
+                                                    ) : (
+                                                        <RequiredMark />
+                                                    )}
                                                 </Label>
                                                 <Input
                                                     {...fieldProps("startTime", { error: errors.startTime })}
@@ -351,6 +361,14 @@ const EditInterventionDialog = ({
                                             <div className="grid gap-1">
                                                 <Label htmlFor="endTime" className="text-lg">
                                                     Ora fine
+                                                    {isScheduled ? (
+                                                        <span className="text-base text-muted-foreground">
+                                                            {" "}
+                                                            (facoltativa)
+                                                        </span>
+                                                    ) : (
+                                                        <RequiredMark />
+                                                    )}
                                                 </Label>
                                                 <Input
                                                     {...fieldProps("endTime", { error: errors.endTime })}
@@ -374,6 +392,7 @@ const EditInterventionDialog = ({
                                         <div className="grid gap-1 lg:col-span-2">
                                             <Label htmlFor="problem" className="text-lg">
                                                 Problema
+                                                <RequiredMark />
                                             </Label>
                                             <Textarea
                                                 {...fieldProps("problem", { error: errors.problem })}
@@ -395,7 +414,9 @@ const EditInterventionDialog = ({
                                             {interventionDescriptionLabel(formValues.type)}
                                             {isScheduled ? (
                                                 <span className="text-base text-muted-foreground"> (facoltativo)</span>
-                                            ) : null}
+                                            ) : (
+                                                <RequiredMark />
+                                            )}
                                         </Label>
                                         <Textarea
                                             {...fieldProps("description", { error: errors.description })}

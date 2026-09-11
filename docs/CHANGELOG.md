@@ -11,6 +11,36 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Asterisco sui campi obbligatori, in tutti i dialoghi
+
+**Cosa.** I dialoghi con etichette scritte a mano (`create`/`editReportDialog`,
+`create`/`editInterventionDialog`, i dialoghi di impostazioni con password e codici 2FA)
+ora segnano i campi obbligatori con lo stesso asterisco + "(obbligatorio)" per gli screen
+reader che `FormField` metteva già nei dialoghi anagrafici (cliente, tecnico, collaboratore,
+dispositivo, difetto). Il markup del segno è stato estratto in `RequiredMark`
+(`form-field.tsx`), riusato sia da `FormField` sia dalle etichette scritte a mano.
+
+*Perché:* nei dialoghi senza `FormField` (report e interventi, con la loro griglia a due
+colonne) l'obbligatorietà di un campo si vedeva solo sbagliando a salvare — il messaggio
+sotto il campo arrivava dopo il tentativo, non prima. Segnare i campi obbligatori chiude un
+gap di coerenza tra dialoghi che condividono la stessa validazione ma erano nati con
+impaginazioni diverse.
+
+Per i campi la cui obbligatorietà dipende dallo stato del modulo (orari e assistenza di un
+intervento, obbligatori solo se non "programmato"; il collaboratore di un report, obbligatorio
+solo se "chiuso"; il problema riscontrato, obbligatorio solo con il difetto "Altro") l'asterisco
+compare e scompare insieme alla regola — stessa logica già usata per il testo "(facoltativo)"
+che questi dialoghi mostravano nel caso opposto.
+
+I test che leggevano l'etichetta con `getByLabelText("Testo esatto")` sono passati a una regex
+ancorata all'inizio (`/^Testo/`), la stessa convenzione già in uso per i campi di `FormField`:
+il nome accessibile ora ha del testo in più in coda.
+
+→ [frontend/src/components/form-field.tsx](../frontend/src/components/form-field.tsx),
+[frontend/src/components/dialogs/](../frontend/src/components/dialogs/)
+
+---
+
 ## 2026-09-11 — Copertura di test del frontend, e i difetti che ha trovato
 
 **Cosa.** Il frontend passa da 13 file e 81 test a **65 file e 503 test**, tutti verdi, con

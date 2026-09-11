@@ -16,6 +16,21 @@ type FormFieldProps = {
 };
 
 /**
+ * L'asterisco visibile e il testo "(obbligatorio)" per gli screen reader, da mettere dentro
+ * un'etichetta. Estratto da `FormField` per le stesse etichette scritte a mano nei dialoghi di
+ * report e interventi (vedi `FieldError`), che altrimenti duplicherebbero questo markup campo
+ * per campo.
+ */
+export const RequiredMark = () => (
+    <>
+        <span aria-hidden="true" className="text-destructive">
+            *
+        </span>
+        <span className="sr-only">(obbligatorio)</span>
+    </>
+);
+
+/**
  * Il solo messaggio d'errore, da mettere sotto un controllo nei form che hanno già la propria
  * impaginazione di etichette: i dialoghi di report e interventi, dove i campi stanno in griglie
  * a due colonne e non conviene rifarne il contorno.
@@ -49,14 +64,7 @@ const FormField = ({ id, label, required = false, error, className, children }: 
         <div className={cn("grid", className)}>
             <Label htmlFor={id} className="text-lg">
                 {label}
-                {required ? (
-                    <>
-                        <span aria-hidden="true" className="text-destructive">
-                            *
-                        </span>
-                        <span className="sr-only">(obbligatorio)</span>
-                    </>
-                ) : null}
+                {required ? <RequiredMark /> : null}
             </Label>
             {children}
             <FieldError id={id} error={error} />

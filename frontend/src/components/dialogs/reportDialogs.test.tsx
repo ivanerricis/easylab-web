@@ -118,7 +118,7 @@ describe("CreateReportDialog", () => {
             "Seleziona se l'alimentatore è presente",
             "Seleziona se deve essere effettuato il backup dati",
         ]);
-        expect(screen.getByLabelText("Cliente")).toHaveFocus();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
@@ -129,7 +129,7 @@ describe("CreateReportDialog", () => {
             expect(listIssues).toHaveBeenCalled();
         });
 
-        await userEvent.type(screen.getByLabelText("Difetto"), "Tastiera bagnata");
+        await userEvent.type(screen.getByLabelText(/^Difetto/), "Tastiera bagnata");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         expect(screen.getByText(/Seleziona un difetto esistente, oppure creane uno nuovo/)).toBeInTheDocument();
@@ -141,13 +141,13 @@ describe("CreateReportDialog", () => {
             expect(listIssues).toHaveBeenCalled();
         });
 
-        await pickSuggestion(screen.getByLabelText("Cliente"), "mario", "Mario Rossi - 333");
-        await pickSuggestion(screen.getByLabelText("Tipologia dispositivo"), "note", "Notebook");
-        await pickSuggestion(screen.getByLabelText("Difetto"), "schermo", "Schermo rotto");
-        expect(screen.queryByLabelText("Problema riscontrato")).not.toBeInTheDocument();
+        await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
+        await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+        expect(screen.queryByLabelText(/^Problema riscontrato/)).not.toBeInTheDocument();
         await userEvent.type(screen.getByLabelText("Password sblocco"), "1234");
-        await chooseOption("Alimentatore presente", "Si");
-        await chooseOption("Backup dati", "No");
+        await chooseOption(/^Alimentatore presente/, "Si");
+        await chooseOption(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -177,17 +177,17 @@ describe("CreateReportDialog", () => {
             expect(listIssues).toHaveBeenCalled();
         });
 
-        await pickSuggestion(screen.getByLabelText("Cliente"), "mario", "Mario Rossi - 333");
-        await pickSuggestion(screen.getByLabelText("Tipologia dispositivo"), "smart", "Smartphone");
-        await pickSuggestion(screen.getByLabelText("Difetto"), "alt", "Altro");
-        await chooseOption("Alimentatore presente", "No");
-        await chooseOption("Backup dati", "Si");
+        await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
+        await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "smart", "Smartphone");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "alt", "Altro");
+        await chooseOption(/^Alimentatore presente/, "No");
+        await chooseOption(/^Backup dati/, "Si");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         expect(screen.getByRole("alert")).toHaveTextContent('Con il difetto "Altro" va descritto il problema');
         expect(onSubmit).not.toHaveBeenCalled();
 
-        await userEvent.type(screen.getByLabelText("Problema riscontrato"), "  Non carica la batteria  ");
+        await userEvent.type(screen.getByLabelText(/^Problema riscontrato/), "  Non carica la batteria  ");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -202,11 +202,11 @@ describe("CreateReportDialog", () => {
             expect(listIssues).toHaveBeenCalled();
         });
 
-        await userEvent.type(screen.getByLabelText("Cliente"), "Mario Rossi");
-        await userEvent.type(screen.getByLabelText("Tipologia dispositivo"), "Tablet");
-        await pickSuggestion(screen.getByLabelText("Difetto"), "schermo", "Schermo rotto");
-        await chooseOption("Alimentatore presente", "No");
-        await chooseOption("Backup dati", "No");
+        await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+        await userEvent.type(screen.getByLabelText(/^Tipologia dispositivo/), "Tablet");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+        await chooseOption(/^Alimentatore presente/, "No");
+        await chooseOption(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -222,10 +222,10 @@ describe("CreateReportDialog", () => {
             expect(listIssues).toHaveBeenCalled();
         });
 
-        await pickSuggestion(screen.getByLabelText("Difetto"), "Tastiera bagnata", 'Crea "Tastiera bagnata"');
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "Tastiera bagnata", 'Crea "Tastiera bagnata"');
 
         expect(createIssue).toHaveBeenCalledWith({ description: "Tastiera bagnata" });
-        expect(screen.getByLabelText("Difetto")).toHaveValue("Tastiera bagnata");
+        expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Tastiera bagnata");
     });
 });
 
@@ -276,7 +276,7 @@ describe("EditReportDialog", () => {
         expect(getReport).toHaveBeenCalledWith(7);
         expect(screen.getByRole("dialog", { name: "Modifica report #7" })).toBeInTheDocument();
         expect(screen.getByLabelText("Password sblocco")).toHaveValue("0000");
-        expect(screen.getByRole("combobox", { name: "Dispositivo" })).toHaveTextContent("Notebook");
+        expect(screen.getByRole("combobox", { name: /^Dispositivo/ })).toHaveTextContent("Notebook");
         expect(screen.getByRole("combobox", { name: "Tecnico" })).toHaveTextContent("Paolo");
         expect(screen.getByLabelText("Prezzo interno")).toHaveValue(80);
         expect(screen.getByRole("radio", { name: "Contanti" })).toBeChecked();
@@ -339,7 +339,7 @@ describe("EditReportDialog", () => {
         );
         expect(onSubmit).not.toHaveBeenCalled();
 
-        await chooseOption("Collaboratore", "Luca Bianchi");
+        await chooseOption(/^Collaboratore/, "Luca Bianchi");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -392,11 +392,11 @@ describe("EditReportDialog", () => {
     it("passando ad 'Altro' chiede il problema e lo consegna", async () => {
         const onSubmit = await renderDialog();
 
-        await chooseOption("Difetto catalogo", "Altro");
+        await chooseOption(/^Difetto catalogo/, "Altro");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
         expect(screen.getByRole("alert")).toHaveTextContent('Con il difetto "Altro" va descritto il problema');
 
-        await userEvent.type(screen.getByLabelText("Problema riscontrato"), "Ventola rumorosa");
+        await userEvent.type(screen.getByLabelText(/^Problema riscontrato/), "Ventola rumorosa");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -413,9 +413,9 @@ describe("EditReportDialog", () => {
     it("azzera il problema scritto quando il difetto non è più 'Altro'", async () => {
         getReport.mockResolvedValue({ ...report, issueId: 21, issueDescription: "Ventola rumorosa" });
         const onSubmit = await renderDialog();
-        expect(screen.getByLabelText("Problema riscontrato")).toHaveValue("Ventola rumorosa");
+        expect(screen.getByLabelText(/^Problema riscontrato/)).toHaveValue("Ventola rumorosa");
 
-        await chooseOption("Difetto catalogo", "Schermo rotto");
+        await chooseOption(/^Difetto catalogo/, "Schermo rotto");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {

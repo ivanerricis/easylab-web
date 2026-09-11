@@ -1,5 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError } from "@/components/form-field";
+import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import { isCatchAllIssue } from "@/lib/issues";
@@ -252,6 +252,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 <div className="grid lg:col-span-1">
                                     <Label htmlFor="client" className="text-lg">
                                         Cliente
+                                        <RequiredMark />
                                     </Label>
                                     <div className="flex">
                                         <InputWithAdd
@@ -289,6 +290,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 <div className="grid lg:col-span-2 xl:col-span-1">
                                     <Label htmlFor="deviceType" className="text-lg">
                                         Tipologia dispositivo
+                                        <RequiredMark />
                                     </Label>
                                     <div className="flex">
                                         <InputWithAdd
@@ -342,6 +344,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 <div className="grid lg:col-span-2 xl:col-span-1">
                                     <Label htmlFor="issue" className="text-lg">
                                         Difetto
+                                        <RequiredMark />
                                     </Label>
                                     <div className="flex">
                                         <InputWithAdd
@@ -395,6 +398,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                     <div className="grid lg:col-span-2 xl:col-span-2">
                                         <Label htmlFor="issueDescription" className="text-lg">
                                             Problema riscontrato
+                                            <RequiredMark />
                                         </Label>
                                         <Textarea
                                             {...fieldProps("issueDescription", { error: fieldErrors.issueDescription })}
@@ -456,6 +460,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 <div className="grid gap-2 rounded-md">
                                     <Label htmlFor="charger" className="w-full text-lg">
                                         Alimentatore presente
+                                        <RequiredMark />
                                     </Label>
                                     <Select
                                         value={formValues.charger}
@@ -485,6 +490,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 <div className="grid gap-2 rounded-md">
                                     <Label htmlFor="dataBackup" className="w-full text-lg">
                                         Backup dati
+                                        <RequiredMark />
                                     </Label>
                                     <Select
                                         value={formValues.dataBackup}

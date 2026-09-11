@@ -107,7 +107,7 @@ describe("UsersSettingsSection", () => {
         expect(toast.error).toHaveBeenCalledWith("Inserisci la tua password");
         expect(api.disableUserTwoFactor).not.toHaveBeenCalled();
 
-        await userEvent.type(within(dialog).getByLabelText("Password"), "segreta1!");
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
         await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
 
         await waitFor(() => {
@@ -204,8 +204,8 @@ describe("SecuritySettingsSection", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Disattiva" }));
         const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
-        await userEvent.type(within(dialog).getByLabelText("Password"), "segreta1!");
-        await userEvent.type(within(dialog).getByLabelText("Codice di verifica o di recupero"), "123456");
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), "123456");
         await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
 
         expect(await screen.findByText("Non attiva")).toBeInTheDocument();
@@ -220,8 +220,8 @@ describe("SecuritySettingsSection", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Disattiva" }));
         const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
-        await userEvent.type(within(dialog).getByLabelText("Password"), "segreta1!");
-        await userEvent.type(within(dialog).getByLabelText("Codice di verifica o di recupero"), "000000");
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), "000000");
         await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
 
         await waitFor(() => {

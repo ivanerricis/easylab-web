@@ -1,5 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError } from "@/components/form-field";
+import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -340,6 +340,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     <div className="grid gap-1">
                                         <Label htmlFor="deviceId" className="text-lg">
                                             Dispositivo
+                                            <RequiredMark />
                                         </Label>
                                         <Select
                                             value={formValues.deviceId}
@@ -369,6 +370,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
                                         <Label htmlFor="collaboratorId" className="text-lg">
                                             Collaboratore
+                                            {formValues.closed ? <RequiredMark /> : null}
                                         </Label>
                                         <Select
                                             value={formValues.collaboratorId}
@@ -413,6 +415,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
                                         <Label htmlFor="issueId" className="text-lg">
                                             Difetto catalogo
+                                            <RequiredMark />
                                         </Label>
                                         <Select
                                             value={formValues.issueId}
@@ -458,6 +461,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         <div className="grid gap-1 sm:col-span-2">
                                             <Label htmlFor="issueDescription" className="text-lg">
                                                 Problema riscontrato
+                                                <RequiredMark />
                                             </Label>
                                             <Textarea
                                                 {...fieldProps("issueDescription", {

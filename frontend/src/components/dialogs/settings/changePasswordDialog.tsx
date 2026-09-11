@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Check, Eye, EyeOff, Save, X } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
+import { RequiredMark } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,7 +81,10 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             content={
                 <div className="grid gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="currentPassword">Password attuale</Label>
+                        <Label htmlFor="currentPassword">
+                            Password attuale
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="currentPassword"
                             type="password"
@@ -93,7 +97,10 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="newPassword">Nuova password</Label>
+                        <Label htmlFor="newPassword">
+                            Nuova password
+                            <RequiredMark />
+                        </Label>
                         <div className="relative">
                             <Input
                                 id="newPassword"
@@ -141,7 +148,10 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="confirmPassword">Conferma nuova password</Label>
+                        <Label htmlFor="confirmPassword">
+                            Conferma nuova password
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="confirmPassword"
                             type={isPasswordVisible ? "text" : "password"}

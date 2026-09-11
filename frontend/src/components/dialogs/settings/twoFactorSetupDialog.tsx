@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
 import CopyableValue from "@/components/dialogs/settings/copyableValue";
+import { RequiredMark } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { enableTwoFactor, getApiErrorMessage, startTwoFactorSetup } from "@/lib/api";
@@ -91,7 +92,10 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                 preventOutsideClose
                 content={
                     <div className="grid gap-2 py-2">
-                        <Label htmlFor="twoFactorPassword">Password</Label>
+                        <Label htmlFor="twoFactorPassword">
+                            Password
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="twoFactorPassword"
                             type="password"
@@ -137,7 +141,10 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                     />
 
                     <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmCode">Codice di verifica</Label>
+                        <Label htmlFor="twoFactorConfirmCode">
+                            Codice di verifica
+                            <RequiredMark />
+                        </Label>
                         <Input
                             id="twoFactorConfirmCode"
                             autoComplete="one-time-code"

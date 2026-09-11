@@ -1,5 +1,5 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError } from "@/components/form-field";
+import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
@@ -234,6 +234,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 <div className="grid">
                                     <Label htmlFor="customer" className="text-lg">
                                         Cliente
+                                        <RequiredMark />
                                     </Label>
                                     <div className="flex">
                                         <InputWithAdd
@@ -271,6 +272,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 <div className="grid gap-1">
                                     <Label htmlFor="collaboratorId" className="text-lg">
                                         Collaboratore
+                                        <RequiredMark />
                                     </Label>
                                     <Select
                                         value={formValues.collaboratorId}
@@ -354,6 +356,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 <div className="grid gap-1">
                                     <Label htmlFor="interventionDate" className="text-lg">
                                         {interventionDateLabel(formValues.type)}
+                                        <RequiredMark />
                                     </Label>
                                     <DatePickerField
                                         id="interventionDate"
@@ -377,7 +380,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                                         {" "}
                                                         (facoltativa)
                                                     </span>
-                                                ) : null}
+                                                ) : (
+                                                    <RequiredMark />
+                                                )}
                                             </Label>
                                             <Input
                                                 {...fieldProps("startTime", { error: errors.startTime })}
@@ -403,7 +408,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                                         {" "}
                                                         (facoltativa)
                                                     </span>
-                                                ) : null}
+                                                ) : (
+                                                    <RequiredMark />
+                                                )}
                                             </Label>
                                             <Input
                                                 {...fieldProps("endTime", { error: errors.endTime })}
@@ -424,6 +431,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     <div className="grid gap-1 lg:col-span-2">
                                         <Label htmlFor="problem" className="text-lg">
                                             Problema
+                                            <RequiredMark />
                                         </Label>
                                         <Textarea
                                             {...fieldProps("problem", { error: errors.problem })}
@@ -445,7 +453,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                         {interventionDescriptionLabel(formValues.type)}
                                         {isScheduled ? (
                                             <span className="text-base text-muted-foreground"> (facoltativo)</span>
-                                        ) : null}
+                                        ) : (
+                                            <RequiredMark />
+                                        )}
                                     </Label>
                                     <Textarea
                                         {...fieldProps("description", { error: errors.description })}

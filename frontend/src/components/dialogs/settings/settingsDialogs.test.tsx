@@ -53,7 +53,7 @@ describe("ChangePasswordDialog", () => {
 
         expect(requirementItems().filter((item) => item.className.includes("line-through"))).toHaveLength(0);
 
-        await userEvent.type(screen.getByLabelText("Nuova password"), "abcdefgh1");
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "abcdefgh1");
 
         const satisfied = requirementItems()
             .filter((item) => item.className.includes("line-through"))
@@ -66,9 +66,9 @@ describe("ChangePasswordDialog", () => {
         const onOpenChange = vi.fn();
         renderWithProviders(<ChangePasswordDialog open onOpenChange={onOpenChange} />);
 
-        await userEvent.type(screen.getByLabelText("Password attuale"), "vecchia");
-        await userEvent.type(screen.getByLabelText("Nuova password"), "nuova-pass1!");
-        await userEvent.type(screen.getByLabelText("Conferma nuova password"), "nuova-pass1!");
+        await userEvent.type(screen.getByLabelText(/^Password attuale/), "vecchia");
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "nuova-pass1!");
+        await userEvent.type(screen.getByLabelText(/^Conferma nuova password/), "nuova-pass1!");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -76,7 +76,7 @@ describe("ChangePasswordDialog", () => {
         });
         expect(changeOwnPassword).toHaveBeenCalledWith({ currentPassword: "vecchia", newPassword: "nuova-pass1!" });
         expect(toastSuccess).toHaveBeenCalledWith("Password aggiornata con successo");
-        expect(screen.getByLabelText("Password attuale")).toHaveValue("");
+        expect(screen.getByLabelText(/^Password attuale/)).toHaveValue("");
     });
 
     it("non invia password non conformi o diverse fra loro", async () => {
@@ -85,9 +85,9 @@ describe("ChangePasswordDialog", () => {
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
         expect(toastError).toHaveBeenLastCalledWith("Inserisci la password attuale");
 
-        await userEvent.type(screen.getByLabelText("Password attuale"), "vecchia");
-        await userEvent.type(screen.getByLabelText("Nuova password"), "nuova-pass1!");
-        await userEvent.type(screen.getByLabelText("Conferma nuova password"), "nuova-pass2!");
+        await userEvent.type(screen.getByLabelText(/^Password attuale/), "vecchia");
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "nuova-pass1!");
+        await userEvent.type(screen.getByLabelText(/^Conferma nuova password/), "nuova-pass2!");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
         expect(toastError).toHaveBeenLastCalledWith("Le due password inserite non coincidono");
 
@@ -107,7 +107,7 @@ describe("TwoFactorSetupDialog", () => {
         const onOpenChange = vi.fn();
         renderWithProviders(<TwoFactorSetupDialog open onOpenChange={onOpenChange} onEnabled={onEnabled} />);
 
-        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
         await userEvent.click(screen.getByRole("button", { name: "Continua" }));
 
         expect(await screen.findByRole("img", { name: /Codice QR/ })).toHaveAttribute(
@@ -117,7 +117,7 @@ describe("TwoFactorSetupDialog", () => {
         expect(screen.getByLabelText("Oppure inserisci questo codice a mano")).toHaveValue("JBSWY3DPEHPK3PXP");
         expect(startTwoFactorSetup).toHaveBeenCalledWith("segreta1!");
 
-        await userEvent.type(screen.getByLabelText("Codice di verifica"), "123456");
+        await userEvent.type(screen.getByLabelText(/^Codice di verifica/), "123456");
         await userEvent.click(screen.getByRole("button", { name: "Attiva" }));
 
         await waitFor(() => {
@@ -133,15 +133,15 @@ describe("TwoFactorSetupDialog", () => {
         const onEnabled = vi.fn();
         renderWithProviders(<TwoFactorSetupDialog open onOpenChange={() => {}} onEnabled={onEnabled} />);
 
-        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
         await userEvent.click(screen.getByRole("button", { name: "Continua" }));
-        await userEvent.type(await screen.findByLabelText("Codice di verifica"), "000000");
+        await userEvent.type(await screen.findByLabelText(/^Codice di verifica/), "000000");
         await userEvent.click(screen.getByRole("button", { name: "Attiva" }));
 
         await waitFor(() => {
             expect(toastError).toHaveBeenCalledWith("Codice non valido");
         });
-        expect(screen.getByLabelText("Codice di verifica")).toHaveValue("");
+        expect(screen.getByLabelText(/^Codice di verifica/)).toHaveValue("");
         expect(onEnabled).not.toHaveBeenCalled();
     });
 
@@ -173,7 +173,7 @@ describe("TwoFactorConfirmDialog", () => {
         const onConfirm = vi.fn();
         renderConfirm(onConfirm);
 
-        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
         await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
 
         expect(toastError).toHaveBeenCalledWith("Inserisci password e codice");
@@ -185,8 +185,8 @@ describe("TwoFactorConfirmDialog", () => {
         const onOpenChange = vi.fn();
         renderConfirm(onConfirm, onOpenChange);
 
-        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
-        await userEvent.type(screen.getByLabelText("Codice di verifica o di recupero"), " 123456 ");
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Codice di verifica o di recupero/), " 123456 ");
         await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
 
         await waitFor(() => {
@@ -205,15 +205,15 @@ describe("TwoFactorConfirmDialog", () => {
         const onOpenChange = vi.fn();
         renderConfirm(onConfirm, onOpenChange);
 
-        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
-        await userEvent.type(screen.getByLabelText("Codice di verifica o di recupero"), "000000");
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Codice di verifica o di recupero/), "000000");
         await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
 
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "Disattiva" })).toBeEnabled();
         });
         expect(onOpenChange).not.toHaveBeenCalled();
-        expect(screen.getByLabelText("Password")).toHaveValue("segreta1!");
+        expect(screen.getByLabelText(/^Password/)).toHaveValue("segreta1!");
     });
 });
 
@@ -281,7 +281,7 @@ describe("CreateUserDialog", () => {
         const onOpenChange = vi.fn();
         renderWithProviders(<CreateUserDialog open onOpenChange={onOpenChange} onCreated={onCreated} />);
 
-        await userEvent.type(screen.getByLabelText("Nome utente"), "  luigi ");
+        await userEvent.type(screen.getByLabelText(/^Nome utente/), "  luigi ");
         await userEvent.click(screen.getByRole("button", { name: "Crea utente" }));
 
         await waitFor(() => {

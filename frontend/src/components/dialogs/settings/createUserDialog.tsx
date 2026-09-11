@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
+import { RequiredMark } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createUser, getApiErrorMessage, type CreatedUserResult } from "@/lib/api";
@@ -60,7 +61,10 @@ const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
             confirmDisabled={isSubmitting}
             content={
                 <div className="grid gap-2">
-                    <Label htmlFor="newUsername">Nome utente</Label>
+                    <Label htmlFor="newUsername">
+                        Nome utente
+                        <RequiredMark />
+                    </Label>
                     <Input
                         id="newUsername"
                         autoFocus

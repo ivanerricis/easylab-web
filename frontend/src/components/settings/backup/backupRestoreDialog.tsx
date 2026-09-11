@@ -54,6 +54,22 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                             autoComplete="off"
                         />
                     </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="restoreBackupKey" className="text-muted-foreground font-normal">
+                            Chiave di backup (solo se richiesta: ripristino da un server diverso da quello che ha
+                            creato questo backup)
+                        </Label>
+                        <Input
+                            id="restoreBackupKey"
+                            value={panel.restoreBackupKeyInput}
+                            disabled={panel.isRestoring}
+                            onChange={(event) => panel.setRestoreBackupKeyInput(event.target.value)}
+                            placeholder="Lascia vuoto se ripristini sullo stesso server del backup"
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                    </div>
                 </div>
             }
             confirmLabel={panel.isRestoring ? "Ripristino in corso..." : "Ripristina"}

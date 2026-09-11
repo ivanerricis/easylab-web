@@ -31,6 +31,7 @@ COPY drizzle ./drizzle
 COPY public ./public
 COPY migrate.js ./migrate.js
 COPY reset-admin-password.js ./reset-admin-password.js
+COPY decrypt-backup-archive.js ./decrypt-backup-archive.js
 COPY --from=builder /app/dist ./dist
 
 # L'immagine node:24-alpine porta gia' l'utente non privilegiato `node` (uid 1000).

@@ -37,6 +37,7 @@ export {
     type SmbConnectionConfig,
 } from "./backupSmb";
 export { restoreBackupFromExisting, restoreBackupFromUpload } from "./backupRestore";
+export { exportBackupKey } from "./backupKey";
 export type { BackupSettingsPublic, BackupSettingsState } from "./backupState";
 
 let schedulerStarted = false;

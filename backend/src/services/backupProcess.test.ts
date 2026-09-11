@@ -16,6 +16,10 @@ const spawnMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 
+const backupCryptoMock = vi.hoisted(() => ({ encryptArchiveFile: vi.fn() }));
+
+vi.mock("./backupCrypto", () => backupCryptoMock);
+
 import { BackupManagerError } from "./backupError";
 import { archiveDataEntry, archiveDumpEntry, backedUpDataEntries } from "./backupFiles";
 import { createBackupArchive, resetPublicSchema, runPgDump, runPsql, runTar } from "./backupProcess";
@@ -41,6 +45,7 @@ beforeEach(() => {
     fsPromisesMock.mkdir.mockResolvedValue(undefined);
     fsPromisesMock.cp.mockResolvedValue(undefined);
     fsPromisesMock.rm.mockResolvedValue(undefined);
+    backupCryptoMock.encryptArchiveFile.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -203,7 +208,7 @@ describe("runPsql / resetPublicSchema", () => {
 });
 
 describe("createBackupArchive", () => {
-    it("assembla dump e dati in una cartella temporanea, poi la comprime e la ripulisce", async () => {
+    it("assembla dump e dati in una cartella temporanea, poi la comprime, la cifra e ripulisce lo staging", async () => {
         spawnMock.mockImplementation(() => autoSucceed());
 
         const archivePath = path.join("backups", "db-backup-20260729-113813.tar.gz");
@@ -213,10 +218,16 @@ describe("createBackupArchive", () => {
         expect(spawnMock.mock.calls[0][0]).toBe("pg_dump");
         expect(spawnMock.mock.calls[1][0]).toBe("tar");
 
+        // Il tar in chiaro finisce in un file temporaneo dentro lo staging, mai in
+        // `archivePath` direttamente: quello lo scrive `encryptArchiveFile`.
         const tarArgs = spawnMock.mock.calls[1][1] as string[];
         expect(tarArgs).toEqual(
-            expect.arrayContaining(["-czf", archivePath, "-C", expect.any(String), archiveDumpEntry, archiveDataEntry])
+            expect.arrayContaining(["-czf", expect.any(String), "-C", expect.any(String), archiveDumpEntry, archiveDataEntry])
         );
+        const plainArchivePath = tarArgs[1];
+        expect(plainArchivePath).not.toBe(archivePath);
+
+        expect(backupCryptoMock.encryptArchiveFile).toHaveBeenCalledWith(plainArchivePath, archivePath);
 
         // Ogni voce configurata viene copiata nella cartella dati di staging.
         expect(fsPromisesMock.cp).toHaveBeenCalledTimes(backedUpDataEntries.length);

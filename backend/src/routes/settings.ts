@@ -5,6 +5,7 @@ import { z } from "zod";
 import { validate } from "./validation";
 import { requireAdmin } from "../middleware/requireAuth";
 import {
+    exportBackupKey,
     getBackupDumpPath,
     getBackupSettings,
     listBackupDumps,
@@ -64,10 +65,15 @@ const backupSettingsSchema = z
     })
     .strict();
 
+const backupKeySchema = z.string().trim().length(64);
+
 const backupRestoreSchema = z
     .object({
         fileName: z.string().trim().min(1).max(255),
         resetSchema: z.boolean(),
+        // Serve solo quando l'archivio è cifrato con una chiave diversa da quella di questo
+        // server (tipicamente: ripristino su una macchina nuova). Vedi services/backupKey.ts.
+        backupKey: backupKeySchema.optional(),
     })
     .strict();
 
@@ -233,6 +239,13 @@ settingsRouter.post("/backup/smb/test", validate({ body: smbTestSchema }), async
     res.json({ message: "Connessione al NAS riuscita" });
 });
 
+// Espone la chiave che cifra l'archivio di backup, cosi l'amministratore puo copiarla e
+// conservarla altrove: e l'unico modo per ripristinare un backup se questo server viene
+// perso insieme al suo disco (vedi services/backupKey.ts).
+settingsRouter.get("/backup/key", async (_req, res) => {
+    res.json({ key: await exportBackupKey() });
+});
+
 settingsRouter.put("/company", validate({ body: companySettingsSchema }), async (req, res) => {
     res.json(await updateCompanySettings(req.body));
 });
@@ -278,9 +291,13 @@ settingsRouter.get("/backup/download/:fileName", async (req, res) => {
 });
 
 settingsRouter.post("/backup/restore", validate({ body: backupRestoreSchema }), async (req, res) => {
-    const { fileName, resetSchema } = req.body as { fileName: string; resetSchema: boolean };
+    const { fileName, resetSchema, backupKey } = req.body as {
+        fileName: string;
+        resetSchema: boolean;
+        backupKey?: string;
+    };
 
-    res.json(await restoreBackupFromExisting(fileName, resetSchema));
+    res.json(await restoreBackupFromExisting(fileName, resetSchema, backupKey));
 });
 
 settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (req, res) => {
@@ -290,8 +307,9 @@ settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (
     }
 
     const resetSchema = req.body.resetSchema === "true";
+    const backupKey = typeof req.body.backupKey === "string" ? req.body.backupKey.trim() || undefined : undefined;
 
-    res.json(await restoreBackupFromUpload(req.file.buffer, req.file.originalname, resetSchema));
+    res.json(await restoreBackupFromUpload(req.file.buffer, req.file.originalname, resetSchema, backupKey));
 });
 
 // Le rotte di aggiornamento sono il caso più delicato di tutti: non modificano una

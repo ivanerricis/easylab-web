@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { BackupManagerError } from "./backupError";
+import { encryptArchiveFile } from "./backupCrypto";
 import { archiveDataEntry, archiveDumpEntry, backedUpDataEntries, settingsDir } from "./backupFiles";
 
 const parseDatabaseUrl = () => {
@@ -122,10 +123,14 @@ export const runTar = async (args: string[]) => {
     });
 };
 
-// Assembla dump + impostazioni in una cartella temporanea e la comprime.
+// Assembla dump + impostazioni in una cartella temporanea, la comprime e cifra il
+// risultato. Il tar intermedio (in chiaro) resta dentro `stagingDir` e non arriva mai a
+// destinazione: solo l'archivio cifrato, prodotto da `encryptArchiveFile`, finisce in
+// `archivePath`.
 export const createBackupArchive = async (archivePath: string) => {
     const stagingDir = path.join(settingsDir, `tmp-backup-${Date.now()}`);
     const stagingDataDir = path.join(stagingDir, archiveDataEntry);
+    const plainArchivePath = path.join(stagingDir, "archive.tar.gz");
 
     try {
         await fs.promises.mkdir(stagingDataDir, { recursive: true });
@@ -139,8 +144,10 @@ export const createBackupArchive = async (archivePath: string) => {
                 .catch(() => {});
         }
 
+        await runTar(["-czf", plainArchivePath, "-C", stagingDir, archiveDumpEntry, archiveDataEntry]);
+
         await fs.promises.mkdir(path.dirname(archivePath), { recursive: true });
-        await runTar(["-czf", archivePath, "-C", stagingDir, archiveDumpEntry, archiveDataEntry]);
+        await encryptArchiveFile(plainArchivePath, archivePath);
     } finally {
         await fs.promises.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
     }

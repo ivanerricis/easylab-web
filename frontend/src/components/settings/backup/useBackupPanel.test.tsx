@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
     testSmbConnection: vi.fn(),
     restoreBackupFromExisting: vi.fn(),
     restoreBackupFromUpload: vi.fn(),
+    getBackupKey: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -337,6 +338,44 @@ describe("useBackupPanel: ripristino", () => {
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
+    /** La chiave di backup incollata (ripristino su un server diverso) va passata solo se compilata. */
+    it("passa la chiave di backup incollata solo quando è stata scritta", async () => {
+        api.restoreBackupFromExisting.mockResolvedValue(restoreResult);
+        logout.mockResolvedValue(undefined);
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-1.tar.gz" });
+            result.current.setRestoreBackupKeyInput(`  ${"ab".repeat(32)}  `);
+        });
+        await act(async () => {
+            await result.current.handleConfirmRestore();
+        });
+
+        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith(
+            "db-backup-1.tar.gz",
+            false,
+            "ab".repeat(32)
+        );
+    });
+
+    it("dimentica la chiave di backup incollata quando si riapre la conferma", async () => {
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-1.tar.gz" });
+            result.current.setRestoreBackupKeyInput("ab".repeat(32));
+        });
+        act(() => {
+            result.current.closeRestoreConfirm();
+        });
+        act(() => {
+            result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-2.tar.gz" });
+        });
+
+        expect(result.current.restoreBackupKeyInput).toBe("");
+    });
+
     it("ripristina da un file caricato, anche se il logout fallisce", async () => {
         api.restoreBackupFromUpload.mockResolvedValue(restoreResult);
         logout.mockRejectedValue(new Error("sessione già inesistente"));
@@ -417,5 +456,43 @@ describe("useBackupPanel: ripristino", () => {
             finishRestore(restoreResult);
             await restoring;
         });
+    });
+});
+
+describe("useBackupPanel: chiave di backup", () => {
+    it("non la carica finché non viene richiesta esplicitamente", async () => {
+        const { result } = await renderPanel();
+
+        expect(result.current.backupKey).toBeNull();
+        expect(api.getBackupKey).not.toHaveBeenCalled();
+    });
+
+    it("la mostra dopo averla richiesta, e non la richiede una seconda volta", async () => {
+        api.getBackupKey.mockResolvedValue({ key: "ab".repeat(32) });
+        const { result } = await renderPanel();
+
+        await act(async () => {
+            await result.current.handleRevealBackupKey();
+        });
+
+        expect(result.current.backupKey).toBe("ab".repeat(32));
+
+        await act(async () => {
+            await result.current.handleRevealBackupKey();
+        });
+
+        expect(api.getBackupKey).toHaveBeenCalledTimes(1);
+    });
+
+    it("segnala l'errore se il recupero della chiave fallisce", async () => {
+        api.getBackupKey.mockRejectedValue(new Error("Accesso negato"));
+        const { result } = await renderPanel();
+
+        await act(async () => {
+            await result.current.handleRevealBackupKey();
+        });
+
+        expect(toast.error).toHaveBeenCalledWith("Accesso negato");
+        expect(result.current.backupKey).toBeNull();
     });
 });

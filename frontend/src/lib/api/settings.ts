@@ -88,21 +88,30 @@ export const getBackupDumpDownloadUrl = (fileName: string) =>
 
 export type RestoreBackupResult = BackupSettingsDto & { message: string };
 
-export const restoreBackupFromExisting = async (fileName: string, resetSchema: boolean) =>
+export const restoreBackupFromExisting = async (fileName: string, resetSchema: boolean, backupKey?: string) =>
     (
         await api.post<RestoreBackupResult>("/settings/backup/restore", {
             fileName,
             resetSchema,
+            ...(backupKey ? { backupKey } : {}),
         })
     ).data;
 
-export const restoreBackupFromUpload = async (file: File, resetSchema: boolean) => {
+export const restoreBackupFromUpload = async (file: File, resetSchema: boolean, backupKey?: string) => {
     const formData = new FormData();
     formData.append("dump", file);
     formData.append("resetSchema", String(resetSchema));
 
+    if (backupKey) {
+        formData.append("backupKey", backupKey);
+    }
+
     return (await api.post<RestoreBackupResult>("/settings/backup/restore/upload", formData)).data;
 };
+
+/** Chiave che cifra l'archivio di backup: va esportata e conservata altrove, perché non
+ * viene mai inclusa nell'archivio stesso (vedi backend/src/services/backupKey.ts). */
+export const getBackupKey = async () => (await api.get<{ key: string }>("/settings/backup/key")).data;
 
 export type LogoStatusDto = {
     hasCustomLogo: boolean;

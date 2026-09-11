@@ -5,6 +5,7 @@ import request from "supertest";
 // Tutti i servizi sono mockati: qui interessano soltanto i permessi e la validazione
 // delle rotte, non cosa fanno backup, log o impostazioni una volta autorizzati.
 vi.mock("../services/backupManager", () => ({
+    exportBackupKey: vi.fn().mockResolvedValue("ab".repeat(32)),
     getBackupDumpPath: vi.fn(),
     getBackupSettings: vi.fn().mockResolvedValue({}),
     listBackupDumps: vi.fn().mockResolvedValue([]),
@@ -88,6 +89,7 @@ describe("settings router: permessi", () => {
     it.each([
         ["get", "/api/settings/backup/download/db-backup-20260101-120000.tar.gz"],
         ["get", "/api/settings/backup/list"],
+        ["get", "/api/settings/backup/key"],
         ["get", "/api/settings/logs"],
         ["get", "/api/settings/email"],
         ["get", "/api/settings/update"],
@@ -169,5 +171,28 @@ describe("settings router: cartella remota SMB", () => {
 
         expect(response.status).toBe(200);
         expect(testSmbConnection).toHaveBeenCalledOnce();
+    });
+});
+
+describe("settings router: chiave di backup", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    // Non è un segreto dell'app come la password SMB: l'amministratore deve poterla
+    // rileggere per esportarla e conservarla altrove (vedi services/backupKey.ts).
+    it("l'amministratore può esportare la chiave di backup", async () => {
+        const response = await request(buildApp(true)).get("/api/settings/backup/key");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ key: "ab".repeat(32) });
+    });
+
+    it("rifiuta una chiave incollata di lunghezza sbagliata nel ripristino", async () => {
+        const response = await request(buildApp(true))
+            .post("/api/settings/backup/restore")
+            .send({ fileName: "db-backup-20260101-120000.tar.gz", resetSchema: false, backupKey: "troppo-corta" });
+
+        expect(response.status).toBe(400);
     });
 });

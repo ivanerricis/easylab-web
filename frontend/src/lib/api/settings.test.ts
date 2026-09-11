@@ -3,6 +3,7 @@ import { api } from "./client";
 import { dismissNotification, listNotifications } from "./notifications";
 import {
     getBackupDumpDownloadUrl,
+    getBackupKey,
     getLogDownloadUrl,
     listLogEntries,
     restoreBackupFromExisting,
@@ -33,6 +34,19 @@ describe("api impostazioni", () => {
         });
     });
 
+    /** Serve solo quando l'archivio è cifrato con la chiave di un altro server. */
+    it("include la chiave di backup nel ripristino solo quando è indicata", async () => {
+        const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
+
+        await restoreBackupFromExisting("db-backup-1.tar.gz", true, "ab".repeat(32));
+
+        expect(post).toHaveBeenCalledWith("/settings/backup/restore", {
+            fileName: "db-backup-1.tar.gz",
+            resetSchema: true,
+            backupKey: "ab".repeat(32),
+        });
+    });
+
     /** Il backend legge il file dal campo "dump" e il flag come stringa multipart. */
     it("carica il backup da ripristinare come multipart", async () => {
         const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
@@ -45,6 +59,24 @@ describe("api impostazioni", () => {
         expect(body.get("dump")).toBeInstanceOf(File);
         expect((body.get("dump") as File).name).toBe("backup.tar.gz");
         expect(body.get("resetSchema")).toBe("false");
+        expect(body.get("backupKey")).toBeNull();
+    });
+
+    it("include la chiave di backup nel multipart quando è indicata", async () => {
+        const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
+        const file = new File(["dump"], "backup.tar.gz");
+
+        await restoreBackupFromUpload(file, false, "cd".repeat(32));
+
+        const [, body] = post.mock.calls[0] as [string, FormData];
+        expect(body.get("backupKey")).toBe("cd".repeat(32));
+    });
+
+    it("esporta la chiave di backup", async () => {
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: { key: "ab".repeat(32) } });
+
+        await expect(getBackupKey()).resolves.toEqual({ key: "ab".repeat(32) });
+        expect(get).toHaveBeenCalledWith("/settings/backup/key");
     });
 
     it("carica il logo nel campo 'logo'", async () => {

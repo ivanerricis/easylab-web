@@ -11,6 +11,39 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Archivio di backup cifrato (AES-256-GCM)
+
+**Cosa.** L'archivio di backup (`db-backup-*.tar.gz`, locale e su NAS) viene ora cifrato:
+il dump del database e le impostazioni che contiene non sono più leggibili aprendo il file,
+solo ripristinandolo dall'app. Nome ed estensione restano invariati — cambia solo il
+contenuto — così retention, upload SMB e download non hanno notato la differenza.
+
+La chiave è dedicata (`data/backup.key`, `backend/src/services/backupKey.ts`), separata da
+`data/secret.key` che cifra le password nelle impostazioni: quest'ultima non deve mai
+lasciare il server, mentre la chiave di backup è pensata per essere esportata
+dall'amministratore (nuova scheda "Chiave di cifratura dei backup" in Impostazioni →
+Backup) e conservata altrove. Il formato su disco
+(`backend/src/services/backupCrypto.ts`) è `[magic "MWB1"][IV][dati cifrati][auth tag GCM]`,
+tutto in streaming per non tenere l'intero dump in RAM. Al ripristino, i primi byte del file
+dicono da soli se è un archivio cifrato o uno storico in chiaro: nessuna migrazione dei
+backup già esistenti. Il form di ripristino accetta anche una chiave incollata a mano, per
+il caso di un archivio creato da un altro server — una volta verificata, diventa la nuova
+chiave locale.
+
+*Perché:* prima chiunque avesse accesso al file (dal NAS, da un file system condiviso, da un
+disco rubato) poteva leggere per intero i dati dei clienti senza bisogno di alcuna
+credenziale. Una chiave dedicata invece di riusare `secret.key` evita che l'esposizione
+dell'una comprometta l'altra, e resta comunque possibile un disastro totale (server e disco
+persi insieme) grazie all'esportazione.
+
+→ [backend/src/services/backupKey.ts](../backend/src/services/backupKey.ts),
+[backend/src/services/backupCrypto.ts](../backend/src/services/backupCrypto.ts),
+[backend/src/services/backupProcess.ts](../backend/src/services/backupProcess.ts),
+[backend/src/services/backupRestore.ts](../backend/src/services/backupRestore.ts),
+[frontend/src/components/settings/backup/backupKeyCard.tsx](../frontend/src/components/settings/backup/backupKeyCard.tsx)
+
+---
+
 ## 2026-09-11 — Incasso netto (senza il compenso dei tecnici esterni) nella dashboard
 
 **Cosa.** La card "Incassi mese" della dashboard, oltre all'incasso totale del mese già

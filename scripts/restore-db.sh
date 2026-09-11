@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # For the Proxmox VM (production/LAN mode).
-# Usage: scripts/restore-db.sh [--dump-path /path/to/backup.tar.gz] [--reset-database]
+# Usage: scripts/restore-db.sh [--dump-path /path/to/backup.tar.gz] [--reset-database] [--backup-key <chiave>]
 #
 # Accepts both backup formats:
-#   db-backup-<ts>.tar.gz  current: dump.sql + data/ (email, backup and logo settings)
-#   db-dump-<ts>.sql       legacy: database only
+#   db-backup-<ts>.tar.gz  current: dump.sql + data/ (email, backup and logo settings), cifrato
+#   db-dump-<ts>.sql       legacy: database only, mai cifrato
 set -euo pipefail
 
 DUMP_PATH=""
 RESET_DATABASE=false
+BACKUP_KEY=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -19,6 +20,13 @@ while [ $# -gt 0 ]; do
         --reset-database)
             RESET_DATABASE=true
             shift
+            ;;
+        # Serve solo se l'archivio è cifrato con la chiave di un altro server (es.
+        # ricostruzione su una VM nuova): vedi "Chiave di cifratura dei backup" in
+        # Impostazioni > Backup sul server che ha creato l'archivio.
+        --backup-key)
+            BACKUP_KEY="$2"
+            shift 2
             ;;
         *)
             echo "Argomento sconosciuto: $1" >&2
@@ -74,7 +82,32 @@ SETTINGS_DIR=""
 case "$DUMP_PATH" in
     *.tar.gz)
         WORK_DIR="$(mktemp -d)"
-        tar -xzf "$DUMP_PATH" -C "$WORK_DIR"
+        TAR_SOURCE="$DUMP_PATH"
+
+        # I primi 4 byte dicono da soli se l'archivio è cifrato ("MWB1", vedi
+        # backend/src/services/backupCrypto.ts) o in chiaro (formato storico, gzip).
+        # La decifratura avviene dentro il container backend, dove vive data/backup.key:
+        # il file va copiato dentro e il risultato ricopiato fuori per essere estratto qui.
+        if [ "$(head -c4 "$DUMP_PATH" 2>/dev/null)" = "MWB1" ]; then
+            echo "Archivio cifrato: decifratura in corso..."
+            docker compose -f "$COMPOSE_FILE" exec -T backend rm -f /tmp/restore-encrypted.tar.gz /tmp/restore-decrypted.tar.gz
+            docker compose -f "$COMPOSE_FILE" cp "$DUMP_PATH" "backend:/tmp/restore-encrypted.tar.gz"
+
+            if ! docker compose -f "$COMPOSE_FILE" exec -T backend \
+                node decrypt-backup-archive.js /tmp/restore-encrypted.tar.gz /tmp/restore-decrypted.tar.gz "$BACKUP_KEY"; then
+                docker compose -f "$COMPOSE_FILE" exec -T backend rm -f /tmp/restore-encrypted.tar.gz /tmp/restore-decrypted.tar.gz
+                echo "" >&2
+                echo "Decifratura non riuscita: chiave di backup errata o file corrotto." >&2
+                echo "Se l'archivio proviene da un altro server, ripeti con --backup-key <chiave esportata da li>." >&2
+                exit 1
+            fi
+
+            docker compose -f "$COMPOSE_FILE" cp "backend:/tmp/restore-decrypted.tar.gz" "$WORK_DIR/archive.tar.gz"
+            docker compose -f "$COMPOSE_FILE" exec -T backend rm -f /tmp/restore-encrypted.tar.gz /tmp/restore-decrypted.tar.gz
+            TAR_SOURCE="$WORK_DIR/archive.tar.gz"
+        fi
+
+        tar -xzf "$TAR_SOURCE" -C "$WORK_DIR"
         SQL_FILE="$WORK_DIR/dump.sql"
 
         if [ ! -f "$SQL_FILE" ]; then

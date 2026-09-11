@@ -8,6 +8,7 @@ import type { SettingsRunStatus } from "@/components/settings/settingsUi";
 import {
     getApiErrorMessage,
     getBackupDumpDownloadUrl,
+    getBackupKey,
     getBackupSettings,
     listBackupDumps,
     restoreBackupFromExisting,
@@ -81,6 +82,9 @@ export const useBackupPanel = () => {
     const [lastRestoreError, setLastRestoreError] = useState<string | null>(null);
     const [lastRestoreFileName, setLastRestoreFileName] = useState<string | null>(null);
     const [secretsToReconfigure, setSecretsToReconfigure] = useState<string[]>([]);
+    const [restoreBackupKeyInput, setRestoreBackupKeyInput] = useState("");
+    const [backupKey, setBackupKey] = useState<string | null>(null);
+    const [isLoadingBackupKey, setIsLoadingBackupKey] = useState(false);
 
     const isDirty = isSettingsFormDirty(formValues, savedValues, ["smbPassword"]);
 
@@ -340,6 +344,7 @@ export const useBackupPanel = () => {
     const openRestoreConfirm = (source: PendingRestore) => {
         setPendingRestore(source);
         setRestoreConfirmText("");
+        setRestoreBackupKeyInput("");
     };
 
     const closeRestoreConfirm = () => {
@@ -349,6 +354,23 @@ export const useBackupPanel = () => {
 
         setPendingRestore(null);
         setRestoreConfirmText("");
+        setRestoreBackupKeyInput("");
+    };
+
+    const handleRevealBackupKey = async () => {
+        if (isLoadingBackupKey || backupKey) {
+            return;
+        }
+
+        try {
+            setIsLoadingBackupKey(true);
+            const result = await getBackupKey();
+            setBackupKey(result.key);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile recuperare la chiave di backup"));
+        } finally {
+            setIsLoadingBackupKey(false);
+        }
     };
 
     const handleConfirmRestore = async () => {
@@ -364,10 +386,14 @@ export const useBackupPanel = () => {
                     "Non chiudere o ricaricare la pagina: l'operazione può richiedere alcuni minuti in base alla dimensione del dump.",
             });
 
-            const result =
-                pendingRestore.type === "existing"
-                    ? await restoreBackupFromExisting(pendingRestore.fileName, resetSchemaOnRestore)
-                    : await restoreBackupFromUpload(pendingRestore.file, resetSchemaOnRestore);
+            const backupKeyOverride = restoreBackupKeyInput.trim() || undefined;
+            const result = backupKeyOverride
+                ? pendingRestore.type === "existing"
+                    ? await restoreBackupFromExisting(pendingRestore.fileName, resetSchemaOnRestore, backupKeyOverride)
+                    : await restoreBackupFromUpload(pendingRestore.file, resetSchemaOnRestore, backupKeyOverride)
+                : pendingRestore.type === "existing"
+                  ? await restoreBackupFromExisting(pendingRestore.fileName, resetSchemaOnRestore)
+                  : await restoreBackupFromUpload(pendingRestore.file, resetSchemaOnRestore);
 
             setLastRestoreAt(result.lastRestoreAt);
             setLastRestoreStatus(result.lastRestoreStatus);
@@ -440,6 +466,10 @@ export const useBackupPanel = () => {
         lastRestoreError,
         lastRestoreFileName,
         secretsToReconfigure,
+        restoreBackupKeyInput,
+        setRestoreBackupKeyInput,
+        backupKey,
+        isLoadingBackupKey,
         loadDumpFiles,
         handleSave,
         handleTestSmbConnection,
@@ -449,6 +479,7 @@ export const useBackupPanel = () => {
         openRestoreConfirm,
         closeRestoreConfirm,
         handleConfirmRestore,
+        handleRevealBackupKey,
     };
 };
 

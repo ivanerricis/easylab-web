@@ -14,6 +14,8 @@ import {
 } from "./backupFiles";
 import { assertNoOperationInProgress, beginRestore, endRestore } from "./backupLock";
 import { resetPublicSchema, runPsql, runTar } from "./backupProcess";
+import { BackupDecryptAuthError, decryptArchiveFile, isEncryptedArchiveFile } from "./backupCrypto";
+import { decodeBackupKeyOverride, setBackupKey } from "./backupKey";
 import {
     findSecretsToReconfigure,
     invalidateBackupStateCache,
@@ -26,7 +28,7 @@ import { invalidateEmailSettingsCache } from "./emailManager";
 
 // Estrae l'archivio e restituisce dove trovare dump e impostazioni. Per il formato
 // storico (.sql puro) non c'è nulla da estrarre e non ci sono impostazioni.
-const prepareRestoreSource = async (filePath: string, sourceFileName: string) => {
+const prepareRestoreSource = async (filePath: string, sourceFileName: string, backupKeyOverride?: string) => {
     if (!isArchiveFileName(sourceFileName)) {
         return { sqlPath: filePath, dataDir: null as string | null, cleanup: async () => {} };
     }
@@ -35,7 +37,37 @@ const prepareRestoreSource = async (filePath: string, sourceFileName: string) =>
     await fs.promises.mkdir(extractDir, { recursive: true });
 
     try {
-        await runTar(["-xzf", filePath, "-C", extractDir]);
+        let tarSourcePath = filePath;
+
+        if (await isEncryptedArchiveFile(filePath)) {
+            const overrideKey = backupKeyOverride ? decodeBackupKeyOverride(backupKeyOverride) : undefined;
+            tarSourcePath = path.join(extractDir, "archive.tar.gz");
+
+            try {
+                await decryptArchiveFile(filePath, tarSourcePath, overrideKey);
+            } catch (error) {
+                if (!(error instanceof BackupDecryptAuthError)) {
+                    throw error;
+                }
+
+                throw new BackupManagerError(
+                    backupKeyOverride
+                        ? "La chiave di backup inserita non è corretta per questo archivio"
+                        : "Questo archivio è cifrato con una chiave diversa da quella presente su questo server. " +
+                              "Se il backup proviene da un altro server, incolla qui la chiave di backup esportata da lì.",
+                    400
+                );
+            }
+
+            // La chiave incollata ha decifrato con successo: da questo momento è quella
+            // "giusta" anche per i prossimi backup su questo server (il caso tipico è un
+            // ripristino su una macchina nuova, con una data/backup.key diversa o assente).
+            if (backupKeyOverride) {
+                await setBackupKey(backupKeyOverride);
+            }
+        }
+
+        await runTar(["-xzf", tarSourcePath, "-C", extractDir]);
     } catch (error) {
         await fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
         throw error;
@@ -81,7 +113,12 @@ const restoreDataEntries = async (dataDir: string) => {
     invalidateCompanySettingsCache();
 };
 
-const performRestore = async (filePath: string, resetSchema: boolean, sourceFileName: string) => {
+const performRestore = async (
+    filePath: string,
+    resetSchema: boolean,
+    sourceFileName: string,
+    backupKeyOverride?: string
+) => {
     let state = await loadState();
 
     assertNoOperationInProgress();
@@ -91,7 +128,7 @@ const performRestore = async (filePath: string, resetSchema: boolean, sourceFile
     let source: Awaited<ReturnType<typeof prepareRestoreSource>> | undefined;
 
     try {
-        source = await prepareRestoreSource(filePath, sourceFileName);
+        source = await prepareRestoreSource(filePath, sourceFileName, backupKeyOverride);
 
         if (resetSchema) {
             await resetPublicSchema();
@@ -136,14 +173,19 @@ const performRestore = async (filePath: string, resetSchema: boolean, sourceFile
     }
 };
 
-export const restoreBackupFromExisting = async (fileName: string, resetSchema: boolean) => {
+export const restoreBackupFromExisting = async (fileName: string, resetSchema: boolean, backupKeyOverride?: string) => {
     const filePath = await getBackupDumpPath(fileName);
-    return performRestore(filePath, resetSchema, fileName);
+    return performRestore(filePath, resetSchema, fileName, backupKeyOverride);
 };
 
 const uploadedDumpNamePattern = /\.(sql|tar\.gz)$/i;
 
-export const restoreBackupFromUpload = async (buffer: Buffer, originalFileName: string, resetSchema: boolean) => {
+export const restoreBackupFromUpload = async (
+    buffer: Buffer,
+    originalFileName: string,
+    resetSchema: boolean,
+    backupKeyOverride?: string
+) => {
     if (!uploadedDumpNamePattern.test(originalFileName)) {
         throw new BackupManagerError("Il file caricato deve avere estensione .sql o .tar.gz", 400);
     }
@@ -156,7 +198,7 @@ export const restoreBackupFromUpload = async (buffer: Buffer, originalFileName: 
     await fs.promises.writeFile(tempFilePath, buffer);
 
     try {
-        return await performRestore(tempFilePath, resetSchema, originalFileName);
+        return await performRestore(tempFilePath, resetSchema, originalFileName, backupKeyOverride);
     } finally {
         await fs.promises.unlink(tempFilePath).catch(() => {});
     }

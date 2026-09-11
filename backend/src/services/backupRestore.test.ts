@@ -41,6 +41,21 @@ const backupProcessMock = vi.hoisted(() => ({
 
 vi.mock("./backupProcess", () => backupProcessMock);
 
+const backupCryptoMock = vi.hoisted(() => ({
+    BackupDecryptAuthError: class extends Error {},
+    isEncryptedArchiveFile: vi.fn(),
+    decryptArchiveFile: vi.fn(),
+}));
+
+vi.mock("./backupCrypto", () => backupCryptoMock);
+
+const backupKeyMock = vi.hoisted(() => ({
+    decodeBackupKeyOverride: vi.fn((hex: string) => Buffer.from(hex, "hex")),
+    setBackupKey: vi.fn(),
+}));
+
+vi.mock("./backupKey", () => backupKeyMock);
+
 const backupStateMock = vi.hoisted(() => ({
     findSecretsToReconfigure: vi.fn(),
     invalidateBackupStateCache: vi.fn(),
@@ -111,6 +126,9 @@ beforeEach(() => {
     fsPromisesMock.cp.mockResolvedValue(undefined);
     fsPromisesMock.writeFile.mockResolvedValue(undefined);
     fsPromisesMock.unlink.mockResolvedValue(undefined);
+    // Formato storico o archivio in chiaro: la maggior parte dei test qui sotto non ha
+    // nulla a che fare con la cifratura, quindi il default salta subito quel passo.
+    backupCryptoMock.isEncryptedArchiveFile.mockResolvedValue(false);
 });
 
 describe("restoreBackupFromExisting", () => {
@@ -281,6 +299,77 @@ describe("restoreBackupFromExisting", () => {
             })
         );
         expect(backupLockMock.endRestore).toHaveBeenCalledTimes(1);
+    });
+
+    it("un archivio cifrato viene decifrato in un file temporaneo prima di essere estratto", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        backupCryptoMock.isEncryptedArchiveFile.mockResolvedValueOnce(true);
+        backupCryptoMock.decryptArchiveFile.mockResolvedValueOnce(undefined);
+        backupProcessMock.runTar.mockResolvedValueOnce(undefined);
+        backupProcessMock.runPsql.mockResolvedValueOnce(undefined);
+        fsPromisesMock.access.mockRejectedValue(new Error("ENOENT")).mockResolvedValueOnce(undefined);
+
+        await restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false);
+
+        expect(backupCryptoMock.decryptArchiveFile).toHaveBeenCalledWith(
+            "/backups/db-backup-20260729-113813.tar.gz",
+            expect.stringContaining("tmp-extract-"),
+            undefined
+        );
+        // Il tar estrae il file appena decifrato, non l'archivio cifrato originale.
+        const tarArgs = backupProcessMock.runTar.mock.calls[0][0] as string[];
+        expect(tarArgs[1]).not.toBe("/backups/db-backup-20260729-113813.tar.gz");
+        expect(backupKeyMock.setBackupKey).not.toHaveBeenCalled();
+    });
+
+    it("una chiave di backup incollata a mano viene usata per decifrare e poi salvata come chiave locale", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        backupCryptoMock.isEncryptedArchiveFile.mockResolvedValueOnce(true);
+        backupCryptoMock.decryptArchiveFile.mockResolvedValueOnce(undefined);
+        backupProcessMock.runTar.mockResolvedValueOnce(undefined);
+        backupProcessMock.runPsql.mockResolvedValueOnce(undefined);
+        fsPromisesMock.access.mockRejectedValue(new Error("ENOENT")).mockResolvedValueOnce(undefined);
+
+        const pastedKey = "ab".repeat(32);
+        await restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false, pastedKey);
+
+        expect(backupKeyMock.decodeBackupKeyOverride).toHaveBeenCalledWith(pastedKey);
+        expect(backupCryptoMock.decryptArchiveFile).toHaveBeenCalledWith(
+            "/backups/db-backup-20260729-113813.tar.gz",
+            expect.stringContaining("tmp-extract-"),
+            Buffer.from(pastedKey, "hex")
+        );
+        expect(backupKeyMock.setBackupKey).toHaveBeenCalledWith(pastedKey);
+    });
+
+    it("una chiave di backup sbagliata fa fallire il ripristino prima di toccare il database", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        backupCryptoMock.isEncryptedArchiveFile.mockResolvedValueOnce(true);
+        backupCryptoMock.decryptArchiveFile.mockRejectedValueOnce(new backupCryptoMock.BackupDecryptAuthError());
+
+        await expect(restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false)).rejects.toThrow(
+            "cifrato con una chiave diversa"
+        );
+
+        expect(backupProcessMock.runTar).not.toHaveBeenCalled();
+        expect(backupProcessMock.runPsql).not.toHaveBeenCalled();
+        expect(backupKeyMock.setBackupKey).not.toHaveBeenCalled();
+    });
+
+    it("segnala che la chiave incollata a mano è sbagliata con un messaggio diverso", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        backupCryptoMock.isEncryptedArchiveFile.mockResolvedValueOnce(true);
+        backupCryptoMock.decryptArchiveFile.mockRejectedValueOnce(new backupCryptoMock.BackupDecryptAuthError());
+
+        await expect(
+            restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false, "ab".repeat(32))
+        ).rejects.toThrow("La chiave di backup inserita non è corretta");
+
+        expect(backupKeyMock.setBackupKey).not.toHaveBeenCalled();
     });
 });
 

@@ -11,7 +11,7 @@ const statusFilePath = path.join(signalDir, "status.json");
 const applyTriggerPath = path.join(signalDir, "apply.trigger");
 const checkTriggerPath = path.join(signalDir, "check.trigger");
 
-export type UpdateStatusState = "unknown" | "idle" | "running" | "success" | "failed";
+type UpdateStatusState = "unknown" | "idle" | "running" | "success" | "failed";
 
 export type UpdateStatus = {
     state: UpdateStatusState;

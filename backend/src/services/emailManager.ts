@@ -196,7 +196,7 @@ export const testEmailConnection = async (config: EmailConnectionTestConfig) => 
     }
 };
 
-export type EmailAttachment = {
+type EmailAttachment = {
     filename: string;
     content: Buffer;
     contentType?: string;

@@ -265,7 +265,7 @@ export const deleteSession = (token: string) =>
  * token: le sessioni di chi chiude il browser e non torna più resterebbero in tabella
  * per sempre. Questa passa periodica le rimuove comunque.
  */
-export const deleteExpiredSessions = async () => {
+const deleteExpiredSessions = async () => {
     const deleted = await db.delete(sessionTable).where(lt(sessionTable.expiresAt, new Date())).returning({
         tokenHash: sessionTable.tokenHash,
     });
@@ -310,7 +310,7 @@ export const stopSessionCleanupScheduler = () => {
     sessionCleanupTimer = null;
 };
 
-export const deleteAllSessionsForUser = (userId: number) =>
+const deleteAllSessionsForUser = (userId: number) =>
     db.delete(sessionTable).where(eq(sessionTable.userId, userId));
 
 const deleteOtherSessionsForUser = (userId: number, currentToken: string) =>

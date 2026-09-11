@@ -11,7 +11,7 @@
  * silenziosa e difficile da diagnosticare (una combobox a cui mancano voci, senza errori):
  * per questo viene registrato un warning esplicito nei log.
  */
-export const unpaginatedMaxRows = 5000;
+const unpaginatedMaxRows = 5000;
 
 /**
  * Tetto del `pageSize` accettato dalle rotte di lista, volutamente lo stesso numero.

@@ -15,7 +15,7 @@ export const listQuerySchema = z.object({
     sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
-export type ListParams = {
+type ListParams = {
     page?: number;
     pageSize?: number;
     search?: string;

@@ -6,7 +6,7 @@ import {
 } from "../db/queries/notification";
 import type { notificationSeverities } from "../db/schema";
 
-export type NotificationSeverity = (typeof notificationSeverities)[number];
+type NotificationSeverity = (typeof notificationSeverities)[number];
 
 const maxActiveNotifications = 50;
 const dismissedRetentionDays = 30;

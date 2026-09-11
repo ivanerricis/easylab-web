@@ -21,14 +21,14 @@ import crypto from "node:crypto";
 const hashAlgorithm = "sha1";
 
 export const totpStepSeconds = 30;
-export const totpDigits = 6;
+const totpDigits = 6;
 
 /**
  * Quanti passi accettare prima e dopo quello corrente. Uno solo: gli orologi dei telefoni
  * sono sincronizzati via rete e sbagliano di secondi, non di minuti, mentre ogni passo in
  * più raddoppia i codici validi nello stesso istante.
  */
-export const totpAllowedStepDrift = 1;
+const totpAllowedStepDrift = 1;
 
 /** 20 byte = la dimensione del blocco di SHA-1, quella raccomandata dalla RFC 4226. */
 const secretBytes = 20;

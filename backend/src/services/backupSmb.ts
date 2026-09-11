@@ -186,7 +186,7 @@ export const uploadDumpToSmb = async (config: SmbConnectionConfig, localFilePath
 // spezzare le righe per spazi (i nomi restanti nella cartella non seguono lo schema).
 const extractBackupFileNames = (lsOutput: string): string[] => lsOutput.match(backupFileNameScanPattern) ?? [];
 
-export const listSmbBackupFileNames = async (config: SmbConnectionConfig): Promise<string[]> => {
+const listSmbBackupFileNames = async (config: SmbConnectionConfig): Promise<string[]> => {
     const remotePath = safeRemotePath(config);
     const command = remotePath ? `cd "${remotePath}"; ls` : "ls";
 
@@ -197,7 +197,7 @@ export const listSmbBackupFileNames = async (config: SmbConnectionConfig): Promi
 // `fileName` non arriva dall'utente: è uno dei nomi estratti dall'output di `ls` con
 // backupFileNameScanPattern, che ammette solo `db-backup-<timestamp>.tar.gz` e il formato
 // storico. Nessun carattere interpretato da smbclient può quindi finire qui.
-export const deleteSmbFile = async (config: SmbConnectionConfig, fileName: string) => {
+const deleteSmbFile = async (config: SmbConnectionConfig, fileName: string) => {
     const remotePath = safeRemotePath(config);
     const delCommand = `del "${fileName}"`;
     const command = remotePath ? `cd "${remotePath}"; ${delCommand}` : delCommand;

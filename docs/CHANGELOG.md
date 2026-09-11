@@ -11,6 +11,41 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Pulizia codice morto (frontend e backend)
+
+**Cosa.** Analisi con `knip` (dependency/export graph) su entrambi i package, verificata a mano
+voce per voce prima di toccare qualsiasi file:
+- Rimosso `components/mode-toggle.tsx` sul frontend: componente mai usato, l'unico riferimento
+  era un import commentato in `MainLayout.tsx`.
+- Rimossi in `backend/src/db/types.ts` gli 8 alias di tipo (`Report`, `Customer`, `Collaborator`,
+  `Technician`, `Device`, `Issue`, `ReportTechnician`, `Intervention`) che duplicavano
+  `InferSelectModel` senza che nessuno li importasse: restano solo `New*`/`Update*`, che sono
+  quelli davvero usati dalle query.
+- Tolto `export` (senza toccare l'implementazione) da funzioni e costanti usate solo all'interno
+  del proprio file ma marcate pubbliche per errore: `unpaginatedMaxRows` (pagination.ts),
+  `deleteExpiredSessions`/`deleteAllSessionsForUser` (authManager.ts),
+  `listSmbBackupFileNames`/`deleteSmbFile` (backupSmb.ts),
+  `totpDigits`/`totpAllowedStepDrift` (totp.ts), `ListParams` (crudRouter.ts),
+  `EmailAttachment` (emailManager.ts), `NotificationSeverity` (notificationManager.ts),
+  `UpdateStatusState` (updateManager.ts).
+
+Non toccati: le re-esportazioni di tipo in `backupManager.ts` (`BackupDumpFile`,
+`SmbConnectionConfig`, `BackupSettingsPublic`, `BackupSettingsState`) — il file le documenta
+esplicitamente come facciata unica per rotte e test, non sono codice morto anche se knip le
+segnala. Lasciati intatti anche `migrate.js`/`reset-admin-password.js` (script invocati da
+Docker/CLI, non da import) e i sotto-componenti generati da shadcn/ui (`components/ui/*`),
+volutamente barrel-exported.
+
+**Il perché.** Richiesta dell'utente di individuare ed eliminare codice morto. Distinzione
+importante emersa durante l'analisi: la maggior parte degli "unused export" segnalati da knip
+non erano funzioni morte ma funzioni usate internamente e solo esportate per errore —
+cancellarle avrebbe rotto i chiamanti reali nello stesso file, quindi la correzione è stata
+togliere `export`, non il corpo.
+
+`tsc --noEmit` pulito su entrambi i package, `eslint` pulito su entrambi, 550 test backend verdi.
+
+---
+
 ## 2026-09-11 — Requisiti della password mostrati come lista, non come frase fissa
 
 **Cosa.** Nel dialogo "Cambia password", sotto il campo della nuova password, la frase

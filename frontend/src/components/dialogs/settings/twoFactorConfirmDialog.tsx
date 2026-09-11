@@ -58,9 +58,14 @@ const TwoFactorConfirmDialog = ({
             setIsSubmitting(true);
             await onConfirm(password, code.trim());
             handleOpenChange(false);
-        } finally {
+        } catch {
             // Il messaggio d'errore lo mostra chi ha passato `onConfirm`, che sa cosa stava
-            // facendo: qui resta solo da riabilitare i campi perché si possa riprovare.
+            // facendo, e poi rilancia apposta perché il dialogo resti aperto. Qui l'errore va
+            // solo fermato: senza questo `catch` arrivava fino al `void handleConfirm()` del
+            // pulsante e diventava un "Uncaught (in promise)" nella console a ogni codice
+            // sbagliato.
+        } finally {
+            // Resta da riabilitare i campi perché si possa riprovare.
             setIsSubmitting(false);
         }
     };

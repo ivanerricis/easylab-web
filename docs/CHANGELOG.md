@@ -11,6 +11,76 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-11 — Copertura di test del frontend, e i difetti che ha trovato
+
+**Cosa.** Il frontend passa da 13 file e 81 test a **65 file e 503 test**, tutti verdi, con
+`tsc`, `eslint`, `prettier` e la build pulite. Erano coperti solo `LoginPage`, quattro hook e
+qualche libreria; ora lo sono le librerie (`lib/*` e i wrapper `lib/api/*`), gli hook, i
+provider, i componenti condivisi (tabella, schede, paginazione, ricerca, notifiche), tutti i
+dialoghi, tutte le pagine e le sezioni di Impostazioni.
+
+Le convenzioni, per chi aggiunge test:
+
+- L'API si simula al confine di `@/lib/api`, come faceva già `LoginPage.test`; quando il mock
+  deve leggere un oggetto al momento del caricamento si usa `vi.hoisted`.
+- `src/test/render.tsx` (`renderWithProviders`) monta il componente dentro gli stessi provider
+  di `App.tsx`: senza `TooltipProvider` qualunque pulsante con tooltip fa fallire il render.
+- Nei test di **pagina** i dialoghi sono sostituiti da un pulsante che consegna i valori scelti
+  dal test: i dialoghi hanno i propri test, e lì si prova solo cosa la pagina ne fa.
+- Tabella e schede sono entrambe nel DOM (le alterna il CSS, che jsdom non applica): le query
+  restano dentro `getByRole("table")`.
+- I moduli lunghi hanno `testTimeout` a 20 secondi. Un test che scade non si ferma: la sua
+  funzione continua a girare e i suoi tasti finiscono nel DOM del test successivo, che fallisce
+  per un motivo non suo. È successo, e il sintomo ("Mario Rossi" digitato che diventa " M") non
+  rimandava affatto alla causa.
+- `setup.ts` ha uno stub in più, `document.elementFromPoint`: react-big-calendar lo chiama a
+  ogni `mousedown` e jsdom non lo implementa.
+
+**Difetti trovati scrivendo i test, e corretti:**
+
+1. **La nota dell'intervento andava persa.** Il dialogo di creazione raccoglie "Note", ma né la
+   pagina Interventi né la Dashboard (che crea anche dal calendario) la passavano a
+   `createIntervention`: veniva scartata senza avviso. Dall'elenco interventi anche la
+   *modifica* della nota si perdeva; solo la scheda la mandava. È lo stesso difetto che
+   `toReportUpdatePayload` racconta per i report — lo stesso payload in più copie, che si
+   allontanano — e ha la stessa cura: `lib/interventionForm.ts`, un solo costruttore del payload
+   per creazione e modifica, usato dai quattro punti.
+2. **La validazione nativa del browser scavalcava i messaggi dei dialoghi.** Il `<form>` di
+   `CustomDialog` non aveva `noValidate`: con Cliente o Difetto vuoti (`required` in
+   `InputWithAdd`) il browser mostrava il suo fumetto "Compila questo campo" e non inviava il
+   form, quindi i messaggi sotto i campi, tutti insieme e con il focus sul primo, non
+   comparivano mai. Lo stesso con un prezzo negativo nella modifica del report (`min={0}`).
+   Scelta dell'utente: `noValidate` su `CustomDialog`, e i due controlli che faceva solo il
+   browser passano al dialogo, sotto il campo — il dispositivo obbligatorio nel nuovo report e
+   un'email valida nel cliente (con la stessa espressione dello standard HTML).
+3. **Ogni errore di creazione compariva due volte.** Report e Interventi (pagina e Dashboard)
+   mostravano il toast e poi rilanciavano l'errore, che il dialogo mostrava di nuovo. Tolto il
+   toast dalle pagine: l'errore lo mostra il dialogo, che resta aperto. La Dashboard lo faceva
+   già giusto per i report e sbagliato per gli interventi.
+4. **"Uncaught (in promise)" a ogni codice 2FA sbagliato** (`twoFactorConfirmDialog.tsx`). Chi
+   passa `onConfirm` mostra l'errore e lo rilancia apposta per tenere il dialogo aperto, ma il
+   dialogo aveva solo `try/finally`: il rifiuto arrivava fino al `void handleConfirm()` del
+   pulsante. Aggiunto il `catch`.
+5. **Impostazioni Email e Backup restavano "modificate" dopo il salvataggio.** I valori inviati
+   sono ripuliti dagli spazi, ma il form teneva quelli scritti: " smtp.nuovo.it " nel campo
+   contro "smtp.nuovo.it" salvato, e Salva restava attivo. Ora il form prende i valori salvati,
+   come faceva già il pannello Azienda.
+6. "Si **e** verificato un errore inatteso" nella pagina d'errore: mancava l'accento.
+
+**Non verificato:** il doppio click su un giorno libero del calendario, che apre la creazione
+con la data: la selezione di react-big-calendar lavora sulle coordinate del mouse e sulle misure
+degli elementi, che in jsdom valgono zero. Il cambio al punto 2 è verificato su jsdom, che segue
+la specifica HTML sulla validazione dei form, ma non in un browser vero.
+
+**README.** Riletto e confrontato con il codice: aggiunta la sezione "Test e controlli", e
+corrette le parti non più vere — le porte richieste (in produzione nessuna), `--configure-ufw`
+che non apre più porte, il cambio password al primo accesso (lo impone l'app; e da Impostazioni
+> Utenti la propria password non si cambia), `company-settings.json` che mancava dal contenuto
+del backup, il ruolo dei campi `LAB_*` nella migrazione, la retention dei backup (configurabile,
+14 è il default) e il comportamento dell'aggiornamento su tutte le schede aperte.
+
+---
+
 ## 2026-09-11 — Correzioni di sicurezza da audit: limiti sul login, sulla 2FA e sul logo
 
 **Cosa.** Cinque correzioni emerse da un audit di sicurezza dell'intero codebase:

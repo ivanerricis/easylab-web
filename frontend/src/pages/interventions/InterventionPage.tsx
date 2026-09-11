@@ -18,6 +18,7 @@ import {
     updateIntervention,
 } from "@/lib/api";
 import { formatDate, formatDateTime, openPrintWindow } from "@/lib/utils";
+import { toInterventionUpdatePayload } from "@/lib/interventionForm";
 import {
     formatInterventionStatus,
     formatInterventionTime,
@@ -101,17 +102,7 @@ const InterventionPage = () => {
     };
 
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
-        await updateIntervention(values.interventionId, {
-            type: values.type,
-            status: values.status,
-            description: values.description,
-            problem: values.problem,
-            note: values.note,
-            collaboratorId: values.collaboratorId,
-            interventionDate: values.interventionDate,
-            startTime: values.startTime,
-            endTime: values.endTime,
-        });
+        await updateIntervention(values.interventionId, toInterventionUpdatePayload(values));
 
         await loadDetails();
     };

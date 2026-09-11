@@ -84,29 +84,26 @@ const ReportsPage = () => {
         pageSize,
     });
 
+    // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
+    // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        try {
-            const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
+        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
 
-            const createdReport = await createReport({
-                deviceId,
-                issueId,
-                customerId,
-                note: trimOrNull(values.notes),
-                password: trimOrNull(values.password),
-                issueDescription,
-                dataBackup: values.dataBackup,
-                charger: values.charger,
-            });
+        const createdReport = await createReport({
+            deviceId,
+            issueId,
+            customerId,
+            note: trimOrNull(values.notes),
+            password: trimOrNull(values.password),
+            issueDescription,
+            dataBackup: values.dataBackup,
+            charger: values.charger,
+        });
 
-            await loadReports();
+        await loadReports();
 
-            if (window.confirm("Report creato. Vuoi stamparlo adesso?")) {
-                handlePrintReport(createdReport.id);
-            }
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile creare il report"));
-            throw error;
+        if (window.confirm("Report creato. Vuoi stamparlo adesso?")) {
+            handlePrintReport(createdReport.id);
         }
     };
 

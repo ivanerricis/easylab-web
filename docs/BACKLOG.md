@@ -37,8 +37,18 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   finché le stampe restano poche.
 
 **Qualità**
-- Test del frontend: il backend è coperto per intero (CHANGELOG del 2026-09-10), il frontend
-  quasi per niente — fra le pagine solo `LoginPage`, pochi hook e librerie condivise.
+- La riconciliazione del tecnico esterno al salvataggio di un report (aggiungi / aggiorna il
+  prezzo / sostituisci / togli) è copiata identica in `ReportsPage`, `ReportPage` e
+  `TechnicianPage`. Il commento di `toReportUpdatePayload` dice che lì "le tre non sono uguali",
+  ma lo sono: cambia solo cosa si ricarica dopo. Candidata a una `syncReportTechnician` in
+  `lib/reportForm.ts`, come è stato fatto per la nota degli interventi (CHANGELOG del
+  2026-09-11): è esattamente il tipo di copia che prima o poi si allontana. I test di
+  `ReportsPage` coprono già i quattro casi.
+- `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
+  file del codice la legge: configurazione morta, da togliere o da ricollegare.
+- Il doppio click su un giorno libero del calendario (apre la creazione con la data) non ha
+  test: in jsdom la selezione di react-big-calendar non funziona. Da coprire con un test nel
+  browser, se ne arriverà uno.
 - Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
   "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.

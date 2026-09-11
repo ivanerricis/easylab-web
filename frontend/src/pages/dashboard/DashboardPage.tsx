@@ -33,6 +33,7 @@ import {
 import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
 import { resolveReportReferences } from "@/lib/reportForm";
 import { resolveCustomerId } from "@/lib/customerLookup";
+import { toInterventionCreatePayload } from "@/lib/interventionForm";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
@@ -167,30 +168,15 @@ const DashboardPage = () => {
         }
     };
 
+    // Come `handleCreateReport` qui sopra, niente try/catch: l'errore lo mostra il dialogo.
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
-        try {
-            const customerId = await resolveCustomerId(values.customerId, values.customer);
+        const customerId = await resolveCustomerId(values.customerId, values.customer);
+        const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
 
-            const createdIntervention = await createIntervention({
-                type: values.type,
-                status: values.status,
-                description: values.description,
-                problem: values.problem,
-                customerId,
-                collaboratorId: values.collaboratorId,
-                interventionDate: values.interventionDate,
-                startTime: values.startTime,
-                endTime: values.endTime,
-            });
+        await Promise.all([loadCalendarEvents(), loadDashboardMetrics(selectedRevenueMonth)]);
 
-            await Promise.all([loadCalendarEvents(), loadDashboardMetrics(selectedRevenueMonth)]);
-
-            if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
-                openPrintWindow(getInterventionPrintUrl(createdIntervention.id));
-            }
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile creare l'intervento"));
-            throw error;
+        if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
+            openPrintWindow(getInterventionPrintUrl(createdIntervention.id));
         }
     };
 

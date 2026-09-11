@@ -9,7 +9,7 @@ type UnhandledErrorPageProps = {
 };
 
 const UnhandledErrorPage = ({
-    title = "Si e verificato un errore inatteso",
+    title = "Si è verificato un errore inatteso",
     message = "Abbiamo riscontrato un problema non gestito. Prova a ricaricare la pagina oppure torna alla dashboard.",
     onRetry,
 }: UnhandledErrorPageProps) => {

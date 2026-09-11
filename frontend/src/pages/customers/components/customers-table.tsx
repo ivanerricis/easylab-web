@@ -73,6 +73,7 @@ const CustomersTable = ({
             getRowKey={(row) => row.id}
             emptyMessage="Nessun cliente disponibile."
             renderRowActions={renderRowActions}
+            onRowOpen={(row) => onOpenCustomer(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}

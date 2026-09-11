@@ -44,7 +44,7 @@ describe("AppErrorBoundary", () => {
             </AppErrorBoundary>
         );
 
-        expect(screen.getByText(/Si e verificato un errore inatteso/i)).toBeInTheDocument();
+        expect(screen.getByText(/Si è verificato un errore inatteso/i)).toBeInTheDocument();
         expect(screen.queryByText("Contenuto applicativo")).not.toBeInTheDocument();
         expect(consoleErrorSpy).toHaveBeenCalled();
     });
@@ -72,7 +72,7 @@ describe("AppErrorBoundary", () => {
 
         render(<Harness />);
 
-        expect(screen.getByText(/Si e verificato un errore inatteso/i)).toBeInTheDocument();
+        expect(screen.getByText(/Si è verificato un errore inatteso/i)).toBeInTheDocument();
 
         // Rimuove la causa dell'errore, poi chiede al boundary di riprovare.
         await user.click(screen.getByRole("button", { name: "Risolvi" }));

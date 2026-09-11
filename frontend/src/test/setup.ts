@@ -41,6 +41,14 @@ if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
 }
 
+// Anche `elementFromPoint` manca in jsdom. Il calendario (react-big-calendar con `selectable`)
+// ascolta ogni `mousedown` del documento e lo chiama per capire se il puntatore è sopra la
+// griglia: senza stub, qualunque click in una pagina con il calendario solleva un'eccezione
+// non gestita. `null` vuol dire "sopra nessun elemento", cioè nessuna selezione da iniziare.
+if (!document.elementFromPoint) {
+    document.elementFromPoint = () => null;
+}
+
 // Stessa storia per ResizeObserver, che jsdom non implementa: il Tooltip di Radix lo usa
 // per misurare la freccia quando il contenuto si apre, quindi senza stub un click su un
 // pulsante con tooltip fa fallire il test con "ResizeObserver is not defined".

@@ -59,10 +59,12 @@ type Props = {
     onSubmit?: (values: CreateReportSubmitValues) => Promise<void> | void;
 };
 
-type FieldErrors = Partial<Record<"issue" | "issueDescription" | "client" | "charger" | "dataBackup", string>>;
+type FieldErrors = Partial<
+    Record<"issue" | "issueDescription" | "client" | "deviceType" | "charger" | "dataBackup", string>
+>;
 
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
-const fieldOrder = ["client", "issue", "issueDescription", "charger", "dataBackup"] as const;
+const fieldOrder = ["client", "deviceType", "issue", "issueDescription", "charger", "dataBackup"] as const;
 
 const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     const [formValues, setFormValues] = useState({
@@ -161,6 +163,13 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
 
         if (formValues.customer.trim() === "") {
             nextFieldErrors.client = "Seleziona un cliente";
+        }
+
+        // Il dispositivo era obbligatorio solo per il `required` nativo del campo, che il
+        // browser controllava da sé: con la validazione nativa spenta (vedi `CustomDialog`)
+        // il controllo sta qui, come quello degli altri campi.
+        if (formValues.deviceType.trim() === "") {
+            nextFieldErrors.deviceType = "Seleziona un dispositivo";
         }
 
         if (formValues.issue.trim() === "") {
@@ -284,6 +293,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                     <div className="flex">
                                         <InputWithAdd
                                             id="deviceType"
+                                            {...fieldErrorAria("deviceType", fieldErrors.deviceType)}
                                             placeholder="Es. iPhone 13"
                                             inputClassName="rounded-r-none"
                                             value={formValues.deviceType}
@@ -296,9 +306,10 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                                     [createdDevice.name]: createdDevice.id,
                                                 }));
                                             }}
-                                            onChange={(value: string) =>
-                                                setFormValues((prev) => ({ ...prev, deviceType: value }))
-                                            }
+                                            onChange={(value: string) => {
+                                                setFormValues((prev) => ({ ...prev, deviceType: value }));
+                                                setFieldErrors((prev) => ({ ...prev, deviceType: undefined }));
+                                            }}
                                             required
                                         />
                                         <Tooltip>
@@ -317,6 +328,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                             <TooltipContent>Crea nuovo dispositivo</TooltipContent>
                                         </Tooltip>
                                     </div>
+                                    <FieldError id="deviceType" error={fieldErrors.deviceType} />
                                 </div>
                             </div>
                         </section>

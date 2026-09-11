@@ -28,7 +28,16 @@ type Props = {
     initialValues?: CustomerDto | null;
 };
 
-type FieldErrors = Partial<Record<"firstName" | "phoneNumber", string>>;
+type FieldErrors = Partial<Record<"firstName" | "phoneNumber" | "email", string>>;
+
+/**
+ * La stessa regola che il browser applica a `type="email"` (è l'espressione dello standard
+ * HTML). Prima la controllava il browser da sé, con il suo fumetto; con la validazione nativa
+ * spenta nei dialoghi (vedi `CustomDialog`) il controllo sta qui, e l'errore va sotto il campo
+ * come gli altri.
+ */
+const emailPattern =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
 const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [formValues, setFormValues] = useState({
@@ -71,9 +80,15 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
             nextErrors.phoneNumber = "Serve almeno un numero di telefono, il primo o il secondo";
         }
 
+        const email = formValues.email.trim();
+
+        if (email !== "" && !emailPattern.test(email)) {
+            nextErrors.email = "Indirizzo email non valido";
+        }
+
         setErrors(nextErrors);
 
-        const firstInvalidField = (["firstName", "phoneNumber"] as const).find((field) => nextErrors[field]);
+        const firstInvalidField = (["firstName", "phoneNumber", "email"] as const).find((field) => nextErrors[field]);
 
         if (firstInvalidField) {
             document.getElementById(firstInvalidField)?.focus();
@@ -170,15 +185,18 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                             }
                         />
                     </FormField>
-                    <FormField id="email" label="Email">
+                    <FormField id="email" label="Email" error={errors.email}>
                         <Input
-                            {...fieldProps("email")}
+                            {...fieldProps("email", { error: errors.email })}
                             className="text-lg!"
                             type="email"
                             autoComplete="off"
                             placeholder="mario.rossi@email.com"
                             value={formValues.email}
-                            onChange={(event) => setFormValues((prev) => ({ ...prev, email: event.target.value }))}
+                            onChange={(event) => {
+                                setFormValues((prev) => ({ ...prev, email: event.target.value }));
+                                setErrors((prev) => ({ ...prev, email: undefined }));
+                            }}
                         />
                     </FormField>
                     <FormField id="city" label="Località">

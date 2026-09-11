@@ -20,6 +20,7 @@ import {
 import { useState } from "react";
 import type { InterventionDto } from "@/types/dtos";
 import { resolveCustomerId } from "@/lib/customerLookup";
+import { toInterventionCreatePayload, toInterventionUpdatePayload } from "@/lib/interventionForm";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
@@ -96,30 +97,16 @@ const InterventionsPage = () => {
         pageSize,
     });
 
+    // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
+    // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
-        try {
-            const customerId = await resolveCustomerId(values.customerId, values.customer);
+        const customerId = await resolveCustomerId(values.customerId, values.customer);
+        const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
 
-            const createdIntervention = await createIntervention({
-                type: values.type,
-                status: values.status,
-                description: values.description,
-                problem: values.problem,
-                customerId,
-                collaboratorId: values.collaboratorId,
-                interventionDate: values.interventionDate,
-                startTime: values.startTime,
-                endTime: values.endTime,
-            });
+        await loadInterventions();
 
-            await loadInterventions();
-
-            if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
-                handlePrintIntervention(createdIntervention.id);
-            }
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile creare l'intervento"));
-            throw error;
+        if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
+            handlePrintIntervention(createdIntervention.id);
         }
     };
 
@@ -145,16 +132,7 @@ const InterventionsPage = () => {
     };
 
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
-        await updateIntervention(values.interventionId, {
-            type: values.type,
-            status: values.status,
-            description: values.description,
-            problem: values.problem,
-            collaboratorId: values.collaboratorId,
-            interventionDate: values.interventionDate,
-            startTime: values.startTime,
-            endTime: values.endTime,
-        });
+        await updateIntervention(values.interventionId, toInterventionUpdatePayload(values));
 
         updateInterventionRow(values.interventionId, (intervention) => ({
             ...intervention,

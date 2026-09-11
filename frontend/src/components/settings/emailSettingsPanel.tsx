@@ -116,8 +116,7 @@ const EmailSettingsPanel = () => {
             });
 
             setPasswordSet(settings.passwordSet);
-            setFormValues((prev) => ({ ...prev, password: "" }));
-            setSavedValues({
+            const nextSavedValues: EmailSettingsInput = {
                 enabled: settings.enabled,
                 host: settings.host,
                 port: settings.port,
@@ -126,7 +125,11 @@ const EmailSettingsPanel = () => {
                 fromName: settings.fromName,
                 fromEmail: settings.fromEmail,
                 password: "",
-            });
+            };
+            // Il form prende i valori salvati (ripuliti dagli spazi): altrimenti restava
+            // "modificato" subito dopo il salvataggio. Vedi lo stesso punto in `useBackupPanel`.
+            setFormValues(nextSavedValues);
+            setSavedValues(nextSavedValues);
             toast.success("Impostazioni email salvate");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare le impostazioni email"));

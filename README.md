@@ -12,7 +12,10 @@ tecnica del codice — cosa è cambiato e perché — vedi [docs/CHANGELOG.md](d
 
 Sviluppo locale:
 - Docker con supporto a Docker Compose
-- Porte libere: `80` (frontend shared), `3000` (backend), `5433` (db in dev), `5173` (frontend dev)
+- Porte libere: `3000` (backend), `5433` (db), `5173` (frontend)
+- Node.js 24 sull'host, solo per lanciare test e controlli fuori dai container (vedi [Test e controlli](#test-e-controlli))
+
+In produzione nessun container pubblica porte sull'host: l'unico ingresso è il Cloudflare Tunnel.
 
 Produzione (VM Proxmox): vedi [Installazione su Proxmox VM (prima volta)](#installazione-su-proxmox-vm-prima-volta).
 
@@ -79,7 +82,7 @@ In alternativa, produzione su CT Proxmox: vedi [Installazione su Proxmox CT (LXC
 	docker cp backend:/app/data/initial-admin-password.txt .
 	```
 
-	Dopo il primo accesso, cambia subito la password da Impostazioni > Utenti (o dal badge utente in alto a destra) e crea eventuali altri utenti da lì.
+	Al primo accesso l'app chiede di sostituire la password generata con una propria, e finché non lo si fa non apre nessuna pagina. Gli altri utenti si creano da Impostazioni > Utenti; in seguito la propria password si cambia dal badge utente in alto a destra > Cambia password.
 
 7. **Abilita l'aggiornamento da interfaccia web** (opzionale ma consigliato):
 
@@ -134,7 +137,9 @@ Per modificare il file in modo interattivo puoi usare:
 ./scripts/edit-env.sh --configure-ufw
 ```
 
-`--configure-ufw` è opzionale e apre le porte 80/3000 con `ufw`, se presente.
+`--configure-ufw` è opzionale e oggi si limita a mostrare lo stato di `ufw`: con il Cloudflare Tunnel non serve aprire nessuna porta in ingresso, e restano consentite solo quelle già aperte (SSH).
+
+I campi `LAB_*` (nome, email, indirizzo e telefono del laboratorio) sono solo i valori di partenza dei dati azienda: dopo il primo avvio si modificano da Impostazioni > Azienda, e da lì in poi valgono quelli.
 
 Al termine, `edit-env.sh` chiede anche se impostare un **IP statico** per la VM. Se confermi, viene eseguito `scripts/configure-static-ip.sh`, che:
 - rileva l'interfaccia di rete e i valori attuali (IP, gateway, DNS) come default;
@@ -148,7 +153,7 @@ Puoi anche eseguirlo da solo, in qualunque momento:
 ./scripts/configure-static-ip.sh
 ```
 
-## Modalita 1: Sviluppo locale (hot reload)
+## Modalità 1: Sviluppo locale (hot reload)
 
 Usa il compose dedicato allo sviluppo:
 
@@ -162,10 +167,33 @@ Servizi disponibili:
 - postgres: localhost:5433
 
 Note:
-- in questa modalita frontend e backend usano volumi bind per aggiornarsi in tempo reale
+- in questa modalità frontend e backend usano volumi bind per aggiornarsi in tempo reale
 - i `node_modules` sono isolati in volumi Docker dedicati
+- su Docker Desktop per Windows il watcher a volte non vede le modifiche: se una modifica sembra non avere effetto, prova `docker restart frontend_dev` (o `backend_dev`) prima di cercare altrove
 
-## Modalita 2: Condivisione / Server (VM Proxmox)
+## Test e controlli
+
+Frontend e backend hanno ciascuno la propria suite (Vitest). Si lanciano dall'host, nella cartella del pacchetto:
+
+```bash
+cd frontend   # oppure: cd backend
+npm ci
+npm test              # tutta la suite, una volta
+npm run test:watch    # solo frontend: rilancia i test a ogni modifica
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+```
+
+Sono gli stessi comandi che la CI (`.github/workflows/ci.yml`) esegue a ogni push, insieme alla build delle immagini Docker di produzione. Nessuno dei due pacchetti ha bisogno di un database per i test: le chiamate al database (backend) e all'API (frontend) sono simulate.
+
+- **Frontend**: Vitest + Testing Library su jsdom. I test stanno accanto al file che provano (`*.test.ts(x)`); `src/test/setup.ts` completa jsdom con le API che non ha (matchMedia, ResizeObserver, pointer capture...) e `src/test/render.tsx` monta un componente dentro gli stessi provider di `App.tsx` (tooltip, router, blocco a schermo).
+- **Backend**: Vitest + Supertest, con il livello delle query simulato.
+
+> **Su Windows** `npm run format:check` segnala anche file corretti, perché git li consegna con fine riga CRLF mentre `.prettierrc` chiede LF. Il controllo attendibile in locale è `npx prettier --check --end-of-line auto "**/*.{ts,tsx}"`, e `--write --end-of-line auto` per correggere senza toccare i fine riga.
+
+## Modalità 2: Condivisione / Server (VM Proxmox)
 
 Il server di produzione gira su una **VM Proxmox** (Debian/Ubuntu, systemd) con Docker Engine nativo, non su Docker Desktop. Prerequisiti sulla VM (fuori da qualunque container): `git`, `docker` (Docker Engine + plugin `docker compose`), `jq` (usato dallo script di aggiornamento).
 
@@ -238,13 +266,13 @@ Per un accesso di emergenza dalla LAN, aggiungi temporaneamente `ports: ["80:80"
 
 ## Arresto servizi
 
-Per fermare i container della modalita in uso:
+Per fermare i container della modalità in uso:
 
 ```bash
 docker compose down
 ```
 
-Oppure, per la modalita dev:
+Oppure, per la modalità dev:
 
 ```bash
 docker compose -f docker-compose.dev.yml down
@@ -259,6 +287,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`:
 | `dump.sql` | tutti i dati: clienti, report, interventi, utenti |
 | `data/email-settings.json` | server SMTP, porta, utente, mittente |
 | `data/backup-settings.json` | pianificazione, destinazione NAS, retention |
+| `data/company-settings.json` | dati azienda (nome, email, indirizzo, telefono) nell'intestazione dei PDF |
 | `data/logo/` | logo del laboratorio usato nei PDF |
 
 **Non** è incluso, di proposito:
@@ -271,7 +300,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`:
 
 ## Restore database
 
-Il ripristino è disponibile da Impostazioni > Backup database (solo per utenti amministratore): si può scegliere un backup già presente sul server oppure caricarne uno da file, con l'opzione per svuotare prima lo schema `public`. Richiede di digitare `RESTORE` per confermare, essendo un'operazione irreversibile.
+Il ripristino è disponibile da Impostazioni > Backup (solo per utenti amministratore): si può scegliere un backup già presente sul server oppure caricarne uno da file, con l'opzione per svuotare prima lo schema `public`. Richiede di digitare `RESTORE` per confermare, essendo un'operazione irreversibile.
 
 > **Limite di caricamento via web:** Cloudflare impone un tetto di **100 MB per richiesta** sul piano Free, quindi il caricamento di un backup più grande di così fallisce dall'interfaccia web (errore 413 generato da Cloudflare, non dall'app). Scegliere un backup **già presente sul server** non è soggetto al limite, perché non carica nulla. Per un archivio esterno più grande di 100 MB, copialo sulla VM e usa lo script da terminale qui sotto.
 
@@ -297,7 +326,7 @@ Procedura per ricostruire l'installazione altrove partendo da un backup: cambio 
 
 **2. Installa da zero** seguendo [Installazione su Proxmox VM (prima volta)](#installazione-su-proxmox-vm-prima-volta) fino al primo avvio incluso.
 
-**3. Ricrea `.env`.** Non è nel backup. Conta soprattutto per i campi `LAB_*` (nome, email, indirizzo, telefono del laboratorio), che compaiono nell'intestazione di ogni PDF. Le credenziali `POSTGRES_*` **non devono coincidere** con quelle del vecchio server: il dump è generato con `--no-owner --no-privileges` e si ripristina su qualsiasi utente.
+**3. Ricrea `.env`.** Non è nel backup. I campi `LAB_*` qui contano poco: sono solo i valori di partenza dei dati azienda, e il ripristino riporta quelli salvati in Impostazioni > Azienda. Le credenziali `POSTGRES_*` **non devono coincidere** con quelle del vecchio server: il dump è generato con `--no-owner --no-privileges` e si ripristina su qualsiasi utente.
 
 **4. Accedi con l'amministratore temporaneo.** Il ripristino da interfaccia richiede una sessione admin, e a questo punto esiste solo l'utente creato al primo avvio:
 
@@ -307,7 +336,7 @@ docker compose logs backend | grep -A3 "Utente amministratore"
 docker cp backend:/app/data/initial-admin-password.txt .
 ```
 
-**5. Ripristina**, da Impostazioni > Backup database (caricando l'archivio o dopo averlo copiato in `BACKUP_HOST_DIR`), oppure da terminale con `./scripts/restore-db.sh`. **Attiva il reset dello schema**: le migrazioni hanno già creato le tabelle al primo avvio e senza reset il dump andrebbe in conflitto.
+**5. Ripristina**, da Impostazioni > Backup (caricando l'archivio o dopo averlo copiato in `BACKUP_HOST_DIR`), oppure da terminale con `./scripts/restore-db.sh`. **Attiva il reset dello schema**: le migrazioni hanno già creato le tabelle al primo avvio e senza reset il dump andrebbe in conflitto.
 
 **6. Rientra con le vecchie credenziali.** Il ripristino sostituisce la tabella utenti, quindi l'amministratore temporaneo del passo 4 non esiste più e l'app forza il logout. Usa un utente del vecchio server.
 
@@ -322,7 +351,7 @@ Per la stessa ragione — `data/secret.key` non è nel backup — chi aveva la *
 
 **8. Verifica**: logo presente nei PDF, test connessione email, test connessione NAS, e prossima esecuzione del backup automatico valorizzata.
 
-> Tutto il resto della configurazione — server SMTP, porta, utente, mittente, indirizzo NAS, condivisione, percorso, dominio, pianificazione, logo — viene ripristinato dall'archivio: le due password sono l'unico intervento manuale.
+> Tutto il resto della configurazione — dati azienda, server SMTP, porta, utente, mittente, indirizzo NAS, condivisione, percorso, dominio, pianificazione, logo — viene ripristinato dall'archivio: le due password sono l'unico intervento manuale.
 
 ## Verifica in due passaggi (2FA)
 
@@ -370,7 +399,7 @@ Lo script installa ed abilita le unit systemd in `ops/systemd/` (`easylab-update
 
 Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 - **Verifica aggiornamenti**: esegue un `git fetch` e mostra se è disponibile un nuovo commit, senza modificare nulla.
-- **Aggiorna adesso**: applica l'aggiornamento e ricostruisce i container. L'app risulta brevemente irraggiungibile durante il rebuild; la pagina ripropone lo stato non appena il backend torna online.
+- **Aggiorna adesso**: applica l'aggiornamento e ricostruisce i container. Per tutta la durata l'app è coperta da un avviso in **ogni** scheda aperta, anche sulle altre postazioni, così nessuno scrive dati mentre girano le migrazioni; a fine aggiornamento le schede si ricaricano da sole con la versione nuova.
 
 > **Nota (aggiornamento del 07/09/2026):** questo aggiornamento cambia il modo in cui le
 > sessioni sono salvate nel database (ora solo l'hash del token, mai il token stesso), quindi
@@ -396,7 +425,7 @@ Alcuni accorgimenti per limitare lo spazio occupato su una VM di produzione a lu
 
 - **Immagini**: backend e frontend usano Dockerfile multi-stage su basi Alpine (più leggere delle equivalenti Debian).
 - **Cache di build**: `scripts/update-server.sh` esegue `docker builder prune` ad ogni aggiornamento (mantiene solo la cache delle ultime 24h, utile per rebuild ravvicinati).
-- **Backup database**: i dump creati da Impostazioni > Backup vengono conservati automaticamente solo per gli ultimi 14, i più vecchi vengono eliminati ad ogni nuovo dump.
+- **Backup database**: a ogni nuovo backup si eliminano i più vecchi, tenendo il numero impostato in Impostazioni > Backup (14 di default). Vale sia per la cartella sul server sia per le copie sul NAS.
 - **Log dei container**: `docker-compose.yml` limita i log di ogni servizio a 3 file da 10 MB (driver `json-file`), per evitare crescita illimitata su container sempre attivi (`restart: always`).
 
 ## Struttura configurazioni Docker
@@ -418,7 +447,7 @@ Sopravvivono a `docker compose down` e agli aggiornamenti; si perdono solo con `
 | Volume | Percorso | Contenuto |
 |---|---|---|
 | `postgres_data` | `/var/lib/postgresql/data` | database |
-| `backend_data` | `/app/data` | chiave di cifratura, impostazioni email/backup, logo |
+| `backend_data` | `/app/data` | chiave di cifratura, impostazioni email/backup, dati azienda, logo |
 | `backend_logs` | `/app/logs` | log azioni utente |
 | *(bind mount)* | `/app/backups` | archivi di backup, in `BACKUP_HOST_DIR` |
 

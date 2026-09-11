@@ -218,8 +218,7 @@ export const useBackupPanel = () => {
             setSmbLastRunAt(settings.smbLastRunAt);
             setSmbLastStatus(settings.smbLastStatus);
             setSmbLastError(settings.smbLastError);
-            setFormValues((prev) => ({ ...prev, smbPassword: "" }));
-            setSavedValues({
+            const nextSavedValues: BackupSettingsInput = {
                 autoEnabled: settings.autoEnabled,
                 frequencyDays: settings.frequencyDays,
                 runAt: settings.runAt,
@@ -234,7 +233,13 @@ export const useBackupPanel = () => {
                 smbPort: settings.smbPort,
                 smbUsername: settings.smbUsername,
                 smbPassword: "",
-            });
+            };
+            // Il form prende i valori salvati, non resta com'era: quelli inviati sono ripuliti
+            // dagli spazi, e un " nas.local " rimasto nel campo contro il "nas.local" salvato
+            // lasciava il form "modificato" (e Salva attivo) subito dopo il salvataggio.
+            // Come in `CompanySettingsPanel`.
+            setFormValues(nextSavedValues);
+            setSavedValues(nextSavedValues);
             toast.success("Impostazioni backup salvate");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare le impostazioni backup"));

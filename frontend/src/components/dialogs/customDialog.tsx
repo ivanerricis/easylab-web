@@ -99,7 +99,15 @@ const CustomDialog = ({
                     }
                 }}
             >
+                {/*
+                    `noValidate`: i dialoghi controllano i campi da sé e mostrano l'errore sotto
+                    quello sbagliato, tutti insieme e con il focus sul primo. Senza, la validazione
+                    nativa del browser partiva prima — un `required` vuoto o un `min` violato
+                    bloccavano l'invio con il fumetto "Compila questo campo" — e i messaggi
+                    scritti per quei casi non comparivano mai.
+                */}
                 <form
+                    noValidate
                     onSubmit={(event) => {
                         event.preventDefault();
                         onConfirm?.();

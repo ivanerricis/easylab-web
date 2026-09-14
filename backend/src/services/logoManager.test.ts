@@ -208,40 +208,95 @@ describe("loadPrintableLogo", () => {
     });
 });
 
+// Solo l'intestazione di ciascun formato: sharp è finto, quindi il resto dei byte non conta.
+const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+const gifBytes = Buffer.from("GIF89a\x01\x00", "latin1");
+const webpBytes = Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WEBPVP8 ")]);
+
 describe("saveLogo", () => {
-    it("rifiuta un formato non supportato", async () => {
-        await expect(saveLogo(Buffer.from("x"), "application/pdf")).rejects.toMatchObject({
+    it("rifiuta un file che non è un'immagine", async () => {
+        await expect(saveLogo(Buffer.from("%PDF-1.7 documento"))).rejects.toMatchObject({
             statusCode: 400,
         });
         expect(LogoManagerError.prototype).toBeInstanceOf(Error);
+        expect(sharpFactory).not.toHaveBeenCalled();
         expect(mkdir).not.toHaveBeenCalled();
     });
 
+    // Il tipo dichiarato nell'upload non conta più: lo sceglie chi carica il file.
+    it("un file di testo non passa per un'immagine", async () => {
+        await expect(saveLogo(Buffer.from("non sono un'immagine"))).rejects.toMatchObject({ statusCode: 400 });
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
     it("rifiuta un file vuoto", async () => {
-        await expect(saveLogo(Buffer.alloc(0), "image/png")).rejects.toMatchObject({ statusCode: 400 });
+        await expect(saveLogo(Buffer.alloc(0))).rejects.toMatchObject({ statusCode: 400 });
     });
 
     it("rifiuta un file oltre i 5 MB", async () => {
-        const troppoGrande = Buffer.alloc(5 * 1024 * 1024 + 1);
+        const troppoGrande = Buffer.concat([pngBytes, Buffer.alloc(5 * 1024 * 1024)]);
 
-        await expect(saveLogo(troppoGrande, "image/png")).rejects.toMatchObject({ statusCode: 400 });
+        await expect(saveLogo(troppoGrande)).rejects.toMatchObject({ statusCode: 400 });
     });
 
-    // L'SVG è vettoriale: passarlo per sharp lo rasterizzerebbe, quindi va scritto così com'è.
-    it("un SVG viene salvato invariato, senza passare da sharp", async () => {
-        const buffer = Buffer.from("<svg></svg>");
+    it.each([
+        ["PNG", pngBytes],
+        ["JPEG", jpegBytes],
+        ["GIF", gifBytes],
+        ["WEBP", webpBytes],
+    ])("riconosce un %s dai byte e lo converte in PNG", async (_format, buffer) => {
+        await saveLogo(buffer);
 
-        const status = await saveLogo(buffer, "image/svg+xml");
+        expect(sharpFactory).toHaveBeenCalledWith(buffer);
+        expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/logo\.png$/), Buffer.from("png-ridimensionato"));
+    });
 
-        expect(sharpFactory).not.toHaveBeenCalled();
+    // Nell'app l'SVG resta vettoriale: si rasterizza solo per verificare che si possa stampare.
+    it("un SVG viene salvato invariato, dopo aver verificato che si possa rasterizzare", async () => {
+        const buffer = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>');
+        sharpMetadata.mockResolvedValue({ width: 10, height: 10 });
+
+        const status = await saveLogo(buffer);
+
+        expect(sharpMetadata).toHaveBeenCalled();
         expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/logo\.svg$/), buffer);
         expect(status.hasCustomLogo).toBe(true);
     });
 
-    it("un raster viene ridimensionato e convertito in PNG tramite sharp", async () => {
-        const buffer = Buffer.from("finto-jpeg");
+    it("riconosce un SVG con BOM e dichiarazione XML in testa", async () => {
+        const buffer = Buffer.from('\uFEFF<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>');
+        sharpMetadata.mockResolvedValue({});
 
-        await saveLogo(buffer, "image/jpeg");
+        await saveLogo(buffer);
+
+        expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/logo\.svg$/), buffer);
+    });
+
+    it("rifiuta un SVG che non si riesce a rasterizzare, senza toccare il logo esistente", async () => {
+        sharpMetadata.mockRejectedValue(new Error("SVG non valido"));
+        readdir.mockResolvedValue(["logo.png", "meta.json"]);
+
+        await expect(saveLogo(Buffer.from("<svg><rotto"))).rejects.toMatchObject({ statusCode: 400 });
+        expect(unlink).not.toHaveBeenCalled();
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    // Prima la cartella si svuotava prima di elaborare il file: un upload illeggibile
+    // cancellava il logo esistente.
+    it("un raster illeggibile viene rifiutato senza toccare il logo esistente", async () => {
+        sharpToBuffer.mockRejectedValue(new Error("Input buffer contains unsupported image format"));
+        readdir.mockResolvedValue(["logo.png", "meta.json"]);
+
+        await expect(saveLogo(pngBytes)).rejects.toMatchObject({ statusCode: 400 });
+        expect(unlink).not.toHaveBeenCalled();
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    it("un raster viene ridimensionato e convertito in PNG tramite sharp", async () => {
+        const buffer = jpegBytes;
+
+        await saveLogo(buffer);
 
         expect(sharpFactory).toHaveBeenCalledWith(buffer);
         expect(sharpResize).toHaveBeenCalledWith(512, 512, { fit: "inside", withoutEnlargement: true });
@@ -258,7 +313,7 @@ describe("saveLogo", () => {
     it("svuota la cartella del logo prima di scrivere il nuovo file", async () => {
         readdir.mockResolvedValue(["vecchio.png", "meta.json"]);
 
-        await saveLogo(Buffer.from("x"), "image/png");
+        await saveLogo(pngBytes);
 
         expect(unlink).toHaveBeenCalledTimes(2);
     });
@@ -266,7 +321,7 @@ describe("saveLogo", () => {
     it("una cartella logo ancora assente non fa fallire il salvataggio", async () => {
         readdir.mockRejectedValue(new Error("ENOENT"));
 
-        await expect(saveLogo(Buffer.from("x"), "image/png")).resolves.toMatchObject({ hasCustomLogo: true });
+        await expect(saveLogo(pngBytes)).resolves.toMatchObject({ hasCustomLogo: true });
     });
 });
 

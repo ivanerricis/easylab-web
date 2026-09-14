@@ -11,6 +11,38 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Il formato del logo caricato si decide dai byte
+
+**Cosa.** `saveLogo` non riceve più il tipo dichiarato nell'upload (`req.file.mimetype`) e
+riconosce il formato dal contenuto:
+- PNG, JPEG, GIF e WEBP dai magic bytes;
+- l'SVG da un filtro testuale, seguito da una rasterizzazione di prova con sharp. È questa la
+  verifica vera: un HTML con dentro un `<svg>` supera il filtro, ma librsvg lo rifiuta.
+
+Un file non riconosciuto o illeggibile riceve un 400 con un messaggio chiaro. Il file ora si
+elabora *prima* di svuotare la cartella del logo.
+
+*Perché:*
+- **Il tipo lo sceglieva chi caricava il file.** Un file qualsiasi dichiarato
+  `image/svg+xml` veniva salvato così com'era e servito come SVG. Un SVG dichiarato
+  `image/png` finiva invece a librsvg attraverso sharp, e un file corrotto faceva fallire sharp
+  con un 500 generico.
+- **L'ordine delle operazioni.** Prima la cartella veniva svuotata prima di elaborare il file,
+  quindi un upload illeggibile cancellava il logo esistente e lasciava l'app senza.
+
+Verificato con sharp e librsvg reali:
+- PNG, JPEG e SVG vengono accettati;
+- testo semplice, HTML con `<svg>` e PNG corrotto ricevono un 400;
+- dopo un rifiuto il logo precedente resta intatto.
+
+Il guadagno di sicurezza è contenuto, ed è giusto dirlo: caricare il logo resta riservato
+all'amministratore, e il servizio dell'SVG (`CSP: sandbox` + `attachment`) non è cambiato.
+
+→ [backend/src/services/logoManager.ts](../backend/src/services/logoManager.ts),
+[backend/src/routes/settings.ts](../backend/src/routes/settings.ts)
+
+---
+
 ## 2026-09-14 — Logo di PDF ed email letto dal disco (chiusa una SSRF), SVG stampabile
 
 **Cosa.** Il logo nei PDF e nelle email non si scarica più via HTTP: lo legge dal disco

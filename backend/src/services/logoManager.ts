@@ -13,15 +13,54 @@ const maxLogoSizeBytes = 5 * 1024 * 1024;
 // tutto in PNG (lossless) e limitiamo il lato massimo, senza mai ingrandire immagini piu piccole.
 const maxLogoDimension = 512;
 
-const allowedMimeTypes: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-    "image/svg+xml": "svg",
+export class LogoManagerError extends ApiError {}
+
+type LogoFormat = "png" | "jpeg" | "gif" | "webp" | "svg";
+
+const hasBytesAt = (buffer: Buffer, bytes: number[], offset = 0) =>
+    buffer.length >= offset + bytes.length && bytes.every((byte, index) => buffer[offset + index] === byte);
+
+const looksLikeSvg = (buffer: Buffer) => {
+    if (buffer.includes(0)) {
+        return false;
+    }
+
+    const text = buffer
+        .toString("utf-8")
+        .replace(/^\uFEFF/, "")
+        .trimStart();
+    return text.startsWith("<") && /<svg[\s/>]/i.test(text);
 };
 
-export class LogoManagerError extends ApiError {}
+/**
+ * Il formato si riconosce dai byte, non dal tipo dichiarato nell'upload: quello lo scrive chi
+ * carica il file. Prima un file qualsiasi dichiarato `image/svg+xml` veniva salvato così
+ * com'era, e uno SVG dichiarato `image/png` finiva a librsvg attraverso sharp.
+ *
+ * Per l'SVG questo è solo un filtro grossolano: la verifica vera è che librsvg riesca a
+ * renderizzarlo, fatta in `saveLogo`.
+ */
+const detectLogoFormat = (buffer: Buffer): LogoFormat | null => {
+    if (hasBytesAt(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+        return "png";
+    }
+
+    if (hasBytesAt(buffer, [0xff, 0xd8, 0xff])) {
+        return "jpeg";
+    }
+
+    const header = buffer.subarray(0, 12).toString("latin1");
+
+    if (header.startsWith("GIF87a") || header.startsWith("GIF89a")) {
+        return "gif";
+    }
+
+    if (header.startsWith("RIFF") && header.slice(8, 12) === "WEBP") {
+        return "webp";
+    }
+
+    return looksLikeSvg(buffer) ? "svg" : null;
+};
 
 type LogoMeta = {
     fileName: string;
@@ -142,41 +181,53 @@ export const loadPrintableLogo = async (): Promise<PrintableLogo | null> => {
     }
 };
 
-export const saveLogo = async (buffer: Buffer, mimeType: string) => {
-    const extension = allowedMimeTypes[mimeType];
-
-    if (!extension) {
-        throw new LogoManagerError("Formato immagine non supportato. Usa JPG, PNG, WEBP, GIF o SVG.", 400);
+/**
+ * L'SVG è vettoriale e nell'app va servito così com'è. Lo si rasterizza comunque una volta,
+ * scartando il risultato: un SVG che librsvg non sa rendere sparirebbe in silenzio da PDF ed
+ * email, e qui l'admin lo scopre subito.
+ */
+const prepareLogoFile = async (buffer: Buffer, format: LogoFormat) => {
+    if (format === "svg") {
+        await rasterizeSvg(buffer);
+        return { fileName: "logo.svg", mimeType: "image/svg+xml", content: buffer };
     }
 
+    const content = await sharp(buffer)
+        .resize(maxLogoDimension, maxLogoDimension, { fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+
+    return { fileName: "logo.png", mimeType: "image/png", content };
+};
+
+export const saveLogo = async (buffer: Buffer) => {
     if (buffer.byteLength === 0) {
-        throw new LogoManagerError("Il file caricato e vuoto", 400);
+        throw new LogoManagerError("Il file caricato è vuoto", 400);
     }
 
     if (buffer.byteLength > maxLogoSizeBytes) {
         throw new LogoManagerError("Il file supera la dimensione massima di 5 MB", 400);
     }
 
+    const format = detectLogoFormat(buffer);
+
+    if (!format) {
+        throw new LogoManagerError("Formato immagine non supportato. Usa JPG, PNG, WEBP, GIF o SVG.", 400);
+    }
+
+    // Il file va elaborato prima di svuotare la cartella: prima un upload che sharp non
+    // riusciva a leggere cancellava il logo esistente e lasciava l'app senza.
+    const { fileName, mimeType, content } = await prepareLogoFile(buffer, format).catch(() => {
+        throw new LogoManagerError("L'immagine non è leggibile: il file potrebbe essere danneggiato.", 400);
+    });
+
     await fs.promises.mkdir(logoDir, { recursive: true });
     await clearLogoDir();
-
-    // L'SVG è vettoriale e nell'app va servito così com'è: lo rasterizza solo
-    // `loadPrintableLogo`, per PDF ed email.
-    const isVector = mimeType === "image/svg+xml";
-    const fileName = isVector ? `logo.${extension}` : "logo.png";
-    const outputMimeType = isVector ? mimeType : "image/png";
-    const outputBuffer = isVector
-        ? buffer
-        : await sharp(buffer)
-              .resize(maxLogoDimension, maxLogoDimension, { fit: "inside", withoutEnlargement: true })
-              .png()
-              .toBuffer();
-
-    await fs.promises.writeFile(path.join(logoDir, fileName), outputBuffer);
+    await fs.promises.writeFile(path.join(logoDir, fileName), content);
 
     const meta: LogoMeta = {
         fileName,
-        mimeType: outputMimeType,
+        mimeType,
         updatedAt: new Date().toISOString(),
     };
 

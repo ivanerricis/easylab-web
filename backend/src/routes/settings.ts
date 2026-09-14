@@ -269,7 +269,7 @@ settingsRouter.post("/logo", logoUpload.single("logo"), async (req, res) => {
         return;
     }
 
-    res.status(201).json(await saveLogo(req.file.buffer, req.file.mimetype));
+    res.status(201).json(await saveLogo(req.file.buffer));
 });
 
 settingsRouter.delete("/logo", async (_req, res) => {

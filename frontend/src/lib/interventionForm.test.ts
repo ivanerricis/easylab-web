@@ -7,6 +7,7 @@ const shared = {
     description: "Sostituito cavo",
     problem: "Rete assente",
     note: "Richiamare lunedì",
+    price: 80,
     collaboratorId: 40,
     interventionDate: "2026-09-10",
     startTime: "09:00",

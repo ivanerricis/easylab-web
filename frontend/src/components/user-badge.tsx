@@ -30,6 +30,10 @@ export function UserBadge() {
     const handleLogout = async () => {
         try {
             await logout();
+            // Niente `state.from`: dopo un logout esplicito il prossimo login (magari di un
+            // altro utente, specie su un'app installata condivisa) deve atterrare sulla
+            // dashboard, non riaprire la pagina su cui ci si trovava.
+            navigate("/login", { replace: true });
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile disconnettersi"));
         }

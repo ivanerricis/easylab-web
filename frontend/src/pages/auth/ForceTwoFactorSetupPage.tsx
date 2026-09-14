@@ -1,5 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,14 @@ import { useAuth } from "@/components/use-auth";
 const ForceTwoFactorSetupPage = () => {
     useDocumentTitle("Verifica in due passaggi");
     const { refresh, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        // Niente `state.from`: il prossimo login (magari di un altro utente) deve atterrare
+        // sulla dashboard, non riaprire la pagina su cui ci si trovava prima di questo blocco.
+        navigate("/login", { replace: true });
+        void logout();
+    };
 
     const [isSetupOpen, setIsSetupOpen] = useState(false);
     const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
@@ -43,7 +52,7 @@ const ForceTwoFactorSetupPage = () => {
                         type="button"
                         variant="ghost"
                         className="text-muted-foreground"
-                        onClick={() => void logout()}
+                        onClick={handleLogout}
                     >
                         Esci
                     </Button>

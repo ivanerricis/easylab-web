@@ -1,5 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,14 @@ import { useAuth } from "@/components/use-auth";
 const ForcePasswordChangePage = () => {
     useDocumentTitle("Cambio password");
     const { user, refresh, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        // Niente `state.from`: il prossimo login (magari di un altro utente) deve atterrare
+        // sulla dashboard, non riaprire la pagina su cui ci si trovava prima di questo blocco.
+        navigate("/login", { replace: true });
+        void logout();
+    };
 
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -130,7 +139,7 @@ const ForcePasswordChangePage = () => {
                             type="button"
                             variant="ghost"
                             className="text-muted-foreground"
-                            onClick={() => void logout()}
+                            onClick={handleLogout}
                         >
                             Esci
                         </Button>

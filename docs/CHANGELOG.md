@@ -11,6 +11,26 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Il logout non passa più la pagina corrente al prossimo login
+
+**Contesto.** Segnalato dall'uso reale: app installata come PWA, login come admin sulla pagina
+di un report, disconnessione, login come utente normale — riapriva la stessa pagina del report.
+
+**Causa.** `handleLogout` in `user-badge.tsx` chiamava solo `logout()`, senza navigare da
+nessuna parte. Il re-render faceva scattare `RequireAuth`, che con `user` diventato `null`
+reindirizza a `/login` salvando la pagina corrente in `state.from`. `LoginPage.goToApp()` legge
+quello `state.from` dopo il login e ci rimanda — ma quello stato appartiene alla navigazione di
+*chi si è appena disconnesso*, non a chi sta effettivamente entrando: su un dispositivo condiviso
+un utente qualunque finisce sulla pagina lasciata aperta da chi l'ha preceduto. Lo stesso
+meccanismo era già stato aggirato una volta, per il ripristino di un backup
+(`useBackupPanel.ts`), ma non per il logout esplicito né per le due pagine di blocco (cambio
+password e setup 2FA obbligatori).
+
+**Correzione.** I tre punti dove si può uscire fuori dal flusso di ripristino backup —
+`user-badge.tsx`, `ForcePasswordChangePage.tsx`, `ForceTwoFactorSetupPage.tsx` — navigano ora
+esplicitamente a `/login` (senza `state.from`) prima o insieme a `logout()`, così il prossimo
+login atterra sempre sulla dashboard invece che sulla pagina di chi l'ha preceduto.
+
 ## 2026-09-14 — Correzioni dall'audit di sicurezza
 
 **Contesto.** Audit del codice con le skill di Trail of Bits (`semgrep`, `insecure-defaults`,

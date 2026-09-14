@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const changeOwnPassword = vi.fn();
@@ -26,26 +27,28 @@ const logout = vi.fn();
 
 const renderPage = () =>
     render(
-        <AuthProviderContext.Provider
-            value={{
-                ...initialAuthProviderState,
-                isLoading: false,
-                refresh,
-                logout,
-                user: {
-                    id: 1,
-                    username: "mario",
-                    createdAt: "2026-01-01T00:00:00.000Z",
-                    mustChangePassword: true,
-                    active: true,
-                    isAdmin: false,
-                    twoFactorEnabled: false,
-                    twoFactorSetupRequired: false,
-                },
-            }}
-        >
-            <ForcePasswordChangePage />
-        </AuthProviderContext.Provider>
+        <MemoryRouter>
+            <AuthProviderContext.Provider
+                value={{
+                    ...initialAuthProviderState,
+                    isLoading: false,
+                    refresh,
+                    logout,
+                    user: {
+                        id: 1,
+                        username: "mario",
+                        createdAt: "2026-01-01T00:00:00.000Z",
+                        mustChangePassword: true,
+                        active: true,
+                        isAdmin: false,
+                        twoFactorEnabled: false,
+                        twoFactorSetupRequired: false,
+                    },
+                }}
+            >
+                <ForcePasswordChangePage />
+            </AuthProviderContext.Provider>
+        </MemoryRouter>
     );
 
 const fill = async (current: string, next: string, confirm: string) => {

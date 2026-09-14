@@ -63,11 +63,40 @@ describe("errorHandler", () => {
         expect(res.body.message).toMatch(/dimensione massima/i);
     });
 
-    it("mappa la violazione di unicità (23505) su 409", () => {
-        const res = run({ code: "23505", detail: "Key (username)=(mario) already exists." });
+    it("mappa la violazione di unicità (23505) su 409 con un messaggio per il vincolo, non il dettaglio Postgres", () => {
+        const res = run({
+            code: "23505",
+            constraint: "user_username_unique",
+            detail: "Key (username)=(mario) already exists.",
+        });
 
         expect(res.statusCode).toBe(409);
-        expect(res.body.message).toBe("Key (username)=(mario) already exists.");
+        expect(res.body.message).toBe("Esiste già un utente con questo nome.");
+        // Il dettaglio resta per il registro delle azioni, lato server.
+        expect(res.locals.apiErrorMessage).toBe("Key (username)=(mario) already exists.");
+    });
+
+    it("per un vincolo di unicità non censito risponde con un messaggio generico", () => {
+        const res = run({
+            code: "23505",
+            constraint: "altro_unique",
+            detail: "Key (colonna)=(valore) already exists.",
+        });
+
+        expect(res.statusCode).toBe(409);
+        expect(res.body.message).toBe("Esiste già un elemento con questi dati.");
+        expect(res.body.message).not.toContain("colonna");
+    });
+
+    it("per una FK non censita non restituisce il dettaglio Postgres", () => {
+        const res = run({
+            code: "23503",
+            constraint: "altro_fk",
+            detail: 'Key (x_id)=(9) is not present in table "x".',
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Riferimento non valido");
     });
 
     it("traduce una FK violata in cancellazione nel messaggio sul genitore", () => {
@@ -96,7 +125,8 @@ describe("errorHandler", () => {
         const res = run(new Error("wrapper", { cause: { code: "23502", detail: "Colonna mancante" } }));
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.message).toBe("Colonna mancante");
+        expect(res.body.message).toBe("Campo obbligatorio mancante");
+        expect(res.locals.apiErrorMessage).toBe("Colonna mancante");
     });
 
     it("non espone il dettaglio Postgres al client sugli errori non gestiti", () => {

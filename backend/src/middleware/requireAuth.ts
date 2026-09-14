@@ -5,14 +5,16 @@ export const sessionCookieName = "session";
 
 // In produzione l'app è raggiungibile solo dal dominio pubblico servito da Cloudflare
 // Tunnel, quindi sempre in HTTPS: il cookie di sessione non deve mai viaggiare in chiaro.
-// In sviluppo il frontend gira su http://localhost, dove un cookie `secure` non verrebbe
-// inviato affatto, quindi lì resta false. Nessun attributo `domain`: il cookie si limita
-// da sé all'host che lo ha emesso, ed è ciò che permette di cambiare dominio senza
-// toccare il codice.
+// `secure` è quindi il default, e si spegne solo dove lo si chiede esplicitamente: il compose
+// di sviluppo imposta NODE_ENV=development, perché lì il backend risponde su http e non tutti
+// i browser accettano un cookie `secure` da http, nemmeno su localhost. Prima valeva il contrario
+// (`secure` solo con NODE_ENV=production): un'immagine avviata senza la variabile perdeva
+// l'attributo senza alcun segnale. Nessun attributo `domain`: il cookie si limita da sé
+// all'host che lo ha emesso, ed è ciò che permette di cambiare dominio senza toccare il codice.
 export const sessionCookieOptions = {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV !== "development",
     path: "/",
 };
 

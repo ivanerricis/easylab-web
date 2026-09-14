@@ -235,6 +235,15 @@ describe("testEmailConnection", () => {
         fromEmail: "lab@easylab.it",
     };
 
+    /** Il buco che questo test chiude: senza, un attaccante in mezzo toglieva STARTTLS e leggeva la password. */
+    it("senza TLS implicito pretende STARTTLS invece di ripiegare sul testo in chiaro", async () => {
+        await testEmailConnection(config);
+        expect(createTransport).toHaveBeenLastCalledWith(expect.objectContaining({ secure: false, requireTLS: true }));
+
+        await testEmailConnection({ ...config, port: 465, secure: true });
+        expect(createTransport).toHaveBeenLastCalledWith(expect.objectContaining({ secure: true, requireTLS: false }));
+    });
+
     it("apre la connessione con le credenziali passate e invia il messaggio di prova", async () => {
         await testEmailConnection(config);
 

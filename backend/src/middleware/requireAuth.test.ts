@@ -155,3 +155,27 @@ describe("requireAdmin", () => {
         expect(next).toHaveBeenCalledOnce();
     });
 });
+
+/**
+ * Le opzioni si calcolano all'import, quindi ogni caso reimporta il modulo con il suo NODE_ENV.
+ * Il buco che questi test chiudono: prima `secure` valeva solo con NODE_ENV=production, e
+ * un'immagine avviata senza la variabile mandava il cookie di sessione senza l'attributo.
+ */
+describe("sessionCookieOptions", () => {
+    const loadOptions = async (nodeEnv: string | undefined) => {
+        vi.resetModules();
+        vi.stubEnv("NODE_ENV", nodeEnv);
+        const { sessionCookieOptions } = await import("./requireAuth.js");
+        vi.unstubAllEnvs();
+        return sessionCookieOptions;
+    };
+
+    it("è secure per default, anche senza NODE_ENV", async () => {
+        expect((await loadOptions(undefined)).secure).toBe(true);
+        expect((await loadOptions("production")).secure).toBe(true);
+    });
+
+    it("rinuncia a secure solo in sviluppo dichiarato", async () => {
+        expect((await loadOptions("development")).secure).toBe(false);
+    });
+});

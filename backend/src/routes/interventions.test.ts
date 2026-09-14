@@ -535,9 +535,7 @@ describe("interventions router", () => {
 
         it("aggiorna il prezzo mantenendo il resto della riga esistente", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([storedIntervention] as never);
-            vi.mocked(updateInterventionById).mockResolvedValue([
-                { ...storedIntervention, price: 60 },
-            ] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([{ ...storedIntervention, price: 60 }] as never);
 
             const response = await request(buildApp()).put("/api/interventions/1").send({ price: 60 });
 

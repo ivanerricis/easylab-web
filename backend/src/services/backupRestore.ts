@@ -23,6 +23,7 @@ import {
     persistState,
     toPublicState,
 } from "./backupState";
+import { clearUnreadableTwoFactorSecrets } from "./authManager";
 import { invalidateCompanySettingsCache } from "./companyManager";
 import { invalidateEmailSettingsCache } from "./emailManager";
 
@@ -144,6 +145,10 @@ const performRestore = async (
         }
 
         const secretsToReconfigure = await findSecretsToReconfigure(state);
+        // I segreti TOTP stanno nel dump appena caricato: se vengono da una macchina con un'altra
+        // `secret.key` qui non si decifrano, e questo è il momento di toglierli (vedi
+        // `clearUnreadableTwoFactorSecrets`), non il primo login di ognuno.
+        const twoFactorCleared = await clearUnreadableTwoFactorSecrets();
 
         state.lastRestoreAt = now.toISOString();
         state.lastRestoreStatus = "success";
@@ -151,12 +156,17 @@ const performRestore = async (
         state.lastRestoreFileName = sourceFileName;
         await persistState(state);
 
+        const notes = [
+            ...(secretsToReconfigure.length > 0 ? [`Reinserisci a mano: ${secretsToReconfigure.join(", ")}.`] : []),
+            ...(twoFactorCleared.length > 0
+                ? [`Verifica in due passaggi disattivata, da riattivare per: ${twoFactorCleared.join(", ")}.`]
+                : []),
+        ];
+
         return {
             ...(await toPublicState(state)),
             message:
-                secretsToReconfigure.length > 0
-                    ? `Ripristino completato. Reinserisci a mano: ${secretsToReconfigure.join(", ")}.`
-                    : "Ripristino completato con successo",
+                notes.length > 0 ? `Ripristino completato. ${notes.join(" ")}` : "Ripristino completato con successo",
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : "Errore durante il ripristino del database";

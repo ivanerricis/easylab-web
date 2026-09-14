@@ -78,11 +78,24 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
     },
 };
 
-const foreignKeyViolationMessage = ({ constraint, message, detail }: PgError): string => {
+// Stessa idea per l'unicità. Prima al client arrivava il `detail` di Postgres ("Key
+// (username)=(mario) already exists."): nomi di colonne e vincoli del database, in inglese,
+// a chi usa l'app. Il dettaglio resta nel registro lato server, tramite `apiErrorMessage`.
+const UNIQUE_MESSAGES: Record<string, string> = {
+    user_username_unique: "Esiste già un utente con questo nome.",
+    device_name_unique: "Esiste già un dispositivo con questo nome.",
+    issue_description_unique: "Esiste già un guasto con questa descrizione.",
+    technician_vat_number_unique: "Esiste già un tecnico con questa partita IVA.",
+};
+
+const GENERIC_UNIQUE_MESSAGE = "Esiste già un elemento con questi dati.";
+const GENERIC_NOT_NULL_MESSAGE = "Campo obbligatorio mancante";
+
+const foreignKeyViolationMessage = ({ constraint, message }: PgError): string => {
     const known = constraint ? FK_MESSAGES[constraint] : undefined;
 
     if (!known) {
-        return detail ?? "Riferimento non valido";
+        return "Riferimento non valido";
     }
 
     // The `table` field is unreliable here — Postgres always reports the
@@ -129,26 +142,27 @@ export const errorHandler = (
     }
 
     const pgError = findPgError(error);
-    const { code, detail, message } = pgError;
+    const { code, detail, message, constraint } = pgError;
 
+    // Nei tre casi riconosciuti il client riceve un messaggio scritto per lui; il `detail` di
+    // Postgres, quando c'è, finisce solo nel registro delle azioni.
     if (code === "23505") {
-        const apiErrorMessage = detail ?? "Valore duplicato";
-        res.locals.apiErrorMessage = apiErrorMessage;
-        res.status(409).json({ message: apiErrorMessage });
+        const clientMessage = (constraint && UNIQUE_MESSAGES[constraint]) || GENERIC_UNIQUE_MESSAGE;
+        res.locals.apiErrorMessage = detail ?? clientMessage;
+        res.status(409).json({ message: clientMessage });
         return;
     }
 
     if (code === "23503") {
-        const apiErrorMessage = foreignKeyViolationMessage(pgError);
-        res.locals.apiErrorMessage = apiErrorMessage;
-        res.status(400).json({ message: apiErrorMessage });
+        const clientMessage = foreignKeyViolationMessage(pgError);
+        res.locals.apiErrorMessage = detail ?? clientMessage;
+        res.status(400).json({ message: clientMessage });
         return;
     }
 
     if (code === "23502") {
-        const apiErrorMessage = detail ?? "Campo obbligatorio mancante";
-        res.locals.apiErrorMessage = apiErrorMessage;
-        res.status(400).json({ message: apiErrorMessage });
+        res.locals.apiErrorMessage = detail ?? GENERIC_NOT_NULL_MESSAGE;
+        res.status(400).json({ message: GENERIC_NOT_NULL_MESSAGE });
         return;
     }
 

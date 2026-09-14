@@ -82,15 +82,28 @@ vi.mock("../db", () => ({
 
 const isLoginRateLimited = vi.fn<(key: string) => boolean>(() => false);
 const isIpLoginRateLimited = vi.fn<(ip: string) => boolean>(() => false);
+const isUsernameLoginRateLimited = vi.fn<(key: string) => boolean>(() => false);
+const isKnownLoginSource = vi.fn<(username: string, subject: string) => boolean>(() => false);
 const registerFailedLogin = vi.fn();
 const registerSuccessfulLogin = vi.fn();
+const rememberLoginSource = vi.fn();
 
-vi.mock("./loginRateLimit", () => ({
-    isLoginRateLimited: (key: string) => isLoginRateLimited(key) as boolean,
-    isIpLoginRateLimited: (ip: string) => isIpLoginRateLimited(ip) as boolean,
-    registerFailedLogin: (key: string) => registerFailedLogin(key),
-    registerSuccessfulLogin: (key: string) => registerSuccessfulLogin(key),
-}));
+// `rateLimitSubject` resta quello vero: che le chiavi nascano dal /64 e non dall'indirizzo
+// esatto è una decisione di authManager da fissare, non un dettaglio del limitatore.
+vi.mock("./loginRateLimit", async () => {
+    const actual = await vi.importActual<typeof import("./loginRateLimit")>("./loginRateLimit");
+
+    return {
+        rateLimitSubject: actual.rateLimitSubject,
+        isLoginRateLimited: (key: string) => isLoginRateLimited(key) as boolean,
+        isIpLoginRateLimited: (ip: string) => isIpLoginRateLimited(ip) as boolean,
+        isUsernameLoginRateLimited: (key: string) => isUsernameLoginRateLimited(key) as boolean,
+        isKnownLoginSource: (username: string, subject: string) => isKnownLoginSource(username, subject) as boolean,
+        registerFailedLogin: (key: string) => registerFailedLogin(key),
+        registerSuccessfulLogin: (key: string) => registerSuccessfulLogin(key),
+        rememberLoginSource: (username: string, subject: string) => rememberLoginSource(username, subject),
+    };
+});
 
 const decryptSecret = vi.fn();
 
@@ -111,9 +124,10 @@ vi.mock("./twoFactorChallenge", () => ({
 }));
 
 const deleteRecoveryCodes = vi.fn();
+const consumeRecoveryCode = vi.fn<(userId: number, codeHash: string) => Promise<boolean>>(() => Promise.resolve(false));
 
 vi.mock("../db/queries/recoveryCode", () => ({
-    consumeRecoveryCode: vi.fn(),
+    consumeRecoveryCode: (userId: number, codeHash: string) => consumeRecoveryCode(userId, codeHash),
     countUnusedRecoveryCodes: vi.fn(() => Promise.resolve(0)),
     deleteRecoveryCodes: (userId: number) => deleteRecoveryCodes(userId),
     replaceRecoveryCodes: vi.fn(),
@@ -146,12 +160,14 @@ vi.mock("node:fs", () => {
 import {
     AuthManagerError,
     changeOwnPassword,
+    clearUnreadableTwoFactorSecrets,
     completeTwoFactorLogin,
     disableTwoFactor,
     ensureDefaultAdmin,
     getSessionUser,
     login,
 } from "./authManager";
+import { generateRecoveryCodes } from "./recoveryCodes";
 import { generateTotpCode } from "./totp";
 
 /** Nello stesso formato prodotto da `hashPassword`: `salt:derivata`, scrypt a 64 byte. */
@@ -186,6 +202,9 @@ beforeEach(() => {
     vi.clearAllMocks();
     isLoginRateLimited.mockReturnValue(false);
     isIpLoginRateLimited.mockReturnValue(false);
+    isUsernameLoginRateLimited.mockReturnValue(false);
+    isKnownLoginSource.mockReturnValue(false);
+    consumeRecoveryCode.mockResolvedValue(false);
     createTwoFactorChallenge.mockReturnValue("challenge-1");
     getTwoFactorChallengeUserId.mockReturnValue(null);
     registerFailedTwoFactorAttempt.mockReturnValue(true);
@@ -201,6 +220,7 @@ const buildTwoFactorUser = (overrides: Record<string, unknown> = {}) =>
 const secondFactorKey = "utente:7:secondo-fattore";
 const passwordKey = "utente:7:password";
 const accountKey = "accesso:mario@1.2.3.4";
+const usernameKey = "nome:mario";
 
 describe("login", () => {
     it("rifiuta con 429 senza nemmeno cercare l'utente quando l'IP ha superato il tetto complessivo", async () => {
@@ -225,13 +245,70 @@ describe("login", () => {
         expect(dbCalls).toHaveLength(0);
     });
 
-    it("una password sbagliata conta sia per l'IP sia per il nome utente da quell'IP", async () => {
+    it("una password sbagliata conta per l'IP, per il nome utente da quell'IP e per il nome utente ovunque", async () => {
         queueRows("select", userTable, [buildUser()]);
 
         await expect(login("mario", "password-sbagliata", "1.2.3.4")).rejects.toMatchObject({ statusCode: 401 });
 
         expect(registerFailedLogin).toHaveBeenCalledWith("1.2.3.4");
         expect(registerFailedLogin).toHaveBeenCalledWith(accountKey);
+        expect(registerFailedLogin).toHaveBeenCalledWith(usernameKey);
+    });
+
+    /**
+     * Il buco che questo test chiude: con la chiave sull'indirizzo esatto, un /64 — cioè 2^64
+     * indirizzi, quanti ne ha qualunque VPS — valeva come 2^64 contatori nuovi.
+     */
+    it("da IPv6 conta per il prefisso /64, non per l'indirizzo esatto", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(login("mario", "password-sbagliata", "2001:db8:1:2::abcd")).rejects.toMatchObject({
+            statusCode: 401,
+        });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith("2001:db8:1:2::/64");
+        expect(registerFailedLogin).toHaveBeenCalledWith("accesso:mario@2001:db8:1:2::/64");
+    });
+
+    it("con l'account sotto attacco rifiuta con 429 chi non ci è mai entrato da quell'indirizzo", async () => {
+        isUsernameLoginRateLimited.mockImplementation((key) => key === usernameKey);
+
+        await expect(login("mario", "password-giusta", "5.6.7.8")).rejects.toMatchObject({ statusCode: 429 });
+
+        expect(isKnownLoginSource).toHaveBeenCalledWith("mario", "5.6.7.8");
+        expect(dbCalls).toHaveLength(0);
+    });
+
+    /**
+     * Il costo che il tetto per nome utente non deve avere: chi attacca un account da mille
+     * indirizzi non deve poter chiudere fuori il titolare, che entra dal solito posto.
+     */
+    it("con l'account sotto attacco lascia provare chi ci è già entrato da quell'indirizzo", async () => {
+        isUsernameLoginRateLimited.mockImplementation((key) => key === usernameKey);
+        isKnownLoginSource.mockReturnValue(true);
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        const result = await login("mario", "password-giusta", "1.2.3.4");
+
+        expect(result.status).toBe("authenticated");
+    });
+
+    it("un login riuscito ricorda l'indirizzo come già usato per quell'account", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        await login("mario", "password-giusta", "1.2.3.4");
+
+        expect(rememberLoginSource).toHaveBeenCalledWith("mario", "1.2.3.4");
+    });
+
+    it("una password sbagliata non rende l'indirizzo già usato", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(login("mario", "password-sbagliata", "1.2.3.4")).rejects.toMatchObject({ statusCode: 401 });
+
+        expect(rememberLoginSource).not.toHaveBeenCalled();
     });
 
     /**
@@ -263,10 +340,11 @@ describe("login", () => {
         expect((utenteInesistente as AuthManagerError).statusCode).toBe(
             (passwordSbagliata as AuthManagerError).statusCode
         );
-        // Ognuno dei due conta sia per l'IP sia per il nome utente da quell'IP: nemmeno il
-        // limitatore tratta diversamente chi non esiste.
-        expect(registerFailedLogin).toHaveBeenCalledTimes(4);
+        // Ognuno dei due conta per l'IP, per il nome utente da quell'IP e per il nome utente
+        // ovunque: nemmeno il limitatore tratta diversamente chi non esiste.
+        expect(registerFailedLogin).toHaveBeenCalledTimes(6);
         expect(registerFailedLogin).toHaveBeenCalledWith("accesso:nessuno@1.2.3.4");
+        expect(registerFailedLogin).toHaveBeenCalledWith("nome:nessuno");
 
         scrypt.mockRestore();
     });
@@ -379,32 +457,19 @@ describe("login", () => {
     });
 
     /**
-     * Il caso da non sbagliare: `data/secret.key` non finisce nei backup, quindi dopo un
-     * ripristino su una macchina diversa il segreto cifrato non si decifra più. Trattarlo
-     * come errore chiuderebbe fuori chi ha la 2FA attiva — e se è l'admin, non resterebbe
-     * nessuno a poterlo sbloccare. Si entra con la sola password, la 2FA viene azzerata e la
-     * risposta lo dice, così l'interfaccia non mostra uno stato che non esiste più.
+     * Il buco che questo test chiude: prima un segreto illeggibile azzerava la 2FA e faceva
+     * entrare con la sola password. Bastava far fallire una volta la lettura di
+     * `data/secret.key` per disinnescare il secondo fattore di tutti, admin compreso.
      */
-    it("se il segreto TOTP non è più leggibile azzera la 2FA e fa entrare con la sola password", async () => {
-        queueRows("select", userTable, [
-            buildUser({ totpSecret: "cifrato-con-un-altra-chiave", totpConfirmedAt: new Date("2026-02-01T00:00:00Z") }),
-        ]);
-        queueAdminIdLookup(1);
+    it("se il segreto TOTP non è più leggibile chiede comunque il secondo fattore e non tocca la 2FA", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser({ totpSecret: "cifrato-con-un-altra-chiave" })]);
         decryptSecret.mockRejectedValue(new Error("chiave diversa"));
 
         const result = await login("mario", "password-giusta", "1.2.3.4");
 
-        expect(result.status).toBe("authenticated");
-        expect(result.status === "authenticated" && result.user.twoFactorEnabled).toBe(false);
-        expect(createTwoFactorChallenge).not.toHaveBeenCalled();
-
-        const azzeramento = dbCalls.find((call) => call.op === "update" && call.table === userTable);
-        expect(azzeramento?.values).toMatchObject({ totpSecret: null, totpConfirmedAt: null, totpLastStep: null });
-        expect(deleteRecoveryCodes).toHaveBeenCalledWith(7);
-        // L'evento non resta silenzioso: chi amministra deve sapere che va riattivata.
-        expect(recordNotification).toHaveBeenCalledWith(
-            expect.objectContaining({ dedupeKey: "two-factor-secret-unreadable:7" })
-        );
+        expect(result).toEqual({ status: "twoFactorRequired", challengeId: "challenge-1" });
+        expect(dbCalls.some((call) => call.op === "update" && call.table === userTable)).toBe(false);
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
     });
 });
 
@@ -540,6 +605,80 @@ describe("completeTwoFactorLogin", () => {
 
         expect(decryptSecret).not.toHaveBeenCalled();
         expect(dbCalls.some((call) => call.op === "insert" && call.table === sessionTable)).toBe(false);
+    });
+
+    it("con il codice giusto ricorda l'indirizzo come già usato per quell'account", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        queueAdminIdLookup(1);
+
+        await completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4");
+
+        expect(rememberLoginSource).toHaveBeenCalledWith("mario", "1.2.3.4");
+    });
+
+    describe("con il segreto TOTP illeggibile", () => {
+        beforeEach(() => {
+            decryptSecret.mockRejectedValue(new Error("chiave diversa"));
+        });
+
+        it("rifiuta anche il codice giusto dell'app, lascia la 2FA com'è e avvisa chi amministra", async () => {
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+
+            await expect(
+                completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4")
+            ).rejects.toMatchObject({ statusCode: 401 });
+
+            expect(dbCalls.some((call) => call.op === "update" && call.table === userTable)).toBe(false);
+            expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({ dedupeKey: "two-factor-secret-unreadable:7" })
+            );
+        });
+
+        /** La via d'uscita che rende sicuro fallire chiusi: i codici di recupero non dipendono dalla chiave. */
+        it("fa entrare con un codice di recupero", async () => {
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+            queueAdminIdLookup(1);
+            consumeRecoveryCode.mockResolvedValue(true);
+
+            const result = await completeTwoFactorLogin("challenge-1", generateRecoveryCodes()[0], "1.2.3.4");
+
+            expect(result.status).toBe("authenticated");
+            expect(decryptSecret).not.toHaveBeenCalled();
+        });
+    });
+});
+
+describe("clearUnreadableTwoFactorSecrets", () => {
+    it("toglie la 2FA solo a chi ha un segreto che non si decifra, e lo annuncia", async () => {
+        queueRows("select", userTable, [
+            buildTwoFactorUser({ id: 7, username: "mario", totpSecret: "leggibile" }),
+            buildTwoFactorUser({ id: 8, username: "anna", totpSecret: "illeggibile" }),
+        ]);
+        decryptSecret.mockImplementation((payload: string) =>
+            payload === "leggibile" ? Promise.resolve(totpSecret) : Promise.reject(new Error("chiave diversa"))
+        );
+
+        const cleared = await clearUnreadableTwoFactorSecrets();
+
+        expect(cleared).toEqual(["anna"]);
+        const azzeramenti = dbCalls.filter((call) => call.op === "update" && call.table === userTable);
+        expect(azzeramenti).toHaveLength(1);
+        expect(azzeramenti[0].values).toMatchObject({ totpSecret: null, totpConfirmedAt: null, totpLastStep: null });
+        expect(deleteRecoveryCodes).toHaveBeenCalledWith(8);
+        expect(deleteRecoveryCodes).not.toHaveBeenCalledWith(7);
+        expect(recordNotification).toHaveBeenCalledWith(
+            expect.objectContaining({ dedupeKey: "two-factor-cleared-after-restore" })
+        );
+    });
+
+    it("se tutti i segreti si decifrano non cambia niente e non avvisa nessuno", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        decryptSecret.mockResolvedValue(totpSecret);
+
+        expect(await clearUnreadableTwoFactorSecrets()).toEqual([]);
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+        expect(recordNotification).not.toHaveBeenCalled();
     });
 });
 

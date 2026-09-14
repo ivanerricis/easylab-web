@@ -203,7 +203,7 @@ Rilancia `sudo ./scripts/install-tunnel.sh` e indica il nuovo nome, poi `docker 
 docker compose logs -f cloudflared
 ```
 
-Per un accesso di emergenza dalla LAN, aggiungi temporaneamente `ports: ["80:80"]` al servizio `frontend` in `docker-compose.yml` e rilancia `docker compose up -d`. Ricordati di rimuoverlo dopo.
+Per un accesso di emergenza dalla LAN, aggiungi temporaneamente `ports: ["80:8080"]` al servizio `frontend` in `docker-compose.yml` e rilancia `docker compose up -d`. Ricordati di rimuoverlo dopo. La porta del container è la 8080, non la 80: su quella nginx ignora l'header `CF-Connecting-IP`, che dalla LAN chiunque potrebbe falsificare per aggirare il limite ai tentativi di login.
 
 ### File da conservare
 

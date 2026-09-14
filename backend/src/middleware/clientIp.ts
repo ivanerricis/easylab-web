@@ -14,6 +14,10 @@ import type { Request } from "express";
  * qualunque valore inviato dal chiamante. È l'unico anello della catena che un
  * attaccante non può falsificare, ed è affidabile proprio perché non esiste un percorso
  * alternativo per raggiungere il backend scavalcando Cloudflare.
+ *
+ * L'unica eccezione prevista è l'accesso d'emergenza dalla LAN, e passa dalla porta 8080 di
+ * nginx, che su quella porta sostituisce l'header con l'indirizzo che vede davvero
+ * (frontend/nginx.conf). Il ragionamento qui sopra resta quindi vero anche in quel caso.
  */
 export const getClientIp = (req: Request): string => {
     const cloudflareIp = req.get("cf-connecting-ip")?.trim();

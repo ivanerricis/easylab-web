@@ -67,6 +67,22 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   0.18.1, cioè una versione più vecchia e incompatibile. Va risolto con un aggiornamento di
   `drizzle-kit` quando la catena `@esbuild-kit` sparirà dalle sue dipendenze. Rilevato
   nell'audit del 2026-09-14.
+- **Updater: gli script root seguono i symlink di una cartella che il backend controlla**
+  (finding EL-01 dell'audit del 2026-09-14, severità alta). `ops/update` è montata nel
+  backend, che la possiede (`docker-entrypoint.sh` la assegna a `node`), e `check-updates.sh` /
+  `update-server.sh` girano come root e ci fanno `cat`, `>` e `chmod 666` per percorso. Con
+  codice in esecuzione nel backend: `status.json` → symlink a `../cloudflared/easylab.json` e
+  un `check.trigger` bastano a far copiare da root le credenziali del tunnel in un file
+  leggibile (deterministico); con una race sul `chmod 666`, root sulla VM. Rimandato per
+  valutare cosa rompe. La strada che non richiede interventi a mano sulla VM: **lasciare i
+  trigger dove sono** (le unit systemd installate in `/etc` guardano `ops/update/*.trigger` e
+  non si aggiornano con `git pull`) e **spostare solo lo stato** in una cartella sorella di
+  root, per esempio `ops/update-status/`, montata `:ro` in un percorso diverso (non dentro
+  `/app/update-signal`, e fuori dal ciclo di `chown` dell'entrypoint, che su un mount in sola
+  lettura fallirebbe e con `set -e` fermerebbe il container). Da mettere in conto: il primo
+  aggiornamento che porta la modifica scrive il suo esito ancora nel vecchio percorso, quindi
+  la pagina Aggiornamenti perde una volta l'ultimo esito e il log; `install-updater.sh` va
+  rilanciato solo se si vuole togliere il `chmod 777`.
 
 ---
 

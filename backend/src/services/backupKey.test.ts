@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BackupManagerError } from "./backupError";
 import {
     decodeBackupKeyOverride,
@@ -37,6 +37,69 @@ describe("getOrCreateBackupKey", () => {
         const second = await getOrCreateBackupKey();
 
         expect(second).toEqual(first);
+    });
+});
+
+/**
+ * Con `node:fs` finto, non sul `data/backup.key` vero: quel file lo creano e cancellano anche
+ * altri file di test che girano in parallelo, e un test che scrive e rilegge lo stesso percorso
+ * finirebbe per leggere quello che un altro ha appena tolto.
+ *
+ * Il buco che questi test chiudono: prima un file illeggibile veniva sostituito da una chiave
+ * nuova, mai esportata, e la copia custodita dall'admin smetteva di aprire i backup.
+ */
+describe("getOrCreateBackupKey, file presente ma inutilizzabile", () => {
+    const readFile = vi.fn();
+    const writeFile = vi.fn();
+    const mkdir = vi.fn();
+
+    const loadModule = async () => {
+        vi.resetModules();
+        vi.doMock("node:fs", () => {
+            const promises = { readFile, writeFile, mkdir };
+            return { default: { promises }, promises };
+        });
+        return import("./backupKey.js");
+    };
+
+    beforeEach(() => {
+        readFile.mockReset();
+        writeFile.mockReset().mockResolvedValue(undefined);
+        mkdir.mockReset().mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.doUnmock("node:fs");
+        vi.resetModules();
+    });
+
+    it("senza una chiave valida dentro fallisce senza sovrascriverlo", async () => {
+        readFile.mockResolvedValue("non-una-chiave\n");
+        const { getOrCreateBackupKey: load } = await loadModule();
+
+        await expect(load()).rejects.toMatchObject({ statusCode: 500 });
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    it("con un errore di lettura diverso dal file mancante fallisce senza scrivere niente", async () => {
+        readFile.mockRejectedValue(Object.assign(new Error("EACCES"), { code: "EACCES" }));
+        const { getOrCreateBackupKey: load } = await loadModule();
+
+        await expect(load()).rejects.toMatchObject({ code: "EACCES" });
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    it("se il file manca lo crea senza poter scrivere sopra uno comparso nel frattempo", async () => {
+        readFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+        const { getOrCreateBackupKey: load } = await loadModule();
+
+        await load();
+
+        expect(writeFile).toHaveBeenCalledWith(
+            keyFilePath,
+            expect.stringMatching(/^[0-9a-f]{64}\n$/),
+            expect.objectContaining({ mode: 0o600, flag: "wx" })
+        );
     });
 });
 

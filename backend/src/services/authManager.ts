@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
-import { and, asc, eq, lt, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lt, ne } from "drizzle-orm";
 import { db } from "../db";
 import { sessionTable, userTable } from "../db/schema";
 import {
@@ -13,9 +13,13 @@ import {
 } from "../db/queries/recoveryCode";
 import {
     isIpLoginRateLimited,
+    isKnownLoginSource,
     isLoginRateLimited,
+    isUsernameLoginRateLimited,
+    rateLimitSubject,
     registerFailedLogin,
     registerSuccessfulLogin,
+    rememberLoginSource,
 } from "./loginRateLimit";
 import { generateCompliantPassword } from "./passwordPolicy";
 import { generateRecoveryCodes, hashRecoveryCode, looksLikeRecoveryCode } from "./recoveryCodes";
@@ -216,7 +220,21 @@ const assertIpLoginRateLimit = (ip: string): void => {
  * account azzera soltanto il proprio contatore; sopra resta il tetto complessivo per IP
  * (`loginRateLimitMaxAttemptsPerIp`), che non si azzera mai.
  */
-const loginAttemptRateLimitKey = (ip: string, username: string) => `accesso:${username}@${ip}`;
+const loginAttemptRateLimitKey = (subject: string, username: string) => `accesso:${username}@${subject}`;
+
+/**
+ * Il tetto sull'account da qualunque indirizzo, che i contatori per IP non danno: chi ha molti
+ * indirizzi li userebbe a turno. Non vale per chi è già entrato con quell'account da lì — il
+ * laboratorio, di solito — altrimenti basterebbe un attacco per chiudere fuori il titolare.
+ * Il prefisso `nome:` non si confonde con un indirizzo: "n" non è una cifra esadecimale.
+ */
+const usernameRateLimitKey = (username: string) => `nome:${username}`;
+
+const assertUsernameLoginRateLimit = (username: string, subject: string): void => {
+    if (isUsernameLoginRateLimited(usernameRateLimitKey(username)) && !isKnownLoginSource(username, subject)) {
+        throw new AuthManagerError(tooManyAttemptsMessage, 429);
+    }
+};
 
 /**
  * Chiavi per utente, accanto a quelle per IP nello stesso limitatore. Il limite per IP da solo
@@ -263,9 +281,11 @@ const createSessionForUser = async (user: UserRow): Promise<LoginResult> => {
 };
 
 export const login = async (username: string, password: string, ip: string): Promise<LoginResult> => {
-    const accountRateLimitKey = loginAttemptRateLimitKey(ip, username);
-    assertIpLoginRateLimit(ip);
+    const subject = rateLimitSubject(ip);
+    const accountRateLimitKey = loginAttemptRateLimitKey(subject, username);
+    assertIpLoginRateLimit(subject);
     assertLoginRateLimit(accountRateLimitKey);
+    assertUsernameLoginRateLimit(username, subject);
 
     const invalidCredentialsError = new AuthManagerError("Nome utente o password non validi", 401);
     const rows = await db.select().from(userTable).where(eq(userTable.username, username)).limit(1);
@@ -276,8 +296,9 @@ export const login = async (username: string, password: string, ip: string): Pro
     const isPasswordValid = await verifyPassword(password, user ? user.passwordHash : await getDummyPasswordHash());
 
     if (!user || !isPasswordValid) {
-        registerFailedLogin(ip);
+        registerFailedLogin(subject);
         registerFailedLogin(accountRateLimitKey);
+        registerFailedLogin(usernameRateLimitKey(username));
         throw invalidCredentialsError;
     }
 
@@ -292,24 +313,14 @@ export const login = async (username: string, password: string, ip: string): Pro
     // Il secondo fattore si scopre solo adesso, a password già verificata: annunciarlo prima
     // direbbe a un estraneo quali account sono protetti e quali no.
     if (isTwoFactorActive(user)) {
-        // Il segreto va letto qui e non al secondo passo: se è illeggibile (ripristino su una
-        // macchina con `data/secret.key` diversa) `readTotpSecret` azzera la 2FA e si entra
-        // con la sola password, invece di restare chiusi fuori senza spiegazione.
-        const secret = await readTotpSecret(user);
-
-        if (secret) {
-            return { status: "twoFactorRequired", challengeId: createTwoFactorChallenge(user.id) };
-        }
-
-        // `readTotpSecret` ha appena azzerato la 2FA in tabella, ma la riga che abbiamo in
-        // mano è di un istante prima: senza questa copia corretta la risposta direbbe al
-        // client che la 2FA è ancora attiva, e l'interfaccia mostrerebbe uno stato che non
-        // esiste più finché qualcuno non ricarica la pagina.
-        registerSuccessfulLogin(accountRateLimitKey);
-        return createSessionForUser({ ...user, totpConfirmedAt: null });
+        // Il segreto non si legge qui ma al secondo passo, e se nel frattempo non si decifra
+        // più la 2FA resta al suo posto: si entra con un codice di recupero, che è un hash nel
+        // database e non dipende da `data/secret.key` (vedi `readTotpSecret`).
+        return { status: "twoFactorRequired", challengeId: createTwoFactorChallenge(user.id) };
     }
 
     registerSuccessfulLogin(accountRateLimitKey);
+    rememberLoginSource(username, subject);
     return createSessionForUser(user);
 };
 
@@ -530,14 +541,18 @@ const clearTwoFactor = async (userId: number): Promise<void> => {
 };
 
 /**
- * Il segreto in chiaro, oppure null se non c'è o non è più leggibile.
+ * Il segreto in chiaro, oppure null se non c'è o non si decifra.
  *
- * Il caso che conta è il secondo. `data/secret.key` è escluso dai backup di proposito
- * (`backupFiles.ts`), ma i segreti cifrati stanno nel dump: ripristinato su una macchina
- * con una chiave diversa, nessuno di essi si decifra più. Trattarlo come un errore
- * lascerebbe fuori dall'app chiunque avesse la 2FA attiva — e se è l'admin, non resta
- * nessuno che possa sbloccarlo. Quindi la 2FA viene azzerata e l'evento annunciato, la
- * stessa scelta già fatta per la password del NAS in `backupState.ts`.
+ * Un segreto che non si decifra lascia la 2FA chiusa, non la toglie. Fino al 2026-09-14 la
+ * toglieva e faceva entrare con la sola password, pensando al ripristino su un'altra macchina;
+ * ma lo stesso ramo scattava per *qualunque* errore su `data/secret.key`, e diventava un modo
+ * per disinnescare il secondo fattore di tutti, admin compreso, a chi ne conosceva la password.
+ * Chi resta senza codici dall'app entra con un codice di recupero (hash nel database, non
+ * dipendono dalla chiave); un admin può disattivare la 2FA di un altro utente; per l'admin
+ * senza codici c'è `scripts/reset-admin-password.sh --reset-2fa` sulla VM.
+ *
+ * Il ripristino, l'unico caso in cui la chiave cambia di proposito, lo gestisce
+ * `clearUnreadableTwoFactorSecrets` alla fine del ripristino stesso.
  */
 const readTotpSecret = async (user: UserRow): Promise<string | null> => {
     if (!user.totpSecret) {
@@ -547,23 +562,67 @@ const readTotpSecret = async (user: UserRow): Promise<string | null> => {
     try {
         return await decryptSecret(user.totpSecret);
     } catch {
-        await clearTwoFactor(user.id);
-        console.error(`Segreto TOTP non decifrabile per l'utente ${user.id}: 2FA azzerata.`);
+        // Un segreto di una configurazione ancora da confermare non protegge niente: basta
+        // ricominciare l'attivazione, non serve avvisare nessuno.
+        if (!isTwoFactorActive(user)) {
+            return null;
+        }
+
+        console.error(`Segreto TOTP non decifrabile per l'utente ${user.id}: la 2FA resta attiva.`);
 
         await recordNotification({
             dedupeKey: `two-factor-secret-unreadable:${user.id}`,
             severity: "warning",
-            title: "Autenticazione a due fattori disattivata",
+            title: "Codici dell'app di autenticazione non verificabili",
             message:
                 `Il secondo fattore di "${user.username}" non è leggibile con la chiave presente in ` +
-                "data/secret.key: succede dopo un ripristino su una macchina diversa, perché la chiave " +
-                "non finisce nei backup. È stato disattivato per non lasciare l'account irraggiungibile: " +
-                "va riattivato dalle impostazioni.",
+                "data/secret.key, quindi i codici dell'app vengono rifiutati. Si entra con un codice di " +
+                "recupero; un amministratore può disattivare la 2FA dell'utente dalla gestione utenti, e " +
+                "per l'amministratore senza codici resta scripts/reset-admin-password.sh --reset-2fa sulla VM.",
             link: "/settings?section=security",
         });
 
         return null;
     }
+};
+
+/**
+ * Dopo un ripristino: toglie la 2FA agli utenti il cui segreto non si decifra con la chiave di
+ * questa macchina, e restituisce i loro nomi.
+ *
+ * `data/secret.key` resta fuori dai backup di proposito (`backupFiles.ts`), quindi un
+ * ripristino su un'altra macchina porta segreti che qui non si leggono. È l'unico momento in
+ * cui azzerarli è giusto: lo fa un admin già entrato con la sua 2FA, avviando un ripristino,
+ * non un errore qualsiasi incontrato al login. Senza, dopo il ripristino su una macchina nuova
+ * tutti gli utenti con la 2FA — admin compreso — dovrebbero entrare con i codici di recupero.
+ */
+export const clearUnreadableTwoFactorSecrets = async (): Promise<string[]> => {
+    const users = await db.select().from(userTable).where(isNotNull(userTable.totpSecret));
+    const cleared: string[] = [];
+
+    for (const user of users) {
+        try {
+            await decryptSecret(user.totpSecret!);
+        } catch {
+            await clearTwoFactor(user.id);
+            cleared.push(user.username);
+        }
+    }
+
+    if (cleared.length > 0) {
+        await recordNotification({
+            dedupeKey: "two-factor-cleared-after-restore",
+            severity: "warning",
+            title: "Verifica in due passaggi da riattivare",
+            message:
+                "Il backup ripristinato è stato cifrato con una chiave diversa da quella di questa macchina: " +
+                `la verifica in due passaggi di ${cleared.map((username) => `"${username}"`).join(", ")} ` +
+                "è stata disattivata e va riattivata dalle impostazioni.",
+            link: "/settings?section=security",
+        });
+    }
+
+    return cleared;
 };
 
 type SecondFactorResult = { valid: false } | { valid: true; usedRecoveryCode: boolean };
@@ -625,7 +684,8 @@ const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFa
 };
 
 export const completeTwoFactorLogin = async (challengeId: string, code: string, ip: string): Promise<LoginResult> => {
-    assertIpLoginRateLimit(ip);
+    const subject = rateLimitSubject(ip);
+    assertIpLoginRateLimit(subject);
 
     // 410 e non 401: 401 è "questo codice è sbagliato, riprova", 410 è "non c'è più niente
     // da verificare, ricomincia dalla password". Il client deve poter distinguere i due casi
@@ -652,7 +712,7 @@ export const completeTwoFactorLogin = async (challengeId: string, code: string, 
         // Tre limiti insieme: i tentativi su questo challenge, quelli dell'utente (contati in
         // `verifySecondFactor`) e quelli complessivi dell'IP. Un milione di combinazioni si
         // esaurisce in fretta, se si può provare all'infinito.
-        registerFailedLogin(ip);
+        registerFailedLogin(subject);
         const challengeStillOpen = registerFailedTwoFactorAttempt(challengeId);
 
         throw challengeStillOpen
@@ -663,7 +723,8 @@ export const completeTwoFactorLogin = async (challengeId: string, code: string, 
     deleteTwoFactorChallenge(challengeId);
     // Come al primo passo: si azzera il contatore di questo nome utente da questo IP, mai
     // quello complessivo dell'IP.
-    registerSuccessfulLogin(loginAttemptRateLimitKey(ip, user.username));
+    registerSuccessfulLogin(loginAttemptRateLimitKey(subject, user.username));
+    rememberLoginSource(user.username, subject);
 
     if (result.usedRecoveryCode) {
         // Il registro delle azioni non può attribuire questa richiesta, che arriva senza

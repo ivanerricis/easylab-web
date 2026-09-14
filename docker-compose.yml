@@ -81,7 +81,9 @@ services:
     # Nessuna porta pubblicata sull'host: si entra solo dal dominio pubblico, attraverso
     # cloudflared, che raggiunge questo container dalla rete interna della compose. Per un
     # accesso di emergenza dalla LAN (tunnel non funzionante) riaggiungere qui
-    # temporaneamente `ports: ["80:80"]` e rifare `docker compose up -d`.
+    # temporaneamente `ports: ["80:8080"]` e rifare `docker compose up -d`. La 8080, non la
+    # 80: è la porta su cui nginx non si fida di `CF-Connecting-IP` (vedi nginx.conf), e
+    # pubblicare la 80 lascerebbe a chiunque sulla LAN tentativi di login illimitati.
     healthcheck:
       test: [ "CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1" ]
       interval: 30s

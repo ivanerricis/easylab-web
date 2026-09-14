@@ -1,16 +1,98 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
     isIpLoginRateLimited,
+    isKnownLoginSource,
     isLoginRateLimited,
+    isUsernameLoginRateLimited,
+    knownLoginSourceTtlMs,
+    knownLoginSourcesMaxEntries,
     loginRateLimitMaxAttempts,
     loginRateLimitMaxAttemptsPerIp,
+    loginRateLimitMaxAttemptsPerUsername,
     loginRateLimitMaxEntries,
     loginRateLimitSize,
     loginRateLimitWindowMs,
+    rateLimitSubject,
     registerFailedLogin,
     registerSuccessfulLogin,
+    rememberLoginSource,
     resetLoginRateLimit,
 } from "./loginRateLimit";
+
+describe("rateLimitSubject", () => {
+    it("lascia un IPv4 com'è", () => {
+        expect(rateLimitSubject("1.2.3.4")).toBe("1.2.3.4");
+    });
+
+    it("riduce un IPv6 al suo /64: due indirizzi dello stesso cliente finiscono sullo stesso contatore", () => {
+        expect(rateLimitSubject("2001:db8:1:2::1")).toBe("2001:db8:1:2::/64");
+        expect(rateLimitSubject("2001:0db8:0001:0002:ffff:eeee:dddd:cccc")).toBe("2001:db8:1:2::/64");
+    });
+
+    it("tiene separati due /64 diversi", () => {
+        expect(rateLimitSubject("2001:db8:1:2::1")).not.toBe(rateLimitSubject("2001:db8:1:3::1"));
+    });
+
+    it("espande `::` in qualunque posizione e non distingue maiuscole e minuscole", () => {
+        expect(rateLimitSubject("::1")).toBe("0:0:0:0::/64");
+        expect(rateLimitSubject("2001:DB8::")).toBe("2001:db8:0:0::/64");
+        expect(rateLimitSubject("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+    });
+
+    it("riporta a IPv4 un indirizzo mappato, come lo presenta un socket dual-stack", () => {
+        expect(rateLimitSubject("::ffff:1.2.3.4")).toBe("1.2.3.4");
+        expect(rateLimitSubject("::ffff:102:304")).toBe("1.2.3.4");
+    });
+
+    it("lascia com'è un valore che non è un indirizzo", () => {
+        expect(rateLimitSubject("unknown")).toBe("unknown");
+    });
+});
+
+describe("tetto per nome utente e indirizzi già usati", () => {
+    beforeEach(() => {
+        resetLoginRateLimit();
+    });
+
+    it("scatta dopo più tentativi di quello per IP + nome utente", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttemptsPerUsername - 1; attempt += 1) {
+            registerFailedLogin("nome:mario");
+        }
+
+        expect(isLoginRateLimited("nome:mario")).toBe(true);
+        expect(isUsernameLoginRateLimited("nome:mario")).toBe(false);
+
+        registerFailedLogin("nome:mario");
+        expect(isUsernameLoginRateLimited("nome:mario")).toBe(true);
+    });
+
+    it("ricorda un indirizzo per account, fino alla scadenza", () => {
+        const now = 1_000_000;
+        rememberLoginSource("mario", "1.2.3.4", now);
+
+        expect(isKnownLoginSource("mario", "1.2.3.4", now)).toBe(true);
+        expect(isKnownLoginSource("anna", "1.2.3.4", now)).toBe(false);
+        expect(isKnownLoginSource("mario", "5.6.7.8", now)).toBe(false);
+        expect(isKnownLoginSource("mario", "1.2.3.4", now + knownLoginSourceTtlMs)).toBe(false);
+    });
+
+    it("oltre il tetto di memoria scarta l'indirizzo usato meno di recente", () => {
+        rememberLoginSource("mario", "0.0.0.0");
+        rememberLoginSource("anna", "0.0.0.0");
+
+        for (let index = 0; index < knownLoginSourcesMaxEntries - 2; index += 1) {
+            rememberLoginSource(`utente${index}`, "9.9.9.9");
+        }
+
+        // Mario è rientrato: ora la più vecchia è Anna.
+        rememberLoginSource("mario", "0.0.0.0");
+        rememberLoginSource("nuovo", "9.9.9.9");
+
+        expect(isKnownLoginSource("mario", "0.0.0.0")).toBe(true);
+        expect(isKnownLoginSource("anna", "0.0.0.0")).toBe(false);
+        expect(isKnownLoginSource("nuovo", "9.9.9.9")).toBe(true);
+    });
+});
 
 describe("loginRateLimit", () => {
     beforeEach(() => {

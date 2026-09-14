@@ -174,6 +174,11 @@ const buildTransporter = (config: EmailConnectionConfig) =>
         host: config.host,
         port: config.port,
         secure: config.secure,
+        // Senza TLS implicito (la 587 del default) nodemailer usa STARTTLS solo se il server lo
+        // annuncia: chi sta in mezzo toglie l'annuncio e l'autenticazione parte in chiaro,
+        // password della casella compresa. Così invece la connessione si interrompe. Il
+        // certificato resta verificato, perché `rejectUnauthorized` vale true di default.
+        requireTLS: !config.secure,
         auth: {
             user: config.username,
             pass: config.password,

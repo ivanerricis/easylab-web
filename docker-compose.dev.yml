@@ -9,8 +9,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
+    # Solo da questa macchina: con "5433:5432" il database di sviluppo, con le sue credenziali
+    # di prova, rispondeva a chiunque sulla stessa rete. Gli strumenti locali (client SQL,
+    # drizzle-kit) si collegano a localhost:5433 come prima.
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
@@ -33,11 +36,17 @@ services:
       # richieste sono cross-origin davvero. In produzione la variabile non esiste e il
       # CORS non viene nemmeno attivato, perché nginx serve tutto dalla stessa origin.
       CORS_ORIGIN: http://localhost:5173
+      # Qui il backend risponde su http: senza questa variabile il cookie di sessione sarebbe
+      # `secure` (il default, vedi middleware/requireAuth.ts), e non tutti i browser lo
+      # accettano da http, nemmeno su localhost.
+      NODE_ENV: development
     volumes:
       - ./backend:/app
       - ${BACKUP_HOST_DIR}:/app/backups
       - backend_node_modules:/app/node_modules
-    command: sh -c 'echo "DATABASE_URL=$$DATABASE_URL"; node migrate.js && npm run dev'
+    # Senza l'echo di DATABASE_URL, tolto anche dal compose di produzione: stampava la password
+    # del database nei log.
+    command: sh -c 'node migrate.js && npm run dev'
     ports:
       - "3000:3000"
     depends_on:

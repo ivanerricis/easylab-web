@@ -49,7 +49,7 @@ export const isEncryptedArchiveFile = async (filePath: string): Promise<boolean>
 export const encryptArchiveFile = async (sourcePath: string, destPath: string): Promise<void> => {
     const key = await getOrCreateBackupKey();
     const iv = crypto.randomBytes(ivLength);
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    const cipher = crypto.createCipheriv(algorithm, key, iv, { authTagLength: tagLength });
     const dest = fs.createWriteStream(destPath);
 
     await new Promise<void>((resolve, reject) => {
@@ -99,7 +99,9 @@ export const decryptArchiveFile = async (sourcePath: string, destPath: string, k
         const tag = Buffer.alloc(tagLength);
         await fh.read(tag, 0, tagLength, size - tagLength);
 
-        const decipher = crypto.createDecipheriv(algorithm, key, iv);
+        // Il tag qui è sempre di 16 byte (lo legge `fh.read` a lunghezza fissa); dichiararlo
+        // lo rende una garanzia di `crypto` invece che di come è scritta la lettura.
+        const decipher = crypto.createDecipheriv(algorithm, key, iv, { authTagLength: tagLength });
         decipher.setAuthTag(tag);
 
         const source = fs.createReadStream(sourcePath, {

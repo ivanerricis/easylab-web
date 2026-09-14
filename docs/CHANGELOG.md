@@ -11,6 +11,78 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Correzioni dall'audit di sicurezza
+
+**Contesto.** Audit del codice con le skill di Trail of Bits (`semgrep`, `insecure-defaults`,
+`sharp-edges`, `supply-chain-risk-auditor`) sul commit `2595d07`: 10 finding. Qui sono corretti
+tutti tranne EL-01 (l'updater), rimandato per capire prima cosa rompe: è nel
+[BACKLOG](BACKLOG.md) con l'analisi.
+
+**EL-02 — Limite ai tentativi di login aggirabile con IPv6.** I contatori avevano come chiave
+l'indirizzo esatto, e un solo cliente IPv6 ne controlla un /64 intero, cioè 2^64 contatori nuovi:
+password illimitate sugli account senza 2FA. Ora `rateLimitSubject` riduce gli IPv6 al /64 (e
+riporta a IPv4 gli indirizzi mappati), e un terzo contatore conta i tentativi sul nome utente da
+qualunque indirizzo (10 per finestra). Superato quel tetto provano ancora solo gli indirizzi da
+cui l'account è già entrato negli ultimi 30 giorni: senza questa eccezione chi attacca un
+account da mille indirizzi chiuderebbe fuori il titolare, che entra sempre dal laboratorio. Gli
+indirizzi noti stanno in memoria come il resto del limitatore, quindi un riavvio li dimentica:
+un attacco in corso subito dopo un aggiornamento può tenere fuori per qualche finestra anche chi
+entra dal laboratorio, finché non rientra una volta. File: `loginRateLimit.ts`, `authManager.ts`.
+
+**EL-03 — Un errore di lettura della chiave disattivava la 2FA di tutti.** `secretCrypto.ts`
+e `backupKey.ts` rigeneravano la chiave a *qualunque* errore di lettura (permessi, I/O, file
+modificato), scrivendoci sopra; e `readTotpSecret`, trovando segreti non più decifrabili,
+toglieva la 2FA e faceva entrare con la sola password. Insieme: far fallire una volta la lettura
+di `data/secret.key` bastava a disinnescare il secondo fattore dell'admin a chi ne conosceva la
+password. Ora la chiave si genera solo se il file manca (`ENOENT`), con `flag: "wx"`, e un file
+presente ma inutilizzabile ferma tutto con un errore invece di essere sostituito. Un segreto
+TOTP illeggibile lascia la 2FA chiusa: si entra con un codice di recupero (hash nel database, non
+dipendono dalla chiave), l'admin può toglierla a un altro utente, e per l'admin resta
+`reset-admin-password.sh --reset-2fa`. L'azzeramento automatico, pensato per il ripristino su
+un'altra macchina, si è spostato proprio lì: `clearUnreadableTwoFactorSecrets` gira alla fine
+di `performRestore`, un'operazione che solo un admin autenticato può avviare, e il messaggio di
+esito dice a chi va riattivata. File: `secretCrypto.ts`, `backupKey.ts`, `authManager.ts`,
+`backupRestore.ts`, `docs/BACKUP.md`, `docs/OPERATIONS.md`.
+
+**EL-04 — SMTP senza `requireTLS`.** Con la configurazione di default (587, `secure: false`)
+nodemailer usa STARTTLS solo se il server lo annuncia: chi sta in mezzo toglie l'annuncio e la
+password della casella viaggia in chiaro. Ora `requireTLS: !secure`. File: `emailManager.ts`.
+
+**EL-05 — Tag GCM di lunghezza libera.** `decryptSecret` accettava tag troncati fino a 4 byte
+(il default di Node senza `authTagLength`). Ora pretende 16 byte; `backupCrypto.ts` li leggeva
+già a lunghezza fissa e dichiara comunque `authTagLength` per coerenza.
+
+**EL-06 — L'accesso d'emergenza dalla LAN disattivava il limite per IP.** Il backend si fida di
+`CF-Connecting-IP`, e con `ports: ["80:80"]` (la procedura d'emergenza) chiunque sulla LAN poteva
+scriverlo a piacere. nginx ascolta ora anche sulla 8080 e lì sostituisce l'header con
+l'indirizzo reale; la procedura pubblica `80:8080`. Verificato con due container usa e getta
+(nginx con questa configurazione e un finto backend che rimanda l'header ricevuto): sulla 80
+passa com'è, sulla 8080 arriva l'IP vero. File: `frontend/nginx.conf`, `frontend/Dockerfile`,
+`docker-compose.yml`, `docs/DEPLOY.md`.
+
+**EL-07 — Dettagli Postgres al client.** Per unicità, not-null e FK non censite la risposta
+conteneva il `detail` di Postgres (`Key (username)=(mario) already exists.`). Ora c'è una mappa
+di messaggi per i vincoli di unicità, come già per le FK; il dettaglio resta nel registro delle
+azioni. File: `errorHandler.ts`.
+
+**EL-08 — `Secure` del cookie di sessione.** Valeva solo con `NODE_ENV=production`: un'immagine
+avviata senza la variabile perdeva l'attributo senza segnali. Ora è il default, e si spegne solo
+con `NODE_ENV=development`, che il compose di sviluppo imposta. File: `requireAuth.ts`,
+`docker-compose.dev.yml`.
+
+**EL-09 — CI.** Le action sono fissate al commit (lo SHA a cui puntava `v7` al momento, quindi
+nessun cambiamento di comportamento) e il workflow dichiara `permissions: contents: read`.
+
+**EL-10 — Compose di sviluppo.** Postgres pubblicato solo su `127.0.0.1:5433` e tolto l'`echo` di
+`DATABASE_URL`, che stampava la password nei log.
+
+**Per applicarlo in sviluppo** servono i container ricreati, non riavviati:
+`docker compose -f docker-compose.dev.yml up -d` (mai `down -v`).
+
+**Test.** Backend 656 test, `tsc`, `eslint` e prettier puliti. I nuovi test sul file della chiave
+usano `node:fs` finto: `data/backup.key` reale lo creano e cancellano anche altri file di test in
+parallelo, e un test che lo scriveva e rileggeva falliva a seconda dell'ordine.
+
 ## 2026-09-14 — Prezzo facoltativo sugli interventi
 
 **Cosa.** Aggiunta la colonna `price` (intero, nullable) alla tabella `intervention`

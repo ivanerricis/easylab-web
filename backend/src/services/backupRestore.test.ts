@@ -72,6 +72,9 @@ vi.mock("./companyManager", () => companyManagerMock);
 const emailManagerMock = vi.hoisted(() => ({ invalidateEmailSettingsCache: vi.fn() }));
 vi.mock("./emailManager", () => emailManagerMock);
 
+const authManagerMock = vi.hoisted(() => ({ clearUnreadableTwoFactorSecrets: vi.fn() }));
+vi.mock("./authManager", () => authManagerMock);
+
 import { BackupManagerError } from "./backupError";
 import { restoreBackupFromExisting, restoreBackupFromUpload } from "./backupRestore";
 
@@ -121,6 +124,7 @@ beforeEach(() => {
         emailConfigured: false,
     }));
     backupStateMock.findSecretsToReconfigure.mockResolvedValue([]);
+    authManagerMock.clearUnreadableTwoFactorSecrets.mockResolvedValue([]);
     fsPromisesMock.mkdir.mockResolvedValue(undefined);
     fsPromisesMock.rm.mockResolvedValue(undefined);
     fsPromisesMock.cp.mockResolvedValue(undefined);
@@ -244,6 +248,35 @@ describe("restoreBackupFromExisting", () => {
         );
 
         expect(result.message).toContain("Reinserisci a mano: Password NAS (SMB).");
+    });
+
+    /**
+     * Il ripristino è il solo momento in cui la 2FA illeggibile si toglie: lo avvia un admin
+     * autenticato, mentre al login un segreto che non si decifra lascia la 2FA chiusa.
+     */
+    it("dopo il dump toglie la 2FA illeggibile con la chiave locale e lo dice nel messaggio", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-dump-20260101-000000.sql");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(false);
+        backupProcessMock.runPsql.mockResolvedValueOnce(undefined);
+        authManagerMock.clearUnreadableTwoFactorSecrets.mockResolvedValueOnce(["admin", "mario"]);
+
+        const result = await restoreBackupFromExisting("db-dump-20260101-000000.sql", false);
+
+        expect(authManagerMock.clearUnreadableTwoFactorSecrets).toHaveBeenCalledOnce();
+        expect(backupProcessMock.runPsql.mock.invocationCallOrder[0]).toBeLessThan(
+            authManagerMock.clearUnreadableTwoFactorSecrets.mock.invocationCallOrder[0]
+        );
+        expect(result.message).toContain("Verifica in due passaggi disattivata, da riattivare per: admin, mario.");
+    });
+
+    it("se il dump non arriva a destinazione non tocca la 2FA di nessuno", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-dump-20260101-000000.sql");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(false);
+        backupProcessMock.runPsql.mockRejectedValueOnce(new Error("psql: errore"));
+
+        await expect(restoreBackupFromExisting("db-dump-20260101-000000.sql", false)).rejects.toThrow("psql");
+
+        expect(authManagerMock.clearUnreadableTwoFactorSecrets).not.toHaveBeenCalled();
     });
 
     // `prepareRestoreSource` viene chiamato *dentro* il blocco try/finally di performRestore

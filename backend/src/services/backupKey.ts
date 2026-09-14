@@ -22,21 +22,42 @@ export const getOrCreateBackupKey = async (): Promise<Buffer> => {
         return cachedKey;
     }
 
+    // Solo l'assenza del file porta a generarne una nuova, come in `secretCrypto.ts`. Prima
+    // qualunque errore di lettura rigenerava la chiave scrivendoci sopra: i backup successivi
+    // uscivano cifrati con una chiave mai esportata, e la copia custodita dall'admin smetteva
+    // di aprirli senza che nessuno se ne accorgesse.
+    let raw: string | null = null;
+
     try {
-        const raw = await fs.promises.readFile(keyFilePath, "utf-8");
+        raw = await fs.promises.readFile(keyFilePath, "utf-8");
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw error;
+        }
+    }
+
+    if (raw !== null) {
         const key = Buffer.from(raw.trim(), "hex");
 
-        if (key.length === backupKeyLength) {
-            cachedKey = key;
-            return cachedKey;
+        if (key.length !== backupKeyLength) {
+            throw new BackupManagerError(
+                "data/backup.key non contiene una chiave valida: il file non è stato sovrascritto",
+                500
+            );
         }
-    } catch {
-        // nessuna chiave ancora: si passa alla generazione
+
+        cachedKey = key;
+        return cachedKey;
     }
 
     const key = crypto.randomBytes(backupKeyLength);
     await fs.promises.mkdir(keyDir, { recursive: true });
-    await fs.promises.writeFile(keyFilePath, `${key.toString("hex")}\n`, { encoding: "utf-8", mode: 0o600 });
+    // `wx`: se nel frattempo il file è comparso, meglio fallire che scrivergli sopra.
+    await fs.promises.writeFile(keyFilePath, `${key.toString("hex")}\n`, {
+        encoding: "utf-8",
+        mode: 0o600,
+        flag: "wx",
+    });
     cachedKey = key;
 
     return cachedKey;

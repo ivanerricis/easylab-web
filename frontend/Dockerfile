@@ -27,4 +27,5 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY security-headers.conf /etc/nginx/security-headers.conf
 COPY document-csp.conf /etc/nginx/document-csp.conf
 
-EXPOSE 80
+# 80 per cloudflared, 8080 solo per l'accesso d'emergenza dalla LAN (vedi nginx.conf).
+EXPOSE 80 8080

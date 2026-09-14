@@ -78,7 +78,7 @@ docker cp backend:/app/data/initial-admin-password.txt .
 
 L'avviso sparisce da solo quando entrambe tornano leggibili.
 
-Per la stessa ragione — `data/secret.key` non è nel backup — chi aveva la **verifica in due passaggi** attiva se la ritrova disattivata: l'app lo rileva al primo accesso, lo annuncia con una notifica e lascia entrare con la sola password invece di bloccare fuori tutti. Va riattivata da Impostazioni > Sicurezza.
+Per la stessa ragione — `data/secret.key` non è nel backup — chi aveva la **verifica in due passaggi** attiva se la ritrova disattivata: l'app lo rileva alla fine del ripristino, lo scrive nel messaggio di esito e in una notifica, e da lì si entra con la sola password invece di restare bloccati fuori. Va riattivata da Impostazioni > Sicurezza. Succede solo durante un ripristino, che è un'operazione avviata da un amministratore: se il segreto di un utente smette di decifrarsi in un altro momento, la 2FA resta attiva e si entra con un codice di recupero (vedi [Sicurezza account e accesso](OPERATIONS.md)).
 
 **8. Verifica**: logo presente nei PDF, test connessione email, test connessione NAS, e prossima esecuzione del backup automatico valorizzata.
 

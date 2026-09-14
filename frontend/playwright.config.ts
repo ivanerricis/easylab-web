@@ -16,6 +16,15 @@ import { defineConfig, devices } from "@playwright/test";
 const port = 5174;
 const outDir = "dist-e2e";
 
+/**
+ * In CI il Chromium scaricato da `npx playwright install`; in locale il browser già
+ * installato, senza scaricarne uno: Edge su Windows, che è Chromium anche lui.
+ * `PLAYWRIGHT_CHANNEL` sceglie un altro canale (per esempio "chrome"); lasciata vuota torna
+ * al Chromium di Playwright, da installare prima con `npx playwright install chromium`.
+ */
+const envChannel = process.env.PLAYWRIGHT_CHANNEL;
+const channel = envChannel !== undefined ? envChannel || undefined : process.env.CI ? undefined : "msedge";
+
 export default defineConfig({
     testDir: "./e2e",
     fullyParallel: true,
@@ -36,13 +45,7 @@ export default defineConfig({
     projects: [
         {
             name: "chromium",
-            use: {
-                ...devices["Desktop Chrome"],
-                // In CI il Chromium scaricato da `npx playwright install`; in locale il browser
-                // già installato, senza scaricarne uno: Edge su Windows, che è Chromium anche lui.
-                // `PLAYWRIGHT_CHANNEL` sceglie un altro canale (per esempio "chrome").
-                channel: process.env.PLAYWRIGHT_CHANNEL ?? (process.env.CI ? undefined : "msedge"),
-            },
+            use: { ...devices["Desktop Chrome"], channel },
         },
     ],
     webServer: {

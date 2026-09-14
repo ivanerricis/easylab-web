@@ -11,6 +11,48 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Documentazione riletta contro il codice, e i dati azienda nel ripristino da terminale
+
+**Contesto.** Rilettura dei documenti operativi (README, DEPLOY, BACKUP, OPERATIONS, BACKLOG)
+confrontando ogni affermazione verificabile con il codice: porte, volumi, script e loro opzioni,
+nginx, cifratura, voci dell'interfaccia. Quasi tutto tornava; queste no.
+
+**Un difetto vero, in `scripts/restore-db.sh`.** Ripristinava dall'archivio `email-settings.json`,
+`backup-settings.json` e il logo, ma non `company-settings.json`: la lista nello script era
+rimasta indietro rispetto a `backedUpDataEntries` (`backend/src/services/backupFiles.ts`), che
+il backend usa sia per creare l'archivio sia per il ripristino dall'interfaccia. Un ripristino da
+terminale riportava quindi i dati azienda (nome, email, indirizzo, telefono dei PDF) ai valori
+iniziali, mentre BACKUP.md diceva il contrario. Aggiunto il file, con un commento che lega le
+due liste. Verificato facendo girare lo script con un `docker` finto che annota le chiamate, su
+un archivio di prova: la versione precedente copiava tre voci, quella nuova quattro.
+
+**Una differenza che non era scritta.** Il ripristino dall'interfaccia, alla fine, disattiva la
+2FA degli utenti il cui segreto non si legge con la chiave della macchina
+(`clearUnreadableTwoFactorSecrets`); lo script non passa dal backend e non lo fa. Scelta
+dell'utente: non replicarlo nello script ma dirlo — nello script stesso, che ora lo ricorda a
+fine esecuzione, in BACKUP (che per le migrazioni consiglia l'interfaccia) e in OPERATIONS.
+
+**Errori della documentazione, corretti.**
+
+- BACKUP descriveva `secret.key` come la chiave delle sole password SMTP e NAS, "dentro
+  `dump.sql`": la password SMTP sta in `email-settings.json`, e la stessa chiave cifra anche i
+  segreti della 2FA, che sono nel database.
+- DEPLOY: il collegamento allo sviluppo locale puntava a una sezione del README che non esiste
+  più; "vedi i punti 3-6" per il CT dimenticava dominio e aggiornamenti (sono 3-7); il titolo
+  "Modalità 2" era rimasto senza una "Modalità 1"; "basi Alpine" valeva per le immagini finali,
+  non per la build del frontend.
+- BACKLOG rimandava al README per i passi su Cloudflare, che dopo la divisione del README stanno
+  in DEPLOY.
+- Tre collegamenti uscivano da `docs/` con `../`: su GitHub funzionano, sul sito pubblicato da
+  GitHub Pages (che serve solo `docs/`) no. Ora usano l'indirizzo GitHub, come già `index.md`.
+- README: "`PLAYWRIGHT_CHANNEL=` vuoto" per usare il Chromium di Playwright non funzionava, perché
+  la configurazione passava la stringa vuota così com'era. Corretta `playwright.config.ts`, e
+  provato: vuota usa il Chromium di Playwright, assente resta Edge.
+
+**Non toccato.** Il CHANGELOG ha circa 210 collegamenti `../` verso file del codice, con lo stesso
+problema sul sito pubblicato. Sono voci storiche e su GitHub funzionano; convertirli è un lavoro
+meccanico, lasciato per ora.
+
 ## 2026-09-14 — Test dove mancavano, e i primi test nel browser
 
 **Contesto.** Misurata la copertura reale dei due pacchetti (backend 75% delle righe, frontend

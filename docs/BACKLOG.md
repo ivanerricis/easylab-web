@@ -57,8 +57,8 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   da telefono, ripristino di un backup con una `secret.key` diversa. Dal CHANGELOG del
   2026-09-08.
 - Esposizione su dominio pubblico: la parte applicativa è fatta; restano i passi sul conto
-  Cloudflare e l'installazione sulla VM, descritti nel [README](../README.md) ("Da fare su
-  Cloudflare", "Da fare sulla VM"). Se sono già stati fatti, questa voce va tolta.
+  Cloudflare e l'installazione sulla VM, descritti in [DEPLOY](DEPLOY.md#dominio-pubblico-e-cloudflare-tunnel)
+  ("Da fare su Cloudflare", "Da fare sulla VM"). Se sono già stati fatti, questa voce va tolta.
 - `npm audit` sul backend segnala 4 vulnerabilità moderate, tutte in `drizzle-kit` →
   `@esbuild-kit` → `esbuild` ≤ 0.24.2 (GHSA-67mh-4wv8-2f99). Il bug riguarda il dev server di
   esbuild, e `drizzle-kit` è una devDependency che in produzione non gira, quindi il rischio

@@ -2,7 +2,7 @@
 
 Guida per installare l'app su una VM/CT Proxmox in produzione: primo avvio, dominio pubblico via Cloudflare Tunnel, aggiornamenti, gestione dei container.
 
-Per lo sviluppo locale vedi il [README](../README.md#modalità-1-sviluppo-locale-hot-reload). Per backup/restore vedi [BACKUP.md](BACKUP.md). Per 2FA e reset password vedi [OPERATIONS.md](OPERATIONS.md).
+Per lo sviluppo locale vedi il [README](https://github.com/ivanerricis/easylab-web#sviluppo-locale-hot-reload). Per backup/restore vedi [BACKUP.md](BACKUP.md). Per 2FA e reset password vedi [OPERATIONS.md](OPERATIONS.md).
 
 ## Installazione su Proxmox VM (prima volta)
 
@@ -102,7 +102,7 @@ In alternativa alla VM, puoi usare un **container LXC (CT)** Proxmox: meno overh
 
 	Con `nesting=1,keyctl=1` su un host Proxmox con kernel recente (8.x+), Docker gira senza ulteriori modifiche (storage driver `overlay2`). Se `docker compose up` fallisce con errori di permessi/storage, verifica con `docker info` che il nesting sia effettivamente attivo sul CT.
 
-3. **Da qui in poi i passaggi sono identici alla VM**: clona il repo, configura `.env`, primo avvio, updater — vedi i punti 3-6 di [Installazione su Proxmox VM](#installazione-su-proxmox-vm-prima-volta). Anche [`configure-static-ip.sh`](../scripts/configure-static-ip.sh) funziona invariato nel CT (rileva netplan/NetworkManager/ifupdown allo stesso modo).
+3. **Da qui in poi i passaggi sono identici alla VM**: clona il repo, configura `.env`, dominio pubblico, primo avvio, updater — vedi i punti 3-7 di [Installazione su Proxmox VM](#installazione-su-proxmox-vm-prima-volta). Anche [`configure-static-ip.sh`](https://github.com/ivanerricis/easylab-web/blob/main/scripts/configure-static-ip.sh) funziona invariato nel CT (rileva netplan/NetworkManager/ifupdown allo stesso modo).
 
 Nota: se preferisci non annidare Docker nel CT, l'alternativa è eseguire i processi Node/Postgres nativamente nel CT senza Docker — ma è un cambio di architettura più profondo, non supportato dagli script/Dockerfile attuali di questo repo.
 
@@ -138,7 +138,7 @@ Puoi anche eseguirlo da solo, in qualunque momento:
 ./scripts/configure-static-ip.sh
 ```
 
-## Modalità 2: Condivisione / Server (VM Proxmox)
+## Avvio in produzione
 
 Il server di produzione gira su una **VM Proxmox** (Debian/Ubuntu, systemd) con Docker Engine nativo, non su Docker Desktop. Prerequisiti sulla VM (fuori da qualunque container): `git`, `docker` (Docker Engine + plugin `docker compose`), `jq` (usato dallo script di aggiornamento).
 
@@ -211,13 +211,13 @@ Per un accesso di emergenza dalla LAN, aggiungi temporaneamente `ports: ["80:808
 
 ## Arresto servizi
 
-Per fermare i container della modalità in uso:
+Per fermare i container di produzione:
 
 ```bash
 docker compose down
 ```
 
-Oppure, per la modalità dev:
+Oppure, per quelli di sviluppo:
 
 ```bash
 docker compose -f docker-compose.dev.yml down
@@ -263,7 +263,7 @@ Ogni aggiornamento esegue anche `docker builder prune -f --filter until=24h`, pe
 
 Alcuni accorgimenti per limitare lo spazio occupato su una VM di produzione a lungo termine:
 
-- **Immagini**: backend e frontend usano Dockerfile multi-stage su basi Alpine (più leggere delle equivalenti Debian).
+- **Immagini**: backend e frontend usano Dockerfile multi-stage, e le immagini finali partono da basi Alpine (più leggere delle equivalenti Debian). La build del frontend gira su una Debian slim, ma quello stadio non finisce nell'immagine: ne resta solo il risultato, servito da nginx su Alpine.
 - **Cache di build**: `scripts/update-server.sh` esegue `docker builder prune` ad ogni aggiornamento (mantiene solo la cache delle ultime 24h, utile per rebuild ravvicinati).
 - **Backup database**: a ogni nuovo backup si eliminano i più vecchi, tenendo il numero impostato in Impostazioni > Backup (14 di default). Vale sia per la cartella sul server sia per le copie sul NAS.
 - **Log dei container**: `docker-compose.yml` limita i log di ogni servizio a 3 file da 10 MB (driver `json-file`), per evitare crescita illimitata su container sempre attivi (`restart: always`).

@@ -3,7 +3,7 @@
 # Usage: scripts/restore-db.sh [--dump-path /path/to/backup.tar.gz] [--reset-database] [--backup-key <chiave>]
 #
 # Accepts both backup formats:
-#   db-backup-<ts>.tar.gz  current: dump.sql + data/ (email, backup and logo settings), cifrato
+#   db-backup-<ts>.tar.gz  current: dump.sql + data/ (email, backup, company and logo settings), cifrato
 #   db-dump-<ts>.sql       legacy: database only, mai cifrato
 set -euo pipefail
 
@@ -128,7 +128,7 @@ echo "Compose file: $COMPOSE_FILE"
 echo "Backup: $DUMP_PATH"
 echo "Database: $POSTGRES_DB_VALUE"
 if [ -n "$SETTINGS_DIR" ]; then
-    echo "Impostazioni incluse: si (email, backup, logo)"
+    echo "Impostazioni incluse: si (email, backup, azienda, logo)"
 else
     echo "Impostazioni incluse: no (solo database)"
 fi
@@ -154,7 +154,11 @@ docker compose -f "$COMPOSE_FILE" exec -T db psql -v ON_ERROR_STOP=1 \
 if [ -n "$SETTINGS_DIR" ]; then
     echo "Ripristino impostazioni applicazione..."
 
-    for entry in email-settings.json backup-settings.json logo; do
+    # Le stesse voci che il backend mette nell'archivio e ripristina dall'interfaccia
+    # (`backedUpDataEntries` in backend/src/services/backupFiles.ts): vanno tenute allineate.
+    # Fino al 2026-09-14 qui mancava company-settings.json, e un ripristino da terminale
+    # riportava i dati azienda ai valori iniziali.
+    for entry in email-settings.json backup-settings.json company-settings.json logo; do
         [ -e "$SETTINGS_DIR/$entry" ] || continue
         # Rimuove la voce esistente: senza, `docker compose cp` di una cartella
         # unirebbe il contenuto invece di sostituirlo.
@@ -180,3 +184,14 @@ if [ -n "$SETTINGS_DIR" ]; then
     echo "  - Impostazioni > Backup > password NAS"
     echo "Il pannello Backup elenca quali risultano illeggibili."
 fi
+
+# Il ripristino dall'interfaccia azzera da solo la 2FA degli utenti il cui segreto non si
+# legge con la chiave di questo server (`clearUnreadableTwoFactorSecrets`); da terminale non
+# succede, perché lo script non passa dal backend. Va detto, altrimenti chi entra dopo una
+# migrazione si trova i codici dell'app rifiutati senza sapere perché.
+echo ""
+echo "ATTENZIONE: anche i segreti della verifica in due passaggi sono cifrati con"
+echo "data/secret.key, e questo script non li azzera come fa il ripristino dall'interfaccia."
+echo "Se il backup viene da un altro server, chi aveva la 2FA attiva vedra rifiutati i codici"
+echo "dell'app: entra con un codice di recupero e poi la riattiva da Impostazioni > Sicurezza."
+echo "Per l'amministratore senza codici: scripts/reset-admin-password.sh --reset-2fa"

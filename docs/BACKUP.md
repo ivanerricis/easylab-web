@@ -17,7 +17,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`, **cifrato** 
 **Non** è incluso, di proposito:
 
 - **`data/backup.key`**, la chiave che cifra l'archivio stesso. Includerla vorrebbe dire spedire, nello stesso file copiato anche su una condivisione di rete, sia i dati sia la chiave per leggerli. Va invece **esportata una volta da Impostazioni > Backup** ("Chiave di cifratura dei backup") e conservata altrove (un password manager, per esempio): senza una copia esterna, un disastro che porta via server e disco insieme rende illeggibile anche l'ultimo backup sul NAS.
-- **`data/secret.key`**, la chiave che cifra le password SMTP e NAS **dentro** `dump.sql`/`backup-settings.json` — una chiave diversa dalla precedente, dedicata solo a quei due segreti. Conseguenza: ripristinando su una macchina diversa quelle due password non sono più leggibili e vanno reinserite a mano (l'app dice quali).
+- **`data/secret.key`**, la chiave che cifra i segreti dell'applicazione *dentro* l'archivio — una chiave diversa dalla precedente. Sono tre: la password SMTP (in `email-settings.json`), la password del NAS (in `backup-settings.json`) e il segreto della verifica in due passaggi di ogni utente che l'ha attiva (nel database, quindi in `dump.sql`). Conseguenza: ripristinando su una macchina diversa nessuno dei tre è più leggibile — le due password vanno reinserite a mano (l'app dice quali) e la 2FA va riattivata (vedi il passo 7 della migrazione).
 - **`data/initial-admin-password.txt`**, credenziale in chiaro utile solo al primo avvio: l'app la cancella appena l'amministratore cambia la password generata.
 - **`.env`**, che non è scritto dall'applicazione: va ricreato a mano sul server nuovo. Conviene tenerne una copia nel proprio gestore di password.
 
@@ -35,7 +35,9 @@ In alternativa, da terminale:
 ./scripts/restore-db.sh --dump-path /path/to/db-backup-YYYYMMDD-HHMMSS.tar.gz
 ```
 
-Se non passi il percorso, lo script usa il backup più recente (`.tar.gz` o `.sql`) trovato nella directory configurata in `.env` tramite `BACKUP_HOST_DIR`, oppure in `backups/` se la variabile non è presente. Un archivio cifrato viene decifrato automaticamente dentro il container backend (dove vive `data/backup.key`) prima di essere estratto. Con un archivio ripristina anche le impostazioni e riavvia il backend per farle rileggere.
+Se non passi il percorso, lo script usa il backup più recente (`.tar.gz` o `.sql`) trovato nella directory configurata in `.env` tramite `BACKUP_HOST_DIR`, oppure in `backups/` se la variabile non è presente. Un archivio cifrato viene decifrato automaticamente dentro il container backend (dove vive `data/backup.key`) prima di essere estratto. Con un archivio ripristina anche le impostazioni (email, backup, dati azienda, logo) e riavvia il backend per farle rileggere.
+
+> **Una differenza rispetto all'interfaccia.** Il ripristino da Impostazioni > Backup, a fine lavoro, disattiva la verifica in due passaggi degli utenti il cui segreto non si legge con la chiave di questo server (succede ripristinando il backup di un'altra macchina, vedi sotto). Lo script non passa dal backend e non lo fa: dopo un ripristino da terminale di un backup venuto da altrove, chi aveva la 2FA attiva si vede rifiutare i codici dell'app, entra con un **codice di recupero** e la riattiva da Impostazioni > Sicurezza; l'amministratore senza codici usa `scripts/reset-admin-password.sh --reset-2fa`. Lo script lo ricorda a fine esecuzione. **Per una migrazione conviene quindi il ripristino dall'interfaccia**; lo script resta la strada per gli archivi oltre i 100 MB.
 
 Opzione distruttiva (svuota prima lo schema `public` nel database target):
 
@@ -67,7 +69,7 @@ docker compose logs backend | grep -A3 "Utente amministratore"
 docker cp backend:/app/data/initial-admin-password.txt .
 ```
 
-**5. Ripristina**, da Impostazioni > Backup (caricando l'archivio o dopo averlo copiato in `BACKUP_HOST_DIR`) — incolla la chiave di backup del passo 1 nel campo facoltativo del dialogo di conferma — oppure da terminale con `./scripts/restore-db.sh --backup-key <chiave>`. **Attiva il reset dello schema**: le migrazioni hanno già creato le tabelle al primo avvio e senza reset il dump andrebbe in conflitto. Una volta decifrato con successo, quella chiave diventa quella di questo server: i prossimi backup qui la useranno senza doverla incollare di nuovo.
+**5. Ripristina**, da Impostazioni > Backup (caricando l'archivio o dopo averlo copiato in `BACKUP_HOST_DIR`) — incolla la chiave di backup del passo 1 nel campo facoltativo del dialogo di conferma. È la strada consigliata: da terminale (`./scripts/restore-db.sh --backup-key <chiave>`) funziona lo stesso, ma la verifica in due passaggi non viene sistemata da sola (vedi [la differenza](#restore-database) descritta sopra), quindi usalo solo se l'archivio supera i 100 MB. **Attiva il reset dello schema**: le migrazioni hanno già creato le tabelle al primo avvio e senza reset il dump andrebbe in conflitto. Una volta decifrato con successo, quella chiave diventa quella di questo server: i prossimi backup qui la useranno senza doverla incollare di nuovo.
 
 **6. Rientra con le vecchie credenziali.** Il ripristino sostituisce la tabella utenti, quindi l'amministratore temporaneo del passo 4 non esiste più e l'app forza il logout. Usa un utente del vecchio server.
 
@@ -78,8 +80,8 @@ docker cp backend:/app/data/initial-admin-password.txt .
 
 L'avviso sparisce da solo quando entrambe tornano leggibili.
 
-Per la stessa ragione — `data/secret.key` non è nel backup — chi aveva la **verifica in due passaggi** attiva se la ritrova disattivata: l'app lo rileva alla fine del ripristino, lo scrive nel messaggio di esito e in una notifica, e da lì si entra con la sola password invece di restare bloccati fuori. Va riattivata da Impostazioni > Sicurezza. Succede solo durante un ripristino, che è un'operazione avviata da un amministratore: se il segreto di un utente smette di decifrarsi in un altro momento, la 2FA resta attiva e si entra con un codice di recupero (vedi [Sicurezza account e accesso](OPERATIONS.md)).
+Per la stessa ragione — `data/secret.key` non è nel backup — chi aveva la **verifica in due passaggi** attiva se la ritrova disattivata (con il ripristino dall'interfaccia; da terminale vedi [la differenza](#restore-database)): l'app lo rileva alla fine del ripristino, lo scrive nel messaggio di esito e in una notifica, e da lì si entra con la sola password invece di restare bloccati fuori. Va riattivata da Impostazioni > Sicurezza. Succede solo durante un ripristino, che è un'operazione avviata da un amministratore: se il segreto di un utente smette di decifrarsi in un altro momento, la 2FA resta attiva e si entra con un codice di recupero (vedi [Sicurezza account e accesso](OPERATIONS.md)).
 
 **8. Verifica**: logo presente nei PDF, test connessione email, test connessione NAS, e prossima esecuzione del backup automatico valorizzata.
 
-> Tutto il resto della configurazione — dati azienda, server SMTP, porta, utente, mittente, indirizzo NAS, condivisione, percorso, dominio, pianificazione, logo — viene ripristinato dall'archivio: le due password sono l'unico intervento manuale.
+> Tutto il resto della configurazione — dati azienda, server SMTP, porta, utente, mittente, indirizzo NAS, condivisione, percorso, dominio, pianificazione, logo — viene ripristinato dall'archivio, sia dall'interfaccia sia da terminale: le due password (e la 2FA da riattivare) sono l'unico intervento manuale.

@@ -14,7 +14,7 @@ Ogni utente può attivarla per sé da **Impostazioni > Sicurezza**: da quel mome
 
 **Se a restare fuori è l'unico amministratore**, l'unica via è la riga di comando sulla macchina: vedi [Reset password utente](#reset-password-utente) con `--reset-2fa`.
 
-> **Il segreto è cifrato con `data/secret.key`, che non finisce nei backup.** Dopo un ripristino su una macchina diversa i segreti non sono più leggibili: l'app se ne accorge alla fine del ripristino, disattiva la 2FA degli utenti interessati invece di lasciarli fuori, e lo annuncia nel messaggio di esito e con una notifica. Va semplicemente riattivata dopo il primo accesso.
+> **Il segreto è cifrato con `data/secret.key`, che non finisce nei backup.** Dopo un ripristino su una macchina diversa i segreti non sono più leggibili: con il ripristino da Impostazioni > Backup l'app se ne accorge alla fine, disattiva la 2FA degli utenti interessati invece di lasciarli fuori, e lo annuncia nel messaggio di esito e con una notifica. Va semplicemente riattivata dopo il primo accesso. Con `scripts/restore-db.sh` invece la 2FA resta com'è e si entra con un codice di recupero (vedi [Restore database](BACKUP.md#restore-database)).
 >
 > Fuori da un ripristino un segreto illeggibile **non** toglie la 2FA: i codici dell'app vengono rifiutati e si entra con un **codice di recupero**, che non dipende da `secret.key`. Un amministratore può anche disattivare la 2FA di un altro utente dalla gestione utenti; per l'amministratore senza codici resta `scripts/reset-admin-password.sh --reset-2fa`. Prima la 2FA veniva tolta al primo login in qualunque caso, ed era un modo per aggirarla: bastava far fallire la lettura della chiave.
 

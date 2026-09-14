@@ -48,12 +48,7 @@ const ForceTwoFactorSetupPage = () => {
                         Configura adesso
                     </Button>
 
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        className="text-muted-foreground"
-                        onClick={handleLogout}
-                    >
+                    <Button type="button" variant="ghost" className="text-muted-foreground" onClick={handleLogout}>
                         Esci
                     </Button>
                 </CardContent>

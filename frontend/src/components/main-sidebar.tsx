@@ -9,6 +9,7 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import {
+    BookOpen,
     BookUser,
     Bug,
     ClipboardList,
@@ -21,6 +22,8 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+
+const DOCS_URL = "https://ivanerricis.github.io/easylab-web/";
 
 type SidebarItem = {
     label: string;
@@ -102,6 +105,18 @@ const MainSidebar = () => {
 
             <SidebarFooter className="border-t border-sidebar-border p-2">
                 <SidebarMenu className="gap-1">
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            tooltip="Documentazione"
+                            size="lg"
+                            onClick={() => window.open(DOCS_URL, "_blank", "noopener,noreferrer")}
+                            className="flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
+                        >
+                            <BookOpen className="size-7 shrink-0" />
+                            <span className="group-data-[collapsible=icon]:hidden">Documentazione</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             tooltip="Impostazioni"

@@ -49,9 +49,13 @@ fine esecuzione, in BACKUP (che per le migrazioni consiglia l'interfaccia) e in 
   la configurazione passava la stringa vuota così com'era. Corretta `playwright.config.ts`, e
   provato: vuota usa il Chromium di Playwright, assente resta Edge.
 
-**Non toccato.** Il CHANGELOG ha circa 210 collegamenti `../` verso file del codice, con lo stesso
-problema sul sito pubblicato. Sono voci storiche e su GitHub funzionano; convertirli è un lavoro
-meccanico, lasciato per ora.
+**I collegamenti del CHANGELOG.** Avevano lo stesso problema: 218 collegamenti `../` verso file e
+cartelle del codice, funzionanti su GitHub e rotti sul sito pubblicato. Convertiti in indirizzi
+GitHub assoluti (`blob/main` per i file, `tree/main` per le cartelle). I due file cancellati nel
+frattempo (`frontend/src/lib/reportCreation.ts` e `CustomerInterventionsPage.tsx`) puntano
+all'ultima versione prima della cancellazione, fissata sul suo commit, invece che a una pagina
+inesistente. Verificato che il resto del testo sia rimasto identico: rifacendo la conversione
+all'indietro si ottiene il file di prima, a meno della barra finale dei collegamenti alle cartelle.
 
 ## 2026-09-14 — Test dove mancavano, e i primi test nel browser
 
@@ -372,9 +376,9 @@ Nota per chi ripete la prova da Git Bash: la conversione automatica dei percorsi
 a chiamare `/api/auth/me` e rimanda al login, cosa che somiglia a un blocco della CSP ma non lo
 è. Serve `MSYS_NO_PATHCONV=1 docker build …`.
 
-→ [frontend/document-csp.conf](../frontend/document-csp.conf),
-[frontend/nginx.conf](../frontend/nginx.conf),
-[frontend/Dockerfile](../frontend/Dockerfile)
+→ [frontend/document-csp.conf](https://github.com/ivanerricis/easylab-web/blob/main/frontend/document-csp.conf),
+[frontend/nginx.conf](https://github.com/ivanerricis/easylab-web/blob/main/frontend/nginx.conf),
+[frontend/Dockerfile](https://github.com/ivanerricis/easylab-web/blob/main/frontend/Dockerfile)
 
 ---
 
@@ -395,8 +399,8 @@ non aveva nessun motivo di esistere ancora: chiunque arrivasse a leggere il volu
 `backend_data` avrebbe trovato una password dall'aspetto valido. Un errore nella cancellazione
 viene solo registrato nei log, così non blocca né l'avvio né il cambio password.
 
-→ [backend/src/services/authManager.ts](../backend/src/services/authManager.ts),
-[README.md](../README.md)
+→ [backend/src/services/authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts),
+[README.md](https://github.com/ivanerricis/easylab-web/blob/main/README.md)
 
 ---
 
@@ -427,8 +431,8 @@ Verificato con sharp e librsvg reali:
 Il guadagno di sicurezza è contenuto, ed è giusto dirlo: caricare il logo resta riservato
 all'amministratore, e il servizio dell'SVG (`CSP: sandbox` + `attachment`) non è cambiato.
 
-→ [backend/src/services/logoManager.ts](../backend/src/services/logoManager.ts),
-[backend/src/routes/settings.ts](../backend/src/routes/settings.ts)
+→ [backend/src/services/logoManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/logoManager.ts),
+[backend/src/routes/settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts)
 
 ---
 
@@ -466,10 +470,10 @@ A pdfmake sono state date le policy di accesso che mancavano:
   che un valore scritto da un utente, finito lì per sbaglio, non riapra lo stesso buco.
   Tolgono anche i due avvisi che pdfmake stampava nei log a ogni PDF.
 
-→ [backend/src/services/logoManager.ts](../backend/src/services/logoManager.ts),
-[backend/src/services/pdf/shared.ts](../backend/src/services/pdf/shared.ts),
-[backend/src/config/lab.ts](../backend/src/config/lab.ts),
-[backend/src/routes/interventions.ts](../backend/src/routes/interventions.ts)
+→ [backend/src/services/logoManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/logoManager.ts),
+[backend/src/services/pdf/shared.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/pdf/shared.ts),
+[backend/src/config/lab.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/config/lab.ts),
+[backend/src/routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts)
 
 ---
 
@@ -493,7 +497,7 @@ scroll reale e delimitato a cui l'intestazione si aggancia.
 colonna. La correzione è nel componente condiviso `Table`, quindi vale per ogni tabella
 dell'app senza toccare le singole pagine.
 
-→ [frontend/src/components/ui/table.tsx](../frontend/src/components/ui/table.tsx)
+→ [frontend/src/components/ui/table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/table.tsx)
 
 ---
 
@@ -522,11 +526,11 @@ credenziale. Una chiave dedicata invece di riusare `secret.key` evita che l'espo
 dell'una comprometta l'altra, e resta comunque possibile un disastro totale (server e disco
 persi insieme) grazie all'esportazione.
 
-→ [backend/src/services/backupKey.ts](../backend/src/services/backupKey.ts),
-[backend/src/services/backupCrypto.ts](../backend/src/services/backupCrypto.ts),
-[backend/src/services/backupProcess.ts](../backend/src/services/backupProcess.ts),
-[backend/src/services/backupRestore.ts](../backend/src/services/backupRestore.ts),
-[frontend/src/components/settings/backup/backupKeyCard.tsx](../frontend/src/components/settings/backup/backupKeyCard.tsx)
+→ [backend/src/services/backupKey.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/backupKey.ts),
+[backend/src/services/backupCrypto.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/backupCrypto.ts),
+[backend/src/services/backupProcess.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/backupProcess.ts),
+[backend/src/services/backupRestore.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/backupRestore.ts),
+[frontend/src/components/settings/backup/backupKeyCard.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/backup/backupKeyCard.tsx)
 
 ---
 
@@ -544,9 +548,9 @@ pagato dal cliente, ma la parte destinata al tecnico esterno non resta al labora
 questo numero, valutare la redditività reale del mese richiedeva un calcolo a mano fuori
 dall'app.
 
-→ [backend/src/db/queries/report.ts](../backend/src/db/queries/report.ts),
-[frontend/src/lib/api/reports.ts](../frontend/src/lib/api/reports.ts),
-[frontend/src/pages/dashboard/DashboardPage.tsx](../frontend/src/pages/dashboard/DashboardPage.tsx)
+→ [backend/src/db/queries/report.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/report.ts),
+[frontend/src/lib/api/reports.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/api/reports.ts),
+[frontend/src/pages/dashboard/DashboardPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/dashboard/DashboardPage.tsx)
 
 ---
 
@@ -575,8 +579,8 @@ I test che leggevano l'etichetta con `getByLabelText("Testo esatto")` sono passa
 ancorata all'inizio (`/^Testo/`), la stessa convenzione già in uso per i campi di `FormField`:
 il nome accessibile ora ha del testo in più in coda.
 
-→ [frontend/src/components/form-field.tsx](../frontend/src/components/form-field.tsx),
-[frontend/src/components/dialogs/](../frontend/src/components/dialogs/)
+→ [frontend/src/components/form-field.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/form-field.tsx),
+[frontend/src/components/dialogs/](https://github.com/ivanerricis/easylab-web/tree/main/frontend/src/components/dialogs)
 
 ---
 
@@ -1297,12 +1301,12 @@ progetto (`project_quality_backlog`) per l'elenco completo lasciato per una sess
 
 ## 2026-09-10 — La scheda del collaboratore: due sezioni a tabella al posto dei riquadri
 
-**Cosa.** [CollaboratorPage](../frontend/src/pages/collaborators/CollaboratorPage.tsx) ha ora
+**Cosa.** [CollaboratorPage](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/collaborators/CollaboratorPage.tsx) ha ora
 due sezioni, "Report del collaboratore" e "Interventi del collaboratore", ciascuna con il
 proprio filtro di stato, la propria impaginazione e le proprie righe per pagina. Le schede
 `CardReport` sono sparite — insieme al componente, che non aveva altri usi — e al loro posto
 ci sono due `EntityTable`, le stesse degli elenchi principali. Le colonne stanno in
-[collaborator-detail-columns.tsx](../frontend/src/pages/collaborators/components/collaborator-detail-columns.tsx).
+[collaborator-detail-columns.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/collaborators/components/collaborator-detail-columns.tsx).
 
 **Il perché.** Gli interventi mancavano del tutto. Il collaboratore è la persona che li
 esegue — `collaboratorId` è obbligatorio su ogni intervento, non facoltativo come sul report
@@ -1332,7 +1336,7 @@ collaboratore, che è l'intestazione della pagina.
 
 La corrispondenza stato -> colore degli interventi era ricopiata in ogni lista che li mostra
 e sarebbe diventata la terza copia: ora sta in
-[lib/interventions.ts](../frontend/src/lib/interventions.ts) (`interventionStatusColor`,
+[lib/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/interventions.ts) (`interventionStatusColor`,
 `interventionAccentClassName`) e la usano anche l'elenco interventi e gli interventi del
 cliente.
 
@@ -1395,7 +1399,7 @@ valido.
 **Cosa.** Al primo trascinamento si salva il layout **intero** della tabella e non la sola
 colonna spostata, e la rimisurazione innescata dal caricamento dei font avviene una volta
 sola invece che a ogni `loadingdone`.
-[useResizableColumns](../frontend/src/hooks/useResizableColumns.ts) espone
+[useResizableColumns](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/useResizableColumns.ts) espone
 `resolveWidthsToPersist`, che è la funzione pura in cui vive la regola (e ha i suoi test).
 
 **Il perché.** Le colonne mai toccate non avevano una voce salvata e ricadevano sulla
@@ -1555,7 +1559,7 @@ che li riguarda invece che in un toast.
 
 ### Caricamenti: primo caricamento e ricarica non sono la stessa cosa
 
-**Il perché.** [usePaginatedRows.ts](../frontend/src/hooks/usePaginatedRows.ts) esponeva un solo
+**Il perché.** [usePaginatedRows.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/usePaginatedRows.ts) esponeva un solo
 `isLoading`, e tutte le pagine-lista lo usavano per alzare un `LoadingPage` con
 `absolute inset-0 bg-background/70 backdrop-blur-sm`. Quel velo copriva tutta la pagina — campo
 di ricerca compreso — e siccome `isLoading` è vero anche per le *ricariche*, digitando nella
@@ -1580,11 +1584,11 @@ sull'elenco report bastava a far lampeggiare "Nessun report disponibile." un ist
 dati. `hasLoadedOnce` si segna nel `finally`, non solo in caso di successo, altrimenti un primo
 caricamento fallito lascerebbe lo scheletro per sempre.
 
-Stessa logica per il calendario ([useCalendarInterventions.ts](../frontend/src/pages/calendar/hooks/useCalendarInterventions.ts))
+Stessa logica per il calendario ([useCalendarInterventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/hooks/useCalendarInterventions.ts))
 e per le statistiche della dashboard: lì il velo copriva le frecce con cui si cambia mese, ed è
 proprio il cambio mese a ricaricare.
 
-La transizione di rotta finta di [MainLayout.tsx](../frontend/src/pages/MainLayout.tsx) — un velo
+La transizione di rotta finta di [MainLayout.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/MainLayout.tsx) — un velo
 di 150ms fissi a **ogni** navigazione, anche a pagina già pronta — è sostituita da un confine
 `Suspense` attorno all'`Outlet`. Le rotte sono già `lazy` in `App.tsx`, ma quel `Suspense` sta
 sopra le rotte: mentre arrivava il chunk faceva sparire anche barra laterale e intestazione.
@@ -1598,7 +1602,7 @@ aveva già una colonna "Stato" con le parole giuste; l'elenco principale no.
 
 **Le scelte e il resto degli interventi.**
 
-- Colonna **Stato** ("Aperto"/"Chiuso") in [report-columns.tsx](../frontend/src/pages/reports/components/report-columns.tsx),
+- Colonna **Stato** ("Aperto"/"Chiuso") in [report-columns.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/reports/components/report-columns.tsx),
   con la stessa formulazione della scheda cliente.
 - **Skip link** "Vai al contenuto" come primo elemento focusabile: con nove voci di barra
   laterale servivano una dozzina di tab per arrivare alla tabella, a ogni pagina.
@@ -1610,7 +1614,7 @@ aveva già una colonna "Stato" con le parole giuste; l'elenco principale no.
 - Il conteggio "Visualizzati 1-10 di 16" diventa `role="status"`: è già la frase giusta nel
   momento giusto, e copre ricerca, filtri e cambio pagina per chi usa uno screen reader. Prima
   la tabella si rinnovava in silenzio.
-- **`document.title` per pagina** ([useDocumentTitle.ts](../frontend/src/hooks/useDocumentTitle.ts)):
+- **`document.title` per pagina** ([useDocumentTitle.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/useDocumentTitle.ts)):
   è un gestionale che si usa con più schede aperte, e si chiamavano tutte "EasyLab".
 - **`prefers-reduced-motion`** non compariva in tutta la codebase. La regola azzera animazioni e
   transizioni, con un'eccezione dichiarata: gli indicatori di caricamento (`data-slot="spinner"`)
@@ -1629,7 +1633,7 @@ e `text-sky-500`. Misurato: **1.57:1** e **2.71:1** su fondo chiaro, contro i **
 1.4.11 chiede agli oggetti grafici.
 
 **Le scelte.** Due token semantici `--action-print` e `--action-email` in
-[index.css](../frontend/src/index.css), più scuri in tema chiaro (3.26:1 e 4.05:1) e coi valori
+[index.css](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/index.css), più scuri in tema chiaro (3.26:1 e 4.05:1) e coi valori
 vividi originali in tema scuro (12.68:1 e 7.33:1). Il giallo resta all'hue 85 e non scivola
 nell'arancione, per la stessa ragione già annotata sopra le righe di stato.
 
@@ -1643,8 +1647,8 @@ che sparisce da solo dopo qualche secondo e non dice *quale* campo sia il proble
 `editReportDialog` erano dieci controlli in fila, ciascuno con un `return`: con tre campi da
 sistemare servivano tre salvataggi per scoprirli tutti.
 
-**Le scelte.** [FormField](../frontend/src/components/form-field.tsx) e `FieldError`, più gli
-helper in [lib/formField.ts](../frontend/src/lib/formField.ts) (separati perché un file di
+**Le scelte.** [FormField](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/form-field.tsx) e `FieldError`, più gli
+helper in [lib/formField.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/formField.ts) (separati perché un file di
 componenti deve esportare solo componenti, altrimenti il refresh rapido di Vite ricarica la
 pagina intera). Applicati a tutti e nove i dialoghi di creazione e modifica:
 
@@ -1655,7 +1659,7 @@ pagina intera). Applicati a tutti e nove i dialoghi di creazione e modifica:
 - i campi obbligatori portano l'asterisco e "(obbligatorio)" per gli screen reader;
 - i toast restano per gli errori che non appartengono a un campo: il rifiuto del server, la rete.
 
-`getInterventionValidationError` in [lib/interventions.ts](../frontend/src/lib/interventions.ts)
+`getInterventionValidationError` in [lib/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/interventions.ts)
 ora restituisce **quale** campo è invalido insieme al messaggio: era già condiviso fra i due
 dialoghi dell'intervento, e col campo lo stesso messaggio finisce sotto il controllo giusto in
 entrambi. `InputWithAdd` e `DatePickerField` accettano le due proprietà aria necessarie.
@@ -1674,7 +1678,7 @@ dati di chi sta al computer.
 - Una ricerca senza esiti dice ora `Nessun risultato per "..."` invece del generico "Nessun
   dispositivo disponibile.": sono due vuoti diversi.
 - Il doppio click per aprire la riga funzionava su due tabelle su sette, perché
-  [entity-crud-table.tsx](../frontend/src/components/entity-crud-table.tsx) non inoltrava
+  [entity-crud-table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/entity-crud-table.tsx) non inoltrava
   `onRowOpen`. Ora è uniforme. Resta un'aggiunta per il mouse: da tastiera la scheda si apre col
   pulsante "Apri", che c'è esattamente dove c'è il doppio click — preferito ad aggiungere un
   punto di tabulazione per ogni riga.
@@ -1693,7 +1697,7 @@ sopra.
 
 ## 2026-09-09 — I suggerimenti dei campi con ricerca compaiono solo quando si digita
 
-**Cosa.** Il menu a tendina di [inputWithAdd.tsx](../frontend/src/components/inputWithAdd.tsx)
+**Cosa.** Il menu a tendina di [inputWithAdd.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/inputWithAdd.tsx)
 non si apre più al solo ricevere il fuoco: resta chiuso finché il campo è vuoto e compare
 alla prima lettera scritta. Con esso sparisce anche la ricerca "a vuoto" che partiva
 all'apertura del dialogo.
@@ -1736,8 +1740,8 @@ dal catalogo non avrebbe dato nessun errore: il programma avrebbe continuato a f
 stampando ricevute meno utili, e capire perché sarebbe stato tutt'altro che immediato.
 
 **Le scelte.** Il riconoscimento resta sul nome, in
-[issueCatalog.ts](../backend/src/services/issueCatalog.ts) sul server e in
-[lib/issues.ts](../frontend/src/lib/issues.ts) nel client. L'alternativa considerata era
+[issueCatalog.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/issueCatalog.ts) sul server e in
+[lib/issues.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/issues.ts) nel client. L'alternativa considerata era
 marcarla nel database — una colonna booleana con un indice unico parziale che ne imponesse
 una sola — che avrebbe permesso anche di rinominarla; è stata scartata perché "Altro" va bene
 com'è, e il nome congelato è esattamente ciò che queste protezioni impongono. Se un giorno
@@ -1803,7 +1807,7 @@ difetto si comporta come cliente e dispositivo — se non esiste, il salvataggio
 dice. Le voci di catalogo si creano solo di proposito, col **+**.
 
 **Da sapere:** la regola si regge sul fatto che nel catalogo esista una voce chiamata
-"Altro", riconosciuta dal testo ([lib/issues.ts](../frontend/src/lib/issues.ts)) perché la
+"Altro", riconosciuta dal testo ([lib/issues.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/issues.ts)) perché la
 tabella non ha una colonna che la marchi come speciale. Rinominarla o cancellarla dalla
 pagina Difetti farebbe sparire la casella del problema, senza errori.
 
@@ -1812,7 +1816,7 @@ scheda, l'elenco, la scheda tecnico — costruivano lo stesso payload di aggiorn
 copie identiche. Aggiungere `issueDescription` voleva dire ricordarsi di tre punti, e
 dimenticarne uno non avrebbe rotto niente in compilazione, perché nel payload i campi sono
 tutti facoltativi: sarebbe stato un campo che non si salva. Ora è `toReportUpdatePayload` in
-[lib/reportForm.ts](../frontend/src/lib/reportForm.ts), con un test che elenca cosa deve
+[lib/reportForm.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/reportForm.ts), con un test che elenca cosa deve
 arrivare all'API.
 
 **Verificato nel browser, e sulle ricevute.** Difetto normale: la casella non compare e
@@ -1827,7 +1831,7 @@ codice.
 ## 2026-09-09 — Quattro colori principali in più: da cinque a nove
 
 **Cosa.** In Impostazioni > Tema si aggiungono **Oliva**, **Mattone**, **Viola** e
-**Grafite** ([theme.ts](../frontend/src/lib/theme.ts)). L'elenco a schermo non è cambiato:
+**Grafite** ([theme.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/theme.ts)). L'elenco a schermo non è cambiato:
 legge l'array, quindi bastava aggiungere i preset.
 
 **Il perché.** I cinque colori esistenti lasciavano scoperti tre settori della ruota — niente
@@ -1839,7 +1843,7 @@ riempire quei buchi, non a caso: rispetto alle tinte già presenti stanno a 52°
 **Il contrasto è stato calcolato, non giudicato a occhio.** Sul colore principale ci va sopra
 il testo bianco dei pulsanti: i quattro nuovi stanno fra 4,65 e 7,53 contro il bianco, tutti
 sopra il migliore dei preesistenti tranne Grafite che è il più alto di tutti. Un test in
-[theme.test.ts](../frontend/src/lib/theme.test.ts) fissa la soglia a 3,5 per l'intera palette,
+[theme.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/theme.test.ts) fissa la soglia a 3,5 per l'intera palette,
 così un colore troppo chiaro non può più entrare per distrazione.
 
 **Una cosa da sapere, non toccata:** il preset **Ambra** è il più debole della palette
@@ -1865,8 +1869,8 @@ stati verificati mutando il codice.
 ## 2026-09-09 — Le quattro pagine di anagrafica erano quattro copie della stessa pagina
 
 **Cosa.** Tecnici, Collaboratori, Dispositivi e Difetti non hanno più una pagina ciascuna:
-condividono [SimpleEntityPage](../frontend/src/components/simple-entity-page.tsx) e
-[EntityCrudTable](../frontend/src/components/entity-crud-table.tsx), e i quattro file di
+condividono [SimpleEntityPage](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/simple-entity-page.tsx) e
+[EntityCrudTable](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/entity-crud-table.tsx), e i quattro file di
 pagina sono diventati una trentina di righe di configurazione l'uno. Spariti anche i quattro
 `*-table.tsx`, identici a meno dell'etichetta di accessibilità. In tutto il ramo di lavoro:
 1248 righe tolte, 496 aggiunte, con dentro dei test in più.
@@ -1902,7 +1906,7 @@ dove serve e assenza dove non serve, e nessun errore in console.
 `editReportDialog` e `createInterventionDialog`. Spariti i 56 `String(values.nomeCampo)`
 sparsi nelle pagine, e con loro l'idioma
 `String(values.x).trim() === "" ? null : String(values.x).trim()`, ora
-[trimOrNull](../frontend/src/lib/utils.ts).
+[trimOrNull](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/utils.ts).
 
 **Il perché.** In una codebase per il resto rigorosa — TypeScript strict, zod su ogni rotta —
 i nomi dei campi dei form erano l'unico punto in cui un refuso **non rompeva la
@@ -1920,8 +1924,8 @@ leggendo il codice, perché leggerlo non bastava.
 ## 2026-09-09 — Creare un report faceva due cose diverse a seconda della pagina
 
 **Cosa.** La risoluzione di cliente, dispositivo e difetto sta ora in un posto solo,
-[lib/reportCreation.ts](../frontend/src/lib/reportCreation.ts), con il confronto sui nomi dei
-clienti in [lib/customers.ts](../frontend/src/lib/customers.ts). Pagina Report e Dashboard la
+[lib/reportCreation.ts](https://github.com/ivanerricis/easylab-web/blob/f1313ecdd4fa7c48bff05e2573c907a6282a1ebf/frontend/src/lib/reportCreation.ts), con il confronto sui nomi dei
+clienti in [lib/customers.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/customers.ts). Pagina Report e Dashboard la
 chiamano entrambe.
 
 **Il perché.** Erano due copie della stessa funzione, allontanatesi nel tempo, e la
@@ -1953,8 +1957,8 @@ report punti ad "Altro" lasciando il catalogo intatto.
 
 ## 2026-09-09 — Le liste annullano la richiesta superata, non si limitano a ignorarla
 
-**Cosa.** [usePaginatedRows](../frontend/src/hooks/usePaginatedRows.ts) e
-[useCalendarInterventions](../frontend/src/pages/calendar/hooks/useCalendarInterventions.ts)
+**Cosa.** [usePaginatedRows](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/usePaginatedRows.ts) e
+[useCalendarInterventions](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/hooks/useCalendarInterventions.ts)
 creano un `AbortController` per ogni richiesta e annullano la precedente; il `signal` arriva
 fino ad axios attraverso le funzioni di lista. Viene annullata anche la richiesta ancora in
 volo quando si cambia pagina.
@@ -1980,7 +1984,7 @@ maggior parte del lavoro e le richieste raramente si sovrappongono davvero.
 
 ## 2026-09-09 — Il totale dei report non ripete più i join che non gli servono
 
-**Cosa.** Due modifiche in [report.ts](../backend/src/db/queries/report.ts). Il compenso del
+**Cosa.** Due modifiche in [report.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/report.ts). Il compenso del
 tecnico si legge con un join diretto sulla chiave primaria di `report_technician` invece che
 con una sottoquery `GROUP BY`; il conteggio totale della pagina non porta con sé i join di
 cliente, dispositivo e difetto quando non c'è una ricerca libera.
@@ -2009,7 +2013,7 @@ quelle tabelle, e i join restano.
 
 ## 2026-09-09 — Test su `authManager`, il file che decide chi entra
 
-**Cosa.** [authManager.test.ts](../backend/src/services/authManager.test.ts): 12 test su
+**Cosa.** [authManager.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.test.ts): 12 test su
 `login` e `getSessionUser`. Il backend passa da 151 a 163 test.
 
 **Il perché.** Era il file più grande del backend (727 righe) e l'unico davvero critico
@@ -2038,9 +2042,9 @@ test che la riguarda e nessun altro.
 ## 2026-09-09 — La CI era rossa su `main`, e `cloudflared` si aggiornava da solo
 
 **Cosa.** Due correzioni piccole e indipendenti. Una riga di
-[ReportsPage.tsx](../frontend/src/pages/reports/ReportsPage.tsx) non era formattata secondo
+[ReportsPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/reports/ReportsPage.tsx) non era formattata secondo
 prettier, quindi il passo `npm run format:check` del job frontend **falliva da `78586b2`**;
-e `cloudflared` in [docker-compose.yml](../docker-compose.yml) era fissato a `latest`, ora a
+e `cloudflared` in [docker-compose.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.yml) era fissato a `latest`, ora a
 `2026.8.3`.
 
 **Il perché.** La CI rossa non era stata notata perché in locale, su Windows, `format:check`
@@ -2059,7 +2063,7 @@ che qualcuno l'abbia scelta.
 
 ## 2026-09-09 — Uno stato "running" rimasto appeso non blocca più il programma per sempre
 
-**Cosa.** [check-updates.sh](../scripts/check-updates.sh), che gira 5 minuti dopo l'avvio del
+**Cosa.** [check-updates.sh](https://github.com/ivanerricis/easylab-web/blob/main/scripts/check-updates.sh), che gira 5 minuti dopo l'avvio del
 server e poi ogni 30 minuti, quando trova lo stato su `running` non si limita più a farsi da
 parte: chiede a systemd se `easylab-update.service` sta davvero girando e, se non sta girando,
 chiude quello stato come fallito, con un messaggio che dice cos'è successo.
@@ -2087,11 +2091,11 @@ che sbloccare tutti nel mezzo di un aggiornamento vero.
 ## 2026-09-09 — L'aggiornamento blocca tutte le postazioni, non solo quella che lo avvia
 
 **Cosa.** Ogni scheda autenticata interroga ogni 5 secondi la nuova rotta
-`GET /api/settings/update-state` ([settings.ts](../backend/src/routes/settings.ts)) e, se sul
+`GET /api/settings/update-state` ([settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts)) e, se sul
 server è in corso un aggiornamento, mostra lo stesso blocco a schermo già usato da chi l'ha
 lanciato; quando l'aggiornamento riesce ricarica la pagina da sola. Il tutto sta in
-[useUpdateWatcher](../frontend/src/hooks/useUpdateWatcher.ts), agganciato a
-[MainLayout](../frontend/src/pages/MainLayout.tsx).
+[useUpdateWatcher](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/useUpdateWatcher.ts), agganciato a
+[MainLayout](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/MainLayout.tsx).
 
 **Il perché.** Il blocco era stato React locale del pannello Impostazioni: lo vedeva solo il
 browser che aveva premuto "Aggiorna adesso". Con il programma aperto su due PC, l'altro
@@ -2103,7 +2107,7 @@ in pagina, che parla con un backend nuovo.
 `/company` e `/logo`: serve a chiunque sia autenticato, perché è chiunque che deve fermarsi.
 Restituisce solo `state` — commit installato, log ed errore restano su `/update`, riservata
 all'amministratore — e un test lo fissa, così non diventa per sbaglio la versione libera di
-`/update`. È in `ignoredPaths` di [requestLogger](../backend/src/middleware/requestLogger.ts)
+`/update`. È in `ignoredPaths` di [requestLogger](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/requestLogger.ts)
 per lo stesso motivo di `/api/health`: interrogata ogni 5 secondi da ogni scheda, riempirebbe
 i log senza dire niente. Un errore di rete non toglie il blocco (durante la ricostruzione dei
 container il backend *non risponde*: è la normalità, non la fine dei lavori) e un
@@ -2137,9 +2141,9 @@ cerca/filtra, poi aggiorna se serve.
 **Cosa.** Gli interventi hanno un campo `note`: testo libero facoltativo, disponibile per
 qualunque tipo e qualunque stato. Compare come campo nei dialoghi di creazione e modifica
 (sotto la descrizione del lavoro), come voce "Note" nella card Dettagli di
-[InterventionPage](../frontend/src/pages/interventions/InterventionPage.tsx), e come sezione
+[InterventionPage](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/interventions/InterventionPage.tsx), e come sezione
 "NOTE" nel PDF dell'intervento, dopo "ORE TECNICI" e prima delle diciture di legge. Nuova
-migrazione [0024_add_intervention_note.sql](../backend/drizzle/0024_add_intervention_note.sql).
+migrazione [0024_add_intervention_note.sql](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0024_add_intervention_note.sql).
 
 **Il perché.** Fra "problema riscontrato" e "assistenza effettuata" non c'era posto per quello
 che non è né l'uno né l'altro: accordi presi col cliente, materiale lasciato in prestito da
@@ -2188,8 +2192,8 @@ dispositivi, difetti) hanno le colonne trascinabili per il bordo destro dell'int
 larghezza è ricordata per tabella in `localStorage`, doppio click sulla maniglia riporta la
 colonna alla larghezza naturale, e le frecce sinistra/destra la regolano da tastiera di 16px
 per volta (la maniglia è un `role="separator"` raggiungibile con Tab). Nuovo hook
-[useResizableColumns](../frontend/src/hooks/useResizableColumns.ts), usato da
-[entity-table.tsx](../frontend/src/components/entity-table.tsx), che è il punto in cui tutte e
+[useResizableColumns](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/useResizableColumns.ts), usato da
+[entity-table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/entity-table.tsx), che è il punto in cui tutte e
 sette convergono; le chiavi di salvataggio sono le stesse già usate per le righe per pagina
 ("interventions", "customers", ...).
 
@@ -2240,7 +2244,7 @@ i suoi `<TableHead>` inline.
 
 ## 2026-09-08 — `.env.example` con valori segnaposto invece di configurazioni reali
 
-**Cosa.** I valori di [.env.example](../.env.example) non sono più quelli di una
+**Cosa.** I valori di [.env.example](https://github.com/ivanerricis/easylab-web/blob/main/.env.example) non sono più quelli di una
 configurazione funzionante (`easylab`, `easylab_password`, `easylab_db`, `EasyLab`,
 `info@easylab.local`, `/opt/easylab-web/backups`) ma segnaposto costruiti sul nome della
 variabile in minuscolo: `postgres_user`, `postgres_password`, `postgres_db`, `lab_name`,
@@ -2293,7 +2297,7 @@ stessa prima card. Chi passa dall'una all'altra trova lo stato sempre nello stes
 aggiornamento: elenchi (Dashboard, Report, Interventi, Clienti, Collaboratori, Tecnici,
 Dispositivi, Difetti), pagine di dettaglio (report, intervento, cliente, interventi del
 cliente, tecnico, collaboratore) e l'elenco utenti in Impostazioni. Il componente condiviso è
-[refresh-button.tsx](../frontend/src/components/refresh-button.tsx).
+[refresh-button.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/refresh-button.tsx).
 
 **Il perché.** I dati vengono letti al montaggio della pagina e poi solo quando è la pagina
 stessa a modificarli. In laboratorio però lavorano più persone insieme: se qualcun altro chiude
@@ -2318,16 +2322,16 @@ montaggio a gestire lo spinner a tutta pagina. L'aggiornamento manuale lascia il
 schermo e segnala l'attesa solo nel pulsante.
 
 **Due pulsanti scritti a mano sono spariti.** L'elenco log
-([logsSettingsPanel.tsx](../frontend/src/components/settings/logsSettingsPanel.tsx)) e
-l'archivio dump ([backupDumpsCard.tsx](../frontend/src/components/settings/backup/backupDumpsCard.tsx))
+([logsSettingsPanel.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/logsSettingsPanel.tsx)) e
+l'archivio dump ([backupDumpsCard.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/backup/backupDumpsCard.tsx))
 avevano già ciascuno la propria copia di `Tooltip` + `Button` + `RefreshCw` con
 `animate-spin`: ora usano il componente condiviso, che è la stessa ragione per cui esiste
 `useSearchableRows`. La taglia dell'icona segue quella del pulsante (20px nelle intestazioni di
 pagina, 16px nelle card delle impostazioni), così le due rese restano identiche a prima.
 
-**Test.** [refresh-button.test.tsx](../frontend/src/components/refresh-button.test.tsx) copre il
+**Test.** [refresh-button.test.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/refresh-button.test.tsx) copre il
 caso che conta, cioè il doppio click durante una richiesta in corso. Ha richiesto uno stub di
-`ResizeObserver` in [test/setup.ts](../frontend/src/test/setup.ts): jsdom non lo implementa e il
+`ResizeObserver` in [test/setup.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/test/setup.ts): jsdom non lo implementa e il
 Tooltip di Radix lo usa per misurare la freccia, quindi qualunque test che clicchi un pulsante
 con tooltip falliva per un motivo che non c'entrava con quello che stava verificando.
 
@@ -2346,7 +2350,7 @@ essere dentro la rete del laboratorio. Da quando l'app risponde sul dominio pubb
 Cloudflare Tunnel, il form di login è raggiungibile da chiunque, e fra un estraneo e i dati di
 tutti i clienti c'è una sola stringa — che una persona può riusare da un altro sito o farsi
 rubare con un phishing. Il limitatore per IP
-([loginRateLimit.ts](../backend/src/services/loginRateLimit.ts)) ferma il tentativo a forza
+([loginRateLimit.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/loginRateLimit.ts)) ferma il tentativo a forza
 bruta, non la password già nota. Aggrava il quadro il fatto che l'admin può lanciare
 l'aggiornamento, che **esegue codice sull'host**, e leggere o ripristinare i backup: un account
 admin compromesso non è una fuga di dati, è la macchina. Il piano stava in
@@ -2354,15 +2358,15 @@ admin compromesso non è una fuga di dati, è la macchina. Il piano stava in
 l'obbligo per l'admin, che è meglio imporre a flusso collaudato.
 
 **TOTP scritto a mano invece che con una libreria.** RFC 6238 è un HMAC-SHA1 su un contatore a
-8 byte più un troncamento: [totp.ts](../backend/src/services/totp.ts) sono un centinaio di
+8 byte più un troncamento: [totp.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/totp.ts) sono un centinaio di
 righe con `node:crypto`, Base32 compreso. È la stessa scelta già fatta per scrypt e AES-GCM, e
 il guadagno vero è che si verifica contro i **vettori ufficiali della RFC** — sei casi in
-[totp.test.ts](../backend/src/services/totp.test.ts), che è una garanzia di correttezza più
+[totp.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/totp.test.ts), che è una garanzia di correttezza più
 forte di "la libreria è popolare", senza aggiungere una dipendenza sul percorso critico del
 login. L'unica dipendenza nuova è `qrcode`, per il QR.
 
 **Lo stato "password ok, manca il codice" sta in memoria, non nel database.**
-[twoFactorChallenge.ts](../backend/src/services/twoFactorChallenge.ts) è calcato su
+[twoFactorChallenge.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/twoFactorChallenge.ts) è calcato su
 `loginRateLimit.ts`: mappa con TTL di 5 minuti, tetto ai tentativi e tetto alle entry.
 L'alternativa — una colonna `pending_totp` su `session` — sopravviverebbe al riavvio, ma
 metterebbe in giro un cookie di sessione **non ancora valido**, da ricontrollare in
@@ -2372,14 +2376,14 @@ accesso. Costo accettato: al riavvio del backend chi era a metà login ridigita 
 **Il primo passo non consegna nessun cookie.** È la differenza fra una porta chiusa e una
 schermata da saltare, ed è anche l'errore che un giorno si reintrodurrebbe rifattorizzando
 `login()`. Per questo `login` restituisce un'unione discriminata invece di una sessione, e
-[routes/auth.test.ts](../backend/src/routes/auth.test.ts) asserisce esplicitamente
+[routes/auth.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/auth.test.ts) asserisce esplicitamente
 `set-cookie` assente sul ramo `twoFactorRequired`.
 
 **410 e non 401 per il challenge morto.** Un codice sbagliato è 401 ("riprova"); un challenge
 scaduto o bruciato dai tentativi è **410** ("non c'è più niente da verificare, ricomincia dalla
 password"). Sono due comportamenti diversi nell'interfaccia, e la prima versione li distingueva
 confrontando il testo italiano del messaggio — che è scritto per le persone e cambierà. Da qui
-`getApiErrorStatus` in [lib/api/errors.ts](../frontend/src/lib/api/errors.ts), accanto a
+`getApiErrorStatus` in [lib/api/errors.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/api/errors.ts), accanto a
 `getApiErrorMessage` che invece lo stato lo scarta di proposito.
 
 **Il caso che decideva se il lavoro era fatto bene: il ripristino su una macchina nuova.** Il
@@ -2388,7 +2392,7 @@ di proposito**, mentre i segreti cifrati stanno nel dump. Ripristinato altrove, 
 si decifra: trattarlo come un errore avrebbe lasciato fuori dall'app chiunque avesse la 2FA
 attiva — e se era l'admin, senza nessuno che potesse sbloccarlo. `readTotpSecret` quindi azzera
 la 2FA, lascia entrare con la sola password e scrive una notifica in-app, la stessa scelta già
-fatta per la password del NAS in [backupState.ts](../backend/src/services/backupState.ts).
+fatta per la password del NAS in [backupState.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/backupState.ts).
 
 **Tre cose che sembravano dettagli e non lo erano.** *(a)* `totp_last_step` sulla tabella
 `user`: un codice vale trenta secondi, e senza ricordare l'ultimo passo accettato chi lo
@@ -2400,7 +2404,7 @@ autenticazione ne sono esenti per costruzione — giusto per login e cambio pass
 per le rotte 2FA, dove la guardia è ripetuta a mano e un test la sorveglia.
 
 **Il consumo di un codice di recupero è una query sola.** `UPDATE ... WHERE used_at IS NULL
-RETURNING id` in [queries/recoveryCode.ts](../backend/src/db/queries/recoveryCode.ts): con una
+RETURNING id` in [queries/recoveryCode.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/recoveryCode.ts): con una
 lettura seguita da una scrittura, due richieste in parallelo spenderebbero due volte lo stesso
 codice. Del codice resta in tabella solo lo sha256, come per i token di sessione — sono già 40
 bit casuali, non c'è niente da indovinare a forza bruta e non serve il costo di scrypt.
@@ -2410,7 +2414,7 @@ stato della pagina e **non** nel contesto di autenticazione: non è una sessione
 avrebbe significato uno stato di autenticazione a metà visibile a tutta l'app. "Sicurezza" è la
 prima sezione personale delle impostazioni oltre al tema, quindi resta fuori da
 `adminOnlySections`. Il blocco "valore più bottone copia" è stato estratto da
-`generatedPasswordDialog` in [copyableValue.tsx](../frontend/src/components/dialogs/settings/copyableValue.tsx),
+`generatedPasswordDialog` in [copyableValue.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/settings/copyableValue.tsx),
 perché ormai serviva in tre punti.
 
 **Cosa resta fuori.** L'obbligo di 2FA per l'admin (fase 5 del piano), da imporre dopo aver
@@ -2425,23 +2429,23 @@ frontend alla password sul 410. **Da fare a mano prima di considerarla in produz
 attivazione con un'app reale, login da telefono, e un ripristino di backup con `secret.key`
 diversa.
 
-**File:** [backend/src/services/totp.ts](../backend/src/services/totp.ts),
-[recoveryCodes.ts](../backend/src/services/recoveryCodes.ts),
-[twoFactorChallenge.ts](../backend/src/services/twoFactorChallenge.ts),
-[authManager.ts](../backend/src/services/authManager.ts),
-[db/queries/recoveryCode.ts](../backend/src/db/queries/recoveryCode.ts),
-[db/schema.ts](../backend/src/db/schema.ts),
-[drizzle/0023_add_user_totp.sql](../backend/drizzle/0023_add_user_totp.sql),
-[routes/auth.ts](../backend/src/routes/auth.ts), [routes/users.ts](../backend/src/routes/users.ts),
-[reset-admin-password.js](../backend/reset-admin-password.js),
-[scripts/reset-admin-password.sh](../scripts/reset-admin-password.sh),
-[frontend/src/lib/api/twoFactor.ts](../frontend/src/lib/api/twoFactor.ts),
-[lib/api/auth.ts](../frontend/src/lib/api/auth.ts), [lib/api/errors.ts](../frontend/src/lib/api/errors.ts),
-[components/auth-provider.tsx](../frontend/src/components/auth-provider.tsx),
-[pages/auth/LoginPage.tsx](../frontend/src/pages/auth/LoginPage.tsx),
-[components/settings/securitySettingsSection.tsx](../frontend/src/components/settings/securitySettingsSection.tsx),
-[components/settings/usersSettingsSection.tsx](../frontend/src/components/settings/usersSettingsSection.tsx),
-[pages/settings/SettingsPage.tsx](../frontend/src/pages/settings/SettingsPage.tsx),
+**File:** [backend/src/services/totp.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/totp.ts),
+[recoveryCodes.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/recoveryCodes.ts),
+[twoFactorChallenge.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/twoFactorChallenge.ts),
+[authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts),
+[db/queries/recoveryCode.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/recoveryCode.ts),
+[db/schema.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/schema.ts),
+[drizzle/0023_add_user_totp.sql](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0023_add_user_totp.sql),
+[routes/auth.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/auth.ts), [routes/users.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/users.ts),
+[reset-admin-password.js](https://github.com/ivanerricis/easylab-web/blob/main/backend/reset-admin-password.js),
+[scripts/reset-admin-password.sh](https://github.com/ivanerricis/easylab-web/blob/main/scripts/reset-admin-password.sh),
+[frontend/src/lib/api/twoFactor.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/api/twoFactor.ts),
+[lib/api/auth.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/api/auth.ts), [lib/api/errors.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/api/errors.ts),
+[components/auth-provider.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/auth-provider.tsx),
+[pages/auth/LoginPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/auth/LoginPage.tsx),
+[components/settings/securitySettingsSection.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/securitySettingsSection.tsx),
+[components/settings/usersSettingsSection.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/usersSettingsSection.tsx),
+[pages/settings/SettingsPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/settings/SettingsPage.tsx),
 più i dialoghi in `components/dialogs/settings/` e il README.
 
 ---
@@ -2465,14 +2469,14 @@ si adatta da sé, con la logica che c'era già.
 paginazione se si omettono `page`/`pageSize` (`takeUnpaginated`), e sembrava il posto giusto
 dove agganciare "Tutte". Ma in quel caso la risposta cambia **forma** — array semplice invece
 di `items + totalItems` — e ogni tabella avrebbe dovuto gestirle entrambe. Peggio:
-[routes/reports.ts](../backend/src/routes/reports.ts) usa la presenza di quei parametri per
+[routes/reports.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/reports.ts) usa la presenza di quei parametri per
 decidere il `visibility` predefinito (`all` senza paginazione, `open` con), quindi passare a
 "Tutte" sui report avrebbe **cambiato in silenzio quali report si vedono**. Mandare un
 `pageSize` grande evita entrambe le cose: stessa forma di risposta, stessi filtri.
 
 **Il tetto è uno solo, condiviso.** Lo zod delle rotte di lista fermava `pageSize` a 1000, che
 avrebbe respinto "Tutte" con un 400. Ora il tetto è `maxPageSize` in
-[db/queries/pagination.ts](../backend/src/db/queries/pagination.ts), definito come lo stesso
+[db/queries/pagination.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/pagination.ts), definito come lo stesso
 numero di `unpaginatedMaxRows` (5000): è la stessa domanda ("quante righe può chiedere una
 schermata in un colpo solo") e due costanti diverse si sarebbero prima o poi contraddette.
 Il tetto valeva in due schemi, quello condiviso e quello dei log in `settings.ts`: aggiornati
@@ -2483,18 +2487,18 @@ controlli di pagina riappaiono, quindi le righe restano raggiungibili invece di 
 avviso. Da tenere presente che la tabella non è virtualizzata: "Tutte" su una tabella molto
 grande disegna davvero tutte le righe nel DOM.
 
-**Verificato.** Test nuovo in [routes/devices.test.ts](../backend/src/routes/devices.test.ts):
+**Verificato.** Test nuovo in [routes/devices.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/devices.test.ts):
 `pageSize` pari al tetto passa, il valore successivo dà 400 — le due asserzioni insieme
 inchiodano il tetto esatto, così riabbassarlo non passa inosservato. Suite complete verdi (98
 backend, 45 frontend) e typecheck pulito sui due progetti. Misurata poi con Playwright la barra
 con "Tutte" selezionata: il trigger passa da 52px a 71px, ma il bordo destro resta a **0px** dal
 bordo del contenitore — la griglia della voce qui sotto assorbe la differenza.
 
-**File:** [frontend/src/lib/theme.ts](../frontend/src/lib/theme.ts),
-[backend/src/db/queries/pagination.ts](../backend/src/db/queries/pagination.ts),
-[backend/src/routes/crudRouter.ts](../backend/src/routes/crudRouter.ts),
-[backend/src/routes/settings.ts](../backend/src/routes/settings.ts),
-[backend/src/routes/devices.test.ts](../backend/src/routes/devices.test.ts).
+**File:** [frontend/src/lib/theme.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/theme.ts),
+[backend/src/db/queries/pagination.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/pagination.ts),
+[backend/src/routes/crudRouter.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/crudRouter.ts),
+[backend/src/routes/settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts),
+[backend/src/routes/devices.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/devices.test.ts).
 
 ---
 
@@ -2531,7 +2535,7 @@ poi i quattro casi: pagina unica (selettore comunque a filo destro), assenza del
 (paginazione comunque centrata), mobile a 420px (impilato, altezza 116px = 20+36+36 più i due
 gap) e mobile con pagina unica (altezza 68px, nessun gap di troppo).
 
-**File:** [frontend/src/components/table-pagination.tsx](../frontend/src/components/table-pagination.tsx).
+**File:** [frontend/src/components/table-pagination.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/table-pagination.tsx).
 
 ---
 
@@ -2561,7 +2565,7 @@ collaboratore" — così al momento del passaggio di stato i campi si compilano 
 richiesta.
 
 **Sul database.** `intervention.description` era `NOT NULL` e diventa facoltativa
-([migrazione 0022](../backend/drizzle/0022_intervention_description_optional.sql)), con lo
+([migrazione 0022](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0022_intervention_description_optional.sql)), con lo
 stesso significato che ha già `problem`: NULL = non ancora noto, non "vuoto". L'obbligo negli
 altri due stati è una regola applicativa, non un vincolo della colonna, perché al passaggio di
 stato il testo arriva nella stessa richiesta e un vincolo di colonna non saprebbe distinguere
@@ -2571,7 +2575,7 @@ modi diversi di dire la stessa cosa.
 **La regola sta in un punto solo per lato.** Le due finestre (creazione e modifica)
 applicavano gli stessi controlli ciascuna per conto proprio, copiati carattere per carattere:
 sono confluiti in `getInterventionValidationError`
-([lib/interventions.ts](../frontend/src/lib/interventions.ts)), per lo stesso motivo per cui
+([lib/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/interventions.ts)), per lo stesso motivo per cui
 esiste `DateRangeFilter` — due copie di una regola sono due occasioni perché una cambi da sola.
 Il server riapplica comunque tutto.
 
@@ -2582,10 +2586,10 @@ tutto (creato), programmato con ora fine prima dell'inizio (rifiutato — la coe
 vale anche quando sono facoltativi), chiusura via modifica senza compilare nulla (rifiutata),
 chiusura compilando tutto (accettata).
 
-**File:** [routes/interventions.ts](../backend/src/routes/interventions.ts),
-[db/schema.ts](../backend/src/db/schema.ts),
-[lib/interventions.ts](../frontend/src/lib/interventions.ts), i due dialoghi degli interventi,
-[interventionPdf.ts](../backend/src/services/interventionPdf.ts) e la scheda intervento (che
+**File:** [routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts),
+[db/schema.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/schema.ts),
+[lib/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/interventions.ts), i due dialoghi degli interventi,
+[interventionPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionPdf.ts) e la scheda intervento (che
 ora mostrano "-" quando il lavoro non è ancora stato descritto).
 
 ---
@@ -2617,7 +2621,7 @@ interpretare quasi due MB di JSON e costruire 5000 eventi per disegnarne una man
 *Il filtro giusto non esisteva.* `dateFrom`/`dateTo` degli interventi filtrano la **data di
 creazione**, mentre il calendario colloca gli eventi sulla **data dell'intervento**: usarli
 avrebbe filtrato la colonna sbagliata. Da qui i due parametri nuovi, più
-l'[indice su `intervention_date`](../backend/drizzle/0021_add_intervention_date_index.sql) che
+l'[indice su `intervention_date`](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0021_add_intervention_date_index.sql) che
 rende quel filtro una lettura d'indice (`BitmapOr`, verificato con `EXPLAIN ANALYZE`) invece di
 una scansione a ogni cambio di mese.
 
@@ -2640,11 +2644,11 @@ Resta infine un tetto di 1000 righe per periodo, ma ora **se scatta lo dice**: c
 avviso che invita a passare alla vista settimana o giorno, invece di disegnare in silenzio una
 parte degli interventi.
 
-**File:** [queries/intervention.ts](../backend/src/db/queries/intervention.ts),
-[routes/interventions.ts](../backend/src/routes/interventions.ts),
-[useCalendarInterventions.ts](../frontend/src/pages/calendar/hooks/useCalendarInterventions.ts),
-[interventions-calendar.tsx](../frontend/src/pages/calendar/components/interventions-calendar.tsx),
-[DashboardPage.tsx](../frontend/src/pages/dashboard/DashboardPage.tsx).
+**File:** [queries/intervention.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/intervention.ts),
+[routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts),
+[useCalendarInterventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/hooks/useCalendarInterventions.ts),
+[interventions-calendar.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/components/interventions-calendar.tsx),
+[DashboardPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/dashboard/DashboardPage.tsx).
 
 ---
 
@@ -2653,11 +2657,11 @@ parte degli interventi.
 **Cosa.** Le sette liste con ricerca libera non convertono più in testo id, date, booleani,
 prezzi e metodo di pagamento per confrontarli con `ILIKE '%…%'`. Restano le colonne di testo,
 più il numero del record come **confronto esatto sulla chiave primaria** quando quello che si
-digita è tutto cifre. Nuovo helper condiviso [parseIdSearch](../backend/src/db/queries/search.ts).
+digita è tutto cifre. Nuovo helper condiviso [parseIdSearch](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/search.ts).
 
 **Il perché, misurato e non ipotizzato** (dati di prova generati da
-[seed-fake-data.sql](../scripts/dev/seed-fake-data.sql), tempi da
-[bench-api.mjs](../scripts/dev/bench-api.mjs), 20.000 report / 8.000 interventi / 5.000 clienti):
+[seed-fake-data.sql](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/seed-fake-data.sql), tempi da
+[bench-api.mjs](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/bench-api.mjs), 20.000 report / 8.000 interventi / 5.000 clienti):
 
 | | prima | dopo |
 | --- | ---: | ---: |
@@ -2709,22 +2713,22 @@ misurato a **35 ms** contro i 323 attuali — ma è un lavoro a parte. Prova di 
 davvero l'indice, sulla stessa macchina e sugli stessi dati: lo stesso `OR` ristretto alla
 sola tabella `report` usa `BitmapOr` su quattro indici trigram ed esegue in **1,1 ms**.
 
-**File:** [search.ts](../backend/src/db/queries/search.ts) (nuovo),
-[report.ts](../backend/src/db/queries/report.ts),
-[customer.ts](../backend/src/db/queries/customer.ts),
-[intervention.ts](../backend/src/db/queries/intervention.ts),
-[collaborator.ts](../backend/src/db/queries/collaborator.ts),
-[technician.ts](../backend/src/db/queries/technician.ts),
-[device.ts](../backend/src/db/queries/device.ts),
-[issue.ts](../backend/src/db/queries/issue.ts).
+**File:** [search.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/search.ts) (nuovo),
+[report.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/report.ts),
+[customer.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/customer.ts),
+[intervention.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/intervention.ts),
+[collaborator.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/collaborator.ts),
+[technician.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/technician.ts),
+[device.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/device.ts),
+[issue.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/issue.ts).
 
 ---
 
 ## 2026-09-07 — Dati fittizi e misura della latenza delle API
 
-**Cosa.** Due script di sviluppo: [scripts/dev/seed-fake-data.sql](../scripts/dev/seed-fake-data.sql)
+**Cosa.** Due script di sviluppo: [scripts/dev/seed-fake-data.sql](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/seed-fake-data.sql)
 riempie il database con dati verosimili (di default 20.000 report, 8.000 interventi, 5.000
-clienti, più anagrafiche e notifiche) e [scripts/dev/bench-api.mjs](../scripts/dev/bench-api.mjs)
+clienti, più anagrafiche e notifiche) e [scripts/dev/bench-api.mjs](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/bench-api.mjs)
 misura la latenza di 46 scenari di chiamata — liste, ricerche, ordinamenti, dettagli, PDF,
 scritture e i "pacchetti" di chiamate che una pagina lancia al mount.
 
@@ -2783,8 +2787,8 @@ per intervallo di date, non dell'elenco completo.
 **Non toccato in questa voce:** nessuna di queste quattro cose è stata corretta qui. Lo script
 serve proprio a poterle correggere misurando, invece che a intuito.
 
-**File:** [scripts/dev/seed-fake-data.sql](../scripts/dev/seed-fake-data.sql),
-[scripts/dev/bench-api.mjs](../scripts/dev/bench-api.mjs).
+**File:** [scripts/dev/seed-fake-data.sql](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/seed-fake-data.sql),
+[scripts/dev/bench-api.mjs](https://github.com/ivanerricis/easylab-web/blob/main/scripts/dev/bench-api.mjs).
 
 ---
 
@@ -2798,7 +2802,7 @@ pagina. Prima stava a sinistra, appiccicato al conteggio.
 dire raggrupparlo in un contenitore comune con i controlli di pagina, e lì il layout si è
 rotto: il selettore finiva su una riga e le frecce sulla riga sotto, disallineati rispetto al
 conteggio. La causa è che `Pagination` di shadcn nasce con `mx-auto flex w-full
-justify-center` ([ui/pagination.tsx](../frontend/src/components/ui/pagination.tsx)). Come
+justify-center` ([ui/pagination.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/pagination.tsx)). Come
 figlio diretto della riga esterna in `justify-between` quel `w-full` si limitava a
 restringersi, quindi il difetto non si vedeva; dentro un contenitore `flex-wrap` invece
 rivendica tutta la larghezza e si porta su una riga propria. Rimediato con `mx-0 w-auto` sul
@@ -2812,7 +2816,7 @@ pagina reale non provava nulla. Misurata quindi la struttura iniettata nel DOM d
 il fix, 42px rimettendo `w-full` a runtime**. Il controllo serviva a escludere un test inerte,
 trappola già incontrata in questo progetto.
 
-**File:** [frontend/src/components/table-pagination.tsx](../frontend/src/components/table-pagination.tsx).
+**File:** [frontend/src/components/table-pagination.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/table-pagination.tsx).
 
 ---
 
@@ -3281,7 +3285,7 @@ Ha richiesto due stub in `src/test/setup.ts`: jsdom non implementa la Pointer Ev
 `scrollIntoView`, che i componenti Radix usano, e senza di essi un semplice click su un menu
 falliva con `target.hasPointerCapture is not a function` — un errore che non c'entra con ciò
 che il test verifica. Servono a qualunque futuro test su Select, DropdownMenu o Popover.
-→ [frontend/src/components/filters/](../frontend/src/components/filters/)
+→ [frontend/src/components/filters/](https://github.com/ivanerricis/easylab-web/tree/main/frontend/src/components/filters)
 
 ---
 
@@ -3297,11 +3301,11 @@ raccolti qui perché nascono dalla stessa lettura.
   `tableLoadingSkeleton.tsx` era stato sostituito da `LoadingPage` senza essere cancellato;
   `assets/react.svg` è un residuo dello scaffold di Vite; `lib/api.ts` conteneva solo
   `export * from "./api/index"`, un rimbalzo che la risoluzione per directory rende inutile.
-  → [frontend/src/](../frontend/src/)
+  → [frontend/src/](https://github.com/ivanerricis/easylab-web/tree/main/frontend/src)
 
 - **`db/relations.ts` (75 righe) descriveva relazioni che Drizzle non ha mai letto.** Le
   `relations()` servono solo all'API relazionale (`db.query.*`), che richiede di passare lo
-  schema a `drizzle()`. In [db/index.ts](../backend/src/db/index.ts) la chiamata è
+  schema a `drizzle()`. In [db/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/index.ts) la chiamata è
   `drizzle(pool)`, senza schema, e nel backend non esiste una sola `db.query`: tutte le
   query sono `db.select()` con join espliciti. Il file dichiarava quindi una mappa del
   dominio che nessuno consultava — peggio che inutile, perché a leggerla si crede che
@@ -3315,7 +3319,7 @@ raccolti qui perché nascono dalla stessa lettura.
   raggiungibili solo digitando l'URL a mano, dove mostravano un cantiere aperto dentro un
   prodotto finito. Difetti e dispositivi sono tabelle a due campi (nome, descrizione): una
   scheda di dettaglio non avrebbe niente da mostrare.
-  → [frontend/src/App.tsx](../frontend/src/App.tsx)
+  → [frontend/src/App.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/App.tsx)
 
 - **La POST dei rapporti validava due volte la stessa regola.** Il vincolo "se il pagamento
   è in contanti o con carta il prezzo deve essere > 0" era espresso sia in un `.refine()`
@@ -3324,7 +3328,7 @@ raccolti qui perché nascono dalla stessa lettura.
   messaggio d'errore, pronta a divergere dalla prima. Il controllo nella PUT resta: lì il
   metodo di pagamento e il prezzo possono arrivare uno dal corpo parziale e l'altro dalla
   riga esistente, combinazione che lo schema non può vedere.
-  → [backend/src/routes/reports.ts](../backend/src/routes/reports.ts)
+  → [backend/src/routes/reports.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/reports.ts)
 
 ### Il toaster non seguiva il tema scelto nell'app
 
@@ -3336,7 +3340,7 @@ raccolti qui perché nascono dalla stessa lettura.
   `@/components/use-theme`, e la dipendenza `next-themes` è stata rimossa insieme a
   `@base-ui/react` (usata solo dal combobox morto) e a `@vitest/coverage-v8` (dichiarata
   senza nessuno script o passo di CI che raccolga la copertura).
-  → [frontend/src/components/ui/sonner.tsx](../frontend/src/components/ui/sonner.tsx)
+  → [frontend/src/components/ui/sonner.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/sonner.tsx)
 
 ### Una sola classe d'errore applicativo al posto di otto
 
@@ -3349,7 +3353,7 @@ raccolti qui perché nascono dalla stessa lettura.
 
   Ora esiste `ApiError` (messaggio già destinato al client + `statusCode`), le classi dei
   servizi la estendono, e la traduzione avviene una volta sola in
-  [errorHandler.ts](../backend/src/middleware/errorHandler.ts). Le rotte non hanno più
+  [errorHandler.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/errorHandler.ts). Le rotte non hanno più
   `try/catch`: Express 5 inoltra da sé il rifiuto di un handler `async` al middleware
   d'errore, cosa su cui `crudRouter` faceva già affidamento.
 
@@ -3360,8 +3364,8 @@ raccolti qui perché nascono dalla stessa lettura.
   `res.locals.apiErrorMessage`, per cui un invio email fallito finiva nel registro delle
   azioni utente come `error=HTTP 502`, senza il motivo. Entrambi risolti dal fatto che ora
   la logica è una sola.
-  → [backend/src/services/apiError.ts](../backend/src/services/apiError.ts),
-  [backend/src/routes/settings.ts](../backend/src/routes/settings.ts)
+  → [backend/src/services/apiError.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/apiError.ts),
+  [backend/src/routes/settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts)
 
 ### La configurazione Prettier del frontend descriveva uno stile che il codice non usava
 
@@ -3377,8 +3381,8 @@ raccolti qui perché nascono dalla stessa lettura.
   riformattato dall'editor di turno, seppellendo la modifica vera dentro un diff che tocca
   tutto il file. La riformattazione è in un commit separato che non cambia altro, così
   `git blame` resta leggibile.
-  → [frontend/.prettierrc](../frontend/.prettierrc),
-  [.github/workflows/ci.yml](../.github/workflows/ci.yml)
+  → [frontend/.prettierrc](https://github.com/ivanerricis/easylab-web/blob/main/frontend/.prettierrc),
+  [.github/workflows/ci.yml](https://github.com/ivanerricis/easylab-web/blob/main/.github/workflows/ci.yml)
 
 ### Duplicazioni consolidate
 
@@ -3395,7 +3399,7 @@ raccolti qui perché nascono dalla stessa lettura.
   intervento singolo, riepilogo interventi per cliente) sono stati rigenerati con lo stesso
   input prima e dopo, e confrontati byte a byte: differiscono solo per `/CreationDate` e
   `/ID`, cioè il timestamp di generazione.
-  → [backend/src/services/pdf/shared.ts](../backend/src/services/pdf/shared.ts)
+  → [backend/src/services/pdf/shared.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/pdf/shared.ts)
 
 - **Sette tabelle identiche a meno del nome del DTO.** Ogni entità aveva il proprio
   `*-table.tsx` che ripeteva per intero la struttura "tabella su desktop, schede su mobile":
@@ -3416,8 +3420,8 @@ raccolti qui perché nascono dalla stessa lettura.
   *Verifica:* tutte e sette le liste sono state aperte con Playwright, a 1440px e a 390px,
   confrontando numero di colonne, di righe e di pulsanti per riga, i colori di stato di
   rapporti e interventi e il bordo colorato delle schede su mobile. Nessun errore in console.
-  → [frontend/src/components/entity-table.tsx](../frontend/src/components/entity-table.tsx),
-  [frontend/src/hooks/useSearchableRows.ts](../frontend/src/hooks/useSearchableRows.ts)
+  → [frontend/src/components/entity-table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/entity-table.tsx),
+  [frontend/src/hooks/useSearchableRows.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/hooks/useSearchableRows.ts)
 
 - **Rapporti e interventi ridichiaravano lo schema di lista invece di estenderlo.**
   `page`, `pageSize`, `search`, `sortOrder` e lo schema del parametro `:id` erano riscritti
@@ -3425,8 +3429,8 @@ raccolti qui perché nascono dalla stessa lettura.
   filtri propri e restringendo `sortBy` alle colonne che sanno davvero ordinare: i limiti
   comuni a tutte le liste (per esempio `pageSize` massimo 1000) tornano a essere decisi in
   un posto solo.
-  → [backend/src/routes/reports.ts](../backend/src/routes/reports.ts),
-  [backend/src/routes/interventions.ts](../backend/src/routes/interventions.ts)
+  → [backend/src/routes/reports.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/reports.ts),
+  [backend/src/routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts)
 
 ### Non fatto di proposito
 
@@ -3436,7 +3440,7 @@ raccolti qui perché nascono dalla stessa lettura.
   dentro un file di libreria costa molto meno di codice inutilizzato scritto da noi, e a
   runtime non costa niente perché Vite lo elimina dal bundle. Diverso il caso di
   `combobox.tsx`, cancellato sopra: era inutilizzato **per intero**, e ricrearlo è un comando.
-  → [frontend/src/components/ui/sidebar.tsx](../frontend/src/components/ui/sidebar.tsx)
+  → [frontend/src/components/ui/sidebar.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/sidebar.tsx)
 
 ---
 
@@ -3450,7 +3454,7 @@ raccolti qui perché nascono dalla stessa lettura.
   header di sicurezza e le regole di cache. Ora `nginx:1.31-alpine`, la stessa versione già
   in uso: dentro quella riga le patch continuano ad arrivare, cambiare riga diventa una
   decisione invece di un effetto collaterale.
-  → [frontend/Dockerfile](../frontend/Dockerfile)
+  → [frontend/Dockerfile](https://github.com/ivanerricis/easylab-web/blob/main/frontend/Dockerfile)
 
 - **Le altre immagini restano come sono, per motivi diversi fra loro.** `postgres:16` e
   `node:24-*` hanno già fissato il numero maggiore, che è la cosa che conta (un salto a
@@ -3462,7 +3466,7 @@ raccolti qui perché nascono dalla stessa lettura.
   contro un'immagine malevola pubblicata sotto lo stesso tag. Interrompe però l'arrivo
   automatico delle patch e va mantenuto a mano: su un progetto con un solo manutentore, un
   Postgres ancorato e dimenticato per due anni è messo peggio di uno che fluttua dentro `16`.
-  → [docker-compose.yml](../docker-compose.yml)
+  → [docker-compose.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.yml)
 
 ---
 
@@ -3476,8 +3480,8 @@ raccolti qui perché nascono dalla stessa lettura.
   L'insieme dei simboli accettati è volutamente aperto — vale tutto ciò che non è lettera o
   cifra, lettere accentate comprese — perché un elenco chiuso rifiuterebbe password già in
   uso altrove, spingendo verso quelle più prevedibili.
-  → [backend/src/services/passwordPolicy.ts](../backend/src/services/passwordPolicy.ts),
-  [backend/src/routes/auth.ts](../backend/src/routes/auth.ts)
+  → [backend/src/services/passwordPolicy.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/passwordPolicy.ts),
+  [backend/src/routes/auth.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/auth.ts)
 
 - **Le password generate dall'app non avrebbero superato i nuovi requisiti:** l'alfabeto di
   generazione conteneva solo lettere e cifre, quindi l'app avrebbe consegnato credenziali
@@ -3487,22 +3491,22 @@ raccolti qui perché nascono dalla stessa lettura.
   in posizione fissa ridurrebbe a due i caratteri da indovinare. Colta l'occasione per
   togliere la distorsione del modulo su un byte, che favoriva i primi caratteri
   dell'alfabeto.
-  → [backend/src/services/passwordPolicy.ts](../backend/src/services/passwordPolicy.ts),
-  [backend/src/services/authManager.ts](../backend/src/services/authManager.ts)
+  → [backend/src/services/passwordPolicy.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/passwordPolicy.ts),
+  [backend/src/services/authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts)
 
 - **`reset-admin-password.js` aveva una terza copia della generazione**, con l'alfabeto
   vecchio: uno script di emergenza che consegna una password non conforme è il momento
   peggiore per accorgersene. Ora richiede il modulo compilato invece di duplicare la regola.
-  → [backend/reset-admin-password.js](../backend/reset-admin-password.js)
+  → [backend/reset-admin-password.js](https://github.com/ivanerricis/easylab-web/blob/main/backend/reset-admin-password.js)
 
 - **Il frontend controllava `length < 8` in due punti separati**, con il messaggio scritto a
   mano in entrambi. Regola e testo ora stanno in un solo file, mostrato anche sotto il campo
   come promemoria: l'utente sa cosa serve prima di inviare, invece di scoprirlo dal
   messaggio di errore. La duplicazione rispetto al backend resta voluta e annotata — il
   controllo che vale è quello del server.
-  → [frontend/src/lib/passwordPolicy.ts](../frontend/src/lib/passwordPolicy.ts),
-  [frontend/src/pages/auth/ForcePasswordChangePage.tsx](../frontend/src/pages/auth/ForcePasswordChangePage.tsx),
-  [frontend/src/components/dialogs/settings/changePasswordDialog.tsx](../frontend/src/components/dialogs/settings/changePasswordDialog.tsx)
+  → [frontend/src/lib/passwordPolicy.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/passwordPolicy.ts),
+  [frontend/src/pages/auth/ForcePasswordChangePage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/auth/ForcePasswordChangePage.tsx),
+  [frontend/src/components/dialogs/settings/changePasswordDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/settings/changePasswordDialog.tsx)
 
 > Le password già in uso non vengono invalidate: chi ne ha una non conforme continua a
 > entrare finché non la cambia. I nuovi requisiti valgono dal prossimo cambio password.
@@ -3524,8 +3528,8 @@ peggio che non fatte.
   legge da `CF-Connecting-IP`, che Cloudflare **sovrascrive** scartando quanto inviato dal
   chiamante. È affidabile solo perché non esiste un percorso alternativo per raggiungere
   l'origine: nessuna porta pubblicata, nessun port forward.
-  → [backend/src/middleware/clientIp.ts](../backend/src/middleware/clientIp.ts),
-  [backend/src/index.ts](../backend/src/index.ts)
+  → [backend/src/middleware/clientIp.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/clientIp.ts),
+  [backend/src/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/index.ts)
 
 - **La mappa dei tentativi era memoria che un estraneo poteva far crescere.** Ogni IP
   sorgente creava una entry, e le entry venivano rimosse solo al login riuscito: mai per
@@ -3536,7 +3540,7 @@ peggio che non fatte.
   *Volutamente non fatto:* la persistenza tra riavvii. Il conteggio si azzera a ogni
   aggiornamento automatico, ma i riavvii non sono provocabili da chi attacca, e una
   tabella dedicata costerebbe una migrazione per un guadagno marginale.
-  → [backend/src/services/loginRateLimit.ts](../backend/src/services/loginRateLimit.ts)
+  → [backend/src/services/loginRateLimit.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/loginRateLimit.ts)
 
 - **L'aggiornamento dell'app era lanciabile da qualsiasi utente autenticato**, non solo
   dall'amministratore: `/settings/update/run` non aveva `requireAdmin`, e il pannello era
@@ -3547,20 +3551,20 @@ peggio che non fatte.
   bastare per arrivarci. Ora le tre rotte `/settings/update*` richiedono `requireAdmin` e
   la sezione è nascosta ai non-admin, insieme a "Utenti", tramite un elenco unico di
   sezioni riservate invece di un controllo ripetuto per chiave.
-  → [backend/src/routes/settings.ts](../backend/src/routes/settings.ts),
-  [frontend/src/pages/settings/SettingsPage.tsx](../frontend/src/pages/settings/SettingsPage.tsx)
+  → [backend/src/routes/settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts),
+  [frontend/src/pages/settings/SettingsPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/settings/SettingsPage.tsx)
 
 - **Il registro delle azioni utente aveva una copia locale della stessa logica**, che
   prendeva la prima entry di `X-Forwarded-For`: un log di controllo in cui l'IP è deciso da
   chi compie l'azione non serve a niente. Ora usa la stessa funzione del limitatore.
-  → [backend/src/middleware/userActionLogger.ts](../backend/src/middleware/userActionLogger.ts)
+  → [backend/src/middleware/userActionLogger.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/userActionLogger.ts)
 
 - **Il cookie di sessione viaggiava senza `secure`**, cosa corretta finché l'unico accesso
   era HTTP in LAN. Ora è `secure` in produzione e resta in chiaro solo in sviluppo, dove il
   frontend gira su `http://localhost` e un cookie `secure` non verrebbe proprio inviato.
   Nessun attributo `domain`, come già prima: è ciò che permette di cambiare dominio senza
   toccare il codice.
-  → [backend/src/middleware/requireAuth.ts](../backend/src/middleware/requireAuth.ts)
+  → [backend/src/middleware/requireAuth.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/requireAuth.ts)
 
 - **Il CORS è stato rimosso invece che ristretto.** Era `origin: true`, cioè "rifletti
   qualunque origine". Il piano era di fissarlo sull'origine di produzione, ma in produzione
@@ -3569,15 +3573,15 @@ peggio che non fatte.
   l'unico valore che sarebbe andato aggiornato a ogni cambio di dominio. Resta attivabile
   in sviluppo tramite `CORS_ORIGIN`, dove Vite su `:5173` chiama il backend su `:3000` e le
   richieste sono cross-origin per davvero.
-  → [backend/src/index.ts](../backend/src/index.ts),
-  [docker-compose.dev.yml](../docker-compose.dev.yml)
+  → [backend/src/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/index.ts),
+  [docker-compose.dev.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.dev.yml)
 
 - **Nessun container pubblica più porte sull'host.** La `3000:3000` del backend permetteva
   di scavalcare nginx, e con esso l'unico punto in cui l'IP del client è attendibile; la
   `80:80` del frontend non serve più, visto che cloudflared raggiunge nginx dalla rete
   interna della compose. Conseguenza voluta: dalla LAN, via IP, non si entra più. Il modo
   di riaprire un accesso di emergenza è annotato nel compose e nel README.
-  → [docker-compose.yml](../docker-compose.yml)
+  → [docker-compose.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.yml)
 
 - **Aggiunti gli header di sicurezza** (`nosniff`, `X-Frame-Options`/`frame-ancestors`,
   `Referrer-Policy`, HSTS), che non c'erano affatto. Stanno in uno snippet incluso, non
@@ -3587,8 +3591,8 @@ peggio che non fatte.
   gli asset statici. Lo snippet sta fuori da `conf.d/` perché nginx include da sé ogni
   `conf.d/*.conf` nel blocco `http`. Verificato che su tutte e tre le location gli header
   escano e il `Cache-Control` resti quello di prima.
-  → [frontend/security-headers.conf](../frontend/security-headers.conf),
-  [frontend/nginx.conf](../frontend/nginx.conf)
+  → [frontend/security-headers.conf](https://github.com/ivanerricis/easylab-web/blob/main/frontend/security-headers.conf),
+  [frontend/nginx.conf](https://github.com/ivanerricis/easylab-web/blob/main/frontend/nginx.conf)
 
 - **Il dominio si sceglie durante l'installazione** (`scripts/install-tunnel.sh`): lo
   script lo chiede, autorizza l'account Cloudflare, crea tunnel, ingress e record DNS.
@@ -3609,16 +3613,16 @@ peggio che non fatte.
   Il record DNS viene creato **senza** `--overwrite-dns` al primo tentativo, chiedendo
   conferma solo se esiste già: il dominio ospita altri sottodomini in uso, e un errore di
   battitura avrebbe altrimenti dirottato in silenzio uno di quelli su EasyLab.
-  → [scripts/install-tunnel.sh](../scripts/install-tunnel.sh),
-  [scripts/edit-env.sh](../scripts/edit-env.sh),
-  [scripts/start-server.sh](../scripts/start-server.sh)
+  → [scripts/install-tunnel.sh](https://github.com/ivanerricis/easylab-web/blob/main/scripts/install-tunnel.sh),
+  [scripts/edit-env.sh](https://github.com/ivanerricis/easylab-web/blob/main/scripts/edit-env.sh),
+  [scripts/start-server.sh](https://github.com/ivanerricis/easylab-web/blob/main/scripts/start-server.sh)
 
 - **Documentato un limite che si sarebbe scoperto durante un'emergenza:** il piano Free di
   Cloudflare taglia le richieste sopra i 100 MB, e nginx accetta fino a 2 GB proprio per il
   caricamento dei dump. Ripristinare un backup più grande dall'interfaccia web fallirà con
   un 413 generato da Cloudflare, non dall'app. Ripristinare un backup *già sul server* non
   è soggetto al limite; per un archivio esterno più grande resta `scripts/restore-db.sh`.
-  → [README.md](../README.md), [frontend/nginx.conf](../frontend/nginx.conf)
+  → [README.md](https://github.com/ivanerricis/easylab-web/blob/main/README.md), [frontend/nginx.conf](https://github.com/ivanerricis/easylab-web/blob/main/frontend/nginx.conf)
 
 ---
 
@@ -3635,7 +3639,7 @@ peggio che non fatte.
   `localhost`) — da un altro dispositivo in LAN via IP su HTTP semplice (situazione attuale,
   vedi [[project_internet_exposure_plan]]) Chrome/Brave non la mostrano; funziona già oggi
   aprendo il sito da `localhost` sulla stessa macchina del server.
-  → [frontend/public/site.webmanifest](../frontend/public/site.webmanifest)
+  → [frontend/public/site.webmanifest](https://github.com/ivanerricis/easylab-web/blob/main/frontend/public/site.webmanifest)
 
 ---
 
@@ -3653,15 +3657,15 @@ peggio che non fatte.
   rinominare a mano sul server (`gh` non era disponibile in questo ambiente per farlo
   automaticamente); rinominare le unit systemd installate su una VM già in produzione
   richiede di rilanciare `scripts/install-updater.sh` dopo il pull.
-  → [.env.example](../.env.example), [README.md](../README.md),
-  [frontend/index.html](../frontend/index.html),
-  [frontend/public/site.webmanifest](../frontend/public/site.webmanifest),
-  [frontend/package.json](../frontend/package.json),
-  [frontend/src/lib/theme.ts](../frontend/src/lib/theme.ts),
-  [frontend/src/lib/calendarView.ts](../frontend/src/lib/calendarView.ts),
-  [backend/src/services/companyManager.ts](../backend/src/services/companyManager.ts),
-  [backend/src/services/emailManager.ts](../backend/src/services/emailManager.ts),
-  [ops/systemd/](../ops/systemd/), [scripts/](../scripts/)
+  → [.env.example](https://github.com/ivanerricis/easylab-web/blob/main/.env.example), [README.md](https://github.com/ivanerricis/easylab-web/blob/main/README.md),
+  [frontend/index.html](https://github.com/ivanerricis/easylab-web/blob/main/frontend/index.html),
+  [frontend/public/site.webmanifest](https://github.com/ivanerricis/easylab-web/blob/main/frontend/public/site.webmanifest),
+  [frontend/package.json](https://github.com/ivanerricis/easylab-web/blob/main/frontend/package.json),
+  [frontend/src/lib/theme.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/theme.ts),
+  [frontend/src/lib/calendarView.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/calendarView.ts),
+  [backend/src/services/companyManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/companyManager.ts),
+  [backend/src/services/emailManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/emailManager.ts),
+  [ops/systemd/](https://github.com/ivanerricis/easylab-web/tree/main/ops/systemd), [scripts/](https://github.com/ivanerricis/easylab-web/tree/main/scripts)
 
 ---
 
@@ -3672,8 +3676,8 @@ peggio che non fatte.
   `192`/`512`) in `frontend/public/` e collegato da `index.html`; aggiunto anche un
   `site.webmanifest` che referenzia le icone 192/512 per il salvataggio in home screen su
   mobile (nessun service worker/PWA plugin configurato, resta solo l'icona).
-  → [frontend/index.html](../frontend/index.html),
-  [frontend/public/site.webmanifest](../frontend/public/site.webmanifest)
+  → [frontend/index.html](https://github.com/ivanerricis/easylab-web/blob/main/frontend/index.html),
+  [frontend/public/site.webmanifest](https://github.com/ivanerricis/easylab-web/blob/main/frontend/public/site.webmanifest)
 
 ---
 
@@ -3687,8 +3691,8 @@ peggio che non fatte.
   `className` a `SettingsCard` (usata solo da questo pannello: gli altri restano invariati)
   e reso `LogsSettingsPanel` una colonna flex con selettore data/ricerca e paginazione
   fissi e solo il riquadro della tabella scrollabile.
-  → [frontend/src/components/settings/settingsUi.tsx](../frontend/src/components/settings/settingsUi.tsx),
-  [frontend/src/components/settings/logsSettingsPanel.tsx](../frontend/src/components/settings/logsSettingsPanel.tsx)
+  → [frontend/src/components/settings/settingsUi.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/settingsUi.tsx),
+  [frontend/src/components/settings/logsSettingsPanel.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/logsSettingsPanel.tsx)
 
 ---
 
@@ -3700,8 +3704,8 @@ peggio che non fatte.
   `slotInfo.action === "doubleClick"` in `onSelectSlot` (richiede la prop `selectable`).
   Aggiunta la prop opzionale `initialDate` a `CreateInterventionDialog` per precompilare il
   campo data all'apertura.
-  → [frontend/src/pages/calendar/components/interventions-calendar.tsx](../frontend/src/pages/calendar/components/interventions-calendar.tsx),
-  [frontend/src/components/dialogs/create/createInterventionDialog.tsx](../frontend/src/components/dialogs/create/createInterventionDialog.tsx)
+  → [frontend/src/pages/calendar/components/interventions-calendar.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/components/interventions-calendar.tsx),
+  [frontend/src/components/dialogs/create/createInterventionDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createInterventionDialog.tsx)
 
 - **Nuovo bottone "Nuovo intervento" in dashboard, accanto a "Nuovo rapportino".** La
   creazione dell'intervento (risoluzione cliente, chiamata API, refresh) è stata spostata
@@ -3710,12 +3714,12 @@ peggio che non fatte.
   così sia il bottone in alto sia il doppio click su una cella condividono la stessa
   logica di creazione, e il calendario e i contatori delle card si aggiornano insieme
   senza reload della pagina.
-  → [frontend/src/pages/dashboard/DashboardPage.tsx](../frontend/src/pages/dashboard/DashboardPage.tsx),
-  [frontend/src/pages/calendar/components/interventions-calendar.tsx](../frontend/src/pages/calendar/components/interventions-calendar.tsx)
+  → [frontend/src/pages/dashboard/DashboardPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/dashboard/DashboardPage.tsx),
+  [frontend/src/pages/calendar/components/interventions-calendar.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/components/interventions-calendar.tsx)
 
 - **Transizione hover delle righe tabella accorciata** (da 150ms di default Tailwind a
   50ms) perché risultava percettibilmente lenta.
-  → [frontend/src/components/ui/table.tsx](../frontend/src/components/ui/table.tsx)
+  → [frontend/src/components/ui/table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/table.tsx)
 
 ---
 
@@ -3727,25 +3731,25 @@ peggio che non fatte.
   bottoni di apertura: `ClipboardList` (giallo) per i report, `HardHat` (azzurro) per gli
   interventi — le stesse icone già usate per le voci "Rapporti" e "Interventi" nella
   sidebar. I due bottoni di stampa resoconto restano `Printer`, stessi colori di prima.
-  → [frontend/src/pages/customers/components/customers-table.tsx](../frontend/src/pages/customers/components/customers-table.tsx)
+  → [frontend/src/pages/customers/components/customers-table.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/customers/components/customers-table.tsx)
 
 - **La pagina dei report di un cliente (`/clients/:id`) ora usa una tabella invece delle
   card**, per essere coerente con Rapporti/Interventi/tutte le altre liste dell'app (stessa
   struttura tabella desktop + card list mobile, stesso colore di riga per stato). Aggiunto
   anche un bottone "Stampa" in alto a destra (prima la stampa del resoconto era disponibile
   solo dalla tabella Clienti).
-  → [frontend/src/pages/customers/CustomerPage.tsx](../frontend/src/pages/customers/CustomerPage.tsx)
+  → [frontend/src/pages/customers/CustomerPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/customers/CustomerPage.tsx)
 
 - **Nuova pagina `/clients/:id/interventions`**, analoga alla precedente ma per gli
   interventi del cliente: tabella con filtro per stato, paginazione e bottone "Stampa" in
   alto a destra.
-  → [frontend/src/pages/customers/CustomerInterventionsPage.tsx](../frontend/src/pages/customers/CustomerInterventionsPage.tsx)
+  → [frontend/src/pages/customers/CustomerInterventionsPage.tsx](https://github.com/ivanerricis/easylab-web/blob/cd80624173378754fb1edd57c526cac9d19bdd74/frontend/src/pages/customers/CustomerInterventionsPage.tsx)
 
 - **Vite non rilevava le modifiche ai file nel container di sviluppo.** Su Docker Desktop
   per Windows i bind mount non propagano gli eventi inotify nativi nel container Linux:
   il file cambiava (visibile dentro il container), ma chokidar non se ne accorgeva e
   l'HMR non scattava mai. Aggiunto `server.watch.usePolling: true` a `vite.config.ts`.
-  → [frontend/vite.config.ts](../frontend/vite.config.ts)
+  → [frontend/vite.config.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/vite.config.ts)
 
 - **Volume `frontend_node_modules` disallineato da `package.json`.** Il volume nominato
   persisteva da prima dell'introduzione di Vitest (commit `ae577c8`) e non veniva mai
@@ -3763,7 +3767,7 @@ peggio che non fatte.
 - **Bottone "Aggiorna adesso" disabilitato quando non c'è nulla da aggiornare.** Prima
   restava cliccabile anche a `updateAvailable: false`, permettendo di avviare un
   aggiornamento (rebuild dei container, breve downtime) senza motivo.
-  → [frontend/src/components/settings/updateSettingsPanel.tsx](../frontend/src/components/settings/updateSettingsPanel.tsx)
+  → [frontend/src/components/settings/updateSettingsPanel.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/updateSettingsPanel.tsx)
 
 - **Solo la tabella scorre, non l'intera pagina.** Nelle liste (Clienti, Interventi,
   Rapporti, Tecnici, Difetti, Collaboratori, Dispositivi), con molte righe scorreva
@@ -3790,7 +3794,7 @@ funzionale visibile all'utente: cambiano robustezza, copertura di test e organiz
   riceve `SIGTERM` di routine, non in casi eccezionali; prima ogni aggiornamento troncava
   le richieste in corso (un download PDF, una scrittura di backup) e chiudeva di colpo le
   connessioni al database.
-  → [backend/src/index.ts](../backend/src/index.ts), [backend/src/db/index.ts](../backend/src/db/index.ts)
+  → [backend/src/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/index.ts), [backend/src/db/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/index.ts)
 
 - **`exec` nel comando del container backend.** `docker-compose.yml` ora lancia
   `sh -c 'node migrate.js && exec node dist/src/index.js'` e dichiara
@@ -3800,19 +3804,19 @@ funzionale visibile all'utente: cambiano robustezza, copertura di test e organiz
   con `SIGKILL`. La grace period è più ampia del timeout applicativo così l'arresto ha il
   tempo di completarsi. Rimosso anche l'`echo "DATABASE_URL=..."` iniziale, che stampava
   la password del database nei log del container.
-  → [docker-compose.yml](../docker-compose.yml)
+  → [docker-compose.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.yml)
 
 - **Healthcheck su backend e frontend.** Prima ce l'aveva solo `db`. Il frontend ora
   dipende dal backend con `condition: service_healthy`.
   *Perché:* `restart: always` copre il processo morto, non quello vivo ma bloccato.
   L'endpoint `/api/health` esisteva già e non lo usava nessuno.
-  → [docker-compose.yml](../docker-compose.yml)
+  → [docker-compose.yml](https://github.com/ivanerricis/easylab-web/blob/main/docker-compose.yml)
 
 - **Pulizia periodica delle sessioni scadute** (ogni ora, più una passata all'avvio).
   *Perché:* `getSessionUser` cancellava una sessione scaduta solo se qualcuno presentava
   proprio quel token; le sessioni di chi chiude il browser e non torna più restavano in
   tabella per sempre.
-  → [backend/src/services/authManager.ts](../backend/src/services/authManager.ts)
+  → [backend/src/services/authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts)
 
 - **Tetto di sicurezza sulle liste non paginate** (5000 righe, con warning nei log quando
   scatta). Omettere `page`/`pageSize` resta legittimo e voluto — combobox e dashboard
@@ -3821,7 +3825,7 @@ funzionale visibile all'utente: cambiano robustezza, copertura di test e organiz
   memoria l'intero contenuto a ogni richiesta. Il limite è molto sopra i volumi reali,
   quindi oggi non cambia nulla; il warning serve perché una troncatura silenziosa (una
   combobox a cui mancano voci) sarebbe difficilissima da diagnosticare.
-  → [backend/src/db/queries/pagination.ts](../backend/src/db/queries/pagination.ts) e le 7 query di lista
+  → [backend/src/db/queries/pagination.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/pagination.ts) e le 7 query di lista
 
 - **`ensureDefaultAdmin` ora ha un `.catch`.** Era invocata con `void` e senza gestione
   dell'errore.
@@ -3831,14 +3835,14 @@ funzionale visibile all'utente: cambiano robustezza, copertura di test e organiz
   problema è mascherato da `depends_on: service_healthy`, ma un intoppo momentaneo non
   deve abbattere il server: ora l'errore viene registrato e l'admin sarà creato al
   riavvio successivo.
-  → [backend/src/index.ts](../backend/src/index.ts)
+  → [backend/src/index.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/index.ts)
 
 - **Log per richiesta su stdout** con metodo, percorso, stato e durata, e marcatura
   `slow=true` oltre 1s. Formato `chiave=valore` come il log azioni utente esistente.
   *Perché:* mancava qualunque traccia delle GET e dei tempi di risposta: quando qualcosa
   risultava lento non c'era niente su cui lavorare. Complementare a `userActionLogger`,
   che registra su file solo le modifiche ai dati, per audit.
-  → [backend/src/middleware/requestLogger.ts](../backend/src/middleware/requestLogger.ts)
+  → [backend/src/middleware/requestLogger.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/requestLogger.ts)
 
 ### Test
 
@@ -3852,7 +3856,7 @@ funzionale visibile all'utente: cambiano robustezza, copertura di test e organiz
   `localStorage`, e `AppErrorBoundary` come primo test di componente.
   *Verifica dei test stessi:* disattivando la guardia in `usePaginatedRows` i due test
   relativi falliscono, quindi rilevano davvero la regressione.
-  → [frontend/vite.config.ts](../frontend/vite.config.ts), [frontend/src/test/setup.ts](../frontend/src/test/setup.ts), i file `*.test.ts(x)`
+  → [frontend/vite.config.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/vite.config.ts), [frontend/src/test/setup.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/test/setup.ts), i file `*.test.ts(x)`
 
 ### Verifiche eseguite
 
@@ -3882,7 +3886,7 @@ secondi che precedevano il `SIGKILL`.
   *Perché:* un solo componente teneva ~25 variabili di stato e ~560 righe di JSX. Le
   schede ricevono l'oggetto dell'hook come unica prop: condividono lo stesso stato, e
   enumerarne i campi nelle firme non aggiungerebbe informazione.
-  → [frontend/src/components/settings/backup/](../frontend/src/components/settings/backup/)
+  → [frontend/src/components/settings/backup/](https://github.com/ivanerricis/easylab-web/tree/main/frontend/src/components/settings/backup)
 
 - **Prettier anche sul backend**, con config propria (4 spazi, `semi: true`, 120 colonne)
   invece di quella del frontend (2 spazi, `semi: false`, 80 colonne). `format:check` è ora
@@ -3890,7 +3894,7 @@ secondi che precedevano il `SIGKILL`.
   *Perché:* riusare la config del frontend avrebbe riformattato l'intero backend
   seppellendo i diff veri — era il motivo per cui Prettier qui era stato saltato. Una
   config allineata allo stile già in uso risolve il problema.
-  → [backend/.prettierrc](../backend/.prettierrc), [.github/workflows/ci.yml](../.github/workflows/ci.yml)
+  → [backend/.prettierrc](https://github.com/ivanerricis/easylab-web/blob/main/backend/.prettierrc), [.github/workflows/ci.yml](https://github.com/ivanerricis/easylab-web/blob/main/.github/workflows/ci.yml)
 
 ### Codice morto rimosso
 

@@ -11,6 +11,20 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — La descrizione dell'intervento arriva nel PDF del report
+
+**Cosa.** Il campo "Descrizione intervento" (`serviceDescription`), compilabile dalla scheda
+report, viene ora stampato nella sezione "LAVORO ESEGUITO" del PDF (`backend/src/services/reportPdf.ts`,
+`backend/src/routes/reports.ts`). Prima quella sezione era sempre e solo righe vuote da
+compilare a mano: la rotta `/:id/print` non selezionava nemmeno `serviceDescription` dal
+database, quindi qualunque cosa fosse scritta nel campo non arrivava mai sulla stampa. Quando
+il campo è vuoto il comportamento non cambia: restano le righe bianche per scrivere a mano.
+
+*Perché:* segnalato dall'utente — un report con la descrizione dell'intervento già compilata
+digitalmente la perdeva in stampa, costringendo a riscriverla a mano sul foglio.
+
+---
+
 ## 2026-09-14 — Content-Security-Policy vera sul documento HTML
 
 **Cosa.** L'`index.html` dell'app, e con lui tutte le rotte della SPA che ci arrivano tramite

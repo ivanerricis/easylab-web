@@ -53,6 +53,7 @@ const buildReport = (overrides: Partial<ReportPrintData> = {}): ReportPrintData 
     customerPhone: "333123456",
     deviceName: "iPhone 13",
     issueDescription: "Schermo rotto",
+    serviceDescription: null,
     note: "Cliente disponibile solo la mattina",
     password: "1234",
     dataBackup: false,

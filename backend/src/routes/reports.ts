@@ -149,6 +149,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
                 note: reportTable.note,
                 password: reportTable.password,
                 issueDescription: reportTable.issueDescription,
+                serviceDescription: reportTable.serviceDescription,
                 issueLabel: IssueTable.description,
                 dataBackup: reportTable.dataBackup,
                 charger: reportTable.charger,
@@ -200,6 +201,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
          * l'etichetta stessa, che è già una descrizione.
          */
         issueDescription: report.issueDescription?.trim() || report.issueLabel,
+        serviceDescription: report.serviceDescription,
         note: report.note ?? "-",
         password: report.password ?? "-",
         dataBackup: report.dataBackup,

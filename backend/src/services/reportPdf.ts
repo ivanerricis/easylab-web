@@ -45,6 +45,7 @@ export type ReportPrintData = {
     customerPhone: string;
     deviceName: string;
     issueDescription: string;
+    serviceDescription: string | null;
     note: string;
     password: string;
     dataBackup: boolean;
@@ -341,16 +342,29 @@ const buildRetentionNoticeSection = () => ({
     margin: [0, 0, 0, 4],
 });
 
-const buildWorkSection = (rowHeight: number, rowPadding: number) => ({
-    table: {
-        widths: ["*"],
-        // La prima riga e' la barra di sezione, le altre restano vuote da compilare a mano.
-        heights: (row: number) => (row === 0 ? "auto" : rowHeight),
-        body: [sectionBarRow("LAVORO ESEGUITO", 1), ...Array.from({ length: WORK_ROW_COUNT }, () => [emptyCell()])],
-    },
-    layout: reportTableLayout(rowPadding),
-    margin: [0, 0, 0, 5],
-});
+const buildWorkSection = (report: ReportPrintData, rowHeight: number, rowPadding: number) => {
+    const serviceDescription = report.serviceDescription?.trim();
+
+    // Se l'intervento ha gia' una descrizione scritta in digitale, va stampata: le righe
+    // vuote servono solo quando manca, per lasciare spazio da compilare a mano.
+    const bodyRows = serviceDescription
+        ? [
+              [{ text: serviceDescription, rowSpan: WORK_ROW_COUNT, fontSize: 9, margin: [2, 2, 2, 2] }],
+              ...Array.from({ length: WORK_ROW_COUNT - 1 }, () => [{}]),
+          ]
+        : Array.from({ length: WORK_ROW_COUNT }, () => [emptyCell()]);
+
+    return {
+        table: {
+            widths: ["*"],
+            // La prima riga e' la barra di sezione, le altre restano vuote da compilare a mano.
+            heights: (row: number) => (row === 0 ? "auto" : rowHeight),
+            body: [sectionBarRow("LAVORO ESEGUITO", 1), ...bodyRows],
+        },
+        layout: reportTableLayout(rowPadding),
+        margin: [0, 0, 0, 5],
+    };
+};
 
 const boxedTable = (title: string, cell: object, rowPadding: number) => ({
     table: {
@@ -470,7 +484,7 @@ const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataU
                 margin: [0, 6, 0, 8],
             },
             ...copyBlock(rowPadding, true),
-            buildWorkSection(workRowHeight, rowPadding),
+            buildWorkSection(report, workRowHeight, rowPadding),
             buildNotesAndPaymentSection(report, rowPadding),
             // Sentinella invisibile: la sua posizione di partenza e' la fine del contenuto.
             // Solo nella passata di misura: nel PDF finale il contenuto arriva a filo pagina

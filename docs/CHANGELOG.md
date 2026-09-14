@@ -86,8 +86,11 @@ non chiuse, codici di recupero salvati in chiaro, blocco dei dump non rilasciato
 del PDF spenta, campi scambiati, rotte tolte…), controllando che fallisse il test giusto. I test
 nel browser sono stati ripetuti 5 volte di fila senza fallimenti.
 
-**Non verificato.** Il job di CI dei test nel browser non è ancora girato su GitHub: in locale
-usano Edge, in CI il Chromium scaricato da Playwright.
+**CI.** Il job dei test nel browser è passato al primo giro su GitHub (commit `d1399dc`),
+insieme a tutti gli altri: in locale i test usano Edge, in CI il Chromium scaricato da
+Playwright. Copertura misurata dopo il commit: backend 90% delle righe (era 75%), frontend 88%
+(era 82%); quello che resta scoperto nel backend è quasi tutto il query layer, cioè i test sul
+database vero ancora da decidere.
 
 ## 2026-09-14 — Il logout non passa più la pagina corrente al prossimo login
 

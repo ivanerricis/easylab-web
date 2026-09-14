@@ -36,7 +36,7 @@ const initialAdminPasswordFilePath = path.join(dataDir, "initial-admin-password.
 
 const scryptKeyLength = 64;
 const sessionTokenBytes = 32;
-const sessionDurationMs = 30 * 24 * 60 * 60 * 1000;
+const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
 const sessionCleanupIntervalMs = 60 * 60 * 1000;
 
 export class AuthManagerError extends ApiError {}

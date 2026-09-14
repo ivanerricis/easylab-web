@@ -23,7 +23,7 @@ import { validate } from "./validation";
 
 const authRouter = Router();
 
-const sessionMaxAgeMs = 30 * 24 * 60 * 60 * 1000;
+const sessionMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 
 const loginBodySchema = z
     .object({

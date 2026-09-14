@@ -11,6 +11,20 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Sessioni utente da 30 a 7 giorni
+
+**Cosa.** La durata di una sessione dopo il login, e il `maxAge` del cookie che la porta,
+scendono da 30 a 7 giorni (`sessionDurationMs` in `backend/src/services/authManager.ts`,
+`sessionMaxAgeMs` in `backend/src/routes/auth.ts`). La scadenza resta fissata al momento del
+login, senza rinnovo a scorrimento: dopo una settimana va rifatto l'accesso (e la 2FA, se
+attiva).
+
+*Perché:* con l'app ora raggiungibile da internet, un token di sessione rubato restava valido
+fino a 30 giorni. Una settimana riduce la finestra di rischio senza pesare troppo su un team
+piccolo che lavora da dispositivi fissi.
+
+---
+
 ## 2026-09-14 — La descrizione dell'intervento arriva nel PDF del report
 
 **Cosa.** Il campo "Descrizione intervento" (`serviceDescription`), compilabile dalla scheda

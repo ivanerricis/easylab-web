@@ -11,6 +11,28 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — La password admin iniziale non resta più sul disco
+
+**Cosa.** Il file `data/initial-admin-password.txt`, scritto al primo avvio con la password
+generata per `admin`, viene cancellato in due momenti:
+- quando l'amministratore cambia la propria password (`changeOwnPassword`);
+- all'avvio, se l'amministratore ha già cambiato la password generata (`ensureDefaultAdmin`).
+
+Il secondo caso ripulisce le installazioni esistenti, produzione compresa, al primo riavvio
+dell'aggiornamento automatico. Verificato sullo stack di sviluppo: al riavvio il file del
+24 luglio, ormai scaduto, è sparito.
+
+*Perché:* dopo il primo cambio password quel file è una credenziale in chiaro, per giunta
+scaduta, lasciata sul disco per sempre. Era già escluso dai backup e aveva permessi `0600`, ma
+non aveva nessun motivo di esistere ancora: chiunque arrivasse a leggere il volume
+`backend_data` avrebbe trovato una password dall'aspetto valido. Un errore nella cancellazione
+viene solo registrato nei log, così non blocca né l'avvio né il cambio password.
+
+→ [backend/src/services/authManager.ts](../backend/src/services/authManager.ts),
+[README.md](../README.md)
+
+---
+
 ## 2026-09-14 — Il formato del logo caricato si decide dai byte
 
 **Cosa.** `saveLogo` non riceve più il tipo dichiarato nell'upload (`req.file.mimetype`) e

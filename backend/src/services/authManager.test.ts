@@ -129,11 +129,26 @@ vi.mock("./companyManager", () => ({
     getCompanySettings: vi.fn(() => Promise.resolve({ name: "Laboratorio" })),
 }));
 
+// Il file con la password admin iniziale sta nel vero `data/`: nessun test deve toccarlo.
+const rm = vi.fn();
+const mkdir = vi.fn();
+const writeFile = vi.fn();
+
+vi.mock("node:fs", () => {
+    const promises = {
+        rm: (...args: unknown[]) => rm(...args),
+        mkdir: (...args: unknown[]) => mkdir(...args),
+        writeFile: (...args: unknown[]) => writeFile(...args),
+    };
+    return { default: { promises }, promises };
+});
+
 import {
     AuthManagerError,
     changeOwnPassword,
     completeTwoFactorLogin,
     disableTwoFactor,
+    ensureDefaultAdmin,
     getSessionUser,
     login,
 } from "./authManager";
@@ -538,6 +553,68 @@ describe("changeOwnPassword", () => {
         expect(dbCalls.some((call) => call.op === "update")).toBe(false);
 
         scrypt.mockRestore();
+    });
+
+    it("quando è l'admin a cambiarla, cancella il file con la password iniziale", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(7);
+
+        await changeOwnPassword(7, "password-giusta", "Nuova-password-1!", "token-corrente");
+
+        expect(rm).toHaveBeenCalledWith(expect.stringMatching(/initial-admin-password\.txt$/), { force: true });
+    });
+
+    it("quando la cambia un altro utente, il file dell'admin resta dov'è", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        await changeOwnPassword(7, "password-giusta", "Nuova-password-1!", "token-corrente");
+
+        expect(rm).not.toHaveBeenCalled();
+    });
+});
+
+describe("ensureDefaultAdmin", () => {
+    it("al primo avvio crea l'admin e scrive la password generata in un file leggibile solo dal proprietario", async () => {
+        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+
+        await ensureDefaultAdmin();
+
+        expect(dbCalls.some((call) => call.op === "insert" && call.table === userTable)).toBe(true);
+        expect(writeFile).toHaveBeenCalledWith(
+            expect.stringMatching(/initial-admin-password\.txt$/),
+            expect.stringContaining("username: admin"),
+            expect.objectContaining({ mode: 0o600 })
+        );
+        expect(rm).not.toHaveBeenCalled();
+        consoleLog.mockRestore();
+    });
+
+    it("se l'admin ha già cambiato la password generata, cancella il file rimasto", async () => {
+        queueRows("select", userTable, [{ id: 1, mustChangePassword: false }]);
+
+        await ensureDefaultAdmin();
+
+        expect(rm).toHaveBeenCalledWith(expect.stringMatching(/initial-admin-password\.txt$/), { force: true });
+        expect(dbCalls.some((call) => call.op === "insert")).toBe(false);
+    });
+
+    it("finché la password generata non è stata cambiata, il file resta", async () => {
+        queueRows("select", userTable, [{ id: 1, mustChangePassword: true }]);
+
+        await ensureDefaultAdmin();
+
+        expect(rm).not.toHaveBeenCalled();
+    });
+
+    it("un errore nel cancellare il file non fa fallire l'avvio", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        rm.mockRejectedValueOnce(new Error("EACCES"));
+        queueRows("select", userTable, [{ id: 1, mustChangePassword: false }]);
+
+        await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
+        expect(consoleError).toHaveBeenCalled();
+        consoleError.mockRestore();
     });
 });
 

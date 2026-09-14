@@ -132,9 +132,32 @@ const getAdminUserId = async (): Promise<number | null> => {
     return rows[0]?.id ?? null;
 };
 
+/**
+ * Il file con la password generata al primo avvio serve solo finché l'admin non la sostituisce:
+ * dopo è una credenziale in chiaro, per giunta scaduta, lasciata sul disco a tempo
+ * indeterminato. Un errore qui non deve far fallire né l'avvio né il cambio password.
+ */
+const removeInitialAdminPasswordFile = async (): Promise<void> => {
+    try {
+        await fs.promises.rm(initialAdminPasswordFilePath, { force: true });
+    } catch (error) {
+        console.error("Impossibile rimuovere il file con la password admin iniziale:", error);
+    }
+};
+
 export const ensureDefaultAdmin = async (): Promise<void> => {
-    const existing = await db.select({ id: userTable.id }).from(userTable).limit(1);
-    if (existing.length > 0) {
+    const [admin] = await db
+        .select({ id: userTable.id, mustChangePassword: userTable.mustChangePassword })
+        .from(userTable)
+        .orderBy(asc(userTable.id))
+        .limit(1);
+
+    if (admin) {
+        // Ripulisce anche le installazioni esistenti, dove l'admin ha cambiato la password
+        // prima che il file venisse cancellato da `changeOwnPassword`.
+        if (!admin.mustChangePassword) {
+            await removeInitialAdminPasswordFile();
+        }
         return;
     }
 
@@ -460,6 +483,10 @@ export const changeOwnPassword = async (
     await db.update(userTable).set({ passwordHash, mustChangePassword: false }).where(eq(userTable.id, userId));
     // Disconnette tutte le altre sessioni (es. un token rubato), mantenendo attiva solo quella corrente.
     await deleteOtherSessionsForUser(userId, currentSessionToken);
+
+    if (userId === (await getAdminUserId())) {
+        await removeInitialAdminPasswordFile();
+    }
 };
 
 /* -------------------------------------------------------------------------------------

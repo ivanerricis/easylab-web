@@ -82,6 +82,8 @@ In alternativa, produzione su CT Proxmox: vedi [Installazione su Proxmox CT (LXC
 	docker cp backend:/app/data/initial-admin-password.txt .
 	```
 
+	Il file esiste solo finché la password generata non viene sostituita: l'app lo cancella appena l'amministratore la cambia, perché da lì in poi sarebbe solo una credenziale in chiaro, e per giunta scaduta.
+
 	Al primo accesso l'app chiede di sostituire la password generata con una propria, e finché non lo si fa non apre nessuna pagina. Gli altri utenti si creano da Impostazioni > Utenti; in seguito la propria password si cambia dal badge utente in alto a destra > Cambia password.
 
 7. **Abilita l'aggiornamento da interfaccia web** (opzionale ma consigliato):
@@ -294,7 +296,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`, **cifrato** 
 
 - **`data/backup.key`**, la chiave che cifra l'archivio stesso. Includerla vorrebbe dire spedire, nello stesso file copiato anche su una condivisione di rete, sia i dati sia la chiave per leggerli. Va invece **esportata una volta da Impostazioni > Backup** ("Chiave di cifratura dei backup") e conservata altrove (un password manager, per esempio): senza una copia esterna, un disastro che porta via server e disco insieme rende illeggibile anche l'ultimo backup sul NAS.
 - **`data/secret.key`**, la chiave che cifra le password SMTP e NAS **dentro** `dump.sql`/`backup-settings.json` — una chiave diversa dalla precedente, dedicata solo a quei due segreti. Conseguenza: ripristinando su una macchina diversa quelle due password non sono più leggibili e vanno reinserite a mano (l'app dice quali).
-- **`data/initial-admin-password.txt`**, credenziale in chiaro utile solo al primo avvio.
+- **`data/initial-admin-password.txt`**, credenziale in chiaro utile solo al primo avvio: l'app la cancella appena l'amministratore cambia la password generata.
 - **`.env`**, che non è scritto dall'applicazione: va ricreato a mano sul server nuovo. Conviene tenerne una copia nel proprio gestore di password.
 
 > I backup nel formato storico `db-dump-YYYYMMDD-HHMMSS.sql` (solo database, mai cifrato) restano elencabili, scaricabili e ripristinabili.

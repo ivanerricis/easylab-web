@@ -222,7 +222,14 @@ describe("createBackupArchive", () => {
         // `archivePath` direttamente: quello lo scrive `encryptArchiveFile`.
         const tarArgs = spawnMock.mock.calls[1][1] as string[];
         expect(tarArgs).toEqual(
-            expect.arrayContaining(["-czf", expect.any(String), "-C", expect.any(String), archiveDumpEntry, archiveDataEntry])
+            expect.arrayContaining([
+                "-czf",
+                expect.any(String),
+                "-C",
+                expect.any(String),
+                archiveDumpEntry,
+                archiveDataEntry,
+            ])
         );
         const plainArchivePath = tarArgs[1];
         expect(plainArchivePath).not.toBe(archivePath);

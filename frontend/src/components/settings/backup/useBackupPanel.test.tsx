@@ -352,11 +352,7 @@ describe("useBackupPanel: ripristino", () => {
             await result.current.handleConfirmRestore();
         });
 
-        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith(
-            "db-backup-1.tar.gz",
-            false,
-            "ab".repeat(32)
-        );
+        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-1.tar.gz", false, "ab".repeat(32));
     });
 
     it("dimentica la chiave di backup incollata quando si riapre la conferma", async () => {

@@ -56,9 +56,9 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="restoreBackupKey" className="text-muted-foreground font-normal">
-                            Chiave di backup (solo se richiesta: ripristino da un server diverso da quello che ha
-                            creato questo backup)
+                        <Label htmlFor="restoreBackupKey" className="font-normal text-muted-foreground">
+                            Chiave di backup (solo se richiesta: ripristino da un server diverso da quello che ha creato
+                            questo backup)
                         </Label>
                         <Input
                             id="restoreBackupKey"

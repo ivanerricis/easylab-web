@@ -11,6 +11,30 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Intestazione delle tabelle fissa durante lo scroll
+
+**Cosa.** In tutte le tabelle dell'app (liste clienti/collaboratori/tecnici/interventi/report
+e le tabelle più piccole come i tecnici nella scheda report) l'intestazione ora resta visibile
+in alto mentre si scorrono le righe, invece di scomparire insieme al resto.
+
+Il solo `sticky` sull'`<thead>` non bastava: il div che avvolge la tabella per lo scroll
+orizzontale (`overflow-x-auto`) veniva promosso dal browser anche a `overflow-y:auto` (la
+specifica CSS forza l'altro asse fuori da "visible" quando uno dei due non lo è), creando un
+contenitore di scroll intermedio "fantasma" tra l'intestazione e il vero antenato che scorre.
+Impostare esplicitamente `overflow-y:hidden` evitava la promozione ma creava comunque un suo
+proprio contenitore di scroll (che però non scorre mai), assorbendo lo sticky e rendendolo
+inerte. La soluzione è far gestire a quel div entrambi gli assi di scroll (`overflow-auto`) e
+fargli riempire l'altezza del genitore (`h-full`): diventa così lui stesso il contenitore di
+scroll reale e delimitato a cui l'intestazione si aggancia.
+
+*Perché:* nelle liste lunghe bisognava risalire fino in cima per rileggere il nome di una
+colonna. La correzione è nel componente condiviso `Table`, quindi vale per ogni tabella
+dell'app senza toccare le singole pagine.
+
+→ [frontend/src/components/ui/table.tsx](../frontend/src/components/ui/table.tsx)
+
+---
+
 ## 2026-09-11 — Archivio di backup cifrato (AES-256-GCM)
 
 **Cosa.** L'archivio di backup (`db-backup-*.tar.gz`, locale e su NAS) viene ora cifrato:

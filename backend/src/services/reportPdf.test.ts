@@ -13,15 +13,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // `vi.hoisted`, altrimenti la fabbrica le referenzia prima che esistano.
 const { createPdf, addFonts } = vi.hoisted(() => ({ createPdf: vi.fn(), addFonts: vi.fn() }));
 
-vi.mock("pdfmake", () => ({ default: { addFonts, createPdf } }));
+vi.mock("pdfmake", () => ({
+    default: { addFonts, createPdf, setUrlAccessPolicy: vi.fn(), setLocalAccessPolicy: vi.fn() },
+}));
 
-const { loadImageDataUrl } = vi.hoisted(() => ({
-    loadImageDataUrl: vi.fn<(url: string) => Promise<string | null>>(),
+const { loadLogoDataUrl } = vi.hoisted(() => ({
+    loadLogoDataUrl: vi.fn<() => Promise<string | null>>(),
 }));
 
 vi.mock("./pdf/shared", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./pdf/shared")>();
-    return { ...actual, loadImageDataUrl };
+    return { ...actual, loadLogoDataUrl };
 });
 
 import { pdfStyles } from "./pdf/shared";
@@ -37,7 +39,7 @@ const fakeBuffer = Buffer.from("finto-pdf");
 
 beforeEach(() => {
     vi.clearAllMocks();
-    loadImageDataUrl.mockResolvedValue(null);
+    loadLogoDataUrl.mockResolvedValue(null);
     createPdf.mockImplementation(() => ({ getBuffer: vi.fn().mockResolvedValue(fakeBuffer) }));
 });
 
@@ -47,7 +49,6 @@ const buildReport = (overrides: Partial<ReportPrintData> = {}): ReportPrintData 
     labEmail: "info@rossi.it",
     labAddress: "Via Roma 1",
     labPhone: "0123456789",
-    labLogoUrl: "https://example.com/logo.png",
     customerName: "Mario Bianchi",
     customerPhone: "333123456",
     deviceName: "iPhone 13",
@@ -71,7 +72,6 @@ const buildCustomerReports = (overrides: Partial<CustomerReportsPrintData> = {})
     labEmail: "info@rossi.it",
     labAddress: "Via Roma 1",
     labPhone: "0123456789",
-    labLogoUrl: "https://example.com/logo.png",
     reportCount: 1,
     reports: [],
     ...overrides,
@@ -112,14 +112,13 @@ const captureCustomerReportsDoc = async (customer: CustomerReportsPrintData) => 
 };
 
 describe("createReportPdfBuffer", () => {
-    it("scarica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
-        loadImageDataUrl.mockResolvedValue("data:image/png;base64,AAA=");
-        const report = buildReport();
+    it("carica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
+        loadLogoDataUrl.mockResolvedValue("data:image/png;base64,AAA=");
 
-        const result = await createReportPdfBuffer(report);
+        const result = await createReportPdfBuffer(buildReport());
 
         expect(result).toBe(fakeBuffer);
-        expect(loadImageDataUrl).toHaveBeenCalledWith(report.labLogoUrl);
+        expect(loadLogoDataUrl).toHaveBeenCalledTimes(1);
     });
 
     it("impagina due volte: una passata di misura e la definizione finale, entrambe A4 con gli stili condivisi", async () => {
@@ -168,13 +167,11 @@ describe("createReportPdfBuffer", () => {
 });
 
 describe("createCustomerReportsPdfBuffer", () => {
-    it("scarica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
-        const customer = buildCustomerReports();
-
-        const result = await createCustomerReportsPdfBuffer(customer);
+    it("carica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
+        const result = await createCustomerReportsPdfBuffer(buildCustomerReports());
 
         expect(result).toBe(fakeBuffer);
-        expect(loadImageDataUrl).toHaveBeenCalledWith(customer.labLogoUrl);
+        expect(loadLogoDataUrl).toHaveBeenCalledTimes(1);
         expect(createPdf).toHaveBeenCalledTimes(1);
     });
 

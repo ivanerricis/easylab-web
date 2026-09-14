@@ -54,8 +54,9 @@ app.use(express.json());
 app.use(cookieParser());
 /**
  * Il logo è l'unica risorsa caricata dagli utenti che l'app restituisce così com'è, e fra i
- * formati ammessi c'è l'SVG, che non viene rasterizzato per non perdere la resa vettoriale
- * nell'app e nei PDF. Un SVG però può contenere `<script>`: dentro un `<img>` non viene
+ * formati ammessi c'è l'SVG, che qui non viene rasterizzato per non perdere la resa
+ * vettoriale nell'app (per PDF ed email lo converte in PNG `loadPrintableLogo`). Un SVG
+ * però può contenere `<script>`: dentro un `<img>` non viene
  * eseguito, ma aprendo direttamente questo URL il browser lo tratta come un documento, e
  * quel documento sta sulla stessa origin dell'app - potrebbe quindi chiamare /api/* con la
  * sessione di chi lo apre. I due header qui sotto chiudono la strada senza rinunciare

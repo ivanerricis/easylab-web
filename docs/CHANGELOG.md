@@ -11,6 +11,47 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Logo di PDF ed email letto dal disco (chiusa una SSRF), SVG stampabile
+
+**Cosa.** Il logo nei PDF e nelle email non si scarica più via HTTP: lo legge dal disco
+`loadPrintableLogo` (`logoManager.ts`), partendo da `getLogoFile()`, che era già protetto
+contro un `meta.json` manomesso. Nel backend non resta nessuna chiamata a `fetch`.
+`getLabConfig()` restituisce solo i dati azienda. La variabile `LAB_LOGO_URL` è stata tolta
+da `.env.example`, `edit-env.sh` e dai due compose: il logo è sempre quello gestito da
+Impostazioni, oppure il segnaposto.
+
+Un logo SVG resta vettoriale nell'app e viene convertito in PNG con sharp solo per PDF ed
+email. La densità si calcola sulle dimensioni dichiarate, perché un SVG con `width="44"`
+reso a 72 dpi uscirebbe sgranato.
+
+A pdfmake sono state date le policy di accesso che mancavano:
+- nessun URL;
+- sul disco, solo la cartella dei suoi font.
+
+*Perché:*
+- **La SSRF.** L'URL del logo si componeva con l'header `Host` della richiesta
+  (`${req.protocol}://${req.get("host")}/assets/logo.jpg`). Chiunque avesse un account e
+  chiedesse la stampa di un PDF sceglieva così l'host che il backend avrebbe contattato, e
+  ne riceveva la risposta incorporata in base64 nel PDF.
+  - Cosa la limitava: nginx passa `$host` senza porta, quindi i bersagli erano solo sulla
+    porta 80, e Cloudflare instrada per hostname.
+  - Cosa succedeva comunque anche nel caso normale: in produzione quel giro usciva su
+    Internet e rientrava dal tunnel solo per rileggere un file che stava già sul disco.
+- **Il bug dell'SVG.** Emerso nella stessa verifica: con un logo SVG si rompeva ogni
+  stampa. pdfkit accetta solo JPEG e PNG e l'SVG faceva fallire l'intero PDF con
+  `Unknown image format.` Verificato con pdfmake e sharp reali prima e dopo la modifica.
+- **Le policy di pdfmake.** Senza, pdfmake scarica qualunque URL e legge qualunque file che
+  trovi come sorgente di un'immagine. Oggi l'unica immagine è un data URL: le policy fanno sì
+  che un valore scritto da un utente, finito lì per sbaglio, non riapra lo stesso buco.
+  Tolgono anche i due avvisi che pdfmake stampava nei log a ogni PDF.
+
+→ [backend/src/services/logoManager.ts](../backend/src/services/logoManager.ts),
+[backend/src/services/pdf/shared.ts](../backend/src/services/pdf/shared.ts),
+[backend/src/config/lab.ts](../backend/src/config/lab.ts),
+[backend/src/routes/interventions.ts](../backend/src/routes/interventions.ts)
+
+---
+
 ## 2026-09-14 — Intestazione delle tabelle fissa durante lo scroll
 
 **Cosa.** In tutte le tabelle dell'app (liste clienti/collaboratori/tecnici/interventi/report

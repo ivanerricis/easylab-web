@@ -91,6 +91,57 @@ export const getLogoFile = async (): Promise<{ filePath: string; mimeType: strin
     return { filePath: defaultLogoPath, mimeType: "image/png" };
 };
 
+// Limiti del parametro `density` di sharp.
+const minSvgDensity = 1;
+const maxSvgDensity = 100_000;
+const defaultSvgDensity = 72;
+
+/**
+ * La densità va calcolata sulle dimensioni dichiarate: sharp renderizza un SVG a 72 dpi, e
+ * un logo esportato con `width="44"` diventerebbe un PNG di 44px, sgranato nel PDF. Così
+ * esce già a `maxLogoDimension` sul lato lungo, senza ingrandire un raster.
+ */
+const rasterizeSvg = async (svg: Buffer): Promise<Buffer> => {
+    const { width, height } = await sharp(svg).metadata();
+    const longestSide = Math.max(width ?? 0, height ?? 0);
+    const density =
+        longestSide > 0
+            ? Math.min(Math.max((defaultSvgDensity * maxLogoDimension) / longestSide, minSvgDensity), maxSvgDensity)
+            : defaultSvgDensity;
+
+    return sharp(svg, { density })
+        .resize(maxLogoDimension, maxLogoDimension, { fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+};
+
+export type PrintableLogo = { content: Buffer; contentType: "image/png" };
+
+/**
+ * Il logo per PDF ed email, sempre PNG: pdfkit accetta solo JPEG e PNG (un SVG faceva
+ * fallire l'intera stampa con "Unknown image format"), e molti client di posta, Gmail per
+ * primo, non mostrano gli SVG. Nell'app l'SVG resta invece vettoriale.
+ *
+ * Si legge dal disco e non da /assets/logo.jpg via HTTP: l'URL veniva composto dall'header
+ * `Host` della richiesta, quindi chi chiedeva un PDF decideva quale host il backend avrebbe
+ * contattato, e riceveva la risposta incorporata nel PDF.
+ */
+export const loadPrintableLogo = async (): Promise<PrintableLogo | null> => {
+    try {
+        const { filePath, mimeType } = await getLogoFile();
+        const content = await fs.promises.readFile(filePath);
+
+        return {
+            content: mimeType === "image/svg+xml" ? await rasterizeSvg(content) : content,
+            contentType: "image/png",
+        };
+    } catch (error) {
+        // Una stampa senza logo è meglio di una stampa che non esce.
+        console.error("Logo non disponibile per la stampa:", error);
+        return null;
+    }
+};
+
 export const saveLogo = async (buffer: Buffer, mimeType: string) => {
     const extension = allowedMimeTypes[mimeType];
 
@@ -109,7 +160,8 @@ export const saveLogo = async (buffer: Buffer, mimeType: string) => {
     await fs.promises.mkdir(logoDir, { recursive: true });
     await clearLogoDir();
 
-    // L'SVG e vettoriale, va servito cosi com'e: passarlo per sharp lo rasterizzerebbe.
+    // L'SVG è vettoriale e nell'app va servito così com'è: lo rasterizza solo
+    // `loadPrintableLogo`, per PDF ed email.
     const isVector = mimeType === "image/svg+xml";
     const fileName = isVector ? `logo.${extension}` : "logo.png";
     const outputMimeType = isVector ? mimeType : "image/png";

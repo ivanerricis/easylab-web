@@ -1,4 +1,3 @@
-import type { Request } from "express";
 import { z } from "zod";
 import {
     createCustomer,
@@ -63,7 +62,7 @@ const customerUpdateBodySchema = customerBodySchemaBase
     });
 
 // Intestazione condivisa dai due resoconti PDF del cliente (report e interventi).
-const loadCustomerPrintContext = async (req: Request, id: number) => {
+const loadCustomerPrintContext = async (id: number) => {
     const customers = await getCustomerById(id);
 
     if (customers.length === 0) {
@@ -77,7 +76,7 @@ const loadCustomerPrintContext = async (req: Request, id: number) => {
         customerName: `${customer.firstName} ${customer.lastName ?? ""}`.trim(),
         customerPhone: formatPhoneLabel(customer.phoneNumber, customer.phoneNumberSecondary),
         customerEmail: customer.email ?? "-",
-        ...(await getLabConfig(req)),
+        ...(await getLabConfig()),
     };
 };
 
@@ -102,7 +101,7 @@ const customersRouter = createCrudRouter({
                     dateFrom?: string;
                     dateTo?: string;
                 };
-                const context = await loadCustomerPrintContext(req, id);
+                const context = await loadCustomerPrintContext(id);
 
                 if (!context) {
                     res.status(404).json({ message: "Customer not found" });
@@ -143,7 +142,7 @@ const customersRouter = createCrudRouter({
                     dateFrom?: string;
                     dateTo?: string;
                 };
-                const context = await loadCustomerPrintContext(req, id);
+                const context = await loadCustomerPrintContext(id);
 
                 if (!context) {
                     res.status(404).json({ message: "Customer not found" });

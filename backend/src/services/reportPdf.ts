@@ -3,7 +3,7 @@ import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
-    loadImageDataUrl,
+    loadLogoDataUrl,
     pdfStyles,
     sectionBarCell,
     sectionBarRow,
@@ -41,7 +41,6 @@ export type ReportPrintData = {
     labEmail: string;
     labAddress: string;
     labPhone: string;
-    labLogoUrl: string;
     customerName: string;
     customerPhone: string;
     deviceName: string;
@@ -75,7 +74,6 @@ export type CustomerReportsPrintData = {
     labEmail: string;
     labAddress: string;
     labPhone: string;
-    labLogoUrl: string;
     rangeLabel?: string;
     reportCount: number;
     reports: CustomerReportSummaryItem[];
@@ -534,13 +532,13 @@ const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataU
 };
 
 export const createReportPdfBuffer = async (report: ReportPrintData) => {
-    const logoDataUrl = await loadImageDataUrl(report.labLogoUrl);
+    const logoDataUrl = await loadLogoDataUrl();
 
     return await createSectionedReportPdfBuffer(report, logoDataUrl);
 };
 
 export const createCustomerReportsPdfBuffer = async (customer: CustomerReportsPrintData) => {
-    const logoDataUrl = await loadImageDataUrl(customer.labLogoUrl);
+    const logoDataUrl = await loadLogoDataUrl();
 
     const documentDefinition = {
         pageSize: "A4",

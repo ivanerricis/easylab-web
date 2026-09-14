@@ -1,5 +1,6 @@
 import path from "node:path";
 import pdfmake from "pdfmake";
+import { loadPrintableLogo } from "../logoManager";
 
 /**
  * Parti comuni ai PDF di report e interventi: font, palette, primitive di tabella e il
@@ -12,20 +13,30 @@ import pdfmake from "pdfmake";
  * compilazione — produce un PDF sbagliato in mano al cliente.
  */
 
-const pdfmakeRoot = path.dirname(require.resolve("pdfmake/package.json"));
+const pdfmakeFontsDir = path.join(path.dirname(require.resolve("pdfmake/package.json")), "fonts");
 
 const fontDescriptors = {
     Roboto: {
-        normal: path.join(pdfmakeRoot, "fonts", "Roboto", "Roboto-Regular.ttf"),
-        bold: path.join(pdfmakeRoot, "fonts", "Roboto", "Roboto-Medium.ttf"),
-        italics: path.join(pdfmakeRoot, "fonts", "Roboto", "Roboto-Italic.ttf"),
-        bolditalics: path.join(pdfmakeRoot, "fonts", "Roboto", "Roboto-MediumItalic.ttf"),
+        normal: path.join(pdfmakeFontsDir, "Roboto", "Roboto-Regular.ttf"),
+        bold: path.join(pdfmakeFontsDir, "Roboto", "Roboto-Medium.ttf"),
+        italics: path.join(pdfmakeFontsDir, "Roboto", "Roboto-Italic.ttf"),
+        bolditalics: path.join(pdfmakeFontsDir, "Roboto", "Roboto-MediumItalic.ttf"),
     },
 };
 
 // Registrazione globale in pdfmake: va fatta una volta sola, e importare questo modulo la
 // garantisce a chiunque generi un PDF.
 pdfmake.addFonts(fontDescriptors);
+
+/**
+ * Senza policy, pdfmake scarica qualunque URL e legge qualunque file che trovi come sorgente
+ * di un'immagine o di un allegato nella definizione del documento. Oggi l'unica immagine è il
+ * logo, già incorporato come data URL (che le policy non toccano): queste due righe fanno sì
+ * che un domani un valore scritto da un utente, finito lì per sbaglio, non diventi una
+ * richiesta verso un host scelto da lui o la lettura di un file del server.
+ */
+pdfmake.setUrlAccessPolicy(() => false);
+pdfmake.setLocalAccessPolicy((filePath: string) => path.resolve(filePath).startsWith(pdfmakeFontsDir + path.sep));
 
 const brandColor = "#2A75B9";
 const mutedColor = "#555555";
@@ -120,39 +131,16 @@ export const dualFieldRow = (label1: string, value1: string, label2: string, val
     { text: value2, style: "value" },
 ];
 
-export type LoadedImage = {
-    content: Buffer;
-    contentType: string;
-};
+// I PDF vogliono il logo incorporato come data URL; le email lo allegano inline
+// direttamente da `loadPrintableLogo`, perché i client di posta bloccano le immagini `data:`.
+export const loadLogoDataUrl = async () => {
+    const logo = await loadPrintableLogo();
 
-// Il logo serve in due forme diverse: i PDF lo vogliono incorporato come data URL,
-// le email come allegato inline (i client di posta bloccano le immagini `data:`).
-// Lo scaricamento è lo stesso, quindi sta qui una volta sola.
-export const loadImage = async (imageUrl: string): Promise<LoadedImage | null> => {
-    try {
-        const response = await fetch(imageUrl);
-
-        if (!response.ok) {
-            return null;
-        }
-
-        return {
-            content: Buffer.from(await response.arrayBuffer()),
-            contentType: response.headers.get("content-type") ?? "image/png",
-        };
-    } catch {
-        return null;
-    }
-};
-
-export const loadImageDataUrl = async (imageUrl: string) => {
-    const image = await loadImage(imageUrl);
-
-    if (!image) {
+    if (!logo) {
         return null;
     }
 
-    return `data:${image.contentType};base64,${image.content.toString("base64")}`;
+    return `data:${logo.contentType};base64,${logo.content.toString("base64")}`;
 };
 
 /** I campi che i riepiloghi per cliente hanno in comune, qualunque cosa elenchino. */

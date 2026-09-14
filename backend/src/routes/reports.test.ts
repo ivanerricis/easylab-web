@@ -78,7 +78,6 @@ const labConfig = {
     labEmail: "info@easylab.it",
     labAddress: "Via Roma 1",
     labPhone: "02 1234567",
-    labLogoUrl: "https://example.test/logo.png",
 };
 
 // Riga così come la restituisce la query congiunta di `/:id/print`.

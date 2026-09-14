@@ -179,7 +179,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
 
     const report = reportRows[0];
     const customerName = `${report.customerFirstName} ${report.customerLastName ?? ""}`.trim();
-    const { labName, labEmail, labAddress, labPhone, labLogoUrl } = await getLabConfig(req);
+    const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(report.customerPhone, report.customerPhoneSecondary);
     const technicianPrice = Number(technicianPriceRows[0]?.technicianPrice ?? 0);
     const totalPrice = Number(report.price ?? 0) + technicianPrice;
@@ -190,7 +190,6 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         labEmail,
         labAddress,
         labPhone,
-        labLogoUrl,
         customerName,
         customerPhone: customerPhoneLabel,
         deviceName: report.deviceName,

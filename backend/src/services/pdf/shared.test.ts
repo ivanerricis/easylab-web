@@ -1,10 +1,18 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import path from "node:path";
+import pdfmake from "pdfmake";
+import { describe, expect, it, vi } from "vitest";
+
+const { loadPrintableLogo } = vi.hoisted(() => ({
+    loadPrintableLogo: vi.fn<() => Promise<{ content: Buffer; contentType: "image/png" } | null>>(),
+}));
+
+vi.mock("../logoManager", () => ({ loadPrintableLogo }));
+
 import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
-    loadImage,
-    loadImageDataUrl,
+    loadLogoDataUrl,
     sectionBarCell,
     sectionBarRow,
     type CustomerSummaryHeaderData,
@@ -133,75 +141,50 @@ describe("buildCustomerSummaryInfoSection", () => {
     });
 });
 
-describe("loadImage", () => {
-    afterEach(() => {
-        vi.unstubAllGlobals();
+describe("policy di accesso di pdfmake", () => {
+    const render = (content: unknown[]) =>
+        pdfmake.createPdf({ content, defaultStyle: { font: "Roboto" } } as never).getBuffer();
+
+    it("un PDF che usa solo i font inclusi viene generato normalmente", async () => {
+        const pdf = await render([{ text: "ciao" }]);
+
+        expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     });
 
-    it("scarica il logo e restituisce contenuto e content-type dalla risposta", async () => {
-        const fetchMock = vi.fn().mockResolvedValue({
-            ok: true,
-            headers: { get: (key: string) => (key === "content-type" ? "image/svg+xml" : null) },
-            arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-        });
-        vi.stubGlobal("fetch", fetchMock);
-
-        const image = await loadImage("https://example.com/logo.svg");
-
-        expect(image).toEqual({ content: Buffer.from([1, 2, 3]), contentType: "image/svg+xml" });
+    it("rifiuta di scaricare un'immagine da un URL", async () => {
+        await expect(render([{ image: "http://127.0.0.1:1/logo.png" }])).rejects.toThrow(/denied/);
     });
 
-    it("senza header content-type ripiega su image/png", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn().mockResolvedValue({
-                ok: true,
-                headers: { get: () => null },
-                arrayBuffer: async () => new Uint8Array([9]).buffer,
-            })
-        );
-
-        const image = await loadImage("https://example.com/logo");
-
-        expect(image?.contentType).toBe("image/png");
-    });
-
-    it("una risposta non-ok (es. 404) restituisce null invece di lanciare", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
-
-        expect(await loadImage("https://example.com/assente.png")).toBeNull();
-    });
-
-    it("un errore di rete (host irraggiungibile) restituisce null invece di far fallire il PDF", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ENOTFOUND")));
-
-        expect(await loadImage("https://non-esiste.invalid/logo.png")).toBeNull();
+    it("rifiuta di leggere un file del server fuori dalla cartella dei font", async () => {
+        await expect(render([{ image: path.resolve("package.json") }])).rejects.toThrow(/denied/);
     });
 });
 
-describe("loadImageDataUrl", () => {
-    afterEach(() => {
-        vi.unstubAllGlobals();
-    });
+describe("loadLogoDataUrl", () => {
+    it("codifica il logo stampabile come data URL base64", async () => {
+        loadPrintableLogo.mockResolvedValue({ content: Buffer.from([1, 2, 3]), contentType: "image/png" });
 
-    it("codifica il contenuto scaricato come data URL base64", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn().mockResolvedValue({
-                ok: true,
-                headers: { get: () => "image/png" },
-                arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-            })
-        );
-
-        const dataUrl = await loadImageDataUrl("https://example.com/logo.png");
+        const dataUrl = await loadLogoDataUrl();
 
         expect(dataUrl).toBe(`data:image/png;base64,${Buffer.from([1, 2, 3]).toString("base64")}`);
     });
 
-    it("quando il download fallisce restituisce null, cosi' i PDF omettono il logo invece di rompersi", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    it("senza logo disponibile restituisce null, così i PDF omettono il logo invece di rompersi", async () => {
+        loadPrintableLogo.mockResolvedValue(null);
 
-        expect(await loadImageDataUrl("https://example.com/assente.png")).toBeNull();
+        expect(await loadLogoDataUrl()).toBeNull();
+    });
+
+    // Il logo prima si scaricava da un URL composto con l'header Host della richiesta: chi
+    // chiedeva il PDF sceglieva l'host contattato dal backend (SSRF).
+    it("non fa nessuna richiesta di rete", async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        loadPrintableLogo.mockResolvedValue({ content: Buffer.from([1]), contentType: "image/png" });
+
+        await loadLogoDataUrl();
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
     });
 });

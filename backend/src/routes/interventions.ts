@@ -14,7 +14,7 @@ import { collaboratorTable, customerTable, interventionTable } from "../db/schem
 import { sendEmail } from "../services/emailManager";
 import { buildInterventionEmail } from "../services/interventionEmail";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
-import { loadImage } from "../services/pdf/shared";
+import { loadPrintableLogo } from "../services/logoManager";
 import { getLabConfig } from "../config/lab";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
@@ -195,10 +195,7 @@ interventionsRouter.get("/stats", async (_req, res) => {
     res.json(stats);
 });
 
-const loadInterventionPrintContext = async (
-    id: number,
-    req: { protocol: string; get: (name: string) => string | undefined }
-) => {
+const loadInterventionPrintContext = async (id: number) => {
     const interventionRows = await db
         .select({
             id: interventionTable.id,
@@ -231,7 +228,7 @@ const loadInterventionPrintContext = async (
     const intervention = interventionRows[0];
     const customerName = `${intervention.customerFirstName} ${intervention.customerLastName ?? ""}`.trim();
     const collaboratorName = `${intervention.collaboratorFirstName} ${intervention.collaboratorLastName ?? ""}`.trim();
-    const { labName, labEmail, labAddress, labPhone, labLogoUrl } = await getLabConfig(req);
+    const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(intervention.customerPhone, intervention.customerPhoneSecondary);
 
     return {
@@ -241,7 +238,6 @@ const loadInterventionPrintContext = async (
         labEmail,
         labAddress,
         labPhone,
-        labLogoUrl,
         type: intervention.type as InterventionType,
         // Date grezze, per il nome del file allegato: le etichette formattate sono per
         // gli occhi del cliente, non per un nome di file.
@@ -253,7 +249,6 @@ const loadInterventionPrintContext = async (
             labEmail,
             labAddress,
             labPhone,
-            labLogoUrl,
             customerName,
             customerPhone: customerPhoneLabel,
             customerEmail: intervention.customerEmail?.trim() || "-",
@@ -274,7 +269,7 @@ const loadInterventionPrintContext = async (
 interventionsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
-    const context = await loadInterventionPrintContext(id, req);
+    const context = await loadInterventionPrintContext(id);
 
     if (!context) {
         res.status(404).json({ message: "Intervento non trovato" });
@@ -290,7 +285,7 @@ interventionsRouter.get("/:id/print", validate({ params: idParamsSchema }), asyn
 
 interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
-    const context = await loadInterventionPrintContext(id, req);
+    const context = await loadInterventionPrintContext(id);
 
     if (!context) {
         res.status(404).json({ message: "Intervento non trovato" });
@@ -302,10 +297,7 @@ interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema })
         return;
     }
 
-    const [pdfBuffer, logo] = await Promise.all([
-        createInterventionPdfBuffer(context.pdfData),
-        loadImage(context.labLogoUrl),
-    ]);
+    const [pdfBuffer, logo] = await Promise.all([createInterventionPdfBuffer(context.pdfData), loadPrintableLogo()]);
 
     const email = buildInterventionEmail({
         customerName: context.customerName,

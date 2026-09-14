@@ -3,7 +3,7 @@ import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
-    loadImageDataUrl,
+    loadLogoDataUrl,
     pdfStyles,
     sectionBarRow,
     tableLayout,
@@ -18,7 +18,6 @@ export type InterventionPrintData = {
     labEmail: string;
     labAddress: string;
     labPhone: string;
-    labLogoUrl: string;
     customerName: string;
     customerPhone: string;
     customerEmail: string;
@@ -55,7 +54,6 @@ export type CustomerInterventionsPrintData = {
     labEmail: string;
     labAddress: string;
     labPhone: string;
-    labLogoUrl: string;
     rangeLabel?: string;
     interventionCount: number;
     interventions: CustomerInterventionSummaryItem[];
@@ -343,7 +341,7 @@ const buildCustomerInterventionsTable = (interventions: CustomerInterventionSumm
 };
 
 export const createInterventionPdfBuffer = async (intervention: InterventionPrintData) => {
-    const logoDataUrl = await loadImageDataUrl(intervention.labLogoUrl);
+    const logoDataUrl = await loadLogoDataUrl();
     const hoursSection = buildTechnicianHoursSection(intervention);
     const notesSection = buildNotesSection(intervention);
 
@@ -373,7 +371,7 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
 };
 
 export const createCustomerInterventionsPdfBuffer = async (customer: CustomerInterventionsPrintData) => {
-    const logoDataUrl = await loadImageDataUrl(customer.labLogoUrl);
+    const logoDataUrl = await loadLogoDataUrl();
 
     const documentDefinition = {
         pageSize: "A4",

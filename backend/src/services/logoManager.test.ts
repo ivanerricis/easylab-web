@@ -24,6 +24,7 @@ vi.mock("node:fs", () => {
 const sharpResize = vi.fn();
 const sharpPng = vi.fn();
 const sharpToBuffer = vi.fn();
+const sharpMetadata = vi.fn();
 const sharpChain = {
     resize: (...args: unknown[]) => {
         sharpResize(...args);
@@ -34,14 +35,36 @@ const sharpChain = {
         return sharpChain;
     },
     toBuffer: () => sharpToBuffer(),
+    metadata: () => sharpMetadata(),
 };
-const sharpFactory = vi.fn((_buffer: Buffer) => sharpChain);
+const sharpFactory = vi.fn((..._args: unknown[]) => sharpChain);
 
 vi.mock("sharp", () => ({
-    default: (buffer: Buffer) => sharpFactory(buffer),
+    default: (...args: unknown[]) => sharpFactory(...args),
 }));
 
-import { LogoManagerError, getLogoFile, getLogoStatus, resetLogo, saveLogo } from "./logoManager";
+import { LogoManagerError, getLogoFile, getLogoStatus, loadPrintableLogo, resetLogo, saveLogo } from "./logoManager";
+
+const svgMeta = JSON.stringify({
+    fileName: "logo.svg",
+    mimeType: "image/svg+xml",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+});
+const pngMeta = JSON.stringify({ fileName: "logo.png", mimeType: "image/png", updatedAt: "2026-01-01T00:00:00.000Z" });
+
+/** `readFile` serve sia per `meta.json` sia per il file del logo: risponde in base al percorso. */
+const mockLogoFiles = (meta: string | null, logoContent: Buffer) => {
+    readFile.mockImplementation(async (filePath: string) => {
+        if (filePath.endsWith("meta.json")) {
+            if (meta === null) {
+                throw new Error("ENOENT");
+            }
+            return meta;
+        }
+        return logoContent;
+    });
+    access.mockResolvedValue(undefined);
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -131,6 +154,57 @@ describe("getLogoFile", () => {
 
         expect(result.mimeType).toBe("image/png");
         expect(result.filePath).toMatch(/logo\.png$/);
+    });
+});
+
+describe("loadPrintableLogo", () => {
+    it("un logo PNG viene letto dal disco così com'è, senza passare da sharp", async () => {
+        const png = Buffer.from("png-bytes");
+        mockLogoFiles(pngMeta, png);
+
+        await expect(loadPrintableLogo()).resolves.toEqual({ content: png, contentType: "image/png" });
+        expect(sharpFactory).not.toHaveBeenCalled();
+    });
+
+    it("senza logo personalizzato restituisce il segnaposto", async () => {
+        const placeholder = Buffer.from("segnaposto");
+        mockLogoFiles(null, placeholder);
+
+        await expect(loadPrintableLogo()).resolves.toEqual({ content: placeholder, contentType: "image/png" });
+        expect(readFile).toHaveBeenCalledWith(expect.stringMatching(/logo-placeholder\.png$/));
+    });
+
+    // pdfkit accetta solo JPEG e PNG: un SVG passato così com'è faceva fallire l'intera stampa.
+    it("un logo SVG viene rasterizzato in PNG alla densità che lo porta a 512px", async () => {
+        const svg = Buffer.from('<svg width="44" height="22"></svg>');
+        mockLogoFiles(svgMeta, svg);
+        sharpMetadata.mockResolvedValue({ width: 44, height: 22 });
+
+        const logo = await loadPrintableLogo();
+
+        expect(sharpFactory).toHaveBeenLastCalledWith(svg, { density: (72 * 512) / 44 });
+        expect(sharpResize).toHaveBeenCalledWith(512, 512, { fit: "inside", withoutEnlargement: true });
+        expect(logo).toEqual({ content: Buffer.from("png-ridimensionato"), contentType: "image/png" });
+    });
+
+    it("un SVG senza dimensioni dichiarate viene reso alla densità di default", async () => {
+        const svg = Buffer.from('<svg viewBox="0 0 10 10"></svg>');
+        mockLogoFiles(svgMeta, svg);
+        sharpMetadata.mockResolvedValue({});
+
+        await loadPrintableLogo();
+
+        expect(sharpFactory).toHaveBeenLastCalledWith(svg, { density: 72 });
+    });
+
+    it("se il logo non si legge restituisce null, così la stampa esce comunque", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        mockLogoFiles(svgMeta, Buffer.from("<svg></svg>"));
+        sharpMetadata.mockRejectedValue(new Error("SVG non valido"));
+
+        await expect(loadPrintableLogo()).resolves.toBeNull();
+        expect(consoleError).toHaveBeenCalled();
+        consoleError.mockRestore();
     });
 });
 

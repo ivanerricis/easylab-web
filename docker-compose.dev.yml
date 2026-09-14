@@ -29,7 +29,6 @@ services:
       LAB_ADDRESS: ${LAB_ADDRESS}
       LAB_PHONE: ${LAB_PHONE}
       LAB_LOGO_TEXT: ${LAB_LOGO_TEXT}
-      LAB_LOGO_URL: ${LAB_LOGO_URL}
       # Solo in sviluppo: qui Vite gira su :5173 e chiama il backend su :3000, quindi le
       # richieste sono cross-origin davvero. In produzione la variabile non esiste e il
       # CORS non viene nemmeno attivato, perché nginx serve tutto dalla stessa origin.

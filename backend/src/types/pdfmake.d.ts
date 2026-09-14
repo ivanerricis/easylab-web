@@ -1,6 +1,8 @@
 declare module "pdfmake" {
     const pdfmake: {
         addFonts(fonts: Record<string, Record<string, string>>): void;
+        setUrlAccessPolicy(callback: (url: string) => boolean): void;
+        setLocalAccessPolicy(callback: (filePath: string) => boolean): void;
         createPdf(
             docDefinition: any,
             options?: any

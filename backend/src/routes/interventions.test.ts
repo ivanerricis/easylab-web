@@ -54,8 +54,8 @@ vi.mock("../services/emailManager", () => ({
     sendEmail: vi.fn(),
 }));
 
-vi.mock("../services/pdf/shared", () => ({
-    loadImage: vi.fn(),
+vi.mock("../services/logoManager", () => ({
+    loadPrintableLogo: vi.fn(),
 }));
 
 import {
@@ -71,7 +71,7 @@ import { getLabConfig } from "../config/lab";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
 import { buildInterventionEmail } from "../services/interventionEmail";
 import { sendEmail } from "../services/emailManager";
-import { loadImage } from "../services/pdf/shared";
+import { loadPrintableLogo } from "../services/logoManager";
 import interventionsRouter from "./interventions";
 import { errorHandler } from "../middleware/errorHandler";
 
@@ -88,7 +88,6 @@ const labConfig = {
     labEmail: "info@easylab.it",
     labAddress: "Via Roma 1",
     labPhone: "02 1234567",
-    labLogoUrl: "https://example.test/logo.png",
 };
 
 // Riga così come la restituisce la query congiunta di `/:id/print` e `/:id/send-email`.
@@ -269,7 +268,7 @@ describe("interventions router", () => {
             vi.mocked(db.select).mockReturnValue(queryResult([printRow]) as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
-            vi.mocked(loadImage).mockResolvedValue({
+            vi.mocked(loadPrintableLogo).mockResolvedValue({
                 content: Buffer.from("logo-bytes"),
                 contentType: "image/png",
             } as never);
@@ -313,7 +312,7 @@ describe("interventions router", () => {
             );
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
-            vi.mocked(loadImage).mockResolvedValue(null as never);
+            vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
             vi.mocked(buildInterventionEmail).mockReturnValue({
                 subject: "Oggetto",
                 text: "Testo",

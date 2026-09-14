@@ -9,16 +9,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // `vi.hoisted`, altrimenti la fabbrica le referenzia prima che esistano.
 const { createPdf, addFonts } = vi.hoisted(() => ({ createPdf: vi.fn(), addFonts: vi.fn() }));
 
-vi.mock("pdfmake", () => ({ default: { addFonts, createPdf } }));
+vi.mock("pdfmake", () => ({
+    default: { addFonts, createPdf, setUrlAccessPolicy: vi.fn(), setLocalAccessPolicy: vi.fn() },
+}));
 
-// Il logo passa da un fetch HTTP (vedi shared.test.ts): qui non deve mai farne uno vero.
-const { loadImageDataUrl } = vi.hoisted(() => ({
-    loadImageDataUrl: vi.fn<(url: string) => Promise<string | null>>(),
+// Il logo si legge dal disco (vedi shared.test.ts): qui non deve mai toccarlo davvero.
+const { loadLogoDataUrl } = vi.hoisted(() => ({
+    loadLogoDataUrl: vi.fn<() => Promise<string | null>>(),
 }));
 
 vi.mock("./pdf/shared", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./pdf/shared")>();
-    return { ...actual, loadImageDataUrl };
+    return { ...actual, loadLogoDataUrl };
 });
 
 import { pdfStyles } from "./pdf/shared";
@@ -35,7 +37,7 @@ const fakeBuffer = Buffer.from("finto-pdf");
 
 beforeEach(() => {
     vi.clearAllMocks();
-    loadImageDataUrl.mockResolvedValue(null);
+    loadLogoDataUrl.mockResolvedValue(null);
     createPdf.mockImplementation(() => ({ getBuffer: vi.fn().mockResolvedValue(fakeBuffer) }));
 });
 
@@ -45,7 +47,6 @@ const buildIntervention = (overrides: Partial<InterventionPrintData> = {}): Inte
     labEmail: "info@rossi.it",
     labAddress: "Via Roma 1",
     labPhone: "0123456789",
-    labLogoUrl: "https://example.com/logo.png",
     customerName: "Mario Bianchi",
     customerPhone: "333123456",
     customerEmail: "mario@bianchi.it",
@@ -73,7 +74,6 @@ const buildCustomerInterventions = (
     labEmail: "info@rossi.it",
     labAddress: "Via Roma 1",
     labPhone: "0123456789",
-    labLogoUrl: "https://example.com/logo.png",
     interventionCount: 1,
     interventions: [],
     ...overrides,
@@ -113,14 +113,13 @@ describe("formatInterventionType", () => {
 });
 
 describe("createInterventionPdfBuffer", () => {
-    it("scarica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
-        loadImageDataUrl.mockResolvedValue("data:image/png;base64,AAA=");
-        const intervention = buildIntervention();
+    it("carica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
+        loadLogoDataUrl.mockResolvedValue("data:image/png;base64,AAA=");
 
-        const result = await createInterventionPdfBuffer(intervention);
+        const result = await createInterventionPdfBuffer(buildIntervention());
 
         expect(result).toBe(fakeBuffer);
-        expect(loadImageDataUrl).toHaveBeenCalledWith(intervention.labLogoUrl);
+        expect(loadLogoDataUrl).toHaveBeenCalledTimes(1);
         expect(createPdf).toHaveBeenCalledTimes(1);
     });
 
@@ -190,13 +189,11 @@ describe("createInterventionPdfBuffer", () => {
 });
 
 describe("createCustomerInterventionsPdfBuffer", () => {
-    it("scarica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
-        const customer = buildCustomerInterventions();
-
-        const result = await createCustomerInterventionsPdfBuffer(customer);
+    it("carica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {
+        const result = await createCustomerInterventionsPdfBuffer(buildCustomerInterventions());
 
         expect(result).toBe(fakeBuffer);
-        expect(loadImageDataUrl).toHaveBeenCalledWith(customer.labLogoUrl);
+        expect(loadLogoDataUrl).toHaveBeenCalledTimes(1);
     });
 
     it("include il nome del cliente e il conteggio interventi nell'intestazione", async () => {

@@ -72,7 +72,6 @@ const labConfig = {
     labEmail: "info@lab.it",
     labAddress: "Via Roma 1",
     labPhone: "0212345678",
-    labLogoUrl: "http://localhost/assets/logo.jpg",
 };
 
 describe("customers router", () => {

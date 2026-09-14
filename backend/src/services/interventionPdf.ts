@@ -30,6 +30,8 @@ export type InterventionPrintData = {
     problem: string | null;
     /** Annotazioni libere: facoltative sempre, quindi la sezione può non esserci. */
     note: string | null;
+    /** Facoltativo: quando manca non compare in stampa, invece di mostrare 0 €. */
+    price: number | null;
     interventionDateLabel: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -84,6 +86,14 @@ const formatInterventionStatus = (value: InterventionStatus) => {
 };
 
 const formatTime = (value: string | null) => (value ? value.slice(0, 5) : "-");
+
+const formatEuro = (value: number) =>
+    new Intl.NumberFormat("it-IT", {
+        style: "currency",
+        currency: "EUR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
 
 const descriptionLabel = (type: InterventionType) =>
     type === "consegna_materiale" ? "Materiali consegnati" : "Assistenza effettuata";
@@ -163,6 +173,18 @@ const buildActivitySection = (intervention: InterventionPrintData) => ({
                 "Stato",
                 formatInterventionStatus(intervention.status)
             ),
+            // Il prezzo è facoltativo per ogni tipo di intervento: la riga compare solo quando
+            // è stato indicato, invece di mostrare uno 0 € che nessuno ha mai chiesto.
+            ...(intervention.price != null
+                ? [
+                      [
+                          { text: "Prezzo", style: "label" },
+                          { text: formatEuro(intervention.price), style: "value", colSpan: 3 },
+                          {},
+                          {},
+                      ],
+                  ]
+                : []),
             // Il problema riscontrato esiste solo per gli interventi in sede o da remoto.
             ...(intervention.problem
                 ? [

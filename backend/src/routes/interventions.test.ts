@@ -401,6 +401,34 @@ describe("interventions router", () => {
             );
         });
 
+        it("il prezzo è facoltativo: senza indicarlo resta null", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            await request(buildApp()).post("/api/interventions").send(minimalBody);
+
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ price: null }));
+        });
+
+        it("crea un intervento con il prezzo indicato", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...minimalBody, price: 45 });
+
+            expect(response.status).toBe(201);
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ price: 45 }));
+        });
+
+        it("rifiuta un prezzo negativo", async () => {
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...minimalBody, price: -1 });
+
+            expect(response.status).toBe(400);
+            expect(createIntervention).not.toHaveBeenCalled();
+        });
+
         it("rifiuta la creazione senza data dell'intervento", async () => {
             const response = await request(buildApp())
                 .post("/api/interventions")
@@ -503,6 +531,18 @@ describe("interventions router", () => {
                     problem: null,
                 })
             );
+        });
+
+        it("aggiorna il prezzo mantenendo il resto della riga esistente", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([storedIntervention] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([
+                { ...storedIntervention, price: 60 },
+            ] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ price: 60 });
+
+            expect(response.status).toBe(200);
+            expect(updateInterventionById).toHaveBeenCalledWith(1, expect.objectContaining({ price: 60 }));
         });
 
         it("rifiuta di azzerare la data dell'intervento", async () => {

@@ -4,6 +4,7 @@ import { fieldErrorAria, fieldProps } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,10 +26,23 @@ import {
 } from "@/lib/interventions";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 
 const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
+
+/** Un campo prezzo con il simbolo dell'euro davanti: prima era un numero nudo. */
+const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
+    <div className="relative">
+        <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-lg text-muted-foreground"
+        >
+            €
+        </span>
+        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
+    </div>
+);
 
 export type CreateInterventionSubmitValues = {
     type: InterventionType;
@@ -37,6 +51,8 @@ export type CreateInterventionSubmitValues = {
     description: string | null;
     problem: string | null;
     note: string | null;
+    /** Facoltativo per qualunque tipo di intervento. */
+    price: number | null;
     customer: string;
     customerId: number | null;
     collaboratorId: number;
@@ -52,7 +68,7 @@ type Props = {
     initialDate?: string;
 };
 
-type FieldErrors = Partial<Record<"customer" | "collaboratorId" | InterventionField, string>>;
+type FieldErrors = Partial<Record<"customer" | "collaboratorId" | "price" | InterventionField, string>>;
 
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 const fieldOrder = [
@@ -63,6 +79,7 @@ const fieldOrder = [
     "endTime",
     "problem",
     "description",
+    "price",
 ] as const;
 
 const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }: Props) => {
@@ -72,6 +89,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
         description: "",
         problem: "",
         note: "",
+        price: "",
         customer: "",
         collaboratorId: "",
         interventionDate: getTodayDateString(),
@@ -102,6 +120,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 description: "",
                 problem: "",
                 note: "",
+                price: "",
                 customer: "",
                 collaboratorId: "",
                 // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
@@ -163,6 +182,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
             nextErrors.collaboratorId = "Seleziona un collaboratore";
         }
 
+        const price = formValues.price.trim() === "" ? null : Number(formValues.price);
+
+        if (price != null && (!Number.isFinite(price) || price < 0)) {
+            nextErrors.price = "Il prezzo deve essere maggiore o uguale a zero";
+        }
+
         const validationError = getInterventionValidationError(formValues);
 
         if (validationError) {
@@ -191,6 +216,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 description: formValues.description.trim() || null,
                 problem: isOnSite ? formValues.problem.trim() : null,
                 note: formValues.note.trim() || null,
+                price,
                 customer: formValues.customer,
                 customerId: customerIdByOption[formValues.customer] ?? null,
                 collaboratorId: Number(formValues.collaboratorId),
@@ -368,6 +394,22 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                         }}
                                     />
                                     <FieldError id="interventionDate" error={errors.interventionDate} />
+                                </div>
+
+                                <div className="grid gap-1">
+                                    <Label htmlFor="price" className="text-lg">
+                                        Prezzo
+                                        <span className="text-base text-muted-foreground"> (facoltativo)</span>
+                                    </Label>
+                                    <EuroInput
+                                        {...fieldProps("price", { error: errors.price })}
+                                        value={formValues.price}
+                                        onChange={(event) => {
+                                            setFormValues((prev) => ({ ...prev, price: event.target.value }));
+                                            setErrors((prev) => ({ ...prev, price: undefined }));
+                                        }}
+                                    />
+                                    <FieldError id="price" error={errors.price} />
                                 </div>
 
                                 {isOnSite ? (

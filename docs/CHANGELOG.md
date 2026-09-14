@@ -11,6 +11,25 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Prezzo facoltativo sugli interventi
+
+**Cosa.** Aggiunta la colonna `price` (intero, nullable) alla tabella `intervention`
+(`0025_add_intervention_price.sql`). Il campo è facoltativo per qualunque tipo di intervento,
+consegna materiale inclusa: non tutte le richieste in laboratorio hanno un lavoro da fatturare
+lì per lì, quindi non poteva essere obbligatorio né limitato agli interventi in sede. I dialoghi
+di creazione e modifica lo espongono con lo stesso `EuroInput` già usato per il prezzo dei
+report (simbolo € e step intero), la scheda dell'intervento lo mostra fra le note e la data di
+creazione ("-" quando assente), e la stampa (`interventionPdf.ts`) lo aggiunge come riga
+"Prezzo" nella sezione REPORT ATTIVITÀ **solo quando è stato indicato**, invece di mostrare uno
+0 € che nessuno ha mai chiesto — stessa logica di `formatOptionalEuro` nel PDF dei report.
+
+**Perché la migrazione è scritta a mano.** `drizzle-kit generate` qui chiede una conferma
+interattiva anche per una semplice `ADD COLUMN` (nessun conflitto reale: solo il prompt "è una
+rinomina?"), e non è eseguibile in una sessione non interattiva. Le migrazioni 0001-0024 erano
+già scritte a mano per lo stesso motivo — solo `0000_snapshot.json` esiste nella cartella
+`meta`, nessuno snapshot successivo — quindi la nuova segue la stessa convenzione: SQL a mano
+più una riga aggiunta a `_journal.json`.
+
 ## 2026-09-14 — Verifica in due passaggi obbligatoria per l'admin
 
 **Cosa.** Fase 5 del [piano della 2FA](2FA-PLAN.md). Un admin senza 2FA attiva non entra più

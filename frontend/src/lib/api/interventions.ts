@@ -10,6 +10,8 @@ export type InterventionEntityDto = {
     problem: string | null;
     /** Annotazioni libere, facoltative per qualunque tipo e stato. */
     note: string | null;
+    /** Facoltativo per qualunque tipo di intervento. */
+    price: number | null;
     status: InterventionStatus;
     interventionDate: string | null;
     startTime: string | null;
@@ -25,6 +27,7 @@ export type InterventionCreateInput = {
     description?: string | null;
     problem?: string | null;
     note?: string | null;
+    price?: number | null;
     status?: InterventionStatus;
     customerId: number;
     collaboratorId: number;

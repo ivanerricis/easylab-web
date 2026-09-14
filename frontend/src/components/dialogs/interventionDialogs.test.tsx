@@ -137,6 +137,7 @@ describe("CreateInterventionDialog", () => {
                 description: null,
                 problem: null,
                 note: null,
+                price: null,
                 customer: "Mario Rossi - 333",
                 customerId: 30,
                 collaboratorId: 40,
@@ -146,6 +147,29 @@ describe("CreateInterventionDialog", () => {
             });
         });
         expect(toastSuccess).toHaveBeenCalledWith("Intervento creato con successo");
+    });
+
+    it("il prezzo è facoltativo ma, se indicato, viaggia come numero", async () => {
+        const onSubmit = await renderDialog({ initialDate: "2026-10-05" });
+
+        await fillCustomerAndCollaborator();
+        await userEvent.type(screen.getByLabelText(/^Prezzo/), "45");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ price: 45 }));
+        });
+    });
+
+    it("rifiuta un prezzo negativo", async () => {
+        const onSubmit = await renderDialog({ initialDate: "2026-10-05" });
+
+        await fillCustomerAndCollaborator();
+        await userEvent.type(screen.getByLabelText(/^Prezzo/), "-5");
+        await save();
+
+        expect(screen.getByLabelText(/^Prezzo/)).toHaveFocus();
+        expect(onSubmit).not.toHaveBeenCalled();
     });
 
     /** Un intervento chiuso deve dire cosa è stato fatto e quando. */
@@ -228,6 +252,7 @@ describe("EditInterventionDialog", () => {
         description: "Sostituito cavo",
         problem: "Rete assente",
         note: null,
+        price: null,
         status: "completato",
         interventionDate: "2026-09-10",
         startTime: "09:00:00",
@@ -281,6 +306,7 @@ describe("EditInterventionDialog", () => {
                 description: "Sostituito cavo",
                 problem: "Rete assente",
                 note: "Richiamare lunedì",
+                price: null,
                 collaboratorId: 40,
                 interventionDate: "2026-09-10",
                 startTime: "09:00",

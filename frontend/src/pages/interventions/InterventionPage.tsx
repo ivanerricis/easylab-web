@@ -17,7 +17,7 @@ import {
     type InterventionEntityDto,
     updateIntervention,
 } from "@/lib/api";
-import { formatDate, formatDateTime, openPrintWindow } from "@/lib/utils";
+import { formatDate, formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
 import { toInterventionUpdatePayload } from "@/lib/interventionForm";
 import {
     formatInterventionStatus,
@@ -283,6 +283,10 @@ const InterventionPage = () => {
                         {isOnSite ? <DetailItem label="Problema" value={details.intervention.problem ?? "-"} /> : null}
                         <DetailItem label="Descrizione" value={details.intervention.description ?? "-"} />
                         <DetailItem label="Note" value={details.intervention.note ?? "-"} />
+                        <DetailItem
+                            label="Prezzo"
+                            value={details.intervention.price != null ? formatEuro(details.intervention.price) : "-"}
+                        />
                         <DetailItem label="Creato il" value={formatDateTime(details.intervention.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"

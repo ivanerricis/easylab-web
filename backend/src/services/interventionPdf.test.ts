@@ -56,6 +56,7 @@ const buildIntervention = (overrides: Partial<InterventionPrintData> = {}): Inte
     description: "Sostituita la scheda madre",
     problem: "Il PC non si accende",
     note: null,
+    price: null,
     interventionDateLabel: "10/09/2026",
     startTime: "09:00",
     endTime: "11:30",
@@ -185,6 +186,15 @@ describe("createInterventionPdfBuffer", () => {
 
         expect(conProblema).toContain("Problema riscontrato");
         expect(senzaProblema).not.toContain("Problema riscontrato");
+    });
+
+    it("mostra il prezzo solo quando è stato indicato", async () => {
+        const conPrezzo = JSON.stringify(await captureInterventionDoc(buildIntervention({ price: 45 })));
+        const senzaPrezzo = JSON.stringify(await captureInterventionDoc(buildIntervention({ price: null })));
+
+        expect(conPrezzo).toContain("Prezzo");
+        expect(conPrezzo).toContain("45,00");
+        expect(senzaPrezzo).not.toContain("Prezzo");
     });
 });
 

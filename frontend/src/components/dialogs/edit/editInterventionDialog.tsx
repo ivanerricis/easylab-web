@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import DatePickerField from "@/components/date-picker-field";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
@@ -18,11 +19,24 @@ import {
     isScheduledInterventionStatus,
 } from "@/lib/interventions";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
 const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
+
+/** Un campo prezzo con il simbolo dell'euro davanti: prima era un numero nudo. */
+const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
+    <div className="relative">
+        <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-lg text-muted-foreground"
+        >
+            €
+        </span>
+        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
+    </div>
+);
 
 export type EditInterventionSubmitValues = {
     interventionId: number;
@@ -32,6 +46,8 @@ export type EditInterventionSubmitValues = {
     description: string | null;
     problem: string | null;
     note: string | null;
+    /** Facoltativo per qualunque tipo di intervento. */
+    price: number | null;
     collaboratorId: number;
     interventionDate: string | null;
     startTime: string | null;
@@ -46,10 +62,18 @@ type EditInterventionDialogProps = {
     onSubmit: (values: EditInterventionSubmitValues) => Promise<void>;
 };
 
-type FieldErrors = Partial<Record<"collaboratorId" | InterventionField, string>>;
+type FieldErrors = Partial<Record<"collaboratorId" | "price" | InterventionField, string>>;
 
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
-const fieldOrder = ["collaboratorId", "interventionDate", "startTime", "endTime", "problem", "description"] as const;
+const fieldOrder = [
+    "collaboratorId",
+    "interventionDate",
+    "startTime",
+    "endTime",
+    "problem",
+    "description",
+    "price",
+] as const;
 
 const EditInterventionDialog = ({
     open,
@@ -70,6 +94,7 @@ const EditInterventionDialog = ({
         description: "",
         problem: "",
         note: "",
+        price: "",
         collaboratorId: "",
         interventionDate: "",
         startTime: "",
@@ -106,6 +131,7 @@ const EditInterventionDialog = ({
                     description: intervention.description ?? "",
                     problem: intervention.problem ?? "",
                     note: intervention.note ?? "",
+                    price: intervention.price != null ? String(intervention.price) : "",
                     collaboratorId: String(intervention.collaboratorId),
                     interventionDate: intervention.interventionDate ?? "",
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
@@ -140,6 +166,12 @@ const EditInterventionDialog = ({
             nextErrors.collaboratorId = "Seleziona un collaboratore valido";
         }
 
+        const price = formValues.price.trim() === "" ? null : Number(formValues.price);
+
+        if (price != null && (!Number.isFinite(price) || price < 0)) {
+            nextErrors.price = "Il prezzo deve essere maggiore o uguale a zero";
+        }
+
         const validationError = getInterventionValidationError(formValues);
 
         if (validationError) {
@@ -164,6 +196,7 @@ const EditInterventionDialog = ({
                 description: formValues.description.trim() || null,
                 problem: isOnSite ? formValues.problem.trim() : null,
                 note: formValues.note.trim() || null,
+                price,
                 collaboratorId,
                 interventionDate: formValues.interventionDate,
                 startTime: isOnSite ? formValues.startTime || null : null,
@@ -326,6 +359,22 @@ const EditInterventionDialog = ({
                                             }}
                                         />
                                         <FieldError id="interventionDate" error={errors.interventionDate} />
+                                    </div>
+
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="price" className="text-lg">
+                                            Prezzo
+                                            <span className="text-base text-muted-foreground"> (facoltativo)</span>
+                                        </Label>
+                                        <EuroInput
+                                            {...fieldProps("price", { error: errors.price })}
+                                            value={formValues.price}
+                                            onChange={(event) => {
+                                                setFormValues((prev) => ({ ...prev, price: event.target.value }));
+                                                setErrors((prev) => ({ ...prev, price: undefined }));
+                                            }}
+                                        />
+                                        <FieldError id="price" error={errors.price} />
                                     </div>
 
                                     {isOnSite ? (

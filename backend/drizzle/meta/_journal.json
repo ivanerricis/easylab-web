@@ -176,6 +176,13 @@
       "when": 1776370001000,
       "tag": "0024_add_intervention_note",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776370002000,
+      "tag": "0025_add_intervention_price",
+      "breakpoints": true
     }
   ]
 }

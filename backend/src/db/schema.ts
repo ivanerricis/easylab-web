@@ -251,6 +251,8 @@ export const interventionTable = pgTable(
          * col cliente, materiale da riportare, promemoria per il prossimo passaggio).
          */
         note: text("note"),
+        /** Facoltativo: alcuni interventi (es. consegne materiale) non hanno un prezzo da segnare. */
+        price: integer("price"),
         status: varchar("status", { length: 20 }).notNull().default("programmato"),
         interventionDate: date("intervention_date"),
         startTime: time("start_time"),

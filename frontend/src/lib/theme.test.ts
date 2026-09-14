@@ -3,12 +3,18 @@ import {
     applyCornerRadius,
     applyFontSize,
     applyTableDensity,
+    applyTableRowIntensity,
     applyThemeAccentPreset,
     getStoredCornerRadius,
     getStoredFontSize,
+    getStoredTableColumnWidths,
     getStoredTableDensity,
+    getStoredTableRowIntensity,
     getStoredTableRowsPerPage,
     getStoredThemeAccentPreset,
+    setStoredCornerRadius,
+    setStoredTableColumnWidths,
+    setStoredTableRowIntensity,
     setStoredTableRowsPerPage,
     setStoredThemeAccentPreset,
     themeAccentPresets,
@@ -19,6 +25,7 @@ beforeEach(() => {
     document.documentElement.removeAttribute("style");
     document.documentElement.removeAttribute("data-table-density");
     document.documentElement.removeAttribute("data-font-size");
+    document.documentElement.removeAttribute("data-table-row-intensity");
 });
 
 describe("preferenze di tema salvate", () => {
@@ -244,5 +251,68 @@ describe("applicazione del tema al DOM", () => {
         applyCornerRadius("round");
 
         expect(document.documentElement.style.getPropertyValue("--radius")).not.toBe("");
+    });
+
+    it("intensità delle righe: attributo sulla radice, tolto tornando al predefinito", () => {
+        applyTableRowIntensity("soft");
+        expect(document.documentElement.getAttribute("data-table-row-intensity")).toBe("soft");
+
+        applyTableRowIntensity(null);
+        expect(document.documentElement.hasAttribute("data-table-row-intensity")).toBe(false);
+    });
+
+    it("intensità delle righe e raggio: il predefinito non si salva, un valore ignoto non si legge", () => {
+        setStoredTableRowIntensity("strong");
+        expect(getStoredTableRowIntensity()).toBe("strong");
+
+        setStoredTableRowIntensity("default");
+        expect(localStorage.getItem("easylab-web-table-row-intensity")).toBeNull();
+
+        localStorage.setItem("easylab-web-table-row-intensity", "fluo");
+        expect(getStoredTableRowIntensity()).toBeNull();
+
+        setStoredCornerRadius("square");
+        expect(getStoredCornerRadius()).toBe("square");
+        setStoredCornerRadius(null);
+        expect(localStorage.getItem("easylab-web-corner-radius")).toBeNull();
+    });
+});
+
+describe("larghezze delle colonne salvate", () => {
+    const storageKey = "easylab-web-table-column-widths:report";
+
+    it("salva e rilegge la mappa della tabella, separata da quella delle altre", () => {
+        setStoredTableColumnWidths("report", { customer: 240, device: 120 });
+
+        expect(getStoredTableColumnWidths("report")).toEqual({ customer: 240, device: 120 });
+        expect(getStoredTableColumnWidths("interventi")).toEqual({});
+    });
+
+    it("una mappa vuota toglie la voce invece di salvare {}", () => {
+        setStoredTableColumnWidths("report", { customer: 240 });
+        setStoredTableColumnWidths("report", {});
+
+        expect(localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    /** localStorage si modifica a mano e sopravvive agli aggiornamenti: si tiene solo ciò che ha senso. */
+    it.each([
+        ["JSON rovinato", "{non json"],
+        ["un array", "[240, 120]"],
+        ["null", "null"],
+        ["un numero", "42"],
+    ])("con %s restituisce una mappa vuota", (_label, rawValue) => {
+        localStorage.setItem(storageKey, rawValue);
+
+        expect(getStoredTableColumnWidths("report")).toEqual({});
+    });
+
+    it("scarta le voci che non sono larghezze plausibili", () => {
+        localStorage.setItem(
+            storageKey,
+            JSON.stringify({ customer: 240, device: "120", notes: -5, zero: 0, id: null, price: 96.5 })
+        );
+
+        expect(getStoredTableColumnWidths("report")).toEqual({ customer: 240, price: 96.5 });
     });
 });

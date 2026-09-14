@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,14 @@ vi.mock("@/lib/api", async () => {
 });
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
+
+/**
+ * Il ripristino si sblocca solo dopo aver scritto RESTORE lettera per lettera: da solo il test
+ * sta sotto i 5 secondi di default, ma con la suite intera o la coverage accesa li ha superati.
+ * Come negli altri file con moduli lunghi, meglio un test lento di uno che scade e continua a
+ * battere tasti nel DOM del test successivo.
+ */
+vi.setConfig({ testTimeout: 20000 });
 
 import { AuthProviderContext, initialAuthProviderState } from "@/components/auth-provider-context";
 import BackupSettingsPanel from "./backupSettingsPanel";
@@ -159,5 +167,109 @@ describe("BackupSettingsPanel", () => {
             expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         });
         expect(api.restoreBackupFromExisting).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * La logica di salvataggio e di prova sta in `useBackupPanel` e ha i suoi test; qui si
+ * verifica il collegamento dei campi, cioè che ognuno scriva l'impostazione giusta. Un
+ * `onChange` copiato dal campo accanto e non corretto passerebbe tutti gli altri test.
+ */
+describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
+    const change = (label: string | RegExp, value: string) =>
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+    const fillNasFields = async () => {
+        await userEvent.click(screen.getByLabelText("Copia ogni backup su una condivisione SMB/CIFS"));
+        change("Host / IP del NAS", " nas.locale ");
+        change("Nome condivisione", "backup");
+        change("Sottocartella (opzionale)", "laboratorio");
+        change("Porta", "1445");
+        change("Dominio/Workgroup (opzionale)", "UFFICIO");
+        change("Utente", "utente-nas");
+        change("Password", "segreta");
+    };
+
+    it("i campi del NAS restano disattivati finché la copia non viene attivata", async () => {
+        await renderPanel();
+
+        expect(screen.getByLabelText("Host / IP del NAS")).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Testa connessione" })).toBeDisabled();
+
+        await userEvent.click(screen.getByLabelText("Copia ogni backup su una condivisione SMB/CIFS"));
+
+        expect(screen.getByLabelText("Host / IP del NAS")).toBeEnabled();
+        expect(screen.getByRole("button", { name: "Testa connessione" })).toBeEnabled();
+    });
+
+    it("ogni campo arriva al salvataggio con il proprio valore", async () => {
+        api.updateBackupSettings.mockResolvedValue({ ...settings, restoreSecretsToReconfigure: [] });
+        await renderPanel();
+
+        await userEvent.click(screen.getByLabelText("Esegui dump in automatico"));
+        change("Ogni quanti giorni", "3");
+        change("Orario", "03:30");
+        change("Numero di backup da mantenere", "7");
+        await fillNasFields();
+        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+
+        await waitFor(() => {
+            expect(api.updateBackupSettings).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    autoEnabled: false,
+                    frequencyDays: 3,
+                    runAt: "03:30",
+                    maxBackupsToKeep: 7,
+                    smbEnabled: true,
+                    smbHost: "nas.locale",
+                    smbShare: "backup",
+                    smbPath: "laboratorio",
+                    smbPort: 1445,
+                    smbDomain: "UFFICIO",
+                    smbUsername: "utente-nas",
+                    smbPassword: "segreta",
+                })
+            );
+        });
+    });
+
+    it("la prova di connessione usa i valori scritti nei campi", async () => {
+        api.testSmbConnection.mockResolvedValue({ message: "Connessione al NAS riuscita" });
+        await renderPanel();
+
+        await fillNasFields();
+        await userEvent.click(screen.getByRole("button", { name: "Testa connessione" }));
+
+        await waitFor(() => {
+            expect(api.testSmbConnection).toHaveBeenCalledWith({
+                host: "nas.locale",
+                share: "backup",
+                path: "laboratorio",
+                domain: "UFFICIO",
+                port: 1445,
+                username: "utente-nas",
+                password: "segreta",
+            });
+        });
+    });
+
+    /** Senza email configurata l'avviso non partirebbe: la casella resta spenta e lo spiega. */
+    it("l'avviso email si può attivare solo con l'invio email configurato", async () => {
+        await renderPanel();
+        expect(screen.getByLabelText("Invia una email se il backup automatico non va a buon fine")).toBeDisabled();
+
+        cleanup();
+        api.getBackupSettings.mockResolvedValue({ ...settings, emailConfigured: true });
+        api.updateBackupSettings.mockResolvedValue({ ...settings, emailConfigured: true });
+        await renderPanel();
+
+        await userEvent.click(screen.getByLabelText("Invia una email se il backup automatico non va a buon fine"));
+        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+
+        await waitFor(() => {
+            expect(api.updateBackupSettings).toHaveBeenCalledWith(
+                expect.objectContaining({ notifyEmailOnFailure: true })
+            );
+        });
     });
 });

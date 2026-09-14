@@ -21,10 +21,15 @@ vi.mock("../services/authManager", () => ({
 }));
 
 import {
+    changeOwnPassword,
     completeTwoFactorLogin,
+    confirmTwoFactorSetup,
+    deleteSession,
+    disableTwoFactor,
     getSessionUser,
     getTwoFactorStatus,
     login,
+    regenerateRecoveryCodes,
     startTwoFactorSetup,
 } from "../services/authManager";
 import authRouter from "./auth";
@@ -237,5 +242,218 @@ describe("rotte di gestione del proprio secondo fattore", () => {
 
         expect(response.status).toBe(400);
         expect(startTwoFactorSetup).not.toHaveBeenCalled();
+    });
+});
+
+describe("POST /api/auth/login/2fa: risultato inatteso dal servizio", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    /** Irraggiungibile oggi, ma se il servizio cambiasse non deve nascere un cookie vuoto. */
+    it("risponde 401 senza cookie se il servizio non autentica", async () => {
+        vi.mocked(completeTwoFactorLogin).mockResolvedValue({ status: "twoFactorRequired", challengeId: "altro" });
+
+        const response = await request(buildApp())
+            .post("/api/auth/login/2fa")
+            .send({ challengeId: "abc123", code: "123456" });
+
+        expect(response.status).toBe(401);
+        expect(sessionCookieOf(response)).toBeUndefined();
+    });
+});
+
+describe("POST /api/auth/logout", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("cancella la sessione del cookie e svuota il cookie", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+        const response = await request(buildApp()).post("/api/auth/logout").set("Cookie", "session=un-token");
+
+        expect(response.status).toBe(204);
+        expect(deleteSession).toHaveBeenCalledWith("un-token");
+        expect(sessionCookieOf(response)).toMatch(/^session=;/);
+    });
+
+    it("senza sessione risponde 401 e non cancella niente", async () => {
+        const response = await request(buildApp()).post("/api/auth/logout");
+
+        expect(response.status).toBe(401);
+        expect(deleteSession).not.toHaveBeenCalled();
+    });
+});
+
+describe("GET /api/auth/me", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("restituisce l'utente della sessione", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", "session=un-token");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(publicUser);
+    });
+
+    it("con una sessione scaduta risponde 401 e svuota il cookie", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue(null);
+
+        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", "session=scaduto");
+
+        expect(response.status).toBe(401);
+        expect(sessionCookieOf(response)).toMatch(/^session=;/);
+    });
+});
+
+describe("PUT /api/auth/password", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    /** È la rotta che sblocca il primo accesso: deve restare raggiungibile a chi deve cambiare password. */
+    it("resta raggiungibile a chi ha la password da cambiare, e passa la sessione corrente al servizio", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue({ ...publicUser, mustChangePassword: true });
+
+        const response = await request(buildApp())
+            .put("/api/auth/password")
+            .set("Cookie", "session=un-token")
+            .send({ currentPassword: "vecchia", newPassword: "Nuova-password-1!" });
+
+        expect(response.status).toBe(204);
+        expect(changeOwnPassword).toHaveBeenCalledWith(publicUser.id, "vecchia", "Nuova-password-1!", "un-token");
+    });
+
+    it("rifiuta una nuova password fuori dalle regole prima di arrivare al servizio", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+        const response = await request(buildApp())
+            .put("/api/auth/password")
+            .set("Cookie", "session=un-token")
+            .send({ currentPassword: "vecchia", newPassword: "corta" });
+
+        expect(response.status).toBe(400);
+        expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+
+    it("propaga l'errore del servizio sulla password attuale sbagliata", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+        vi.mocked(changeOwnPassword).mockRejectedValue(new ApiError("La password attuale non è corretta", 400));
+
+        const response = await request(buildApp())
+            .put("/api/auth/password")
+            .set("Cookie", "session=un-token")
+            .send({ currentPassword: "sbagliata", newPassword: "Nuova-password-1!" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toBe("La password attuale non è corretta");
+    });
+
+    it("senza sessione risponde 401", async () => {
+        const response = await request(buildApp())
+            .put("/api/auth/password")
+            .send({ currentPassword: "vecchia", newPassword: "Nuova-password-1!" });
+
+        expect(response.status).toBe(401);
+        expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+});
+
+describe("attivazione, disattivazione e codici di recupero", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+    });
+
+    /**
+     * L'admin a cui la 2FA è imposta passa proprio da qui per configurarla: se queste rotte
+     * avessero anche `requireTwoFactorSetupCompleted` resterebbe chiuso fuori per sempre.
+     */
+    it("lascia confermare la 2FA all'admin a cui è imposta, passando la sessione corrente", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue({
+            ...publicUser,
+            isAdmin: true,
+            twoFactorEnabled: false,
+            twoFactorSetupRequired: true,
+        });
+        vi.mocked(confirmTwoFactorSetup).mockResolvedValue({ recoveryCodes: ["ABCD2345"] });
+
+        const response = await request(buildApp())
+            .post("/api/auth/2fa/enable")
+            .set("Cookie", "session=un-token")
+            .send({ code: "123456" });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ recoveryCodes: ["ABCD2345"] });
+        expect(confirmTwoFactorSetup).toHaveBeenCalledWith(publicUser.id, "123456", "un-token");
+    });
+
+    it("la conferma senza codice non arriva al servizio", async () => {
+        const response = await request(buildApp())
+            .post("/api/auth/2fa/enable")
+            .set("Cookie", "session=un-token")
+            .send({ code: "   " });
+
+        expect(response.status).toBe(400);
+        expect(confirmTwoFactorSetup).not.toHaveBeenCalled();
+    });
+
+    it("la disattivazione chiede password e codice, e risponde 204", async () => {
+        const response = await request(buildApp())
+            .delete("/api/auth/2fa")
+            .set("Cookie", "session=un-token")
+            .send({ password: "segreta1!", code: "123456" });
+
+        expect(response.status).toBe(204);
+        expect(disableTwoFactor).toHaveBeenCalledWith(publicUser.id, "segreta1!", "123456");
+    });
+
+    it("la disattivazione con la sola password non arriva al servizio", async () => {
+        const response = await request(buildApp())
+            .delete("/api/auth/2fa")
+            .set("Cookie", "session=un-token")
+            .send({ password: "segreta1!" });
+
+        expect(response.status).toBe(400);
+        expect(disableTwoFactor).not.toHaveBeenCalled();
+    });
+
+    it("rigenera i codici di recupero con password e codice", async () => {
+        vi.mocked(regenerateRecoveryCodes).mockResolvedValue({ recoveryCodes: ["ZXCV2345", "QWER6789"] });
+
+        const response = await request(buildApp())
+            .post("/api/auth/2fa/recovery-codes")
+            .set("Cookie", "session=un-token")
+            .send({ password: "segreta1!", code: "123456" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.recoveryCodes).toHaveLength(2);
+        expect(regenerateRecoveryCodes).toHaveBeenCalledWith(publicUser.id, "segreta1!", "123456");
+    });
+
+    it("non accetta campi in più nel corpo", async () => {
+        const response = await request(buildApp())
+            .post("/api/auth/2fa/recovery-codes")
+            .set("Cookie", "session=un-token")
+            .send({ password: "segreta1!", code: "123456", userId: 1 });
+
+        expect(response.status).toBe(400);
+        expect(regenerateRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("chi deve ancora cambiare password non può disattivare la 2FA", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue({ ...publicUser, mustChangePassword: true });
+
+        const response = await request(buildApp())
+            .delete("/api/auth/2fa")
+            .set("Cookie", "session=un-token")
+            .send({ password: "segreta1!", code: "123456" });
+
+        expect(response.status).toBe(403);
+        expect(disableTwoFactor).not.toHaveBeenCalled();
     });
 });

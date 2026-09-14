@@ -11,6 +11,84 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Test dove mancavano, e i primi test nel browser
+
+**Contesto.** Misurata la copertura reale dei due pacchetti (backend 75% delle righe, frontend
+82%) per capire dove mancassero test, non solo quanti ce ne fossero. I buchi più seri erano in
+codice di sicurezza e di backup mai eseguito da nessun test; il resto erano componenti e rami
+coperti a metà. Scelta dell'utente: tutto tranne i test sul database vero, che restano da
+decidere (vedi BACKLOG).
+
+**Backend** — da 656 a 810 test.
+
+- `authManager`: gestione utenti (creazione, rigenera password, attiva/disattiva, elimina),
+  attivazione e conferma della 2FA, disattivazione, codici di recupero, sblocco da admin,
+  pulizia periodica delle sessioni, codice TOTP monouso, challenge scaduto o account cambiato
+  nel frattempo. Il mock di `db` ora sa anche far fallire una query.
+- Rotte `auth`: logout, `/me`, cambio password (raggiungibile a chi deve ancora cambiarla), le
+  rotte `/2fa/*` — compresa quella che conta di più: l'admin a cui la 2FA è imposta deve poter
+  raggiungere proprio le rotte per configurarla.
+- `backupManager` (era al 7%): salvataggio delle impostazioni, il dump con retention, copia e
+  pulizia sul NAS, gli avvisi dei backup automatici falliti (notifica e mail, che non deve mai
+  sostituire l'errore del backup), il blocco fra dump concorrenti, lo scheduler.
+- `backupSmb`: come viene avviato smbclient (la password nell'ambiente, mai fra gli argomenti,
+  che `ps` mostra a chiunque), timeout, errori di avvio, cartella remota già esistente, pulizia
+  dei vecchi backup. Il processo è un finto `child_process` pilotato dal test.
+- Rotte di Impostazioni: paginazione e ricerca dei log, download di log e backup, ripristino da
+  file caricato, logo (compreso il 413 oltre i 5 MB), email, aggiornamento.
+- **`app.ts` separato da `index.ts`.** L'ordine delle guardie su `/api` (sessione, password
+  cambiata, 2FA configurata, admin) è una decisione di sicurezza che nessun test di router
+  isolato vede, ma `index.ts` apriva la porta 3000 appena importato. Ora `app.ts` costruisce
+  l'app e `index.ts` la avvia; `app.test.ts` verifica che ogni prefisso di `/api` chieda la
+  sessione, che password e 2FA in sospeso blocchino i dati ma non le rotte per sistemarle, che
+  il logo esca in sandbox. Solo spostamento di righe: confrontato riga per riga col vecchio file.
+- `reportPdf.render.test.ts`, con pdfmake **vero**: il test esistente lo simula, e con
+  l'impaginazione finta l'algoritmo che fa riempire alla ricevuta esattamente un foglio non
+  veniva mai eseguito (lo diceva il suo stesso commento). Ora si verifica che resti una pagina
+  e che non avanzi spazio in fondo.
+
+**Frontend** — da 519 a 611 test.
+
+- Sezione Tema (era allo 0%), pannello Email (prova di invio, validazioni, errori del server),
+  sezione Sicurezza (attivazione completa della 2FA, rigenerazione dei codici), `lib/theme.ts`
+  (larghezze colonne lette da localStorage, che può contenere di tutto), il popover del
+  calendario, le colonne della scheda collaboratore.
+- `useResizableColumns`: prima era testata solo la funzione pura; ora l'hook su una tabella
+  vera — trascinamento, minimo leggibile, tastiera, doppio click, salvataggio dell'intero
+  layout, rimisurazione una volta sola al caricamento dei font.
+- Il routing di `App.tsx` (era allo 0%): ogni URL la sua pagina, radice e indirizzi sconosciuti
+  verso la dashboard, login, cambio password e 2FA che prendono il posto di qualunque pagina.
+- Nel pannello Backup, il collegamento dei campi: che ognuno scriva la propria impostazione.
+  Un `onChange` copiato dal campo accanto passava tutti i test esistenti.
+- `backupSettingsPanel.test.tsx` ha il timeout a 20 secondi come gli altri moduli lunghi: con
+  la suite intera il test del ripristino superava i 5 secondi, e un test che scade continua a
+  battere tasti nel DOM di quello dopo.
+
+**Test nel browser (Playwright)**, nuovi: `frontend/e2e/`, `npm run test:e2e`, un job a parte
+in CI. Coprono quello che jsdom non sa fare: il login (anche con la 2FA e il ritorno alla
+pagina chiesta), la validazione dei dialoghi con le regole native del browser attive, e il
+doppio click sul calendario — la voce del BACKLOG che aspettava proprio un test nel browser.
+L'API è simulata dentro il browser, quindi niente backend né database. Due scelte che non si
+vedono dal codice:
+
+- Girano sulla **build** servita da `vite preview`, non sul server di sviluppo: a freddo Vite
+  scopre le dipendenze del calendario (caricato in differita) solo quando servono e ricarica la
+  pagina a test iniziato. Da solo il test passava, con tre in parallelo no.
+- Il mock intercetta i percorsi che *cominciano* con `/api/`, non il glob `**/api/**`, che
+  prendeva anche i moduli di `/src/lib/api/` e l'app non partiva.
+
+Con questo è verificato in un browser vero anche il punto lasciato aperto il 2026-09-11:
+togliendo `noValidate` dal `<form>` di `CustomDialog`, gli errori sotto i campi non compaiono.
+
+**Verifica.** Ogni test nuovo che passava al primo colpo è stato provato contro una
+regressione introdotta apposta nel sorgente (una trentina in tutto: guardie tolte, sessioni
+non chiuse, codici di recupero salvati in chiaro, blocco dei dump non rilasciato, ridistribuzione
+del PDF spenta, campi scambiati, rotte tolte…), controllando che fallisse il test giusto. I test
+nel browser sono stati ripetuti 5 volte di fila senza fallimenti.
+
+**Non verificato.** Il job di CI dei test nel browser non è ancora girato su GitHub: in locale
+usano Edge, in CI il Chromium scaricato da Playwright.
+
 ## 2026-09-14 — Il logout non passa più la pagina corrente al prossimo login
 
 **Contesto.** Segnalato dall'uso reale: app installata come PWA, login come admin sulla pagina

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Test nel browser (Playwright): build di prova, risultati e tracce dei fallimenti
+dist-e2e
+test-results
+playwright-report
+blob-report
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

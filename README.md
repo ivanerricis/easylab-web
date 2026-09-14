@@ -64,6 +64,14 @@ npm run build
 Sono gli stessi comandi che la CI (`.github/workflows/ci.yml`) esegue a ogni push, insieme alla build delle immagini Docker di produzione. Nessuno dei due pacchetti ha bisogno di un database per i test: le chiamate al database (backend) e all'API (frontend) sono simulate.
 
 - **Frontend**: Vitest + Testing Library su jsdom. I test stanno accanto al file che provano (`*.test.ts(x)`); `src/test/setup.ts` completa jsdom con le API che non ha (matchMedia, ResizeObserver, pointer capture...) e `src/test/render.tsx` monta un componente dentro gli stessi provider di `App.tsx` (tooltip, router, blocco a schermo).
-- **Backend**: Vitest + Supertest, con il livello delle query simulato.
+- **Backend**: Vitest + Supertest, con il livello delle query simulato. `app.test.ts` monta l'app intera per verificare l'ordine delle guardie su `/api`; `reportPdf.render.test.ts` usa pdfmake vero per controllare che la ricevuta riempia esattamente un foglio.
+- **Frontend nel browser**: Playwright, per quello che jsdom non sa fare (coordinate del mouse nel calendario, validazione nativa dei form, il giro di login). I test stanno in `frontend/e2e/`, girano sulla build di produzione servita da `vite preview` e simulano l'API dentro il browser (`e2e/support/mockApi.ts`), quindi non serve né il backend né il database:
+
+  ```bash
+  cd frontend
+  npm run test:e2e
+  ```
+
+  In locale usano Edge già installato; per un altro browser `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`, oppure `npx playwright install chromium` e `PLAYWRIGHT_CHANNEL=` vuoto. In CI girano sul Chromium di Playwright, in un job a parte.
 
 > **Su Windows** `npm run format:check` segnala anche file corretti, perché git li consegna con fine riga CRLF mentre `.prettierrc` chiede LF. Il controllo attendibile in locale è `npx prettier --check --end-of-line auto "**/*.{ts,tsx}"`, e `--write --end-of-line auto` per correggere senza toccare i fine riga.

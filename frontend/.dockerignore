@@ -9,3 +9,7 @@ npm-debug.log
 *.env
 *.env.*
 vite.config.ts.timestamp-*
+dist-e2e
+test-results
+playwright-report
+blob-report

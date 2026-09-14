@@ -46,9 +46,11 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   `ReportsPage` coprono già i quattro casi.
 - `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
   file del codice la legge: configurazione morta, da togliere o da ricollegare.
-- Il doppio click su un giorno libero del calendario (apre la creazione con la data) non ha
-  test: in jsdom la selezione di react-big-calendar non funziona. Da coprire con un test nel
-  browser, se ne arriverà uno.
+- Test sul database vero: il query layer (`backend/src/db/queries/*`) è allo 0% di copertura,
+  perché ogni test lo simula — join, ordinamenti, ricerca e vincoli non li esegue nessun test.
+  Serve Postgres in CI (un servizio nel job, o testcontainers), cioè rinunciare alla scelta di
+  una CI senza database. Da decidere; il resto della copertura è stato completato il
+  2026-09-14 (vedi CHANGELOG).
 - Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
   "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.

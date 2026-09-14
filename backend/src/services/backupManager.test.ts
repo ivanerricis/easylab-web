@@ -1,4 +1,79 @@
-import { describe, expect, it } from "vitest";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { BackupSettingsState } from "./backupState";
+
+/**
+ * Mock parziali: nomi dei file, ordinamento e messaggi SMB restano veri (li coprono i test
+ * in cima al file), mentre tutto ciò che tocca disco, processi, NAS e posta è sostituito.
+ * Lo stato è un oggetto del test, restituito da `loadState` come farebbe la cache vera:
+ * `runBackupNow` e `updateBackupSettings` lo modificano sul posto.
+ */
+let state: BackupSettingsState;
+
+const persistState = vi.fn<(value: BackupSettingsState) => Promise<void>>(() => Promise.resolve());
+
+vi.mock("./backupState", async () => {
+    const actual = await vi.importActual<typeof import("./backupState")>("./backupState");
+    return {
+        ...actual,
+        loadState: () => Promise.resolve(state),
+        persistState: (value: BackupSettingsState) => persistState(value),
+    };
+});
+
+const createBackupArchive = vi.fn<(archivePath: string) => Promise<void>>(() => Promise.resolve());
+
+vi.mock("./backupProcess", () => ({
+    createBackupArchive: (archivePath: string) => createBackupArchive(archivePath),
+}));
+
+const pruneOldBackups = vi.fn<(outputDir: string, keep: number) => Promise<void>>(() => Promise.resolve());
+
+vi.mock("./backupFiles", async () => {
+    const actual = await vi.importActual<typeof import("./backupFiles")>("./backupFiles");
+    return { ...actual, pruneOldBackups: (outputDir: string, keep: number) => pruneOldBackups(outputDir, keep) };
+});
+
+const uploadDumpToSmb = vi.fn<(config: unknown, localFilePath: string) => Promise<void>>(() => Promise.resolve());
+const pruneOldSmbBackups = vi.fn<(config: unknown, keep: number) => Promise<void>>(() => Promise.resolve());
+
+vi.mock("./backupSmb", async () => {
+    const actual = await vi.importActual<typeof import("./backupSmb")>("./backupSmb");
+    return {
+        ...actual,
+        uploadDumpToSmb: (config: unknown, localFilePath: string) => uploadDumpToSmb(config, localFilePath),
+        pruneOldSmbBackups: (config: unknown, keep: number) => pruneOldSmbBackups(config, keep),
+    };
+});
+
+vi.mock("./secretCrypto", () => ({
+    encryptSecret: (value: string) => Promise.resolve(`cifrato:${value}`),
+    decryptSecret: (payload: string) => Promise.resolve(payload.replace(/^cifrato:/, "")),
+}));
+
+const isEmailConfigured = vi.fn<() => Promise<boolean>>(() => Promise.resolve(false));
+const sendEmail = vi.fn<(input: { to: string; subject: string; text: string }) => Promise<void>>(() =>
+    Promise.resolve()
+);
+
+vi.mock("./emailManager", () => ({
+    isEmailConfigured: () => isEmailConfigured(),
+    isStoredEmailPasswordUsable: () => Promise.resolve(true),
+    sendEmail: (input: { to: string; subject: string; text: string }) => sendEmail(input),
+}));
+
+const getCompanySettings = vi.fn(() => Promise.resolve({ name: "Laboratorio", email: "lab@example.com" }));
+
+vi.mock("./companyManager", () => ({
+    getCompanySettings: () => getCompanySettings(),
+}));
+
+const recordNotification = vi.fn();
+
+vi.mock("./notificationManager", () => ({
+    recordNotification: (input: unknown) => recordNotification(input),
+}));
+
 import {
     BackupManagerError,
     composeSmbErrorMessage,
@@ -7,8 +82,14 @@ import {
     getBackupSortKey,
     isAlreadyExistsSmbError,
     restoreBackupFromUpload,
+    runBackupNow,
     sortBackupFileNamesByAge,
+    startBackupScheduler,
+    stopBackupScheduler,
+    updateBackupSettings,
+    type SmbConnectionConfig,
 } from "./backupManager";
+import { defaultState } from "./backupState";
 
 // Il nome file è l'unico filtro fra la richiesta e il filesystem: questi test
 // coprono sia la retrocompatibilità col formato storico sia il traversal.
@@ -161,5 +242,383 @@ describe("restoreBackupFromUpload", () => {
         await expect(restoreBackupFromUpload(Buffer.from("x"), "backup.tar", false)).rejects.toThrow(
             BackupManagerError
         );
+    });
+});
+
+const smbState: Partial<BackupSettingsState> = {
+    smbEnabled: true,
+    smbHost: "nas.locale",
+    smbShare: "backup",
+    smbPath: "laboratorio",
+    smbDomain: "",
+    smbPort: 445,
+    smbUsername: "utente-nas",
+    smbPasswordEncrypted: "cifrato:password-nas",
+};
+
+beforeEach(() => {
+    state = { ...defaultState };
+    vi.clearAllMocks();
+    isEmailConfigured.mockResolvedValue(false);
+    getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "lab@example.com" });
+    createBackupArchive.mockResolvedValue(undefined);
+    uploadDumpToSmb.mockResolvedValue(undefined);
+    pruneOldSmbBackups.mockResolvedValue(undefined);
+});
+
+describe("updateBackupSettings", () => {
+    const input = {
+        autoEnabled: false,
+        frequencyDays: 1,
+        runAt: "02:00",
+        outputDir: "/etc",
+        maxBackupsToKeep: 7,
+        notifyEmailOnFailure: false,
+        smbEnabled: false,
+        smbHost: "",
+        smbShare: "",
+        smbPath: "",
+        smbDomain: "",
+        smbPort: 445,
+        smbUsername: "",
+    };
+
+    /** La cartella di destinazione non è configurabile dal client: è montata dal compose. */
+    it("ignora la cartella scelta dal client, ripulisce i campi del NAS e salva", async () => {
+        const result = await updateBackupSettings({
+            ...input,
+            smbEnabled: true,
+            smbHost: "  nas.locale ",
+            smbShare: " backup ",
+            smbPath: " laboratorio ",
+            smbUsername: " utente-nas ",
+            smbPassword: "password-nas",
+        });
+
+        expect(persistState).toHaveBeenCalledOnce();
+        expect(state).toMatchObject({
+            outputDir: "backups",
+            maxBackupsToKeep: 7,
+            smbHost: "nas.locale",
+            smbShare: "backup",
+            smbPath: "laboratorio",
+            smbUsername: "utente-nas",
+            smbPasswordEncrypted: "cifrato:password-nas",
+        });
+        expect(result).not.toHaveProperty("smbPasswordEncrypted");
+        expect(result.smbPasswordSet).toBe(true);
+    });
+
+    /** Il campo password arriva vuoto quando non la si vuole cambiare: la vecchia resta. */
+    it("senza una nuova password tiene quella già salvata", async () => {
+        state = { ...defaultState, ...smbState };
+
+        await updateBackupSettings({ ...input, ...smbState, smbEnabled: true } as typeof input);
+
+        expect(state.smbPasswordEncrypted).toBe("cifrato:password-nas");
+    });
+
+    it("rifiuta il NAS attivo senza host, condivisione o utente, senza salvare", async () => {
+        await expect(
+            updateBackupSettings({ ...input, smbEnabled: true, smbHost: "nas", smbShare: "  ", smbUsername: "u" })
+        ).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(persistState).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta il NAS attivo senza nessuna password", async () => {
+        await expect(
+            updateBackupSettings({ ...input, smbEnabled: true, smbHost: "nas", smbShare: "b", smbUsername: "u" })
+        ).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("password") as unknown });
+
+        expect(persistState).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta l'avviso email se l'invio email non è configurato", async () => {
+        await expect(updateBackupSettings({ ...input, notifyEmailOnFailure: true })).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(persistState).not.toHaveBeenCalled();
+    });
+
+    it("accetta l'avviso email quando l'invio è configurato", async () => {
+        isEmailConfigured.mockResolvedValue(true);
+
+        await updateBackupSettings({ ...input, notifyEmailOnFailure: true });
+
+        expect(state.notifyEmailOnFailure).toBe(true);
+    });
+
+    it("con il backup automatico attivo fissa la prossima esecuzione nel futuro; spento la toglie", async () => {
+        await updateBackupSettings({ ...input, autoEnabled: true });
+        expect(new Date(state.nextRunAt!).getTime()).toBeGreaterThan(Date.now());
+
+        await updateBackupSettings({ ...input, autoEnabled: false });
+        expect(state.nextRunAt).toBeNull();
+    });
+});
+
+describe("runBackupNow", () => {
+    it("crea l'archivio nella cartella configurata, applica la retention e registra il successo", async () => {
+        state = { ...defaultState, maxBackupsToKeep: 5 };
+
+        const result = await runBackupNow("manual");
+
+        const archivePath = createBackupArchive.mock.calls[0][0];
+        expect(path.dirname(archivePath)).toBe(path.join(process.cwd(), "backups"));
+        expect(path.basename(archivePath)).toMatch(/^db-backup-\d{8}-\d{6}\.tar\.gz$/);
+        expect(pruneOldBackups).toHaveBeenCalledWith("backups", 5);
+        expect(state).toMatchObject({
+            lastRunStatus: "success",
+            lastRunOrigin: "manual",
+            lastError: null,
+            lastDumpPath: archivePath,
+        });
+        expect(persistState).toHaveBeenCalled();
+        expect(result.message).toBe("Dump completato con successo");
+        expect(uploadDumpToSmb).not.toHaveBeenCalled();
+    });
+
+    it("non avvia un dump automatico se l'automatico è spento", async () => {
+        await expect(runBackupNow("auto")).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(createBackupArchive).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta con 409 un secondo dump mentre il primo è in corso, e libera il blocco alla fine", async () => {
+        let finishFirst!: () => void;
+        createBackupArchive.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishFirst = resolve;
+                })
+        );
+
+        const first = runBackupNow("manual");
+        await expect(runBackupNow("manual")).rejects.toMatchObject({ statusCode: 409 });
+
+        finishFirst();
+        await first;
+        await expect(runBackupNow("manual")).resolves.toMatchObject({ lastRunStatus: "success" });
+    });
+
+    it("un dump manuale fallito registra l'errore, lo rilancia e libera il blocco, senza notifiche", async () => {
+        createBackupArchive.mockRejectedValueOnce(new Error("pg_dump terminato con codice 1"));
+
+        await expect(runBackupNow("manual")).rejects.toThrow("pg_dump terminato con codice 1");
+
+        expect(state).toMatchObject({ lastRunStatus: "failed", lastError: "pg_dump terminato con codice 1" });
+        expect(persistState).toHaveBeenCalled();
+        expect(recordNotification).not.toHaveBeenCalled();
+        await expect(runBackupNow("manual")).resolves.toBeDefined();
+    });
+
+    describe("fallimento del backup automatico", () => {
+        beforeEach(() => {
+            state = { ...defaultState, autoEnabled: true, notifyEmailOnFailure: true };
+            createBackupArchive.mockRejectedValue(new Error("disco pieno"));
+        });
+
+        /** Gira di notte: senza notifica non lo vedrebbe nessuno. */
+        it("lascia una notifica in app e manda la mail all'indirizzo dell'azienda", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({ dedupeKey: "backup:auto-failed", message: "disco pieno" })
+            );
+            expect(sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    to: "lab@example.com",
+                    subject: "Backup automatico non riuscito - Laboratorio",
+                })
+            );
+        });
+
+        it("senza avviso email attivo si ferma alla notifica in app", async () => {
+            state.notifyEmailOnFailure = false;
+            isEmailConfigured.mockResolvedValue(true);
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            expect(recordNotification).toHaveBeenCalled();
+            expect(sendEmail).not.toHaveBeenCalled();
+        });
+
+        it("senza un indirizzo dell'azienda non manda nessuna mail", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "" });
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            expect(sendEmail).not.toHaveBeenCalled();
+        });
+
+        /** L'invio della mail non deve mai sostituire l'errore del backup con il proprio. */
+        it("una mail che non parte resta nei log e l'errore riportato è quello del backup", async () => {
+            const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+            isEmailConfigured.mockResolvedValue(true);
+            sendEmail.mockRejectedValueOnce(new Error("SMTP giù"));
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            expect(consoleError).toHaveBeenCalledWith("Invio email di avviso backup non riuscito:", expect.any(Error));
+            consoleError.mockRestore();
+        });
+    });
+
+    describe("copia sul NAS", () => {
+        beforeEach(() => {
+            state = { ...defaultState, ...smbState, maxBackupsToKeep: 4 };
+        });
+
+        it("carica l'archivio con la password decifrata e pulisce i vecchi con la stessa retention", async () => {
+            const result = await runBackupNow("manual");
+
+            const [config, uploadedPath] = uploadDumpToSmb.mock.calls[0] as [SmbConnectionConfig, string];
+            expect(config).toMatchObject({ host: "nas.locale", share: "backup", password: "password-nas" });
+            expect(uploadedPath).toBe(state.lastDumpPath);
+            expect(pruneOldSmbBackups).toHaveBeenCalledWith(config, 4);
+            expect(state).toMatchObject({ smbLastStatus: "success", smbLastError: null });
+            expect(result.message).toBe("Dump completato con successo");
+        });
+
+        /** Il backup locale c'è: un NAS irraggiungibile non deve farlo sembrare fallito. */
+        it("se la copia fallisce il backup locale resta riuscito e il messaggio lo dice", async () => {
+            uploadDumpToSmb.mockRejectedValueOnce(new Error("NT_STATUS_LOGON_FAILURE"));
+
+            const result = await runBackupNow("manual");
+
+            expect(state).toMatchObject({
+                lastRunStatus: "success",
+                smbLastStatus: "failed",
+                smbLastError: "NT_STATUS_LOGON_FAILURE",
+            });
+            expect(result.message).toContain("la copia su NAS non e riuscita: NT_STATUS_LOGON_FAILURE");
+            expect(recordNotification).not.toHaveBeenCalled();
+        });
+
+        it("in automatico una copia fallita lascia una notifica", async () => {
+            state.autoEnabled = true;
+            uploadDumpToSmb.mockRejectedValueOnce(new Error("NT_STATUS_HOST_UNREACHABLE"));
+
+            await runBackupNow("auto");
+
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({ dedupeKey: "backup:auto-nas-failed" })
+            );
+        });
+
+        it("se fallisce solo la pulizia sul NAS la copia resta riuscita, e in automatico lo notifica", async () => {
+            state.autoEnabled = true;
+            pruneOldSmbBackups.mockRejectedValueOnce(new Error("NT_STATUS_ACCESS_DENIED"));
+
+            const result = await runBackupNow("auto");
+
+            expect(state.smbLastStatus).toBe("success");
+            expect(result.message).toContain("la pulizia dei vecchi backup sul NAS non e riuscita");
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({ dedupeKey: "backup:auto-nas-prune-failed" })
+            );
+        });
+
+        it("con il NAS attivo ma senza password non tenta la copia", async () => {
+            state.smbPasswordEncrypted = null;
+
+            await runBackupNow("manual");
+
+            expect(uploadDumpToSmb).not.toHaveBeenCalled();
+        });
+    });
+});
+
+describe("scheduler del backup automatico", () => {
+    const minute = 60 * 1000;
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: new Date("2026-09-14T10:00:00") });
+    });
+
+    afterEach(() => {
+        stopBackupScheduler();
+        vi.useRealTimers();
+    });
+
+    it("all'ora prevista esegue il dump una volta sola e fissa la prossima esecuzione", async () => {
+        state = { ...defaultState, autoEnabled: true, runAt: "10:00", nextRunAt: new Date().toISOString() };
+
+        startBackupScheduler();
+        startBackupScheduler();
+        await vi.advanceTimersByTimeAsync(minute);
+
+        expect(createBackupArchive).toHaveBeenCalledOnce();
+        expect(state.lastRunOrigin).toBe("auto");
+        expect(new Date(state.nextRunAt!).getTime()).toBeGreaterThan(Date.now());
+
+        await vi.advanceTimersByTimeAsync(5 * minute);
+        expect(createBackupArchive).toHaveBeenCalledOnce();
+    });
+
+    it("prima dell'ora prevista aspetta", async () => {
+        state = {
+            ...defaultState,
+            autoEnabled: true,
+            nextRunAt: new Date(Date.now() + 10 * minute).toISOString(),
+        };
+
+        startBackupScheduler();
+        await vi.advanceTimersByTimeAsync(9 * minute);
+        expect(createBackupArchive).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(2 * minute);
+        expect(createBackupArchive).toHaveBeenCalledOnce();
+    });
+
+    it("con l'automatico spento, o senza una data valida, non fa niente", async () => {
+        state = { ...defaultState, autoEnabled: false, nextRunAt: new Date(0).toISOString() };
+        startBackupScheduler();
+        await vi.advanceTimersByTimeAsync(3 * minute);
+
+        state = { ...defaultState, autoEnabled: true, nextRunAt: "non-una-data" };
+        await vi.advanceTimersByTimeAsync(3 * minute);
+
+        expect(createBackupArchive).not.toHaveBeenCalled();
+    });
+
+    it("salta il giro se un dump è già in corso", async () => {
+        let finishManual!: () => void;
+        createBackupArchive.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    finishManual = resolve;
+                })
+        );
+        state = { ...defaultState, autoEnabled: true, nextRunAt: new Date(0).toISOString() };
+        const manual = runBackupNow("manual");
+
+        startBackupScheduler();
+        await vi.advanceTimersByTimeAsync(minute);
+        expect(createBackupArchive).toHaveBeenCalledOnce();
+
+        finishManual();
+        await manual;
+    });
+
+    it("un dump fallito finisce nei log e non ferma lo scheduler", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        state = { ...defaultState, autoEnabled: true, nextRunAt: new Date().toISOString() };
+        createBackupArchive.mockRejectedValueOnce(new Error("pg_dump terminato con codice 1"));
+
+        startBackupScheduler();
+        await vi.advanceTimersByTimeAsync(minute);
+        expect(consoleError).toHaveBeenCalledWith("Errore scheduler dump database:", expect.any(Error));
+
+        // Anche fallito, il giro ha fissato la prossima esecuzione: rimettendola a ora riparte.
+        state.nextRunAt = new Date().toISOString();
+        await vi.advanceTimersByTimeAsync(minute);
+        expect(createBackupArchive).toHaveBeenCalledTimes(2);
+        consoleError.mockRestore();
     });
 });

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionTable, userTable } from "../db/schema";
 
 /**
@@ -26,10 +26,10 @@ const tableLabel = (table: unknown) => (table === userTable ? "user" : table ===
 
 const queueKey = (op: string, table: unknown) => `${op}:${tableLabel(table)}`;
 
-const queueRows = (op: DbCall["op"], table: unknown, rows: unknown[]) => {
+const queueRows = (op: DbCall["op"], table: unknown, rows: unknown[] | Error) => {
     const key = queueKey(op, table);
     const existing = queuedRows.get(key) ?? [];
-    existing.push(rows);
+    existing.push(rows as unknown[]);
     queuedRows.set(key, existing);
 };
 
@@ -63,6 +63,11 @@ const createBuilder = (op: DbCall["op"], table?: unknown) => {
 
             const key = queueKey(op, call.table);
             const rows = queuedRows.get(key)?.shift() ?? [];
+
+            // Un errore accodato al posto delle righe fa fallire la query, come farebbe il driver.
+            if (rows instanceof Error) {
+                return Promise.reject(rows).then(resolve, reject);
+            }
 
             return Promise.resolve(rows).then(resolve, reject);
         },
@@ -116,21 +121,25 @@ const createTwoFactorChallenge = vi.fn<(userId: number) => string>(() => "challe
 const getTwoFactorChallengeUserId = vi.fn<(challengeId: string) => number | null>(() => null);
 const registerFailedTwoFactorAttempt = vi.fn<(challengeId: string) => boolean>(() => true);
 
+const deleteTwoFactorChallenge = vi.fn();
+
 vi.mock("./twoFactorChallenge", () => ({
     createTwoFactorChallenge: (userId: number) => createTwoFactorChallenge(userId) as string,
-    deleteTwoFactorChallenge: vi.fn(),
+    deleteTwoFactorChallenge: (challengeId: string) => deleteTwoFactorChallenge(challengeId),
     getTwoFactorChallengeUserId: (challengeId: string) => getTwoFactorChallengeUserId(challengeId) as number | null,
     registerFailedTwoFactorAttempt: (challengeId: string) => registerFailedTwoFactorAttempt(challengeId) as boolean,
 }));
 
 const deleteRecoveryCodes = vi.fn();
 const consumeRecoveryCode = vi.fn<(userId: number, codeHash: string) => Promise<boolean>>(() => Promise.resolve(false));
+const countUnusedRecoveryCodes = vi.fn<(userId: number) => Promise<number>>(() => Promise.resolve(0));
+const replaceRecoveryCodes = vi.fn<(userId: number, codeHashes: string[]) => Promise<void>>(() => Promise.resolve());
 
 vi.mock("../db/queries/recoveryCode", () => ({
     consumeRecoveryCode: (userId: number, codeHash: string) => consumeRecoveryCode(userId, codeHash),
-    countUnusedRecoveryCodes: vi.fn(() => Promise.resolve(0)),
+    countUnusedRecoveryCodes: (userId: number) => countUnusedRecoveryCodes(userId),
     deleteRecoveryCodes: (userId: number) => deleteRecoveryCodes(userId),
-    replaceRecoveryCodes: vi.fn(),
+    replaceRecoveryCodes: (userId: number, codeHashes: string[]) => replaceRecoveryCodes(userId, codeHashes),
 }));
 
 const recordNotification = vi.fn();
@@ -159,16 +168,30 @@ vi.mock("node:fs", () => {
 
 import {
     AuthManagerError,
+    adminDisableTwoFactor,
+    assertOwnPassword,
     changeOwnPassword,
     clearUnreadableTwoFactorSecrets,
     completeTwoFactorLogin,
+    confirmTwoFactorSetup,
+    createUser,
+    deleteSession,
+    deleteUser,
     disableTwoFactor,
     ensureDefaultAdmin,
     getSessionUser,
+    getTwoFactorStatus,
+    listUsers,
     login,
+    regeneratePassword,
+    regenerateRecoveryCodes,
+    setUserActive,
+    startSessionCleanupScheduler,
+    startTwoFactorSetup,
+    stopSessionCleanupScheduler,
 } from "./authManager";
-import { generateRecoveryCodes } from "./recoveryCodes";
-import { generateTotpCode } from "./totp";
+import { generateRecoveryCodes, hashRecoveryCode, looksLikeRecoveryCode } from "./recoveryCodes";
+import { generateTotpCode, stepForTimestamp } from "./totp";
 
 /** Nello stesso formato prodotto da `hashPassword`: `salt:derivata`, scrypt a 64 byte. */
 const hashLikeTheAppDoes = (password: string) => {
@@ -205,6 +228,7 @@ beforeEach(() => {
     isUsernameLoginRateLimited.mockReturnValue(false);
     isKnownLoginSource.mockReturnValue(false);
     consumeRecoveryCode.mockResolvedValue(false);
+    countUnusedRecoveryCodes.mockResolvedValue(0);
     createTwoFactorChallenge.mockReturnValue("challenge-1");
     getTwoFactorChallengeUserId.mockReturnValue(null);
     registerFailedTwoFactorAttempt.mockReturnValue(true);
@@ -807,5 +831,604 @@ describe("disableTwoFactor", () => {
         });
 
         expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("con password e codice giusti toglie segreto, conferma, ultimo passo e codici di recupero", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await disableTwoFactor(7, "password-giusta", generateTotpCode(totpSecret));
+
+        const cleared = dbCalls.find((call) => call.op === "update" && call.values?.totpSecret === null);
+        expect(cleared?.values).toEqual({ totpSecret: null, totpConfirmedAt: null, totpLastStep: null });
+        expect(deleteRecoveryCodes).toHaveBeenCalledWith(7);
+    });
+
+    /** Password *e* codice: chi ha rubato solo la sessione non arriva nemmeno a provare codici. */
+    it("con la password sbagliata si ferma prima di guardare il codice", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(disableTwoFactor(7, "password-sbagliata", generateTotpCode(totpSecret))).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(decryptSecret).not.toHaveBeenCalled();
+        expect(registerFailedLogin).toHaveBeenCalledWith(passwordKey);
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta con 400 quando la 2FA non è attiva", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(disableTwoFactor(7, "password-giusta", "123456")).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+    });
+});
+
+describe("login: dettagli della verifica della password", () => {
+    /** Un hash rovinato nel database (import a mano, colonna troncata) è una password sbagliata, non un 500. */
+    it("tratta un hash senza separatore come una password sbagliata", async () => {
+        queueRows("select", userTable, [buildUser({ passwordHash: "hash-senza-sale" })]);
+
+        await expect(login("mario", "password-giusta", "1.2.3.4")).rejects.toMatchObject({ statusCode: 401 });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith(accountKey);
+    });
+});
+
+describe("completeTwoFactorLogin: challenge e account cambiati nel frattempo", () => {
+    beforeEach(() => {
+        decryptSecret.mockResolvedValue(totpSecret);
+    });
+
+    it("un challenge scaduto o mai esistito risponde 410 senza cercare l'utente", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(null);
+
+        await expect(
+            completeTwoFactorLogin("challenge-vecchio", generateTotpCode(totpSecret), "1.2.3.4")
+        ).rejects.toMatchObject({ statusCode: 410 });
+
+        expect(dbCalls).toHaveLength(0);
+    });
+
+    it("un account disattivato mentre il challenge era aperto chiude il challenge con un 410", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        queueRows("select", userTable, [buildTwoFactorUser({ active: false })]);
+
+        await expect(
+            completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4")
+        ).rejects.toMatchObject({ statusCode: 410 });
+
+        expect(deleteTwoFactorChallenge).toHaveBeenCalledWith("challenge-1");
+        expect(dbCalls.some((call) => call.op === "insert" && call.table === sessionTable)).toBe(false);
+    });
+
+    it("una 2FA tolta da un'altra sessione mentre il challenge era aperto chiude il challenge con un 410", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(
+            completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4")
+        ).rejects.toMatchObject({ statusCode: 410 });
+
+        expect(deleteTwoFactorChallenge).toHaveBeenCalledWith("challenge-1");
+    });
+
+    it("all'ultimo codice sbagliato del challenge risponde 410, non 401", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        registerFailedTwoFactorAttempt.mockReturnValue(false);
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(completeTwoFactorLogin("challenge-1", wrongTotpCode(), "1.2.3.4")).rejects.toMatchObject({
+            statusCode: 410,
+        });
+    });
+
+    it("salva il passo del codice accettato, così lo stesso codice non entra una seconda volta", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        const now = Date.now();
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        queueAdminIdLookup(1);
+
+        await completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret, now), "1.2.3.4");
+
+        const saved = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+        expect(saved?.values?.totpLastStep).toBeGreaterThanOrEqual(stepForTimestamp(now));
+        expect(deleteTwoFactorChallenge).toHaveBeenCalledWith("challenge-1");
+    });
+
+    it("rifiuta un codice già usato nei suoi trenta secondi", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        const now = Date.now();
+        queueRows("select", userTable, [buildTwoFactorUser({ totpLastStep: stepForTimestamp(now) })]);
+
+        await expect(
+            completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret, now), "1.2.3.4")
+        ).rejects.toMatchObject({ statusCode: 401 });
+
+        expect(dbCalls.some((call) => call.op === "insert" && call.table === sessionTable)).toBe(false);
+    });
+
+    describe("con un codice di recupero", () => {
+        beforeEach(() => {
+            getTwoFactorChallengeUserId.mockReturnValue(7);
+            consumeRecoveryCode.mockResolvedValue(true);
+        });
+
+        /** L'accesso arriva senza sessione, quindi il registro delle azioni non lo vede: resta solo questo avviso. */
+        it("fa entrare e avvisa, dicendo quanti codici restano", async () => {
+            countUnusedRecoveryCodes.mockResolvedValue(3);
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+            queueAdminIdLookup(1);
+
+            const result = await completeTwoFactorLogin("challenge-1", generateRecoveryCodes()[0], "1.2.3.4");
+
+            expect(result.status).toBe("authenticated");
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dedupeKey: "two-factor-recovery-code-used:7",
+                    severity: "info",
+                    message: expect.stringContaining("Ne restano 3") as unknown,
+                })
+            );
+        });
+
+        it("con l'ultimo codice rimasto l'avviso diventa un'allerta", async () => {
+            countUnusedRecoveryCodes.mockResolvedValue(0);
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+            queueAdminIdLookup(1);
+
+            await completeTwoFactorLogin("challenge-1", generateRecoveryCodes()[0], "1.2.3.4");
+
+            expect(recordNotification).toHaveBeenCalledWith(expect.objectContaining({ severity: "warning" }));
+        });
+
+        it("consuma il codice per hash, mai in chiaro", async () => {
+            const [code] = generateRecoveryCodes();
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+            queueAdminIdLookup(1);
+
+            await completeTwoFactorLogin("challenge-1", code, "1.2.3.4");
+
+            expect(consumeRecoveryCode).toHaveBeenCalledWith(7, hashRecoveryCode(code));
+        });
+    });
+
+    it("con un TOTP giusto non manda nessun avviso", async () => {
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        queueAdminIdLookup(1);
+
+        await completeTwoFactorLogin("challenge-1", generateTotpCode(totpSecret), "1.2.3.4");
+
+        expect(recordNotification).not.toHaveBeenCalled();
+    });
+});
+
+describe("deleteSession e pulizia periodica delle sessioni", () => {
+    const sessionDeletes = () => dbCalls.filter((call) => call.op === "delete" && call.table === sessionTable);
+
+    afterEach(() => {
+        stopSessionCleanupScheduler();
+        vi.useRealTimers();
+    });
+
+    it("deleteSession cancella dalla tabella delle sessioni", async () => {
+        await deleteSession("token-in-chiaro");
+
+        expect(sessionDeletes()).toHaveLength(1);
+    });
+
+    it("pulisce subito all'avvio e poi una volta l'ora; un secondo avvio non raddoppia il timer", async () => {
+        vi.useFakeTimers();
+        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+        queueRows("delete", sessionTable, [{ tokenHash: "a" }, { tokenHash: "b" }]);
+
+        startSessionCleanupScheduler();
+        startSessionCleanupScheduler();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(sessionDeletes()).toHaveLength(1);
+        expect(consoleLog).toHaveBeenCalledWith("Sessioni scadute rimosse: 2");
+
+        await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+        expect(sessionDeletes()).toHaveLength(2);
+
+        stopSessionCleanupScheduler();
+        await vi.advanceTimersByTimeAsync(3 * 60 * 60 * 1000);
+        expect(sessionDeletes()).toHaveLength(2);
+        consoleLog.mockRestore();
+    });
+
+    it("non scrive nel log quando non c'era niente da togliere", async () => {
+        vi.useFakeTimers();
+        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+
+        startSessionCleanupScheduler();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(consoleLog).not.toHaveBeenCalled();
+        consoleLog.mockRestore();
+    });
+
+    it("un errore del database non ferma le passate successive", async () => {
+        vi.useFakeTimers();
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        queueRows("delete", sessionTable, new Error("connessione persa"));
+
+        startSessionCleanupScheduler();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(consoleError).toHaveBeenCalledWith("Errore pulizia sessioni scadute:", expect.any(Error));
+
+        await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+        expect(sessionDeletes()).toHaveLength(2);
+        consoleError.mockRestore();
+    });
+});
+
+describe("gestione utenti", () => {
+    /** Nello stesso formato di `hashPassword`: verifica che l'hash salvato apra con quella password. */
+    const hashOpensWith = (storedHash: unknown, password: string) => {
+        const [salt, derived] = String(storedHash).split(":");
+        return crypto.scryptSync(password, salt, 64).toString("hex") === derived;
+    };
+
+    it("listUsers segna come amministratore solo l'id più basso e non espone hash né segreti", async () => {
+        const rows = [
+            buildUser({ id: 1, username: "admin", totpSecret: "segreto-admin", totpConfirmedAt: new Date() }),
+            buildUser({ id: 7, username: "mario", totpSecret: "segreto-mario" }),
+        ];
+        // Stesse righe per l'elenco e per la ricerca dell'id più basso: le due query partono
+        // insieme, e così il risultato non dipende da quale delle due esce per prima.
+        queueRows("select", userTable, rows);
+        queueRows("select", userTable, rows);
+
+        const users = await listUsers();
+
+        expect(users.map((user) => [user.username, user.isAdmin, user.twoFactorEnabled])).toEqual([
+            ["admin", true, true],
+            ["mario", false, false],
+        ]);
+        const serialized = JSON.stringify(users);
+        expect(serialized).not.toContain(passwordHash);
+        expect(serialized).not.toContain("segreto-");
+    });
+
+    it("createUser salva solo l'hash della password generata e ne impone il cambio", async () => {
+        queueRows("insert", userTable, [buildUser({ id: 9, username: "anna", mustChangePassword: true })]);
+        queueAdminIdLookup(1);
+
+        const result = await createUser("anna");
+
+        const inserted = dbCalls.find((call) => call.op === "insert" && call.table === userTable);
+        expect(inserted?.values).toMatchObject({ username: "anna", mustChangePassword: true });
+        expect(String(inserted?.values?.passwordHash)).not.toContain(result.generatedPassword);
+        expect(hashOpensWith(inserted?.values?.passwordHash, result.generatedPassword)).toBe(true);
+        expect(result.user).toMatchObject({ username: "anna", isAdmin: false, mustChangePassword: true });
+    });
+
+    describe("regeneratePassword", () => {
+        it("sostituisce la password, ne impone il cambio e chiude tutte le sessioni dell'utente", async () => {
+            queueRows("select", userTable, [buildUser()]);
+            queueAdminIdLookup(1);
+
+            const result = await regeneratePassword(7);
+
+            const updated = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+            expect(updated?.values?.mustChangePassword).toBe(true);
+            expect(hashOpensWith(updated?.values?.passwordHash, result.generatedPassword)).toBe(true);
+            expect(hashOpensWith(updated?.values?.passwordHash, "password-giusta")).toBe(false);
+            expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+            expect(result.user.mustChangePassword).toBe(true);
+        });
+
+        it("risponde 404 per un utente che non esiste, senza scrivere niente", async () => {
+            queueRows("select", userTable, []);
+
+            await expect(regeneratePassword(99)).rejects.toMatchObject({ statusCode: 404 });
+
+            expect(dbCalls.some((call) => call.op !== "select")).toBe(false);
+        });
+    });
+
+    describe("setUserActive", () => {
+        it("disattivare chiude subito le sessioni già aperte", async () => {
+            queueRows("select", userTable, [buildUser()]);
+            queueRows("update", userTable, [buildUser({ active: false })]);
+            queueAdminIdLookup(1);
+
+            const result = await setUserActive(7, false);
+
+            expect(result.active).toBe(false);
+            expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+        });
+
+        it("riattivare non tocca le sessioni", async () => {
+            queueRows("select", userTable, [buildUser({ active: false })]);
+            queueRows("update", userTable, [buildUser({ active: true })]);
+            queueAdminIdLookup(1);
+
+            const result = await setUserActive(7, true);
+
+            expect(result.active).toBe(true);
+            expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
+        });
+
+        it("risponde 404 per un utente che non esiste", async () => {
+            queueRows("select", userTable, []);
+
+            await expect(setUserActive(99, false)).rejects.toMatchObject({ statusCode: 404 });
+
+            expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+        });
+    });
+
+    describe("deleteUser", () => {
+        it("cancella l'utente che esiste", async () => {
+            queueRows("select", userTable, [{ id: 7 }]);
+
+            await deleteUser(7);
+
+            expect(dbCalls.some((call) => call.op === "delete" && call.table === userTable)).toBe(true);
+        });
+
+        it("risponde 404 per un utente che non esiste, senza cancellare niente", async () => {
+            queueRows("select", userTable, []);
+
+            await expect(deleteUser(99)).rejects.toMatchObject({ statusCode: 404 });
+
+            expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
+        });
+    });
+
+    it("changeOwnPassword salva un hash che apre con la nuova password e toglie l'obbligo di cambiarla", async () => {
+        queueRows("select", userTable, [buildUser({ mustChangePassword: true })]);
+
+        await changeOwnPassword(7, "password-giusta", "Nuova-password-1!", "token-corrente");
+
+        const updated = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+        expect(updated?.values?.mustChangePassword).toBe(false);
+        expect(hashOpensWith(updated?.values?.passwordHash, "Nuova-password-1!")).toBe(true);
+        expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+    });
+
+    it("changeOwnPassword risponde 404 per un utente che non esiste", async () => {
+        queueRows("select", userTable, []);
+
+        await expect(changeOwnPassword(99, "x", "Nuova-password-1!", "token")).rejects.toMatchObject({
+            statusCode: 404,
+        });
+    });
+
+    it("ensureDefaultAdmin non fallisce se non riesce a scrivere il file con la password", async () => {
+        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        mkdir.mockRejectedValueOnce(new Error("EROFS"));
+
+        await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
+
+        expect(dbCalls.some((call) => call.op === "insert" && call.table === userTable)).toBe(true);
+        expect(consoleError).toHaveBeenCalled();
+        consoleLog.mockRestore();
+        consoleError.mockRestore();
+    });
+});
+
+describe("getTwoFactorStatus", () => {
+    it("con la 2FA spenta risponde zero codici senza nemmeno contarli", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        expect(await getTwoFactorStatus(7)).toEqual({ enabled: false, remainingRecoveryCodes: 0 });
+        expect(countUnusedRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("con la 2FA attiva conta i codici di recupero rimasti", async () => {
+        countUnusedRecoveryCodes.mockResolvedValue(5);
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        expect(await getTwoFactorStatus(7)).toEqual({ enabled: true, remainingRecoveryCodes: 5 });
+    });
+
+    it("risponde 404 per un utente che non esiste", async () => {
+        queueRows("select", userTable, []);
+
+        await expect(getTwoFactorStatus(99)).rejects.toMatchObject({ statusCode: 404 });
+    });
+});
+
+describe("startTwoFactorSetup", () => {
+    it("salva il nuovo segreto cifrato, ancora da confermare, e restituisce QR e URI", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        const setup = await startTwoFactorSetup(7, "password-giusta");
+
+        const saved = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+        expect(saved?.values).toEqual({
+            totpSecret: `cifrato:${setup.secretBase32}`,
+            totpConfirmedAt: null,
+            totpLastStep: null,
+        });
+        expect(setup.otpauthUri).toContain(`secret=${setup.secretBase32}`);
+        expect(setup.otpauthUri).toContain("issuer=Laboratorio");
+        expect(setup.otpauthUri).toContain("mario");
+        expect(setup.qrDataUrl).toMatch(/^data:image\/png;base64,/);
+    });
+
+    it("con la password sbagliata non genera niente e conta il tentativo contro l'utente", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(startTwoFactorSetup(7, "password-sbagliata")).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith(passwordKey);
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+    });
+
+    /**
+     * Il buco che questo test chiude: senza il controllo, la sola password rubata basterebbe
+     * a sostituire il secondo fattore di un altro con uno proprio.
+     */
+    it("con la 2FA già attiva rifiuta anche con la password giusta, senza toccare il segreto", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(startTwoFactorSetup(7, "password-giusta")).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+    });
+});
+
+describe("confirmTwoFactorSetup", () => {
+    const pendingSetupUser = () => buildUser({ totpSecret: "cifrato", totpConfirmedAt: null });
+
+    beforeEach(() => {
+        decryptSecret.mockResolvedValue(totpSecret);
+    });
+
+    it("con il codice dell'app attiva la 2FA, salva solo gli hash dei codici di recupero e chiude le altre sessioni", async () => {
+        queueRows("select", userTable, [pendingSetupUser()]);
+
+        const { recoveryCodes } = await confirmTwoFactorSetup(7, generateTotpCode(totpSecret), "token-corrente");
+
+        expect(recoveryCodes).toHaveLength(8);
+        expect(recoveryCodes.every(looksLikeRecoveryCode)).toBe(true);
+        expect(replaceRecoveryCodes).toHaveBeenCalledWith(7, recoveryCodes.map(hashRecoveryCode));
+        const stored = JSON.stringify(replaceRecoveryCodes.mock.calls);
+        expect(recoveryCodes.some((code) => stored.includes(code))).toBe(false);
+
+        const confirmed = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+        expect(confirmed?.values?.totpConfirmedAt).toBeInstanceOf(Date);
+        expect(typeof confirmed?.values?.totpLastStep).toBe("number");
+        expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+    });
+
+    it("con un codice sbagliato non attiva niente", async () => {
+        queueRows("select", userTable, [pendingSetupUser()]);
+
+        await expect(confirmTwoFactorSetup(7, wrongTotpCode(), "token-corrente")).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(replaceRecoveryCodes).not.toHaveBeenCalled();
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+    });
+
+    /** Solo un TOTP prova che l'app ha davvero acquisito il segreto. */
+    it("non accetta un codice di recupero come conferma", async () => {
+        queueRows("select", userTable, [pendingSetupUser()]);
+
+        await expect(confirmTwoFactorSetup(7, generateRecoveryCodes()[0], "token-corrente")).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(consumeRecoveryCode).not.toHaveBeenCalled();
+        expect(replaceRecoveryCodes).not.toHaveBeenCalled();
+    });
+
+    it("senza una configurazione avviata chiede di ricominciare", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(confirmTwoFactorSetup(7, "123456", "token-corrente")).rejects.toMatchObject({
+            statusCode: 400,
+            message: expect.stringContaining("Nessuna configurazione") as unknown,
+        });
+    });
+
+    /** Un segreto mai confermato non protegge niente: basta ricominciare, senza allarmi. */
+    it("con il segreto in attesa non più leggibile chiede di ricominciare, senza avvisi", async () => {
+        decryptSecret.mockRejectedValue(new Error("chiave diversa"));
+        queueRows("select", userTable, [pendingSetupUser()]);
+
+        await expect(confirmTwoFactorSetup(7, "123456", "token-corrente")).rejects.toMatchObject({
+            statusCode: 400,
+            message: expect.stringContaining("Nessuna configurazione") as unknown,
+        });
+
+        expect(recordNotification).not.toHaveBeenCalled();
+    });
+
+    it("con la 2FA già attiva rifiuta", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(confirmTwoFactorSetup(7, generateTotpCode(totpSecret), "token-corrente")).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(replaceRecoveryCodes).not.toHaveBeenCalled();
+    });
+});
+
+describe("regenerateRecoveryCodes", () => {
+    beforeEach(() => {
+        decryptSecret.mockResolvedValue(totpSecret);
+    });
+
+    it("con password e codice giusti sostituisce i codici e restituisce i nuovi in chiaro una volta sola", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        const { recoveryCodes } = await regenerateRecoveryCodes(7, "password-giusta", generateTotpCode(totpSecret));
+
+        expect(recoveryCodes).toHaveLength(8);
+        expect(replaceRecoveryCodes).toHaveBeenCalledWith(7, recoveryCodes.map(hashRecoveryCode));
+    });
+
+    it("con il codice sbagliato lascia i codici di prima", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+
+        await expect(regenerateRecoveryCodes(7, "password-giusta", wrongTotpCode())).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(replaceRecoveryCodes).not.toHaveBeenCalled();
+    });
+});
+
+describe("adminDisableTwoFactor", () => {
+    it("toglie la 2FA e chiude tutte le sessioni dell'utente, che non sono più fidate", async () => {
+        queueRows("select", userTable, [buildTwoFactorUser()]);
+        queueAdminIdLookup(1);
+
+        const user = await adminDisableTwoFactor(7);
+
+        expect(user.twoFactorEnabled).toBe(false);
+        expect(deleteRecoveryCodes).toHaveBeenCalledWith(7);
+        expect(dbCalls.find((call) => call.op === "update" && call.table === userTable)?.values).toEqual({
+            totpSecret: null,
+            totpConfirmedAt: null,
+            totpLastStep: null,
+        });
+        expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+    });
+
+    it("risponde 404 per un utente che non esiste, senza toccare niente", async () => {
+        queueRows("select", userTable, []);
+
+        await expect(adminDisableTwoFactor(99)).rejects.toMatchObject({ statusCode: 404 });
+
+        expect(deleteRecoveryCodes).not.toHaveBeenCalled();
+    });
+});
+
+describe("assertOwnPassword", () => {
+    it("con la password giusta passa e azzera il contatore dell'utente", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(assertOwnPassword(7, "password-giusta")).resolves.toBeUndefined();
+
+        expect(registerSuccessfulLogin).toHaveBeenCalledWith(passwordKey);
+    });
+
+    it("con la password sbagliata risponde 400 e conta il tentativo", async () => {
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(assertOwnPassword(7, "password-sbagliata")).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(registerFailedLogin).toHaveBeenCalledWith(passwordKey);
+    });
+
+    it("a tentativi esauriti risponde 429 anche con la password giusta", async () => {
+        isLoginRateLimited.mockImplementation((key) => key === passwordKey);
+        queueRows("select", userTable, [buildUser()]);
+
+        await expect(assertOwnPassword(7, "password-giusta")).rejects.toMatchObject({ statusCode: 429 });
     });
 });

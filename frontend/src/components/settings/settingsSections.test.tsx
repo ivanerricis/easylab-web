@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
     deleteUser: vi.fn(),
     disableUserTwoFactor: vi.fn(),
     getTwoFactorStatus: vi.fn(),
+    startTwoFactorSetup: vi.fn(),
+    enableTwoFactor: vi.fn(),
     disableTwoFactor: vi.fn(),
     regenerateRecoveryCodes: vi.fn(),
     getEmailSettings: vi.fn(),
@@ -25,7 +27,7 @@ vi.mock("@/lib/api", async () => {
             (...args: unknown[]) => (api[name as keyof typeof api] as (...a: unknown[]) => unknown)(...args),
         ])
     );
-    return { ...errors, ...forwarded, createUser: vi.fn(), startTwoFactorSetup: vi.fn(), enableTwoFactor: vi.fn() };
+    return { ...errors, ...forwarded, createUser: vi.fn() };
 });
 
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }));
@@ -231,6 +233,101 @@ describe("SecuritySettingsSection", () => {
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).toBeInTheDocument();
     });
+
+    it("se lo stato non si legge lo dice", async () => {
+        api.getTwoFactorStatus.mockRejectedValue(new Error("Sessione scaduta"));
+        renderWithUser(<SecuritySettingsSection />);
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Sessione scaduta");
+        });
+    });
+
+    /**
+     * Il percorso intero dalla sezione: password, QR, codice, e alla fine gli otto codici di
+     * recupero mostrati una volta sola. Dopo, stato e utente in sessione vanno riletti.
+     */
+    it("attiva la 2FA, mostra i codici di recupero e rilegge stato e utente", async () => {
+        api.getTwoFactorStatus
+            .mockResolvedValueOnce({ enabled: false, remainingRecoveryCodes: 0 })
+            .mockResolvedValue({ enabled: true, remainingRecoveryCodes: 8 });
+        api.startTwoFactorSetup.mockResolvedValue({
+            secretBase32: "JBSWY3DPEHPK3PXP",
+            otpauthUri: "otpauth://totp/EasyLab:luigi?secret=JBSWY3DPEHPK3PXP",
+            qrDataUrl: "data:image/png;base64,AAAA",
+        });
+        api.enableTwoFactor.mockResolvedValue({ recoveryCodes: ["ABCD-2345", "EFGH-6789"] });
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Attiva" }));
+        const passwordStep = screen.getByRole("dialog", { name: "Attiva la verifica in due passaggi" });
+        await userEvent.type(within(passwordStep).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(within(passwordStep).getByRole("button", { name: "Continua" }));
+
+        const qrStep = await screen.findByRole("dialog", { name: "Inquadra il codice QR" });
+        await userEvent.type(within(qrStep).getByLabelText(/^Codice di verifica/), "123456");
+        await userEvent.click(within(qrStep).getByRole("button", { name: "Attiva" }));
+
+        const codesDialog = await screen.findByRole("dialog", { name: "Codici di recupero" });
+        expect(within(codesDialog).getByText("ABCD-2345")).toBeInTheDocument();
+        expect(api.startTwoFactorSetup).toHaveBeenCalledWith("segreta1!");
+        expect(api.enableTwoFactor).toHaveBeenCalledWith("123456");
+        expect(await screen.findByText("Codici di recupero ancora utilizzabili: 8 su 8.")).toBeInTheDocument();
+        expect(screen.queryByText("Non attiva")).not.toBeInTheDocument();
+        expect(refresh).toHaveBeenCalled();
+    });
+
+    it("rigenera i codici di recupero con password e codice, e li mostra", async () => {
+        api.getTwoFactorStatus
+            .mockResolvedValueOnce({ enabled: true, remainingRecoveryCodes: 1 })
+            .mockResolvedValue({ enabled: true, remainingRecoveryCodes: 8 });
+        api.regenerateRecoveryCodes.mockResolvedValue({ recoveryCodes: ["WXYZ-2345"] });
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
+        const dialog = screen.getByRole("dialog", { name: "Rigenera i codici di recupero" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), " 123456 ");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Rigenera" }));
+
+        expect(await screen.findByRole("dialog", { name: "Codici di recupero" })).toBeInTheDocument();
+        expect(screen.getByText("WXYZ-2345")).toBeInTheDocument();
+        expect(api.regenerateRecoveryCodes).toHaveBeenCalledWith({ password: "segreta1!", code: "123456" });
+        expect(await screen.findByText("Codici di recupero ancora utilizzabili: 8 su 8.")).toBeInTheDocument();
+    });
+
+    it("se la rigenerazione fallisce lo dice una volta e lascia il dialogo aperto", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 3 });
+        api.regenerateRecoveryCodes.mockRejectedValue(new Error("La password non è corretta"));
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
+        const dialog = screen.getByRole("dialog", { name: "Rigenera i codici di recupero" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "sbagliata");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), "123456");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Rigenera" }));
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("La password non è corretta");
+        });
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("dialog", { name: "Rigenera i codici di recupero" })).toBeInTheDocument();
+        expect(screen.queryByRole("dialog", { name: "Codici di recupero" })).not.toBeInTheDocument();
+    });
+
+    /** Per l'admin è obbligatoria: disattivarla vuol dire riconfigurarla subito dopo, e va detto prima. */
+    it("all'amministratore che la disattiva avverte che dovrà configurarla di nuovo", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        renderWithUser(<SecuritySettingsSection />, admin);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disattiva" }));
+
+        expect(
+            within(screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).getByText(
+                /ti verrà chiesto di configurarla di nuovo/
+            )
+        ).toBeInTheDocument();
+    });
 });
 
 describe("EmailSettingsPanel", () => {
@@ -303,5 +400,182 @@ describe("EmailSettingsPanel", () => {
         expect(api.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ host: "smtp.nuovo.it" }));
         expect(host).toHaveValue("smtp.nuovo.it");
         expect(saveButton()).toBeDisabled();
+    });
+
+    const renderLoaded = async (settings: typeof saved = saved) => {
+        api.getEmailSettings.mockResolvedValue(settings);
+        renderWithUser(<EmailSettingsPanel />);
+        const host = await screen.findByLabelText("Host SMTP");
+        await waitFor(() => {
+            expect(host).toHaveValue(settings.host);
+        });
+        return host;
+    };
+
+    it("se il caricamento fallisce lo dice", async () => {
+        api.getEmailSettings.mockRejectedValue(new Error("Server irraggiungibile"));
+        renderWithUser(<EmailSettingsPanel />);
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Server irraggiungibile");
+        });
+    });
+
+    /** La password salvata non torna mai al browser: il campo resta vuoto e lo dice. */
+    it("non riempie mai il campo password, ma avverte che una password c'è già", async () => {
+        await renderLoaded();
+
+        expect(screen.getByLabelText("Password")).toHaveValue("");
+        expect(screen.getByLabelText("Password")).toHaveAttribute("placeholder", "•••• (invariata)");
+    });
+
+    it("mostra e nasconde la password scritta", async () => {
+        await renderLoaded();
+
+        const password = screen.getByLabelText("Password");
+        expect(password).toHaveAttribute("type", "password");
+
+        await userEvent.click(screen.getByRole("button", { name: "Mostra password" }));
+        expect(password).toHaveAttribute("type", "text");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nascondi password" }));
+        expect(password).toHaveAttribute("type", "password");
+    });
+
+    it("con l'invio attivo chiede host, utente ed email mittente", async () => {
+        const host = await renderLoaded();
+
+        await userEvent.clear(host);
+        await userEvent.click(saveButton());
+
+        expect(toast.error).toHaveBeenCalledWith("Specifica almeno host, utente ed email mittente");
+        expect(api.updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta una porta fuori intervallo", async () => {
+        await renderLoaded();
+
+        await userEvent.clear(screen.getByLabelText("Porta"));
+        await userEvent.type(screen.getByLabelText("Porta"), "70000");
+        await userEvent.click(saveButton());
+
+        expect(toast.error).toHaveBeenCalledWith("La porta SMTP deve essere un numero valido");
+        expect(api.updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    it("alla prima configurazione la password è obbligatoria", async () => {
+        const host = await renderLoaded({ ...saved, passwordSet: false });
+
+        await userEvent.type(host, ".it");
+        await userEvent.click(saveButton());
+
+        expect(toast.error).toHaveBeenCalledWith("Specifica una password per l'account email");
+        expect(api.updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    /** Spegnere l'invio non deve richiedere un server valido: i campi sono disattivati. */
+    it("disattivare l'invio salva senza validare i campi del server", async () => {
+        await renderLoaded({ ...saved, host: "", username: "", fromEmail: "", passwordSet: false });
+
+        await userEvent.click(screen.getByLabelText("Abilita invio email ai clienti"));
+        expect(screen.getByLabelText("Host SMTP")).toBeDisabled();
+        await userEvent.click(saveButton());
+
+        await waitFor(() => {
+            expect(api.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+        });
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("se il server rifiuta il salvataggio mostra il suo messaggio e lascia il form modificato", async () => {
+        api.updateEmailSettings.mockRejectedValue(new Error("Host non raggiungibile"));
+        const host = await renderLoaded();
+
+        await userEvent.type(host, ".it");
+        await userEvent.click(saveButton());
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Host non raggiungibile");
+        });
+        expect(host).toHaveValue("smtp.example.com.it");
+        expect(saveButton()).toBeEnabled();
+    });
+
+    describe("prova di invio", () => {
+        const testButton = () => screen.getByRole("button", { name: "Testa connessione" });
+
+        /** La password salvata resta sul server: per provare l'invio va riscritta. */
+        it("chiede di scrivere la password anche se ce n'è una salvata", async () => {
+            await renderLoaded();
+
+            await userEvent.click(testButton());
+
+            expect(toast.error).toHaveBeenCalledWith(
+                "Inserisci la password nel campo qui sopra per testare la connessione"
+            );
+            expect(api.testEmailConnection).not.toHaveBeenCalled();
+        });
+
+        it("chiede host e utente", async () => {
+            await renderLoaded();
+
+            await userEvent.clear(screen.getByLabelText("Utente"));
+            await userEvent.click(testButton());
+
+            expect(toast.error).toHaveBeenCalledWith("Per testare la connessione specifica almeno host e utente");
+        });
+
+        it("chiede un'email mittente valida", async () => {
+            await renderLoaded();
+
+            await userEvent.clear(screen.getByLabelText("Email mittente"));
+            await userEvent.type(screen.getByLabelText("Email mittente"), "non-una-mail");
+            await userEvent.click(testButton());
+
+            expect(toast.error).toHaveBeenCalledWith("Inserisci un'email mittente valida per testare l'invio");
+        });
+
+        it("manda al server i valori scritti, ripuliti, e riporta la sua risposta", async () => {
+            api.testEmailConnection.mockResolvedValue({ message: "Email di prova inviata a info@example.com" });
+            const host = await renderLoaded();
+
+            await userEvent.clear(host);
+            await userEvent.type(host, " smtp.prova.it ");
+            await userEvent.type(screen.getByLabelText("Password"), " segreta ");
+            await userEvent.click(testButton());
+
+            await waitFor(() => {
+                expect(toast.success).toHaveBeenCalledWith("Email di prova inviata a info@example.com");
+            });
+            expect(api.testEmailConnection).toHaveBeenCalledWith({
+                host: "smtp.prova.it",
+                port: 587,
+                secure: false,
+                username: "lab",
+                password: "segreta",
+                fromName: "EasyLab",
+                fromEmail: "info@example.com",
+            });
+            // Provare non vuol dire salvare.
+            expect(api.updateEmailSettings).not.toHaveBeenCalled();
+        });
+
+        it("riporta l'errore del server quando l'invio non riesce", async () => {
+            api.testEmailConnection.mockRejectedValue(new Error("Autenticazione SMTP rifiutata"));
+            await renderLoaded();
+
+            await userEvent.type(screen.getByLabelText("Password"), "segreta");
+            await userEvent.click(testButton());
+
+            await waitFor(() => {
+                expect(toast.error).toHaveBeenCalledWith("Autenticazione SMTP rifiutata");
+            });
+        });
+
+        it("con l'invio disattivato il pulsante non si può usare", async () => {
+            await renderLoaded({ ...saved, enabled: false });
+
+            expect(testButton()).toBeDisabled();
+        });
     });
 });

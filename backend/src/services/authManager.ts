@@ -50,6 +50,12 @@ export type PublicUser = {
     isAdmin: boolean;
     /** Solo se la 2FA è attiva: il segreto non esce mai da qui, nemmeno verso l'admin. */
     twoFactorEnabled: boolean;
+    /**
+     * Come `mustChangePassword`: finché è vero l'app non apre nulla se non la configurazione
+     * della 2FA. Vale per il solo admin, l'account che lancia gli aggiornamenti (codice
+     * eseguito sull'host) e ripristina i backup: rubarlo significa prendersi la macchina.
+     */
+    twoFactorSetupRequired: boolean;
 };
 
 type UserRow = typeof userTable.$inferSelect;
@@ -123,6 +129,7 @@ const toPublicUser = (
     active: user.active,
     isAdmin,
     twoFactorEnabled: user.totpConfirmedAt !== null,
+    twoFactorSetupRequired: isAdmin && user.totpConfirmedAt === null,
 });
 
 // L'admin è semplicemente il primo account mai registrato (id più basso): non esiste

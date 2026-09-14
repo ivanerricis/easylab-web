@@ -71,7 +71,8 @@ async function main() {
         console.log("questo utente sono state disconnesse.");
         if (resetTwoFactor) {
             console.log("La verifica in due passaggi è stata disattivata e i codici di recupero");
-            console.log("cancellati: vanno riattivati dalle impostazioni dopo l'accesso.");
+            console.log("cancellati: vanno riattivati dopo l'accesso. All'amministratore l'app");
+            console.log("lo chiede subito, prima di aprire qualunque pagina.");
         } else {
             console.log("La verifica in due passaggi, se attiva, resta necessaria per accedere:");
             console.log("aggiungi --reset-2fa se anche quella è irraggiungibile.");

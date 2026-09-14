@@ -345,6 +345,22 @@ describe("login", () => {
         expect(nonAdmin.status === "authenticated" && nonAdmin.user.isAdmin).toBe(false);
     });
 
+    /** L'obbligo riguarda solo l'admin: agli altri utenti la 2FA resta una scelta. */
+    it("impone la configurazione della 2FA all'admin che non l'ha attiva, e solo a lui", async () => {
+        queueRows("select", userTable, [buildUser({ id: 7 })]);
+        queueAdminIdLookup(7);
+
+        const admin = await login("mario", "password-giusta", "1.2.3.4");
+        expect(admin.status === "authenticated" && admin.user.twoFactorSetupRequired).toBe(true);
+
+        dbCalls.length = 0;
+        queueRows("select", userTable, [buildUser({ id: 7 })]);
+        queueAdminIdLookup(1);
+
+        const nonAdmin = await login("mario", "password-giusta", "1.2.3.4");
+        expect(nonAdmin.status === "authenticated" && nonAdmin.user.twoFactorSetupRequired).toBe(false);
+    });
+
     /**
      * Il secondo fattore viene annunciato solo qui, a password già verificata: dirlo prima
      * direbbe a un estraneo quali account sono protetti e quali no.
@@ -412,6 +428,15 @@ describe("getSessionUser", () => {
 
         expect(user).toMatchObject({ id: 7, username: "mario", isAdmin: false });
         expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
+    });
+
+    it("smette di imporre la configurazione all'admin appena la 2FA è attiva", async () => {
+        queueRows("select", sessionTable, [sessionRow({ totpConfirmedAt: new Date("2026-02-01T00:00:00Z") })]);
+        queueAdminIdLookup(7);
+
+        const user = await getSessionUser("token-in-chiaro");
+
+        expect(user).toMatchObject({ isAdmin: true, twoFactorEnabled: true, twoFactorSetupRequired: false });
     });
 
     it("cerca la sessione partendo dalla tabella delle sessioni, senza scrivere il token", async () => {

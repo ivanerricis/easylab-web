@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
  * ed è quindi — insieme al tema — una delle poche visibili anche a chi non è amministratore.
  */
 const SecuritySettingsSection = () => {
-    const { refresh } = useAuth();
+    const { user, refresh } = useAuth();
     const [status, setStatus] = useState<TwoFactorStatusDto | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSetupOpen, setIsSetupOpen] = useState(false);
@@ -169,7 +169,11 @@ const SecuritySettingsSection = () => {
                 open={isDisableOpen}
                 onOpenChange={setIsDisableOpen}
                 title="Disattiva la verifica in due passaggi"
-                description="Da quel momento per entrare basterà la password. Conferma con la password e con un codice, dell'app o di recupero."
+                description={
+                    user?.isAdmin
+                        ? "Per l'amministratore è obbligatoria: subito dopo ti verrà chiesto di configurarla di nuovo, per esempio su un altro telefono. Conferma con la password e con un codice, dell'app o di recupero."
+                        : "Da quel momento per entrare basterà la password. Conferma con la password e con un codice, dell'app o di recupero."
+                }
                 confirmLabel="Disattiva"
                 confirmIcon={ShieldOff}
                 submittingLabel="Disattivazione..."

@@ -67,7 +67,7 @@ Per lo sviluppo locale vedi il [README](../README.md#modalità-1-sviluppo-locale
 
 	Il file esiste solo finché la password generata non viene sostituita: l'app lo cancella appena l'amministratore la cambia, perché da lì in poi sarebbe solo una credenziale in chiaro, e per giunta scaduta.
 
-	Al primo accesso l'app chiede di sostituire la password generata con una propria, e finché non lo si fa non apre nessuna pagina. Gli altri utenti si creano da Impostazioni > Utenti; in seguito la propria password si cambia dal badge utente in alto a destra > Cambia password.
+	Al primo accesso l'app chiede di sostituire la password generata con una propria, e subito dopo di attivare la verifica in due passaggi (QR da inquadrare con un'app di autenticazione sul telefono, poi otto codici di recupero da conservare): finché non si completano entrambi i passi non apre nessuna pagina. Tieni il telefono a portata di mano. Vedi [OPERATIONS.md](OPERATIONS.md#verifica-in-due-passaggi-2fa). Gli altri utenti si creano da Impostazioni > Utenti; in seguito la propria password si cambia dal badge utente in alto a destra > Cambia password.
 
 7. **Abilita l'aggiornamento da interfaccia web** (opzionale ma consigliato):
 

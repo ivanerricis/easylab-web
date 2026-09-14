@@ -8,6 +8,8 @@ export type UserDto = {
     active: boolean;
     isAdmin: boolean;
     twoFactorEnabled: boolean;
+    /** Deciso dal server (oggi: admin senza 2FA). Finché è vero l'app mostra solo la configurazione. */
+    twoFactorSetupRequired: boolean;
 };
 
 /**

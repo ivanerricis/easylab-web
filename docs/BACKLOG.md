@@ -54,8 +54,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
 
 **Sicurezza e messa in produzione**
-- 2FA, fase 5: obbligo della verifica in due passaggi per l'admin, rimandato a flusso collaudato.
-  Vedi [2FA-PLAN.md](2FA-PLAN.md).
 - 2FA, collaudo a mano prima di considerarla in produzione: attivazione con un'app reale, login
   da telefono, ripristino di un backup con una `secret.key` diversa. Dal CHANGELOG del
   2026-09-08.

@@ -1,5 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
@@ -29,6 +29,7 @@ const LoginPage = () => {
     const [challengeId, setChallengeId] = useState<string | null>(null);
     const [code, setCode] = useState("");
     const [isUsingRecoveryCode, setIsUsingRecoveryCode] = useState(false);
+    const codeInputRef = useRef<HTMLInputElement>(null);
 
     const goToApp = () => {
         const state = location.state as { from?: { pathname: string } } | null;
@@ -91,6 +92,9 @@ const LoginPage = () => {
             // Insistere sul codice non porterebbe da nessuna parte: si riparte dalla password.
             if (getApiErrorStatus(error) === 410) {
                 backToCredentials();
+            } else {
+                // Il clic su "Verifica" ha lasciato il focus sul bottone.
+                codeInputRef.current?.focus();
             }
         } finally {
             setIsSubmitting(false);
@@ -122,6 +126,13 @@ const LoginPage = () => {
                                     {isUsingRecoveryCode ? "Codice di recupero" : "Codice di verifica"}
                                 </Label>
                                 <Input
+                                    // La `key` forza un input nuovo: le due schermate hanno la
+                                    // stessa struttura, e senza React riuserebbe quello del nome
+                                    // utente — `autoFocus` scatta solo al montaggio. Cambia anche
+                                    // passando al codice di recupero, per riprendere il focus
+                                    // tolto dal clic sul link.
+                                    key={isUsingRecoveryCode ? "recovery" : "totp"}
+                                    ref={codeInputRef}
                                     id="loginCode"
                                     // `one-time-code` è ciò che permette a iOS e Android di
                                     // proporre il codice senza farlo ricopiare a mano.

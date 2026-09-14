@@ -59,6 +59,7 @@ const buildApp = (isAdmin: boolean) => {
             createdAt: "",
             mustChangePassword: false,
             twoFactorEnabled: false,
+            twoFactorSetupRequired: false,
             active: true,
             isAdmin,
         };

@@ -34,6 +34,7 @@ const user: UserDto = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: false,
+    twoFactorSetupRequired: false,
 };
 
 beforeEach(() => {

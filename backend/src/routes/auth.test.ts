@@ -48,6 +48,7 @@ const publicUser = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: true,
+    twoFactorSetupRequired: false,
 };
 
 const sessionCookieOf = (response: request.Response) =>

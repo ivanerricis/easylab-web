@@ -25,6 +25,7 @@ const user: UserDto = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: false,
+    twoFactorSetupRequired: false,
 };
 
 const renderPage = (route: string, currentUser: UserDto) =>

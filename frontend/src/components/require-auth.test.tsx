@@ -6,6 +6,10 @@ vi.mock("@/pages/auth/ForcePasswordChangePage", () => ({
     default: () => <p>Imposta una nuova password</p>,
 }));
 
+vi.mock("@/pages/auth/ForceTwoFactorSetupPage", () => ({
+    default: () => <p>Attiva la verifica in due passaggi</p>,
+}));
+
 import { AuthProviderContext, initialAuthProviderState } from "./auth-provider-context";
 import RequireAuth from "./require-auth";
 import type { UserDto } from "@/lib/api";
@@ -18,6 +22,7 @@ const user: UserDto = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: false,
+    twoFactorSetupRequired: false,
 };
 
 const LoginProbe = () => {
@@ -60,6 +65,24 @@ describe("RequireAuth", () => {
 
         expect(screen.getByText("Imposta una nuova password")).toBeInTheDocument();
         expect(screen.queryByText("Pagina report")).not.toBeInTheDocument();
+    });
+
+    it("impone la configurazione della 2FA quando il server la richiede", () => {
+        renderAt("/reports", { user: { ...user, isAdmin: true, twoFactorSetupRequired: true }, isLoading: false });
+
+        expect(screen.getByText("Attiva la verifica in due passaggi")).toBeInTheDocument();
+        expect(screen.queryByText("Pagina report")).not.toBeInTheDocument();
+    });
+
+    /** La configurazione chiede la password: quella generata va sostituita prima. */
+    it("con entrambi gli obblighi chiede prima il cambio password", () => {
+        renderAt("/reports", {
+            user: { ...user, isAdmin: true, mustChangePassword: true, twoFactorSetupRequired: true },
+            isLoading: false,
+        });
+
+        expect(screen.getByText("Imposta una nuova password")).toBeInTheDocument();
+        expect(screen.queryByText("Attiva la verifica in due passaggi")).not.toBeInTheDocument();
     });
 
     it("mostra la pagina a chi è autenticato", () => {

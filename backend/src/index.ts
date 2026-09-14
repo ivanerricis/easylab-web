@@ -17,7 +17,12 @@ import authRouter from "./routes/auth";
 import usersRouter from "./routes/users";
 import { userActionLogger } from "./middleware/userActionLogger";
 import { errorHandler } from "./middleware/errorHandler";
-import { requireAdmin, requireAuth, requirePasswordChangeCompleted } from "./middleware/requireAuth";
+import {
+    requireAdmin,
+    requireAuth,
+    requirePasswordChangeCompleted,
+    requireTwoFactorSetupCompleted,
+} from "./middleware/requireAuth";
 import settingsRouter from "./routes/settings";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backupManager";
 import { getLogoFile } from "./services/logoManager";
@@ -85,7 +90,7 @@ app.get("/api/health", (_, res) => {
 
 app.use("/api/auth", authRouter);
 
-app.use("/api", requireAuth, requirePasswordChangeCompleted);
+app.use("/api", requireAuth, requirePasswordChangeCompleted, requireTwoFactorSetupCompleted);
 
 app.use("/api/users", requireAdmin, usersRouter);
 app.use("/api/reports", reportsRouter);

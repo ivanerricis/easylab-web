@@ -1,7 +1,7 @@
 # Piano d'azione — Autenticazione a due fattori (TOTP via app)
 
-Stato: **fasi 1-4 implementate l'8 settembre 2026.** La 2FA è attiva e opzionale per utente;
-resta da fare la fase 5 (obbligo per l'admin), volutamente rimandata a flusso collaudato.
+Stato: **fasi 1-4 implementate l'8 settembre 2026, fase 5 (obbligo per l'admin) il 14
+settembre.** La 2FA è obbligatoria per l'admin e opzionale per gli altri utenti.
 Il documento resta come traccia del ragionamento: la voce del
 [CHANGELOG](CHANGELOG.md) racconta cosa è stato fatto davvero e dove il codice si è discostato
 da questo piano — la migration è la `0023` e non la `0021`, il challenge morto risponde 410 e

@@ -6,7 +6,13 @@ vi.mock("../services/authManager", () => ({
 }));
 
 import { getSessionUser } from "../services/authManager";
-import { requireAdmin, requirePasswordChangeCompleted, requireAuth, sessionCookieName } from "./requireAuth";
+import {
+    requireAdmin,
+    requirePasswordChangeCompleted,
+    requireAuth,
+    requireTwoFactorSetupCompleted,
+    sessionCookieName,
+} from "./requireAuth";
 
 const createResponse = () => {
     const res = {
@@ -98,6 +104,30 @@ describe("requirePasswordChangeCompleted", () => {
         const req = { user: { mustChangePassword: false } } as Request;
 
         requirePasswordChangeCompleted(req, res, next as NextFunction);
+
+        expect(next).toHaveBeenCalledOnce();
+    });
+});
+
+describe("requireTwoFactorSetupCompleted", () => {
+    it("blocca con 403 finché l'admin non ha configurato la 2FA", () => {
+        const res = createResponse();
+        const next = vi.fn();
+        const req = { user: { twoFactorSetupRequired: true } } as Request;
+
+        requireTwoFactorSetupCompleted(req, res, next as NextFunction);
+
+        expect(res.statusCode).toBe(403);
+        expect(res.body).toMatchObject({ twoFactorSetupRequired: true });
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it("lascia passare quando la configurazione non è richiesta", () => {
+        const res = createResponse();
+        const next = vi.fn();
+        const req = { user: { twoFactorSetupRequired: false } } as Request;
+
+        requireTwoFactorSetupCompleted(req, res, next as NextFunction);
 
         expect(next).toHaveBeenCalledOnce();
     });

@@ -26,6 +26,7 @@ const user = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: false,
+    twoFactorSetupRequired: false,
 };
 
 /**

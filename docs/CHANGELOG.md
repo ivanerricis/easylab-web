@@ -11,6 +11,64 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Verifica in due passaggi obbligatoria per l'admin
+
+**Cosa.** Fase 5 del [piano della 2FA](2FA-PLAN.md). Un admin senza 2FA attiva non entra più
+nell'app: dopo l'eventuale cambio della password generata, `RequireAuth` mostra
+`ForceTwoFactorSetupPage` (password → QR → codice → codici di recupero) al posto di qualunque
+pagina, e il backend risponde 403 `{ twoFactorSetupRequired: true }` a ogni rotta fuori da
+`/api/auth/*` (`requireTwoFactorSetupCompleted` in `backend/src/middleware/requireAuth.ts`,
+montato in `index.ts` dopo `requirePasswordChangeCompleted`). È lo stesso schema del cambio
+password forzato, e il flag `twoFactorSetupRequired` viaggia in `PublicUser` accanto a
+`mustChangePassword`: la regola "admin senza 2FA" sta solo in `toPublicUser`, il frontend si
+limita a seguirla. Per gli altri utenti non cambia nulla.
+
+Il QR compare nel browser al primo accesso, **non** durante l'installazione: l'admin nasce dal
+backend al primo avvio, e un QR stampato nei log di Docker metterebbe il segreto proprio dove il
+piano (3.2) aveva deciso di non farlo finire.
+
+Dettagli che contano:
+- **I codici di recupero prima di `refresh`.** La pagina rilegge l'utente solo alla chiusura del
+  dialogo dei codici: farlo appena la 2FA è attiva la smonterebbe, e con lei gli unici codici in
+  chiaro. Il test lo verifica, ed è stato controllato introducendo l'errore.
+- **L'ordine dei due obblighi.** Prima la password, poi la 2FA: l'attivazione chiede la password
+  attuale, e quella generata va sostituita prima.
+- **Togliere la propria 2FA resta possibile**, ed è il modo di passare a un telefono nuovo: subito
+  dopo l'app richiede la nuova configurazione. Il testo del dialogo "Disattiva" lo dice all'admin
+  invece di promettergli che basterà la password. Lo stesso vale per `--reset-2fa` (lo script ora
+  lo annuncia) e per il ripristino con una `secret.key` diversa: la 2FA azzerata viene richiesta
+  al primo accesso, invece di restare spenta finché qualcuno se ne ricorda.
+
+*Perché:* l'admin è l'account che lancia l'aggiornamento — codice eseguito sull'host — e legge e
+ripristina i backup: con l'app su un dominio pubblico, la sua password da sola era l'unica cosa
+fra un estraneo e la macchina. La fase era stata rimandata finché il flusso opzionale non fosse
+collaudato: il collaudo a mano con un'app reale resta in [BACKLOG](BACKLOG.md), e ora lo fa per
+forza il primo accesso dell'admin.
+
+**Sul server già installato:** se l'admin ha già la 2FA attiva non cambia nulla. Se non ce l'ha,
+al primo caricamento dopo l'aggiornamento l'app chiede di configurarla prima di proseguire.
+
+File: `backend/src/services/authManager.ts`, `backend/src/middleware/requireAuth.ts`,
+`backend/src/index.ts`, `backend/reset-admin-password.js`, `frontend/src/lib/api/auth.ts`,
+`frontend/src/components/require-auth.tsx`, `frontend/src/pages/auth/ForceTwoFactorSetupPage.tsx`,
+`frontend/src/components/settings/securitySettingsSection.tsx`, i test relativi, `docs/`.
+
+---
+
+## 2026-09-14 — Focus sul campo del codice al login con la 2FA
+
+**Cosa.** Al secondo passo del login il campo del codice non riceveva il focus, nonostante
+`autoFocus`: le due schermate di `LoginPage` hanno la stessa struttura, quindi React riusava
+l'input del nome utente come campo del codice, e `autoFocus` scatta solo al montaggio. Una `key`
+sull'input lo fa rimontare, anche passando a "Usa un codice di recupero" (dove il clic sul link
+toglieva il focus). Dopo un codice sbagliato il focus torna sul campo, invece di restare sul
+bottone "Verifica".
+
+*Perché:* segnalato dall'utente — bisognava cliccare sul campo prima di digitare il codice, a
+ogni accesso. I due test nuovi falliscono sul codice di prima.
+
+---
+
 ## 2026-09-14 — Sessioni utente da 30 a 7 giorni
 
 **Cosa.** La durata di una sessione dopo il login, e il `maxAge` del cookie che la porta,

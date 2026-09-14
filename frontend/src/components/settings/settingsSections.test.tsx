@@ -47,6 +47,7 @@ const admin: UserDto = {
     active: true,
     isAdmin: true,
     twoFactorEnabled: true,
+    twoFactorSetupRequired: false,
 };
 
 const luigi: UserDto = { ...admin, id: 2, username: "luigi", isAdmin: false, twoFactorEnabled: false };

@@ -40,6 +40,7 @@ const renderPage = () =>
                     active: true,
                     isAdmin: false,
                     twoFactorEnabled: false,
+                    twoFactorSetupRequired: false,
                 },
             }}
         >

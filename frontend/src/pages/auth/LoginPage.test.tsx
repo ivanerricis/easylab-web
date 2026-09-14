@@ -37,6 +37,7 @@ const user = {
     active: true,
     isAdmin: false,
     twoFactorEnabled: true,
+    twoFactorSetupRequired: false,
 };
 
 const buildAxiosError = (message: string, status: number) => {
@@ -153,6 +154,34 @@ describe("LoginPage", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Usa un codice di recupero" }));
 
-        expect(screen.getByLabelText("Codice di recupero")).toBeInTheDocument();
+        expect(screen.getByLabelText("Codice di recupero")).toHaveFocus();
+    });
+
+    /**
+     * Le due schermate hanno la stessa struttura: senza accorgimenti React riusa l'input del
+     * nome utente come campo del codice, e `autoFocus` — che vale solo al montaggio — non scatta.
+     */
+    it("mette il focus sul campo del codice appena viene chiesto", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        renderLoginPage();
+        await submitCredentials();
+
+        expect(await screen.findByLabelText("Codice di verifica")).toHaveFocus();
+    });
+
+    it("riporta il focus sul campo dopo un codice sbagliato", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+        verifyTwoFactorLogin.mockRejectedValue(buildAxiosError("Codice non valido", 401));
+
+        renderLoginPage();
+        await submitCredentials();
+
+        await userEvent.type(await screen.findByLabelText("Codice di verifica"), "000000");
+        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText("Codice di verifica")).toHaveFocus();
+        });
     });
 });

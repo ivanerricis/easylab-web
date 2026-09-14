@@ -46,11 +46,8 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   `ReportsPage` coprono già i quattro casi.
 - `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
   file del codice la legge: configurazione morta, da togliere o da ricollegare.
-- Test sul database vero: il query layer (`backend/src/db/queries/*`) è allo 0% di copertura,
-  perché ogni test lo simula — join, ordinamenti, ricerca e vincoli non li esegue nessun test.
-  Serve Postgres in CI (un servizio nel job, o testcontainers), cioè rinunciare alla scelta di
-  una CI senza database. Da decidere; il resto della copertura è stato completato il
-  2026-09-14 (vedi CHANGELOG).
+- [Test sul database vero](#test-sul-database-vero): l'SQL del backend non lo esegue nessun
+  test. Rimandato di proposito il 2026-09-14, con il piano già pronto.
 - Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
   "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
@@ -140,3 +137,42 @@ riconoscibili e risolve il contrasto con una variabile in più.
 `getComputedStyle` delle righe `tr[data-status-color]` e degli eventi `.rbc-event`, convertendo
 i colori `oklch` in RGB con un canvas (il parsing diretto delle stringhe `oklch` dà numeri
 sbagliati). Controllare tutte e tre le intensità, in chiaro e in scuro.
+
+## Test sul database vero
+
+**Il problema.** Nessuno degli 810 test del backend parla con un database: le query sono
+sostituite da un finto che restituisce le righe scritte nel test. Si verifica così cosa fa il
+codice *con* quelle righe (permessi, validazione, errori), ma l'SQL mandato a Postgres non lo
+esegue nessun test: se è sbagliato, resta tutto verde. Il query layer (`backend/src/db/queries/*`)
+è fra il 15% e il 30% di copertura, ed è l'unico buco rimasto dopo il lavoro del 2026-09-14
+(backend al 90% delle righe).
+
+Esempi di cosa passerebbe inosservato:
+
+- un filtro o un ordinamento che non fa quello che dovrebbe (è già successo con l'`orderBy`
+  degli interventi, il 2026-07-30, scoperto solo dall'app vera);
+- una join che duplica o perde righe (il report con il tecnico esterno collegato);
+- la ricerca libera su cinque tabelle — proprio quella da riscrivere con `UNION` per le
+  prestazioni (vedi più in alto, **Prestazioni**): senza test sul database vero, riscriverla
+  vuol dire fidarsi;
+- i vincoli, per esempio l'unicità di "Altro", che il codice controlla da sé perché il vincolo
+  unico di Postgres distingue le maiuscole.
+
+**Perché è rimandato.** Non c'è un ostacolo tecnico: serve un Postgres acceso durante i test, e
+questo cambia una scelta fatta il 2026-07-28, cioè una CI che gira senza database.
+
+**Il piano, quando si fa.**
+
+1. **CI**: un `services: postgres` nel job `backend` di `.github/workflows/ci.yml` (stessa
+   versione maggiore del compose di produzione), circa un minuto in più a ogni push.
+2. **In locale**: un database solo per i test, **mai** quello del dev stack
+   (`masso-web_postgres_data_dev`), che altrimenti i test sovrascriverebbero. Un database a
+   parte nello stesso container di sviluppo, o testcontainers.
+3. **Preparazione**: le migrazioni di `backend/drizzle/` creano le tabelle all'avvio della
+   suite; ogni test parte da uno stato noto (transazione annullata alla fine, o tabelle svuotate).
+4. **Separati dagli altri**: in una cartella o con un suffisso propri (per esempio
+   `*.db.test.ts`) e un comando a parte, così `npm test` resta veloce e senza database; la CI li
+   lancia entrambi. I test esistenti non cambiano.
+5. **Da dove cominciare**: le query di report e interventi (`report.ts`, `intervention.ts`) —
+   ricerca, filtri, paginazione — che sono le più complesse e le più soggette a modifiche. Poi
+   i vincoli e le cancellazioni con chiavi esterne.

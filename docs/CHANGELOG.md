@@ -11,6 +11,53 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-14 — Content-Security-Policy vera sul documento HTML
+
+**Cosa.** L'`index.html` dell'app, e con lui tutte le rotte della SPA che ci arrivano tramite
+`try_files`, ora ha una CSP completa (`frontend/document-csp.conf`):
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
+font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self';
+worker-src 'none'; manifest-src 'self'
+```
+
+Prima c'era solo `frame-ancestors 'none'`, che resta in `security-headers.conf` e continua a
+valere ovunque. Su `index.html` arrivano quindi due header CSP, e il browser li applica
+entrambi. La policy nuova è volutamente assente da `/api/` e `/assets/`: su JSON e PDF non
+serve, e `object-src 'none'` rischierebbe di bloccare il visualizzatore PDF del browser.
+
+Due concessioni, entrambe verificate e non evitabili:
+- **`'unsafe-inline'` sugli stili.** sonner e Radix (Dialog, Select, ScrollArea) inseriscono
+  elementi `<style>` a runtime, e un nonce non è praticabile con un `index.html` statico.
+- **`data:` sulle immagini.** Il QR della verifica in due passaggi arriva come data URL, e
+  alcune icone di `index.css` sono SVG incorporati.
+
+*Perché:* la difesa dall'XSS finora era solo React, che fa l'escape del testo, e nel frontend
+non c'è nessun `dangerouslySetInnerHTML`. Bastava però un solo punto sfuggito, oggi o in
+futuro, perché uno script iniettato girasse con la sessione di chi guarda la pagina, compresa
+quella dell'admin, che può aggiornare il server. Con `script-src 'self'` quello script non
+parte comunque.
+
+**Verifica.** Fatta con l'immagine di produzione, costruita e servita da nginx su
+`localhost:8080` con proxy verso il backend di sviluppo, e con Playwright + Edge:
+- tutte le pagine, un dialog con un Select di Radix, il tema scuro e un'immagine `data:` danno
+  zero violazioni;
+- i PDF di stampa escono regolarmente;
+- come controllo, uno script inline iniettato viene bloccato e la violazione registrata:
+  quindi il test misura davvero, e la policy è attiva.
+
+Nota per chi ripete la prova da Git Bash: la conversione automatica dei percorsi trasforma
+`--build-arg VITE_API_URL=/api` in `C:/Program Files/Git/api`. L'app allora non riesce nemmeno
+a chiamare `/api/auth/me` e rimanda al login, cosa che somiglia a un blocco della CSP ma non lo
+è. Serve `MSYS_NO_PATHCONV=1 docker build …`.
+
+→ [frontend/document-csp.conf](../frontend/document-csp.conf),
+[frontend/nginx.conf](../frontend/nginx.conf),
+[frontend/Dockerfile](../frontend/Dockerfile)
+
+---
+
 ## 2026-09-14 — La password admin iniziale non resta più sul disco
 
 **Cosa.** Il file `data/initial-admin-password.txt`, scritto al primo avvio con la password

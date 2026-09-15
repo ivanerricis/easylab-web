@@ -162,4 +162,32 @@ describe("ThemeSettingsSection", () => {
         expect(root.hasAttribute("data-table-density")).toBe(false);
         expect(root.hasAttribute("data-font-size")).toBe(false);
     });
+
+    it('"Ripristina predefiniti" azzera le cinque personalizzazioni ma non la modalità', async () => {
+        localStorage.setItem("vite-ui-theme", "dark");
+        renderSection();
+
+        await userEvent.click(option("Colore principale", "Mattone"));
+        await userEvent.click(option("Raggio degli angoli", "Squadrato"));
+        await userEvent.click(option("Righe delle tabelle", "Intensa"));
+        await userEvent.click(option("Densità tabelle", "Comoda"));
+        await userEvent.click(option("Dimensione testo", "Piccolo"));
+
+        await userEvent.click(screen.getByRole("button", { name: "Ripristina predefiniti" }));
+
+        expect(isHighlighted(option("Colore principale", "Predefinito"))).toBe(true);
+        expect(isHighlighted(option("Raggio degli angoli", "Normale"))).toBe(true);
+        expect(isHighlighted(option("Righe delle tabelle", "Media"))).toBe(true);
+        expect(isHighlighted(option("Densità tabelle", "Normale"))).toBe(true);
+        expect(isHighlighted(option("Dimensione testo", "Medio"))).toBe(true);
+        expect(localStorage.getItem("easylab-web-theme-accent")).toBeNull();
+        expect(localStorage.getItem("easylab-web-corner-radius")).toBeNull();
+        expect(localStorage.getItem("easylab-web-table-row-intensity")).toBeNull();
+        expect(localStorage.getItem("easylab-web-table-density")).toBeNull();
+        expect(localStorage.getItem("easylab-web-font-size")).toBeNull();
+
+        // La modalità è una scelta a sé: il reset dell'aspetto non la tocca.
+        expect(isHighlighted(option("Modalità", "Scuro"))).toBe(true);
+        expect(localStorage.getItem("vite-ui-theme")).toBe("dark");
+    });
 });

@@ -12,28 +12,67 @@ const actionVerbByMethod: Record<string, string> = {
     DELETE: "eliminato",
 };
 
-const formatAction = (method: string, routePath: string) => {
-    const normalizedPath = routePath.split("?")[0];
-
+const formatAction = (method: string, normalizedPath: string) => {
     const verb = actionVerbByMethod[method] ?? `eseguito ${method}`;
     return `${verb} ${normalizedPath}`;
 };
 
 const trackedMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/**
+ * Etichette dedicate per le rotte dove il verbo generico (creato/modificato/eliminato)
+ * racconta la cosa sbagliata — "creato /api/auth/logout" non vuol dire niente — o dove la
+ * rotta è una GET che altrimenti non verrebbe mai tracciata. Ogni voce sostituisce
+ * `formatAction`; l'esito (riuscito o no) resta nello status accanto, non qui.
+ */
+const actionLabelRules: { method: string; match: string | RegExp; label: string }[] = [
+    { method: "POST", match: "/api/auth/login", label: "tentativo di accesso" },
+    { method: "POST", match: "/api/auth/login/2fa", label: "verifica codice 2FA in accesso" },
+    { method: "POST", match: "/api/auth/logout", label: "disconnessione" },
+    { method: "PUT", match: "/api/auth/password", label: "cambio password" },
+    { method: "POST", match: "/api/auth/2fa/setup", label: "avvio configurazione 2FA" },
+    { method: "POST", match: "/api/auth/2fa/enable", label: "attivazione 2FA" },
+    { method: "DELETE", match: "/api/auth/2fa", label: "disattivazione 2FA" },
+    { method: "POST", match: "/api/auth/2fa/recovery-codes", label: "rigenerazione codici di recupero 2FA" },
+    { method: "GET", match: /^\/api\/reports\/\d+\/print$/, label: "download ricevuta report" },
+    { method: "GET", match: /^\/api\/interventions\/\d+\/print$/, label: "download ricevuta intervento" },
+    { method: "GET", match: /^\/api\/settings\/backup\/download\/.+$/, label: "download backup" },
+    { method: "GET", match: /^\/api\/settings\/logs\/\d{4}-\d{2}-\d{2}\/download$/, label: "download log azioni" },
+    { method: "GET", match: "/api/settings/backup/key", label: "esportazione chiave di backup" },
+];
+
+const findActionLabel = (method: string, normalizedPath: string): string | null => {
+    const rule = actionLabelRules.find(
+        (candidate) =>
+            candidate.method === method &&
+            (typeof candidate.match === "string"
+                ? candidate.match === normalizedPath
+                : candidate.match.test(normalizedPath))
+    );
+
+    return rule?.label ?? null;
+};
+
 export const userActionLogger = (request: Request, _response: Response, next: NextFunction) => {
-    if (
-        !request.originalUrl.startsWith("/api") ||
-        request.originalUrl.startsWith("/api/health") ||
-        !trackedMethods.has(request.method)
-    ) {
+    if (!request.originalUrl.startsWith("/api") || request.originalUrl.startsWith("/api/health")) {
+        next();
+        return;
+    }
+
+    const normalizedPath = request.originalUrl.split("?")[0];
+    const specificLabel = findActionLabel(request.method, normalizedPath);
+
+    // Le GET si registrano solo quando hanno un'etichetta dedicata (i download sensibili
+    // sopra): tutte le altre sono consultazioni, e tracciarle tutte sommergerebbe il log
+    // con ogni apertura di lista o pagina di dettaglio.
+    if (!trackedMethods.has(request.method) && !specificLabel) {
         next();
         return;
     }
 
     const response = _response;
     const ip = getClientIp(request);
-    const action = formatAction(request.method, request.originalUrl);
+    const action = specificLabel ?? formatAction(request.method, normalizedPath);
     response.once("finish", () => {
         const now = new Date();
         const timestamp = now.toISOString();

@@ -22,7 +22,13 @@ import { smbPathPattern, smbPathRequirementsMessage } from "../services/backupSm
 import { canonicalTimeZone, getCompanySettings, updateCompanySettings } from "../services/companyManager";
 import { getEmailSettings, testEmailConnection, updateEmailSettings } from "../services/emailManager";
 import { getLogoStatus, resetLogo, saveLogo } from "../services/logoManager";
-import { getLogFilePath, listLogFiles, readLogEntries } from "../services/logManager";
+import {
+    getLogFilePath,
+    getLogRetentionDays,
+    listLogFiles,
+    readLogEntries,
+    setLogRetentionDays,
+} from "../services/logManager";
 import { getUpdateStatus, requestUpdate, requestUpdateCheck } from "../services/updateManager";
 
 // Le rotte qui sotto non hanno try/catch: i servizi sollevano `ApiError` (messaggio e
@@ -152,6 +158,8 @@ const logEntriesQuerySchema = z
     })
     .strict();
 
+const logRetentionSchema = z.object({ maxDays: z.coerce.number().int().min(1).max(90) }).strict();
+
 // Le uniche letture lasciate a chiunque sia autenticato: sono i dati che l'app mostra
 // già in giro per l'interfaccia (nome del laboratorio, presenza di un logo), non
 // contengono nulla di riservato e non permettono di cambiare niente.
@@ -185,6 +193,18 @@ settingsRouter.use(requireAdmin);
 
 settingsRouter.get("/logs", async (_req, res) => {
     res.json(await listLogFiles());
+});
+
+// Prima di "/logs/:dayKey": "retention" non è una dayKey valida, ma Express la farebbe
+// comunque cadere lì se questa rotta fosse registrata dopo.
+settingsRouter.get("/logs/retention", async (_req, res) => {
+    res.json({ maxDays: await getLogRetentionDays() });
+});
+
+settingsRouter.put("/logs/retention", validate({ body: logRetentionSchema }), async (req, res) => {
+    const { maxDays } = req.body as { maxDays: number };
+
+    res.json(await setLogRetentionDays(maxDays));
 });
 
 settingsRouter.get(

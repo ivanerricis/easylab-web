@@ -6,6 +6,7 @@ const readdir = vi.fn();
 const unlink = vi.fn();
 const stat = vi.fn();
 const readFile = vi.fn();
+const writeFile = vi.fn();
 
 vi.mock("node:fs", () => {
     const promises = {
@@ -15,6 +16,7 @@ vi.mock("node:fs", () => {
         unlink: (...args: unknown[]) => unlink(...args),
         stat: (...args: unknown[]) => stat(...args),
         readFile: (...args: unknown[]) => readFile(...args),
+        writeFile: (...args: unknown[]) => writeFile(...args),
     };
     return { default: { promises }, promises };
 });
@@ -24,8 +26,10 @@ import {
     appendUserActionLog,
     getDayKey,
     getLogFilePath,
+    getLogRetentionDays,
     listLogFiles,
     readLogEntries,
+    setLogRetentionDays,
 } from "./logManager";
 
 const direntFile = (name: string) => ({ name, isFile: () => true, isDirectory: () => false });
@@ -35,6 +39,7 @@ beforeEach(() => {
     mkdir.mockResolvedValue(undefined);
     appendFile.mockResolvedValue(undefined);
     unlink.mockResolvedValue(undefined);
+    writeFile.mockResolvedValue(undefined);
 });
 
 describe("getDayKey", () => {
@@ -146,6 +151,36 @@ describe("listLogFiles", () => {
             { dayKey: "2026-03-05", sizeBytes: 100, updatedAt: "2026-03-05T00:00:00.000Z" },
             { dayKey: "2026-03-01", sizeBytes: 50, updatedAt: "2026-03-05T00:00:00.000Z" },
         ]);
+    });
+});
+
+describe("getLogRetentionDays / setLogRetentionDays", () => {
+    it("usa il default di 7 giorni quando non è stato ancora configurato nulla", async () => {
+        readFile.mockRejectedValue(new Error("ENOENT"));
+
+        await expect(getLogRetentionDays()).resolves.toBe(7);
+    });
+
+    it("rifiuta un valore fuori dall'intervallo 1-90", async () => {
+        await expect(setLogRetentionDays(0)).rejects.toMatchObject({ statusCode: 400 });
+        await expect(setLogRetentionDays(91)).rejects.toMatchObject({ statusCode: 400 });
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    it("salva il nuovo valore e lo tiene in cache per le letture successive", async () => {
+        const saved = await setLogRetentionDays(30);
+
+        expect(saved).toEqual({ maxDays: 30 });
+        expect(writeFile).toHaveBeenCalledWith(
+            expect.stringMatching(/log-settings\.json$/),
+            expect.stringContaining('"maxDays": 30'),
+            "utf-8"
+        );
+        await expect(getLogRetentionDays()).resolves.toBe(30);
+
+        // Riporta il default: il test di pulizia più sotto assume la retention originale di 7
+        // giorni, e questo stato in memoria non si resetta fra i test dello stesso file.
+        await setLogRetentionDays(7);
     });
 });
 

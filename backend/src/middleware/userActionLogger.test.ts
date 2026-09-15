@@ -93,13 +93,48 @@ describe("userActionLogger", () => {
         expect(line).toContain("user=mario / rossi admin | action=");
     });
 
-    it("non registra le GET", () => {
+    it("non registra le GET senza un'etichetta dedicata", () => {
         const res = createResponse(200);
 
         userActionLogger(createRequest("GET", "/api/devices"), res, vi.fn() as NextFunction);
         res.emit("finish");
 
         expect(appendUserActionLog).not.toHaveBeenCalled();
+    });
+
+    it("registra le GET di download sensibili con un'etichetta dedicata", async () => {
+        const res = createResponse(200, {});
+
+        userActionLogger(
+            createRequest("GET", "/api/reports/42/print", { username: "mario" }),
+            res,
+            vi.fn() as NextFunction
+        );
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(appendUserActionLog).toHaveBeenCalledOnce();
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=download ricevuta report");
+    });
+
+    it("usa etichette dedicate per login e logout invece del verbo generico", async () => {
+        const loginRes = createResponse(200);
+        userActionLogger(createRequest("POST", "/api/auth/login"), loginRes, vi.fn() as NextFunction);
+        loginRes.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=tentativo di accesso");
+
+        const logoutRes = createResponse(204);
+        userActionLogger(
+            createRequest("POST", "/api/auth/logout", { username: "mario" }),
+            logoutRes,
+            vi.fn() as NextFunction
+        );
+        logoutRes.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[1][0]).toContain("action=disconnessione");
     });
 
     it("non registra le rotte fuori da /api", () => {

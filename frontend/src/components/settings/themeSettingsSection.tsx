@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Computer, Moon, Sun } from "lucide-react";
+import { Computer, Moon, RotateCcw, Sun } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
+import { SettingsActions, SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/use-theme";
 import {
@@ -147,8 +148,26 @@ const ThemeSettingsSection = () => {
         applyCornerRadius(radiusKey);
     };
 
+    // Non tocca la modalità chiara/scura/sistema: è una scelta a sé, non una delle cinque
+    // personalizzazioni d'aspetto qui sotto.
+    const handleResetDefaults = () => {
+        handleSelectAccent("default");
+        handleSelectRadius("default");
+        handleSelectRowIntensity("default");
+        handleSelectDensity("default");
+        handleSelectFontSize("default");
+        toast.success("Aspetto ripristinato ai valori predefiniti");
+    };
+
     return (
         <SettingsSection>
+            <SettingsActions>
+                <Button type="button" variant="outline" size="sm" onClick={handleResetDefaults}>
+                    <RotateCcw className="size-4" />
+                    Ripristina predefiniti
+                </Button>
+            </SettingsActions>
+
             <SettingsCard
                 title="Modalità"
                 description="Scegli se seguire il sistema oppure forzare il tema chiaro o scuro."

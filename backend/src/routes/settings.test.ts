@@ -34,8 +34,10 @@ vi.mock("../services/logoManager", () => ({
 }));
 vi.mock("../services/logManager", () => ({
     getLogFilePath: vi.fn(),
+    getLogRetentionDays: vi.fn().mockResolvedValue(7),
     listLogFiles: vi.fn().mockResolvedValue([]),
     readLogEntries: vi.fn().mockResolvedValue([]),
+    setLogRetentionDays: vi.fn(),
 }));
 vi.mock("../services/authManager", () => ({
     assertOwnPassword: vi.fn(),
@@ -69,7 +71,7 @@ import {
 import { updateCompanySettings } from "../services/companyManager";
 import { testEmailConnection, updateEmailSettings } from "../services/emailManager";
 import { resetLogo, saveLogo } from "../services/logoManager";
-import { getLogFilePath, readLogEntries } from "../services/logManager";
+import { getLogFilePath, getLogRetentionDays, readLogEntries, setLogRetentionDays } from "../services/logManager";
 import { requestUpdate, requestUpdateCheck } from "../services/updateManager";
 import { assertOwnPassword } from "../services/authManager";
 
@@ -116,6 +118,8 @@ describe("settings router: permessi", () => {
         ["get", "/api/settings/backup/list"],
         ["get", "/api/settings/backup/key"],
         ["get", "/api/settings/logs"],
+        ["get", "/api/settings/logs/retention"],
+        ["put", "/api/settings/logs/retention"],
         ["get", "/api/settings/email"],
         ["get", "/api/settings/update"],
         ["put", "/api/settings/company"],
@@ -272,6 +276,39 @@ describe("settings router: registro delle azioni", () => {
         const response = await request(buildApp(true)).get("/api/settings/logs/2026-09-14?pageSize=1000000");
 
         expect(response.status).toBe(400);
+    });
+});
+
+describe("settings router: conservazione dei log", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(getLogRetentionDays).mockResolvedValue(7);
+    });
+
+    // "retention" è registrata prima di "/logs/:dayKey": senza quell'ordine finirebbe
+    // interpretata come una dayKey e respinta con 400 invece di arrivare qui.
+    it("legge la retention configurata senza cadere nella rotta della singola giornata", async () => {
+        const response = await request(buildApp(true)).get("/api/settings/logs/retention");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ maxDays: 7 });
+    });
+
+    it("salva la nuova retention", async () => {
+        vi.mocked(setLogRetentionDays).mockResolvedValue({ maxDays: 30 });
+
+        const response = await request(buildApp(true)).put("/api/settings/logs/retention").send({ maxDays: 30 });
+
+        expect(response.status).toBe(200);
+        expect(setLogRetentionDays).toHaveBeenCalledWith(30);
+        expect(response.body).toEqual({ maxDays: 30 });
+    });
+
+    it("rifiuta un valore fuori dall'intervallo 1-90 prima di chiamare il servizio", async () => {
+        const response = await request(buildApp(true)).put("/api/settings/logs/retention").send({ maxDays: 91 });
+
+        expect(response.status).toBe(400);
+        expect(setLogRetentionDays).not.toHaveBeenCalled();
     });
 });
 

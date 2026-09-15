@@ -1,6 +1,8 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SettingsCard, SettingsEmptyBox, SettingsSection } from "@/components/settings/settingsUi";
 import RefreshButton from "@/components/refresh-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,12 +15,17 @@ import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import {
     getApiErrorMessage,
     getLogDownloadUrl,
+    getLogRetention,
     listLogEntries,
     listLogFiles,
+    updateLogRetention,
     type LogEntryDto,
     type LogFileDto,
 } from "@/lib/api";
 import { cn, formatDateTime, formatFileSize } from "@/lib/utils";
+
+const minRetentionDays = 1;
+const maxRetentionDays = 90;
 
 const formatDayKey = (dayKey: string) => formatDateTime(`${dayKey}T00:00:00.000Z`).split(",")[0]?.trim() ?? dayKey;
 
@@ -36,6 +43,46 @@ const LogsSettingsPanel = () => {
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [selectedDayKey, debouncedSearchText, pageSize],
     });
+    const [retentionDays, setRetentionDays] = useState<number | null>(null);
+    const [isLoadingRetention, setIsLoadingRetention] = useState(false);
+    const [isSavingRetention, setIsSavingRetention] = useState(false);
+
+    const loadRetention = useCallback(async () => {
+        setIsLoadingRetention(true);
+
+        try {
+            const result = await getLogRetention();
+            setRetentionDays(result.maxDays);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare la conservazione dei log"));
+        } finally {
+            setIsLoadingRetention(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        startTransition(() => {
+            void loadRetention();
+        });
+    }, [loadRetention]);
+
+    const handleSaveRetention = async () => {
+        if (retentionDays === null || !Number.isInteger(retentionDays)) {
+            return;
+        }
+
+        setIsSavingRetention(true);
+
+        try {
+            const result = await updateLogRetention(retentionDays);
+            setRetentionDays(result.maxDays);
+            toast.success("Conservazione log aggiornata");
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile salvare la conservazione dei log"));
+        } finally {
+            setIsSavingRetention(false);
+        }
+    };
 
     const loadLogFiles = useCallback(async () => {
         setIsLoadingFiles(true);
@@ -106,6 +153,42 @@ const LogsSettingsPanel = () => {
 
     return (
         <SettingsSection className="flex h-full min-h-0 flex-col">
+            <SettingsCard
+                title="Conservazione"
+                description="Per quanti giorni tenere i registri prima di eliminarli automaticamente."
+            >
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="grid gap-2">
+                        <Label htmlFor="log-retention-days">Giorni da conservare</Label>
+                        <Input
+                            id="log-retention-days"
+                            type="number"
+                            min={minRetentionDays}
+                            max={maxRetentionDays}
+                            className="w-28"
+                            disabled={isLoadingRetention}
+                            value={retentionDays ?? ""}
+                            onChange={(event) => setRetentionDays(Number(event.target.value))}
+                        />
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={
+                            isLoadingRetention ||
+                            isSavingRetention ||
+                            retentionDays === null ||
+                            !Number.isInteger(retentionDays) ||
+                            retentionDays < minRetentionDays ||
+                            retentionDays > maxRetentionDays
+                        }
+                        onClick={() => void handleSaveRetention()}
+                    >
+                        {isSavingRetention ? "Salvataggio..." : "Salva"}
+                    </Button>
+                </div>
+            </SettingsCard>
+
             <SettingsCard
                 title="Log azioni"
                 description="Consulta il registro delle azioni eseguite sull'applicazione, giorno per giorno."

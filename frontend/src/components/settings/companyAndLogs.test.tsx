@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
     resetLogo: vi.fn(),
     listLogFiles: vi.fn(),
     listLogEntries: vi.fn(),
+    getLogRetention: vi.fn(),
+    updateLogRetention: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -157,6 +159,10 @@ describe("LogsSettingsPanel", () => {
         error: null,
     };
 
+    beforeEach(() => {
+        api.getLogRetention.mockResolvedValue({ maxDays: 7 });
+    });
+
     it("dice quando sul server non ci sono log", async () => {
         api.listLogFiles.mockResolvedValue([]);
         renderWithProviders(<LogsSettingsPanel />);
@@ -194,5 +200,37 @@ describe("LogsSettingsPanel", () => {
         await userEvent.click(screen.getByRole("button", { name: "Scarica log selezionato" }));
 
         expect(location.href).toBe("/logs/2026-09-11/download");
+    });
+
+    it("carica la conservazione configurata e permette di salvarne una nuova", async () => {
+        api.listLogFiles.mockResolvedValue([]);
+        api.updateLogRetention.mockResolvedValue({ maxDays: 30 });
+        renderWithProviders(<LogsSettingsPanel />);
+
+        const retentionInput = await screen.findByLabelText("Giorni da conservare");
+        await waitFor(() => expect(retentionInput).toHaveValue(7));
+
+        await userEvent.clear(retentionInput);
+        await userEvent.type(retentionInput, "30");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(api.updateLogRetention).toHaveBeenCalledWith(30);
+        });
+        expect(toast.success).toHaveBeenCalledWith("Conservazione log aggiornata");
+    });
+
+    it("non lascia salvare una conservazione fuori dall'intervallo 1-90", async () => {
+        api.listLogFiles.mockResolvedValue([]);
+        renderWithProviders(<LogsSettingsPanel />);
+
+        const retentionInput = await screen.findByLabelText("Giorni da conservare");
+        await waitFor(() => expect(retentionInput).toHaveValue(7));
+
+        await userEvent.clear(retentionInput);
+        await userEvent.type(retentionInput, "91");
+
+        expect(screen.getByRole("button", { name: "Salva" })).toBeDisabled();
+        expect(api.updateLogRetention).not.toHaveBeenCalled();
     });
 });

@@ -5,10 +5,66 @@ import { ApiError } from "./apiError";
 const logDir = path.join(process.cwd(), "logs");
 const logFilePrefix = "user-actions-";
 const logFileExtension = ".log";
-const maxLogFiles = 7;
 const dayKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 const dailyLogFileNamePattern = /^user-actions-\d{4}-\d{2}-\d{2}\.log$/;
 let lastCleanupDay = "";
+
+const settingsDir = path.join(process.cwd(), "data");
+const retentionSettingsPath = path.join(settingsDir, "log-settings.json");
+const minRetentionDays = 1;
+const maxRetentionDays = 90;
+
+export type LogRetentionState = { maxDays: number };
+
+const defaultRetention: LogRetentionState = { maxDays: 7 };
+let cachedRetention: LogRetentionState | null = null;
+
+const sanitizeRetention = (input: Partial<LogRetentionState>): LogRetentionState => {
+    const maxDays = Number(input.maxDays);
+
+    return {
+        maxDays:
+            Number.isInteger(maxDays) && maxDays >= minRetentionDays && maxDays <= maxRetentionDays
+                ? maxDays
+                : defaultRetention.maxDays,
+    };
+};
+
+// A differenza delle altre impostazioni persistite (company/backup), qui un valore mancante
+// o illeggibile non viene riscritto su disco: il default vale finché nessuno lo cambia
+// davvero, invece di aggiungere una scrittura a ogni riga di log del primo giorno.
+const loadRetention = async (): Promise<LogRetentionState> => {
+    if (cachedRetention) {
+        return cachedRetention;
+    }
+
+    try {
+        const raw = await fs.promises.readFile(retentionSettingsPath, "utf-8");
+        cachedRetention = sanitizeRetention(JSON.parse(raw) as Partial<LogRetentionState>);
+    } catch {
+        cachedRetention = { ...defaultRetention };
+    }
+
+    return cachedRetention;
+};
+
+export const getLogRetentionDays = async (): Promise<number> => (await loadRetention()).maxDays;
+
+export const setLogRetentionDays = async (maxDays: number): Promise<LogRetentionState> => {
+    if (!Number.isInteger(maxDays) || maxDays < minRetentionDays || maxDays > maxRetentionDays) {
+        throw new LogManagerError(
+            `La conservazione dei log deve essere tra ${minRetentionDays} e ${maxRetentionDays} giorni`,
+            400
+        );
+    }
+
+    const next = { maxDays };
+    await fs.promises.mkdir(settingsDir, { recursive: true });
+    await fs.promises.writeFile(retentionSettingsPath, `${JSON.stringify(next, null, 2)}\n`, "utf-8");
+    cachedRetention = next;
+
+    return next;
+};
 
 export class LogManagerError extends ApiError {}
 
@@ -34,6 +90,7 @@ const getDailyLogFilePath = (dayKey: string) => path.join(logDir, `${logFilePref
 const extractDayKey = (fileName: string) => fileName.slice(logFilePrefix.length, logFilePrefix.length + 10);
 
 const cleanupOldDailyLogs = async () => {
+    const maxLogFiles = await getLogRetentionDays();
     const dirEntries = await fs.promises.readdir(logDir, { withFileTypes: true });
     const logFiles = dirEntries
         .filter((entry) => entry.isFile() && dailyLogFileNamePattern.test(entry.name))

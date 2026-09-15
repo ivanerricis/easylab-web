@@ -5,9 +5,11 @@ import {
     getBackupDumpDownloadUrl,
     getBackupKey,
     getLogDownloadUrl,
+    getLogRetention,
     listLogEntries,
     restoreBackupFromExisting,
     restoreBackupFromUpload,
+    updateLogRetention,
     uploadLogo,
 } from "./settings";
 import { checkForUpdates, getUpdateState, getUpdateStatus, runUpdateNow } from "./system";
@@ -105,6 +107,17 @@ describe("api impostazioni", () => {
             params: { page: 3, pageSize: 10, search: "login" },
         });
         expect(getLogDownloadUrl("2026-09-11")).toContain("/settings/logs/2026-09-11/download");
+    });
+
+    it("legge e aggiorna la conservazione dei log", async () => {
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: { maxDays: 7 } });
+        const put = vi.spyOn(api, "put").mockResolvedValue({ data: { maxDays: 30 } });
+
+        await expect(getLogRetention()).resolves.toEqual({ maxDays: 7 });
+        expect(get).toHaveBeenCalledWith("/settings/logs/retention");
+
+        await expect(updateLogRetention(30)).resolves.toEqual({ maxDays: 30 });
+        expect(put).toHaveBeenCalledWith("/settings/logs/retention", { maxDays: 30 });
     });
 });
 

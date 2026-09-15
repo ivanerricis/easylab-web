@@ -181,6 +181,13 @@ export const listLogEntries = async (dayKey: string, params: ListLogEntriesParam
 export const getLogDownloadUrl = (dayKey: string) =>
     api.getUri({ url: `/settings/logs/${encodeURIComponent(dayKey)}/download` });
 
+export type LogRetentionDto = { maxDays: number };
+
+export const getLogRetention = async () => (await api.get<LogRetentionDto>("/settings/logs/retention")).data;
+
+export const updateLogRetention = async (maxDays: number) =>
+    (await api.put<LogRetentionDto>("/settings/logs/retention", { maxDays })).data;
+
 export type CompanySettingsDto = {
     name: string;
     email: string;

@@ -11,6 +11,38 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Log: etichette leggibili, download tracciati, conservazione configurabile; Tema: reset dell'aspetto
+
+**Cosa.** Tre interventi sul registro azioni
+([`userActionLogger.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/userActionLogger.ts),
+[`logManager.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/logManager.ts),
+[`settings.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts)) più uno
+sulla sezione Tema
+([`themeSettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/themeSettingsSection.tsx)):
+
+1. `userActionLogger` aveva un solo verbo per metodo HTTP (`creato`/`modificato`/`eliminato`), che per rotte
+   come login e logout non descriveva l'azione (`creato /api/auth/logout`). Una tabella di regole per
+   metodo+percorso assegna ora etichette dedicate alle rotte di autenticazione (login, 2FA, logout, cambio
+   password) e alle GET sui download sensibili — ricevute PDF di report e interventi, dump di backup, log
+   stesso, chiave di cifratura del backup — che prima non venivano registrate perché solo le scritture
+   (POST/PUT/PATCH/DELETE) lo erano.
+2. La conservazione dei log era fissa a 7 giorni (`maxLogFiles` in `logManager.ts`). Ora è un'impostazione tra
+   1 e 90 giorni, persistita in `data/log-settings.json` sullo stesso modello di `companyManager.ts`, esposta
+   su `GET`/`PUT /api/settings/logs/retention` (registrata prima di `/logs/:dayKey`, altrimenti Express la
+   interpreterebbe come una data) e regolabile da una card in cima a
+   [`logsSettingsPanel.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/logsSettingsPanel.tsx).
+3. La sezione Tema aveva cinque personalizzazioni indipendenti in `localStorage` (colore, raggio, intensità
+   righe, densità tabelle, dimensione testo) senza un modo per azzerarle insieme. Un pulsante "Ripristina
+   predefiniti" richiama le stesse funzioni `setStoredX`/`applyX` con l'argomento predefinito; la modalità
+   chiara/scura/sistema resta fuori, è una scelta a sé.
+
+**Il perché.** Chiesto dall'utente dopo aver visto il log azioni e la sezione Tema: il primo tracciava solo
+le scritture e con un'etichetta che non distingueva un login da un logout, senza modo di limitarne lo spazio
+occupato; la seconda non aveva un modo rapido per tornare a una combinazione nota dopo aver provato varie
+opzioni.
+
+---
+
 ## 2026-09-15 — Toast di caricamento durante la verifica aggiornamenti
 
 **Cosa.** In

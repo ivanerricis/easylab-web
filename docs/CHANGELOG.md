@@ -11,6 +11,34 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Gli errori sotto i campi non spostano più i campi vicini
+
+**Cosa.** `items-start` sulle griglie di campi di altri tre dialoghi:
+[`createInterventionDialog.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createInterventionDialog.tsx),
+[`editInterventionDialog.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/edit/editInterventionDialog.tsx)
+(anche la griglia interna ora inizio / ora fine) e
+[`createReportDialog.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createReportDialog.tsx).
+
+**Il perché.** Segnalato dall'utente: un prezzo negativo nella modifica di un intervento mostra
+l'errore, come deve, ma rompe l'impaginazione. La causa è la stessa già corretta nel dialogo di
+modifica report (voce più sotto): la scritta d'errore allunga la riga della griglia, e senza
+`items-start` la cella accanto si stira con lei. Dentro quella cella, che è a sua volta una
+griglia, lo spazio in più finisce fra etichetta e controllo: accanto a "Prezzo" in errore, la
+data scendeva di 14 px. L'errore resta sotto il campo che lo genera, ma ora allunga solo la
+propria colonna.
+
+Stesso difetto trovato e misurato negli altri dialoghi con errori sotto i campi: ora fine
+(24 px), alimentatore / backup e difetto / password nel nuovo report (14–16 px). I dialoghi di
+cliente, tecnico e collaboratore hanno i campi uno sotto l'altro, e le impostazioni non
+mostrano errori sotto i campi: non ne soffrono.
+
+Verificato con Playwright sui dialoghi veri, a 1440 e 800 px: con la correzione lo scarto fra
+i controlli affiancati è 0 px in tutti i casi. Test di controllo: togliendo `items-start` a
+runtime gli scarti tornano (14, 24, 16, 14 px), quindi la misura distingue. `tsc`, `eslint`,
+Prettier e i 67 test dei dialoghi passano.
+
+---
+
 ## 2026-09-15 — Revisione di sicurezza e prestazioni: CSRF, ripristino, fuso orario, PDF
 
 **Contesto.** Revisione del 2026-09-14 alla ricerca di codice morto, falle di sicurezza e margini

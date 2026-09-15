@@ -256,7 +256,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 Anagrafica
                             </h3>
 
-                            <div className="grid gap-4 lg:grid-cols-2">
+                            {/*
+                                `items-start` in tutte le griglie di campi: quando un campo mostra
+                                l'errore sotto di sé la riga si allunga, e senza le celle vicine si
+                                stiravano con lei spingendo in giù etichetta e campo.
+                            */}
+                            <div className="grid items-start gap-4 lg:grid-cols-2">
                                 <div className="grid">
                                     <Label htmlFor="customer" className="text-lg">
                                         Cliente
@@ -332,7 +337,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 Intervento
                             </h3>
 
-                            <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="grid items-start gap-4 lg:grid-cols-2">
                                 <div className="grid gap-1">
                                     <Label htmlFor="type" className="text-lg">
                                         Tipo intervento
@@ -413,7 +418,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 </div>
 
                                 {isOnSite ? (
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 items-start gap-4">
                                         <div className="grid gap-1">
                                             <Label htmlFor="startTime" className="text-lg">
                                                 Ora inizio

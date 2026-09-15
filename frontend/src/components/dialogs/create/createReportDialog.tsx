@@ -248,7 +248,12 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 Anagrafica
                             </h3>
 
-                            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                            {/*
+                                `items-start` in tutte le griglie di campi: quando un campo mostra
+                                l'errore sotto di sé la riga si allunga, e senza le celle vicine si
+                                stiravano con lei spingendo in giù etichetta e campo.
+                            */}
+                            <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
                                 <div className="grid lg:col-span-1">
                                     <Label htmlFor="client" className="text-lg">
                                         Cliente
@@ -340,7 +345,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 Intervento
                             </h3>
 
-                            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                            <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
                                 <div className="grid lg:col-span-2 xl:col-span-1">
                                     <Label htmlFor="issue" className="text-lg">
                                         Difetto
@@ -456,7 +461,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                 Stato
                             </h3>
 
-                            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-2">
+                            <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
                                 <div className="grid gap-2 rounded-md">
                                     <Label htmlFor="charger" className="w-full text-lg">
                                         Alimentatore presente

@@ -43,6 +43,21 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                     </div>
 
                     <div className="grid gap-2">
+                        <Label htmlFor="restorePassword">La tua password</Label>
+                        <Input
+                            id="restorePassword"
+                            type="password"
+                            value={panel.restorePassword}
+                            disabled={panel.isRestoring}
+                            onChange={(event) => panel.setRestorePassword(event.target.value)}
+                            autoComplete="current-password"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Richiesta di nuovo perché il ripristino sostituisce l&apos;intero database.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-2">
                         <Label htmlFor="restoreConfirmText">
                             Digita <span className="font-semibold">{restoreConfirmKeyword}</span> per confermare
                         </Label>
@@ -78,7 +93,11 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
             onCancel={panel.closeRestoreConfirm}
             onConfirm={() => void panel.handleConfirmRestore()}
             cancelDisabled={panel.isRestoring}
-            confirmDisabled={panel.isRestoring || panel.restoreConfirmText !== restoreConfirmKeyword}
+            confirmDisabled={
+                panel.isRestoring ||
+                panel.restoreConfirmText !== restoreConfirmKeyword ||
+                panel.restorePassword.length === 0
+            }
             preventOutsideClose={panel.isRestoring}
             destructive
         />

@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Qui pdfmake è quello vero, a differenza di `reportPdf.test.ts`. L'algoritmo che fa riempire
- * alla ricevuta esattamente un foglio (misura, sonda sul padding, ridistribuzione dello spazio
- * avanzato) lavora sulle posizioni che solo un'impaginazione reale produce: con pdfmake finto
- * l'hook di misura non scatta mai e quel codice non viene eseguito.
+ * alla ricevuta esattamente un foglio (misura, ridistribuzione dello spazio avanzato, riduzione
+ * del testo quando non ci sta) lavora sulle posizioni che solo un'impaginazione reale produce:
+ * con pdfmake finto l'hook di misura non scatta da solo.
  *
- * Ogni ricevuta costa tre impaginazioni da circa mezzo secondo l'una, da qui il timeout.
+ * Ogni impaginazione costa da un decimo a mezzo secondo secondo la macchina, da qui il timeout.
  */
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -16,7 +16,12 @@ vi.mock("./pdf/shared", async (importOriginal) => {
     return { ...actual, loadLogoDataUrl: () => Promise.resolve(null) };
 });
 
-import { createReportPdfBuffer, type ReportPrintData } from "./reportPdf";
+import {
+    createReportPdfBuffer,
+    measureReceiptContentBottom,
+    PADDING_COST_PER_POINT,
+    type ReportPrintData,
+} from "./reportPdf";
 
 type DocumentDefinition = { content: unknown[] };
 
@@ -87,24 +92,74 @@ describe("createReportPdfBuffer con l'impaginazione vera", () => {
 
         expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
         expect(countPages(pdf)).toBe(1);
-        // Misura, sonda sul padding, PDF finale.
-        expect(createPdf).toHaveBeenCalledTimes(3);
+        // Una misura e il PDF finale.
+        expect(createPdf).toHaveBeenCalledTimes(2);
 
         // Senza la ridistribuzione avanzerebbero decine di punti in fondo al foglio.
         expect(await pagesWithExtraSpace(finalDefinition(), 6)).toBe(2);
     });
 
     /**
-     * Il ramo di riserva: se già alla prima misura il contenuto non sta in un foglio non c'è
-     * spazio da ridistribuire, niente sonda, e le righe da compilare scendono al minimo.
+     * Il difetto corretto il 2026-09-15: con i campi pieni fino a quanto l'API accetta la ricevuta
+     * usciva su due pagine. Ora il testo si riduce finché ci sta, e il foglio resta pieno.
      */
-    it("con un contenuto che non entra in un foglio salta la sonda e produce comunque il PDF", async () => {
+    const fullText = "Il cliente segnala che il dispositivo si spegne da solo dopo pochi minuti di uso ".repeat(4);
+
+    it.each([
+        [
+            "problema e note a 255 caratteri",
+            buildReport({ issueDescription: fullText.slice(0, 255), note: fullText.slice(0, 255) }),
+        ],
+        ["una password di 255 caratteri", buildReport({ password: fullText.slice(0, 255) })],
+        [
+            "nome del cliente e dispositivo lunghi",
+            buildReport({ customerName: fullText.slice(0, 120), deviceName: fullText.slice(0, 120) }),
+        ],
+    ])("%s: una sola pagina, riempita fino in fondo", async (_label, report) => {
+        const pdf = await createReportPdfBuffer(report);
+
+        expect(countPages(pdf)).toBe(1);
+        expect(await pagesWithExtraSpace(finalDefinition(), 6)).toBe(2);
+    });
+
+    /**
+     * Il ramo di riserva: un testo che non entra nemmeno al corpo più piccolo. L'API non lo
+     * accetta (i campi hanno un tetto di 255 caratteri), ma il PDF deve uscire lo stesso.
+     */
+    it("con un contenuto che non entra in un foglio nemmeno ridotto produce comunque il PDF", async () => {
         const pdf = await createReportPdfBuffer(
             buildReport({ note: "Nota molto lunga che occupa spazio. ".repeat(250) })
         );
 
         expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-        expect(createPdf).toHaveBeenCalledTimes(2);
+        // Cinque misure (righe a mano alte, poi basse a quattro corpi diversi) e il PDF finale.
+        expect(createPdf).toHaveBeenCalledTimes(6);
         expect(countPages(pdf)).toBeGreaterThan(1);
+    });
+});
+
+/**
+ * La seconda misura che la ricevuta faceva a ogni stampa — quanto spazio costa un punto di
+ * padding — è diventata una costante perché è sempre venuta uguale. Questo test la rifà nel modo
+ * di prima su ricevute diverse: se un giorno l'impaginato cambia, fallisce qui invece di lasciare
+ * ricevute che sbordano o che non arrivano in fondo al foglio.
+ */
+describe("PADDING_COST_PER_POINT", () => {
+    it.each([
+        ["con i dati essenziali", buildReport()],
+        ["con la descrizione del lavoro", buildReport({ serviceDescription: "Sostituito il display. ".repeat(8) })],
+        [
+            "con problema e note lunghi",
+            buildReport({ issueDescription: "Non si accende. ".repeat(10), note: "Richiamare. ".repeat(12) }),
+        ],
+        ["con l'avviso al cliente", buildReport({ alerted: true, dataBackup: true, charger: true })],
+    ])("è quello che misura l'impaginazione vera %s", async (_label, report) => {
+        const layout = { workRowHeight: 18, rowPadding: 2.5, valueFontSize: 11.75 };
+
+        const bottom = await measureReceiptContentBottom(report, null, layout);
+        const withLessPadding = await measureReceiptContentBottom(report, null, { ...layout, rowPadding: 1.5 });
+
+        expect(bottom).not.toBeNull();
+        expect(bottom! - withLessPadding!).toBeCloseTo(PADDING_COST_PER_POINT, 3);
     });
 });

@@ -183,6 +183,13 @@
       "when": 1776370002000,
       "tag": "0025_add_intervention_price",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776370003000,
+      "tag": "0026_add_report_technician_technician_index",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsPromisesMock = vi.hoisted(() => ({
     readFile: vi.fn(),
@@ -31,6 +31,7 @@ import {
     findSecretsToReconfigure,
     invalidateBackupStateCache,
     loadState,
+    moveNextRunToNewTimeZone,
     persistState,
     sanitizeState,
     setNextRunIfNeeded,
@@ -109,6 +110,55 @@ describe("setNextRunIfNeeded", () => {
 
         const next = new Date(state.nextRunAt as string);
         expect(next.getDate()).toBe(4);
+    });
+});
+
+describe("moveNextRunToNewTimeZone", () => {
+    // Il calcolo usa l'ora locale di `Date`, cioè `TZ`: qui la si imposta e poi si rimette.
+    const originalTz = process.env.TZ;
+
+    afterEach(() => {
+        if (originalTz === undefined) {
+            delete process.env.TZ;
+        } else {
+            process.env.TZ = originalTz;
+        }
+    });
+
+    it("tiene il giorno del prossimo backup e lo porta all'orario impostato nel fuso nuovo", () => {
+        // Le 02:00 di Roma del 20 settembre.
+        const state = { ...defaultState, autoEnabled: true, runAt: "02:00", nextRunAt: "2026-09-20T00:00:00.000Z" };
+        process.env.TZ = "Asia/Tokyo";
+
+        moveNextRunToNewTimeZone(state, "Europe/Rome", new Date("2026-09-15T08:00:00Z"));
+
+        // Le 02:00 di Tokyo dello stesso 20 settembre.
+        expect(state.nextRunAt).toBe("2026-09-19T17:00:00.000Z");
+    });
+
+    it("se nel fuso nuovo quell'orario è già passato, ripiega sul calcolo da adesso", () => {
+        const state = {
+            ...defaultState,
+            autoEnabled: true,
+            runAt: "02:00",
+            frequencyDays: 1,
+            nextRunAt: "2026-09-15T00:00:00.000Z",
+        };
+        process.env.TZ = "Asia/Tokyo";
+        const now = new Date("2026-09-15T08:00:00Z");
+
+        moveNextRunToNewTimeZone(state, "Europe/Rome", now);
+
+        // Domani alle 02:00 di Tokyo.
+        expect(state.nextRunAt).toBe("2026-09-15T17:00:00.000Z");
+    });
+
+    it("con l'automatico spento non pianifica nulla", () => {
+        const state = { ...defaultState, autoEnabled: false, nextRunAt: "2026-09-20T00:00:00.000Z" };
+
+        moveNextRunToNewTimeZone(state, "Europe/Rome", new Date());
+
+        expect(state.nextRunAt).toBeNull();
     });
 });
 

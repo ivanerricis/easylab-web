@@ -34,6 +34,9 @@ import {
 } from "../services/authManager";
 import authRouter from "./auth";
 import { errorHandler } from "../middleware/errorHandler";
+import { sessionCookieName } from "../middleware/requireAuth";
+
+const sessionCookie = (token: string) => `${sessionCookieName}=${token}`;
 import { ApiError } from "../services/apiError";
 
 const buildApp = () => {
@@ -58,7 +61,7 @@ const publicUser = {
 
 const sessionCookieOf = (response: request.Response) =>
     (response.headers["set-cookie"] as unknown as string[] | undefined)?.find((cookie) =>
-        cookie.startsWith("session=")
+        cookie.startsWith(`${sessionCookieName}=`)
     );
 
 describe("POST /api/auth/login", () => {
@@ -80,7 +83,7 @@ describe("POST /api/auth/login", () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({ username: "mario" });
-        expect(sessionCookieOf(response)).toContain("session=un-token");
+        expect(sessionCookieOf(response)).toContain(sessionCookie("un-token"));
     });
 
     // Il cuore della 2FA: se una sessione nascesse già qui, il secondo fattore sarebbe una
@@ -129,7 +132,7 @@ describe("POST /api/auth/login/2fa", () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({ username: "mario", twoFactorEnabled: true });
-        expect(sessionCookieOf(response)).toContain("session=token-dopo-2fa");
+        expect(sessionCookieOf(response)).toContain(sessionCookie("token-dopo-2fa"));
     });
 
     it("risponde 401 senza cookie quando il codice è sbagliato", async () => {
@@ -194,7 +197,7 @@ describe("rotte di gestione del proprio secondo fattore", () => {
 
         const response = await request(buildApp())
             .post("/api/auth/2fa/setup")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!" });
 
         expect(response.status).toBe(403);
@@ -205,7 +208,7 @@ describe("rotte di gestione del proprio secondo fattore", () => {
         vi.mocked(getSessionUser).mockResolvedValue(publicUser);
         vi.mocked(getTwoFactorStatus).mockResolvedValue({ enabled: true, remainingRecoveryCodes: 6 });
 
-        const response = await request(buildApp()).get("/api/auth/2fa").set("Cookie", "session=un-token");
+        const response = await request(buildApp()).get("/api/auth/2fa").set("Cookie", sessionCookie("un-token"));
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ enabled: true, remainingRecoveryCodes: 6 });
@@ -224,7 +227,7 @@ describe("rotte di gestione del proprio secondo fattore", () => {
 
         const response = await request(buildApp())
             .post("/api/auth/2fa/setup")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!" });
 
         expect(response.status).toBe(200);
@@ -237,7 +240,7 @@ describe("rotte di gestione del proprio secondo fattore", () => {
 
         const response = await request(buildApp())
             .post("/api/auth/2fa/setup")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({});
 
         expect(response.status).toBe(400);
@@ -271,11 +274,11 @@ describe("POST /api/auth/logout", () => {
     it("cancella la sessione del cookie e svuota il cookie", async () => {
         vi.mocked(getSessionUser).mockResolvedValue(publicUser);
 
-        const response = await request(buildApp()).post("/api/auth/logout").set("Cookie", "session=un-token");
+        const response = await request(buildApp()).post("/api/auth/logout").set("Cookie", sessionCookie("un-token"));
 
         expect(response.status).toBe(204);
         expect(deleteSession).toHaveBeenCalledWith("un-token");
-        expect(sessionCookieOf(response)).toMatch(/^session=;/);
+        expect(sessionCookieOf(response)).toMatch(new RegExp(`^${sessionCookieName}=;`));
     });
 
     it("senza sessione risponde 401 e non cancella niente", async () => {
@@ -294,7 +297,7 @@ describe("GET /api/auth/me", () => {
     it("restituisce l'utente della sessione", async () => {
         vi.mocked(getSessionUser).mockResolvedValue(publicUser);
 
-        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", "session=un-token");
+        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", sessionCookie("un-token"));
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual(publicUser);
@@ -303,10 +306,10 @@ describe("GET /api/auth/me", () => {
     it("con una sessione scaduta risponde 401 e svuota il cookie", async () => {
         vi.mocked(getSessionUser).mockResolvedValue(null);
 
-        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", "session=scaduto");
+        const response = await request(buildApp()).get("/api/auth/me").set("Cookie", sessionCookie("scaduto"));
 
         expect(response.status).toBe(401);
-        expect(sessionCookieOf(response)).toMatch(/^session=;/);
+        expect(sessionCookieOf(response)).toMatch(new RegExp(`^${sessionCookieName}=;`));
     });
 });
 
@@ -321,7 +324,7 @@ describe("PUT /api/auth/password", () => {
 
         const response = await request(buildApp())
             .put("/api/auth/password")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ currentPassword: "vecchia", newPassword: "Nuova-password-1!" });
 
         expect(response.status).toBe(204);
@@ -333,7 +336,7 @@ describe("PUT /api/auth/password", () => {
 
         const response = await request(buildApp())
             .put("/api/auth/password")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ currentPassword: "vecchia", newPassword: "corta" });
 
         expect(response.status).toBe(400);
@@ -346,7 +349,7 @@ describe("PUT /api/auth/password", () => {
 
         const response = await request(buildApp())
             .put("/api/auth/password")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ currentPassword: "sbagliata", newPassword: "Nuova-password-1!" });
 
         expect(response.status).toBe(400);
@@ -384,7 +387,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
 
         const response = await request(buildApp())
             .post("/api/auth/2fa/enable")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ code: "123456" });
 
         expect(response.status).toBe(200);
@@ -395,7 +398,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
     it("la conferma senza codice non arriva al servizio", async () => {
         const response = await request(buildApp())
             .post("/api/auth/2fa/enable")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ code: "   " });
 
         expect(response.status).toBe(400);
@@ -405,7 +408,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
     it("la disattivazione chiede password e codice, e risponde 204", async () => {
         const response = await request(buildApp())
             .delete("/api/auth/2fa")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!", code: "123456" });
 
         expect(response.status).toBe(204);
@@ -415,7 +418,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
     it("la disattivazione con la sola password non arriva al servizio", async () => {
         const response = await request(buildApp())
             .delete("/api/auth/2fa")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!" });
 
         expect(response.status).toBe(400);
@@ -427,7 +430,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
 
         const response = await request(buildApp())
             .post("/api/auth/2fa/recovery-codes")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!", code: "123456" });
 
         expect(response.status).toBe(200);
@@ -438,7 +441,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
     it("non accetta campi in più nel corpo", async () => {
         const response = await request(buildApp())
             .post("/api/auth/2fa/recovery-codes")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!", code: "123456", userId: 1 });
 
         expect(response.status).toBe(400);
@@ -450,7 +453,7 @@ describe("attivazione, disattivazione e codici di recupero", () => {
 
         const response = await request(buildApp())
             .delete("/api/auth/2fa")
-            .set("Cookie", "session=un-token")
+            .set("Cookie", sessionCookie("un-token"))
             .send({ password: "segreta1!", code: "123456" });
 
         expect(response.status).toBe(403);

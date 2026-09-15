@@ -38,6 +38,7 @@ vi.mock("./services/logoManager", async (importOriginal) => ({
 }));
 
 import app from "./app";
+import { sessionCookieName } from "./middleware/requireAuth";
 
 const user = {
     id: 2,
@@ -50,7 +51,7 @@ const user = {
     twoFactorSetupRequired: false,
 };
 
-const withSession = (test: request.Test) => test.set("Cookie", "session=un-token");
+const withSession = (test: request.Test) => test.set("Cookie", `${sessionCookieName}=un-token`);
 
 beforeAll(() => {
     fs.writeFileSync(logoPath, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
@@ -80,6 +81,23 @@ describe("rotte aperte", () => {
         const response = await request(app).post("/api/auth/login").send({});
 
         expect(response.status).toBe(400);
+    });
+});
+
+describe("scritture da un'altra origine", () => {
+    /**
+     * Montato prima di ogni router: anche il login, perché una pagina di un sottodominio vicino
+     * potrebbe altrimenti far entrare il browser dell'utente in un account scelto da lei.
+     */
+    it("vengono respinte prima di arrivare ai router, login compreso", async () => {
+        const login = await request(app).post("/api/auth/login").set("Sec-Fetch-Site", "same-site").send({});
+        const restore = await withSession(
+            request(app).post("/api/settings/backup/restore/upload").set("Sec-Fetch-Site", "same-site")
+        );
+
+        expect(login.status).toBe(403);
+        expect(restore.status).toBe(403);
+        expect(getSessionUser).not.toHaveBeenCalled();
     });
 });
 

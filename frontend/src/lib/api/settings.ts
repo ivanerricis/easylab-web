@@ -42,7 +42,6 @@ export type BackupSettingsInput = Pick<
     | "autoEnabled"
     | "frequencyDays"
     | "runAt"
-    | "outputDir"
     | "maxBackupsToKeep"
     | "notifyEmailOnFailure"
     | "smbEnabled"
@@ -88,19 +87,35 @@ export const getBackupDumpDownloadUrl = (fileName: string) =>
 
 export type RestoreBackupResult = BackupSettingsDto & { message: string };
 
-export const restoreBackupFromExisting = async (fileName: string, resetSchema: boolean, backupKey?: string) =>
+/**
+ * `password` è quella dell'admin: il server la chiede di nuovo prima di sostituire il database,
+ * come per le altre operazioni che non si annullano.
+ */
+export const restoreBackupFromExisting = async (
+    fileName: string,
+    resetSchema: boolean,
+    password: string,
+    backupKey?: string
+) =>
     (
         await api.post<RestoreBackupResult>("/settings/backup/restore", {
             fileName,
             resetSchema,
+            password,
             ...(backupKey ? { backupKey } : {}),
         })
     ).data;
 
-export const restoreBackupFromUpload = async (file: File, resetSchema: boolean, backupKey?: string) => {
+export const restoreBackupFromUpload = async (
+    file: File,
+    resetSchema: boolean,
+    password: string,
+    backupKey?: string
+) => {
     const formData = new FormData();
     formData.append("dump", file);
     formData.append("resetSchema", String(resetSchema));
+    formData.append("password", password);
 
     if (backupKey) {
         formData.append("backupKey", backupKey);
@@ -171,6 +186,12 @@ export type CompanySettingsDto = {
     email: string;
     address: string;
     phone: string;
+    /**
+     * Il fuso orario del laboratorio (nome IANA). Lo usa il server per i giorni e i mesi — filtri
+     * per data, incassi mensili, date su PDF ed email, ora dei backup — non il browser, che mostra
+     * gli orari nel fuso del dispositivo.
+     */
+    timeZone: string;
 };
 
 export type CompanySettingsInput = CompanySettingsDto;

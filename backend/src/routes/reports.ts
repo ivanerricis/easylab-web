@@ -5,15 +5,15 @@ import {
     createReport,
     deleteReportById,
     getReportById,
+    getReportDetailById,
     getReportStats,
     listReports,
     updateReportById,
 } from "../db/queries/report";
-import { getReportTechnicianByReportId } from "../db/queries/reportTechnician";
 import { db } from "../db";
 import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTable } from "../db/schema";
 import { createReportPdfBuffer } from "../services/reportPdf";
-import { getLabConfig } from "../config/lab";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { formatDateLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
@@ -120,6 +120,7 @@ reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, r
         technicianId,
         sortBy,
         sortOrder,
+        timeZone: await getAppTimeZone(),
     });
 
     sendListResponse(res, reports, page, pageSize);
@@ -134,7 +135,7 @@ const reportStatsQuerySchema = z.object({
 
 reportsRouter.get("/stats", validate({ query: reportStatsQuerySchema }), async (req, res) => {
     const { month } = req.query as unknown as { month?: string };
-    const stats = await getReportStats(month);
+    const stats = await getReportStats(month, await getAppTimeZone());
 
     res.json(stats);
 });
@@ -180,7 +181,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
 
     const report = reportRows[0];
     const customerName = `${report.customerFirstName} ${report.customerLastName ?? ""}`.trim();
-    const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
+    const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(report.customerPhone, report.customerPhoneSecondary);
     const technicianPrice = Number(technicianPriceRows[0]?.technicianPrice ?? 0);
     const totalPrice = Number(report.price ?? 0) + technicianPrice;
@@ -208,7 +209,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         charger: report.charger,
         alerted: report.alerted,
         totalPrice,
-        createdAtLabel: formatDateLabel(report.createdAt),
+        createdAtLabel: formatDateLabel(report.createdAt, timeZone),
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -216,28 +217,17 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
     res.send(pdfBuffer);
 });
 
-/**
- * Il report con il suo tecnico esterno e il compenso (`technicianId` null e `technicianPrice` 0
- * se non ce l'ha).
- *
- * Il tecnico viaggia con il report perché chi apre un report lo vuole sempre: prima il dialogo
- * di modifica e la pagina di dettaglio lo cercavano scaricando l'intera `report_technician`
- * (8000 righe, 376 KB sul database di sviluppo) per usarne una, a ogni apertura.
- */
+/** Il report con i nomi di ciò a cui rimanda e il suo tecnico: vedi `getReportDetailById`. */
 reportsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
-    const [report, reportTechnician] = await Promise.all([getReportById(id), getReportTechnicianByReportId(id)]);
+    const [report] = await getReportDetailById(id);
 
-    if (report.length === 0) {
+    if (!report) {
         res.status(404).json({ message: "Report not found" });
         return;
     }
 
-    res.json({
-        ...report[0],
-        technicianId: reportTechnician[0]?.technicianId ?? null,
-        technicianPrice: reportTechnician[0]?.price ?? 0,
-    });
+    res.json(report);
 });
 
 reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, res) => {

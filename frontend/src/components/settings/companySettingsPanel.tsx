@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,21 @@ const defaultForm: CompanySettingsInput = {
     email: "",
     address: "",
     phone: "",
+    timeZone: "",
 };
+
+/** Il nome canonico del fuso (`europe/rome` → `Europe/Rome`), o null se il browser non lo conosce. */
+const canonicalTimeZone = (value: string): string | null => {
+    try {
+        return new Intl.DateTimeFormat("en-US", { timeZone: value.trim() }).resolvedOptions().timeZone;
+    } catch {
+        return null;
+    }
+};
+
+/** L'ora di adesso in quel fuso: la prova, per chi lo sceglie, di aver preso quello giusto. */
+const currentTimeIn = (timeZone: string) =>
+    new Intl.DateTimeFormat("it-IT", { timeZone, hour: "2-digit", minute: "2-digit" }).format(new Date());
 
 const CompanySettingsPanel = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +63,10 @@ const CompanySettingsPanel = () => {
     const logoInputRef = useRef<HTMLInputElement>(null);
 
     const isDirty = isSettingsFormDirty(formValues, savedValues);
+    // Tutti i fusi che il browser conosce, per i suggerimenti del campo: sono gli stessi nomi IANA
+    // che il server accetta.
+    const timeZoneOptions = useMemo(() => Intl.supportedValuesOf("timeZone"), []);
+    const selectedTimeZone = formValues.timeZone.trim() ? canonicalTimeZone(formValues.timeZone) : null;
 
     const loadSettings = async () => {
         setIsLoading(true);
@@ -95,6 +113,11 @@ const CompanySettingsPanel = () => {
             return;
         }
 
+        if (!selectedTimeZone) {
+            toast.error("Scegli un fuso orario dall'elenco, per esempio Europe/Rome");
+            return;
+        }
+
         try {
             setIsSaving(true);
             const settings = await updateCompanySettings({
@@ -102,6 +125,7 @@ const CompanySettingsPanel = () => {
                 email: formValues.email.trim(),
                 address: formValues.address.trim(),
                 phone: formValues.phone.trim(),
+                timeZone: selectedTimeZone,
             });
             setFormValues(settings);
             setSavedValues(settings);
@@ -219,6 +243,40 @@ const CompanySettingsPanel = () => {
                                     />
                                 </SettingsField>
                             </SettingsFieldRow>
+
+                            <SettingsFieldRow>
+                                <SettingsField>
+                                    <Label htmlFor="companyTimeZone">Fuso orario</Label>
+                                    <Input
+                                        id="companyTimeZone"
+                                        list="companyTimeZoneOptions"
+                                        placeholder="es: Europe/Rome"
+                                        autoComplete="off"
+                                        aria-invalid={formValues.timeZone.trim() !== "" && !selectedTimeZone}
+                                        aria-describedby="companyTimeZoneHint"
+                                        value={formValues.timeZone}
+                                        onChange={(event) =>
+                                            setFormValues((prev) => ({ ...prev, timeZone: event.target.value }))
+                                        }
+                                    />
+                                    {/* Nascosto, non occupa righe della griglia: dà solo i suggerimenti. */}
+                                    <datalist id="companyTimeZoneOptions">
+                                        {timeZoneOptions.map((timeZone) => (
+                                            <option key={timeZone} value={timeZone} />
+                                        ))}
+                                    </datalist>
+                                </SettingsField>
+                            </SettingsFieldRow>
+
+                            {/* Fuori dal campo, come gli altri testi d'aiuto: `SettingsField` è una
+                                griglia a due righe, etichetta e controllo. */}
+                            <p id="companyTimeZoneHint" className="text-xs text-muted-foreground">
+                                {selectedTimeZone
+                                    ? `Adesso lì sono le ${currentTimeIn(selectedTimeZone)}. `
+                                    : "Fuso orario non riconosciuto. "}
+                                Il fuso orario decide dove cominciano giorni e mesi: filtri per data, incassi mensili,
+                                date su PDF ed email, orario dei backup automatici.
+                            </p>
                         </SettingsGroup>
 
                         <SettingsActions>

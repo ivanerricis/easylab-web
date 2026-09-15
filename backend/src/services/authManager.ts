@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
-import { and, asc, eq, isNotNull, lt, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessionTable, userTable } from "../db/schema";
 import {
@@ -324,6 +324,13 @@ export const login = async (username: string, password: string, ip: string): Pro
     return createSessionForUser(user);
 };
 
+/**
+ * Gira a ogni richiesta autenticata, compreso il controllo dello stato dell'aggiornamento che ogni
+ * scheda aperta fa ogni pochi secondi: una query sola. Prima erano due — la sessione, poi
+ * `getAdminUserId` — cioè due giri verso il database per ogni chiamata all'API. Se l'utente è
+ * l'admin (il primo account mai creato) lo dice qui una sottoquery, con la stessa regola di
+ * `getAdminUserId`.
+ */
 export const getSessionUser = async (token: string): Promise<PublicUser | null> => {
     const tokenHash = hashSessionToken(token);
     const rows = await db
@@ -335,6 +342,7 @@ export const getSessionUser = async (token: string): Promise<PublicUser | null> 
             mustChangePassword: userTable.mustChangePassword,
             active: userTable.active,
             totpConfirmedAt: userTable.totpConfirmedAt,
+            isAdmin: sql<boolean>`${userTable.id} = (select min("id") from "user")`,
         })
         .from(sessionTable)
         .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
@@ -351,8 +359,7 @@ export const getSessionUser = async (token: string): Promise<PublicUser | null> 
         return null;
     }
 
-    const adminId = await getAdminUserId();
-    return toPublicUser(row, row.id === adminId);
+    return toPublicUser(row, row.isAdmin === true);
 };
 
 export const deleteSession = (token: string) =>

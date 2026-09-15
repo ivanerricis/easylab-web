@@ -120,7 +120,7 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
 
             <div className="grid gap-1">
                 <span className="text-sm font-medium">Cartella dump sul server</span>
-                <p className="font-mono text-sm break-all">{formValues.outputDir || "-"}</p>
+                <p className="font-mono text-sm break-all">{panel.outputDir || "-"}</p>
                 <p className="text-xs text-muted-foreground">
                     Definita dalla configurazione del compose/.env, non modificabile da qui.
                 </p>

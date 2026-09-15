@@ -8,14 +8,11 @@ import request from "supertest";
 vi.mock("../db/queries/report", () => ({
     listReports: vi.fn(),
     getReportById: vi.fn(),
+    getReportDetailById: vi.fn(),
     createReport: vi.fn(),
     updateReportById: vi.fn(),
     deleteReportById: vi.fn(),
     getReportStats: vi.fn(),
-}));
-
-vi.mock("../db/queries/reportTechnician", () => ({
-    getReportTechnicianByReportId: vi.fn(),
 }));
 
 // `/:id/print` interroga `db` direttamente (join su cliente, dispositivo, difetto e prezzo
@@ -44,6 +41,7 @@ vi.mock("../db", () => ({
 
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
+    getAppTimeZone: vi.fn(async () => "Europe/Rome"),
 }));
 
 vi.mock("../services/reportPdf", () => ({
@@ -54,11 +52,11 @@ import {
     createReport,
     deleteReportById,
     getReportById,
+    getReportDetailById,
     getReportStats,
     listReports,
     updateReportById,
 } from "../db/queries/report";
-import { getReportTechnicianByReportId } from "../db/queries/reportTechnician";
 import { db } from "../db";
 import { getLabConfig } from "../config/lab";
 import { createReportPdfBuffer } from "../services/reportPdf";
@@ -78,7 +76,11 @@ const labConfig = {
     labEmail: "info@easylab.it",
     labAddress: "Via Roma 1",
     labPhone: "02 1234567",
+    timeZone: "Europe/Rome",
 };
+
+// Quello che finisce nell'intestazione del PDF: il fuso serve solo a scrivere le date.
+const { timeZone: _timeZone, ...labHeader } = labConfig;
 
 // Riga così come la restituisce la query congiunta di `/:id/print`.
 const printReportRow = {
@@ -187,7 +189,7 @@ describe("reports router", () => {
             const response = await request(buildApp()).get("/api/reports/stats");
 
             expect(response.status).toBe(200);
-            expect(getReportStats).toHaveBeenCalledWith(undefined);
+            expect(getReportStats).toHaveBeenCalledWith(undefined, "Europe/Rome");
         });
 
         it("inoltra il mese richiesto", async () => {
@@ -200,7 +202,7 @@ describe("reports router", () => {
 
             await request(buildApp()).get("/api/reports/stats?month=2026-03");
 
-            expect(getReportStats).toHaveBeenCalledWith("2026-03");
+            expect(getReportStats).toHaveBeenCalledWith("2026-03", "Europe/Rome");
         });
 
         it("rifiuta un mese in un formato non valido", async () => {
@@ -248,7 +250,7 @@ describe("reports router", () => {
                     serviceDescription: "Sostituito display",
                     totalPrice: 70,
                     createdAtLabel: "1 gen 2026",
-                    ...labConfig,
+                    ...labHeader,
                 })
             );
         });
@@ -270,8 +272,7 @@ describe("reports router", () => {
 
     describe("GET /:id", () => {
         it("risponde 404 quando il report non esiste", async () => {
-            vi.mocked(getReportById).mockResolvedValue([] as never);
-            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([] as never);
+            vi.mocked(getReportDetailById).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/reports/999");
 
@@ -279,34 +280,38 @@ describe("reports router", () => {
             expect(response.body.message).toBe("Report not found");
         });
 
-        it("restituisce il report trovato, senza tecnico", async () => {
-            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
-            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([] as never);
-
-            const response = await request(buildApp()).get("/api/reports/1");
-
-            expect(response.status).toBe(200);
-            expect(response.body.id).toBe(1);
-            expect(response.body).toMatchObject({ technicianId: null, technicianPrice: 0 });
-        });
-
         /**
-         * Il tecnico viaggia con il report: è ciò che permette al dialogo di modifica e alla
-         * pagina di dettaglio di non scaricare l'intera tabella report-tecnico per usarne una
-         * riga. Se il campo sparisse, il dialogo mostrerebbe "Nessuno" e al salvataggio
-         * cancellerebbe l'abbinamento esistente.
+         * Il report arriva con i nomi e con il suo tecnico: la pagina di dettaglio non scarica più i
+         * cataloghi interi, e il dialogo di modifica non deve perdere il tecnico. Se il campo del
+         * tecnico sparisse, il dialogo mostrerebbe "Nessuno" e al salvataggio cancellerebbe
+         * l'abbinamento esistente.
          */
-        it("porta con sé il tecnico e il suo compenso, chiesti per quel solo report", async () => {
-            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
-            vi.mocked(getReportTechnicianByReportId).mockResolvedValue([
-                { reportId: 1, technicianId: 12, price: 110 },
-            ] as never);
+        it("restituisce il report con i nomi e il tecnico, così come li dà la query", async () => {
+            const detail = {
+                ...storedReport,
+                customerName: "Mario Rossi",
+                customerPhone: "02 1234567",
+                deviceName: "iPhone 12",
+                issueName: "Schermo rotto",
+                collaboratorName: null,
+                technicianId: 12,
+                technicianPrice: 110,
+                technicianName: "Luca Verdi",
+            };
+            vi.mocked(getReportDetailById).mockResolvedValue([detail] as never);
 
             const response = await request(buildApp()).get("/api/reports/1");
 
             expect(response.status).toBe(200);
-            expect(response.body).toMatchObject({ id: 1, technicianId: 12, technicianPrice: 110 });
-            expect(getReportTechnicianByReportId).toHaveBeenCalledWith(1);
+            expect(response.body).toMatchObject({
+                id: 1,
+                customerName: "Mario Rossi",
+                deviceName: "iPhone 12",
+                technicianId: 12,
+                technicianPrice: 110,
+                technicianName: "Luca Verdi",
+            });
+            expect(getReportDetailById).toHaveBeenCalledWith(1);
         });
     });
 

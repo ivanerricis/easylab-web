@@ -25,7 +25,12 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`, **cifrato** 
 
 ## Restore database
 
-Il ripristino è disponibile da Impostazioni > Backup (solo per utenti amministratore): si può scegliere un backup già presente sul server oppure caricarne uno da file, con l'opzione per svuotare prima lo schema `public`. Richiede di digitare `RESTORE` per confermare, essendo un'operazione irreversibile. Un archivio cifrato con la chiave di *questo* server viene decifrato da solo; se invece proviene da un altro server (vedi [Migrazione su un nuovo server](#migrazione-su-un-nuovo-server)), il dialogo di conferma ha un campo facoltativo per incollare la chiave esportata da lì.
+Il ripristino è disponibile da Impostazioni > Backup (solo per utenti amministratore): si può scegliere un backup già presente sul server oppure caricarne uno da file, con l'opzione per svuotare prima lo schema `public`. Richiede di digitare `RESTORE` e **la propria password** per confermare, essendo un'operazione irreversibile (la password la chiede il server: una sessione rubata, o una pagina di un altro sito che la sfrutta, non basta a sostituire il database). Un archivio cifrato con la chiave di *questo* server viene decifrato da solo; se invece proviene da un altro server (vedi [Migrazione su un nuovo server](#migrazione-su-un-nuovo-server)), il dialogo di conferma ha un campo facoltativo per incollare la chiave esportata da lì.
+
+Il ripristino si fida solo di ciò che un backup contiene davvero (dal 15/09/2026):
+
+- **solo file e cartelle**: un archivio con collegamenti (simbolici o fisici) viene rifiutato prima di estrarlo. Un collegamento copiato in `data/` poteva far servire un file qualsiasi del server, `secret.key` compresa, al posto del logo;
+- **solo SQL**: psql esegue il dump in modalità ristretta (`\restrict`), che rifiuta ogni meta-comando — `\!` aprirebbe una shell nel container. Le due righe `\restrict`/`\unrestrict` che pg_dump scrive da sé vengono gestite; un dump con altri meta-comandi fa fallire il ripristino.
 
 > **Limite di caricamento via web:** Cloudflare impone un tetto di **100 MB per richiesta** sul piano Free, quindi il caricamento di un backup più grande di così fallisce dall'interfaccia web (errore 413 generato da Cloudflare, non dall'app). Scegliere un backup **già presente sul server** non è soggetto al limite, perché non carica nulla. Per un archivio esterno più grande di 100 MB, copialo sulla VM e usa lo script da terminale qui sotto.
 
@@ -35,7 +40,7 @@ In alternativa, da terminale:
 ./scripts/restore-db.sh --dump-path /path/to/db-backup-YYYYMMDD-HHMMSS.tar.gz
 ```
 
-Se non passi il percorso, lo script usa il backup più recente (`.tar.gz` o `.sql`) trovato nella directory configurata in `.env` tramite `BACKUP_HOST_DIR`, oppure in `backups/` se la variabile non è presente. Un archivio cifrato viene decifrato automaticamente dentro il container backend (dove vive `data/backup.key`) prima di essere estratto. Con un archivio ripristina anche le impostazioni (email, backup, dati azienda, logo) e riavvia il backend per farle rileggere.
+Se non passi il percorso, lo script usa il backup più recente (`.tar.gz` o `.sql`) trovato nella directory configurata in `.env` tramite `BACKUP_HOST_DIR`, oppure in `backups/` se la variabile non è presente. Un archivio cifrato viene decifrato automaticamente dentro il container backend (dove vive `data/backup.key`) prima di essere estratto. Con un archivio ripristina anche le impostazioni (email, backup, dati azienda con il fuso orario, logo) e riavvia il backend per farle rileggere.
 
 > **Una differenza rispetto all'interfaccia.** Il ripristino da Impostazioni > Backup, a fine lavoro, disattiva la verifica in due passaggi degli utenti il cui segreto non si legge con la chiave di questo server (succede ripristinando il backup di un'altra macchina, vedi sotto). Lo script non passa dal backend e non lo fa: dopo un ripristino da terminale di un backup venuto da altrove, chi aveva la 2FA attiva si vede rifiutare i codici dell'app, entra con un **codice di recupero** e la riattiva da Impostazioni > Sicurezza; l'amministratore senza codici usa `scripts/reset-admin-password.sh --reset-2fa`. Lo script lo ricorda a fine esecuzione. **Per una migrazione conviene quindi il ripristino dall'interfaccia**; lo script resta la strada per gli archivi oltre i 100 MB.
 

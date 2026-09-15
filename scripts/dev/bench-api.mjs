@@ -248,7 +248,6 @@ const run = async () => {
         [`Cataloghi: difetti (${counts.issues})`, "Cataloghi", "/issues"],
         [`Cataloghi: collaboratori (${counts.collaborators})`, "Cataloghi", "/collaborators"],
         [`Cataloghi: tecnici (${counts.technicians})`, "Cataloghi", "/technicians"],
-        ["Cataloghi: tecnici sui report (tutti)", "Cataloghi", "/report-technicians"],
 
         ["Notifiche", "Sistema", "/notifications"],
         ["Impostazioni azienda", "Sistema", "/settings/company"],

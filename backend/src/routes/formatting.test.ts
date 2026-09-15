@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { buildDateRangeLabel, formatDayLabel, formatPhoneLabel, formatScheduleLabel } from "./formatting";
+import {
+    buildDateRangeLabel,
+    formatDateLabel,
+    formatDayLabel,
+    formatPhoneLabel,
+    formatScheduleLabel,
+} from "./formatting";
+
+describe("formatDateLabel", () => {
+    /**
+     * Il caso che il fuso esiste a risolvere: le 00:30 del 14 settembre a Roma sono le 22:30 del
+     * 13 in UTC, e la ricevuta deve dire il 14.
+     */
+    it("scrive il giorno nel fuso del laboratorio, non in quello del processo", () => {
+        const justAfterMidnightInRome = new Date("2026-09-13T22:30:00Z");
+
+        expect(formatDateLabel(justAfterMidnightInRome, "Europe/Rome")).toBe("14 set 2026");
+        expect(formatDateLabel(justAfterMidnightInRome, "UTC")).toBe("13 set 2026");
+    });
+});
 
 describe("formatDayLabel", () => {
     it("formatta una data solo-giorno senza slittare al giorno precedente", () => {

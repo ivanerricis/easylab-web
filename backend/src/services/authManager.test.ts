@@ -506,22 +506,29 @@ describe("getSessionUser", () => {
         mustChangePassword: false,
         active: true,
         totpConfirmedAt: null,
+        // La sottoquery sul primo account: la calcola Postgres, qui arriva come colonna.
+        isAdmin: false,
         ...overrides,
     });
 
-    it("restituisce l'utente della sessione valida", async () => {
+    /**
+     * Gira a ogni richiesta autenticata: una query sola, con l'essere admin calcolato dentro,
+     * invece della sessione più una seconda lettura per sapere chi è l'admin.
+     */
+    it("restituisce l'utente della sessione valida con una sola lettura", async () => {
         queueRows("select", sessionTable, [sessionRow()]);
-        queueAdminIdLookup(1);
 
         const user = await getSessionUser("token-in-chiaro");
 
         expect(user).toMatchObject({ id: 7, username: "mario", isAdmin: false });
+        expect(dbCalls).toHaveLength(1);
         expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
     });
 
     it("smette di imporre la configurazione all'admin appena la 2FA è attiva", async () => {
-        queueRows("select", sessionTable, [sessionRow({ totpConfirmedAt: new Date("2026-02-01T00:00:00Z") })]);
-        queueAdminIdLookup(7);
+        queueRows("select", sessionTable, [
+            sessionRow({ isAdmin: true, totpConfirmedAt: new Date("2026-02-01T00:00:00Z") }),
+        ]);
 
         const user = await getSessionUser("token-in-chiaro");
 

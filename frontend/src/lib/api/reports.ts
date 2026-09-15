@@ -117,9 +117,19 @@ export async function listReports(params?: ListReportsParams) {
  * Il report singolo, con il suo tecnico esterno: `technicianId` è null e `technicianPrice` 0
  * se non ce l'ha. Solo `GET /reports/:id` li restituisce, per questo il tipo è a parte.
  */
+/**
+ * Il report come lo restituisce `GET /reports/:id`: con il tecnico esterno e i nomi di ciò a cui
+ * rimanda, così la pagina di dettaglio non scarica i cataloghi interi per mostrarli.
+ */
 export type ReportDetailDto = ReportEntityDto & {
     technicianId: number | null;
     technicianPrice: number;
+    technicianName: string | null;
+    customerName: string | null;
+    customerPhone: string | null;
+    deviceName: string;
+    issueName: string;
+    collaboratorName: string | null;
 };
 
 export const getReport = async (id: number) => (await api.get<ReportDetailDto>(`/reports/${id}`)).data;

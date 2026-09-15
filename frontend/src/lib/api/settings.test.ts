@@ -23,14 +23,15 @@ describe("api impostazioni", () => {
         );
     });
 
-    it("ripristina da un backup esistente indicando se azzerare lo schema", async () => {
+    it("ripristina da un backup esistente indicando se azzerare lo schema, con la password dell'admin", async () => {
         const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
 
-        await restoreBackupFromExisting("db-backup-1.tar.gz", true);
+        await restoreBackupFromExisting("db-backup-1.tar.gz", true, "segreta");
 
         expect(post).toHaveBeenCalledWith("/settings/backup/restore", {
             fileName: "db-backup-1.tar.gz",
             resetSchema: true,
+            password: "segreta",
         });
     });
 
@@ -38,11 +39,12 @@ describe("api impostazioni", () => {
     it("include la chiave di backup nel ripristino solo quando è indicata", async () => {
         const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
 
-        await restoreBackupFromExisting("db-backup-1.tar.gz", true, "ab".repeat(32));
+        await restoreBackupFromExisting("db-backup-1.tar.gz", true, "segreta", "ab".repeat(32));
 
         expect(post).toHaveBeenCalledWith("/settings/backup/restore", {
             fileName: "db-backup-1.tar.gz",
             resetSchema: true,
+            password: "segreta",
             backupKey: "ab".repeat(32),
         });
     });
@@ -52,13 +54,14 @@ describe("api impostazioni", () => {
         const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
         const file = new File(["dump"], "backup.tar.gz");
 
-        await restoreBackupFromUpload(file, false);
+        await restoreBackupFromUpload(file, false, "segreta");
 
         const [url, body] = post.mock.calls[0] as [string, FormData];
         expect(url).toBe("/settings/backup/restore/upload");
         expect(body.get("dump")).toBeInstanceOf(File);
         expect((body.get("dump") as File).name).toBe("backup.tar.gz");
         expect(body.get("resetSchema")).toBe("false");
+        expect(body.get("password")).toBe("segreta");
         expect(body.get("backupKey")).toBeNull();
     });
 
@@ -66,7 +69,7 @@ describe("api impostazioni", () => {
         const post = vi.spyOn(api, "post").mockResolvedValue({ data: { message: "ok" } });
         const file = new File(["dump"], "backup.tar.gz");
 
-        await restoreBackupFromUpload(file, false, "cd".repeat(32));
+        await restoreBackupFromUpload(file, false, "segreta", "cd".repeat(32));
 
         const [, body] = post.mock.calls[0] as [string, FormData];
         expect(body.get("backupKey")).toBe("cd".repeat(32));

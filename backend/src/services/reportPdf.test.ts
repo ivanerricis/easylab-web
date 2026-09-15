@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Come in interventionPdf.test.ts: pdfmake viene mockato del tutto, l'unica cosa che
  * conta e' la document definition che i generatori costruiscono. `createReportPdfBuffer`
  * in particolare chiama `createPdf` più volte per misurare quanto contenuto entra in
- * pagina (vedi `createSectionedReportPdfBuffer` in reportPdf.ts): con l'impaginazione
- * mockata quell'hook di misura (`pageBreakBefore`) non scatta mai, quindi il codice
- * prende sempre il ramo "non c'e' spazio da ridistribuire" — è il comportamento reale
- * quando il contenuto non entra in una sola pagina, ed e' quello che qui viene verificato.
+ * pagina (vedi `planReceiptLayout` in reportPdf.ts). Con l'impaginazione mockata l'hook di
+ * misura (`pageBreakBefore`) non scatta da solo: `reportEndsAt` lo fa scattare dove serve al
+ * test, e senza di lui ogni misura dice "non entra nel foglio". L'impaginazione vera sta in
+ * `reportPdf.render.test.ts`.
  */
 // `vi.mock` viene issato in cima al file: le funzioni finte devono nascere dentro
 // `vi.hoisted`, altrimenti la fabbrica le referenzia prima che esistano.
@@ -36,6 +36,44 @@ import {
 } from "./reportPdf";
 
 const fakeBuffer = Buffer.from("finto-pdf");
+
+type MeasurableDoc = {
+    content: { id?: string }[];
+    pageBreakBefore: (node: { id?: string; startPosition?: { top: number; pageNumber: number } }) => boolean;
+};
+
+/**
+ * Fa "finire" il contenuto a `top` punti dall'alto della prima pagina in ogni passata di misura,
+ * come farebbe pdfmake chiamando l'hook sulla sentinella.
+ */
+const reportEndsAt = (top: number) => {
+    createPdf.mockImplementation((doc: MeasurableDoc) => {
+        const sentinel = doc.content.find((node) => node?.id === "reportContentEnd");
+
+        if (sentinel) {
+            doc.pageBreakBefore({ ...sentinel, startPosition: { top, pageNumber: 1 } });
+        }
+
+        return { getBuffer: vi.fn().mockResolvedValue(fakeBuffer) };
+    });
+};
+
+/** Il corpo dei valori nella definizione: quello del nome del cliente, che è sempre un valore. */
+const customerNameFontSize = (doc: Record<string, unknown>, customerName: string) => {
+    let fontSize: number | undefined;
+
+    JSON.stringify(doc, (_key, value: unknown) => {
+        const cell = value as { text?: unknown; style?: unknown; fontSize?: number } | null;
+
+        if (cell && typeof cell === "object" && cell.text === customerName && cell.style === "value") {
+            fontSize = cell.fontSize;
+        }
+
+        return value;
+    });
+
+    return fontSize;
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -123,9 +161,11 @@ describe("createReportPdfBuffer", () => {
     });
 
     it("impagina due volte: una passata di misura e la definizione finale, entrambe A4 con gli stili condivisi", async () => {
+        reportEndsAt(700);
         createPdf.mockClear();
         await createReportPdfBuffer(buildReport());
 
+        // Prima erano tre: la seconda misura (la "sonda" sul padding) è diventata una costante.
         expect(createPdf).toHaveBeenCalledTimes(2);
         for (const [doc] of createPdf.mock.calls) {
             expect((doc as Record<string, unknown>).pageSize).toBe("A4");
@@ -134,6 +174,7 @@ describe("createReportPdfBuffer", () => {
     });
 
     it("solo la passata di misura porta il nodo sentinella di fine contenuto", async () => {
+        reportEndsAt(700);
         createPdf.mockClear();
         await createReportPdfBuffer(buildReport());
 
@@ -141,6 +182,47 @@ describe("createReportPdfBuffer", () => {
 
         expect(misurazione).toContain("reportContentEnd");
         expect(finale).not.toContain("reportContentEnd");
+    });
+
+    it("lo spazio che avanza in fondo va sul padding, al costo fisso per punto", async () => {
+        // 100 punti liberi meno uno di margine: 99 / 54 = 1,83 punti di padding in più, sotto il tetto.
+        reportEndsAt(841.89 - 14 - 100);
+        const doc = await captureFinalReportDoc(buildReport());
+        const layout = (doc.content as { layout?: { paddingTop?: () => number } }[]).find(
+            (node) => node.layout?.paddingTop
+        )!.layout!;
+
+        expect(layout.paddingTop!()).toBeCloseTo(2.5 + 99 / 54, 5);
+    });
+
+    it("se il testo non entra in un foglio lo riduce a gradini, e si ferma al primo che entra", async () => {
+        let passes = 0;
+        createPdf.mockImplementation((doc: MeasurableDoc) => {
+            const sentinel = doc.content.find((node) => node?.id === "reportContentEnd");
+
+            // Le prime tre misure sbordano: righe a mano alte, poi basse al corpo pieno, poi a 10,5.
+            if (sentinel) {
+                passes += 1;
+                doc.pageBreakBefore({ ...sentinel, startPosition: { top: 50, pageNumber: passes <= 3 ? 2 : 1 } });
+            }
+
+            return { getBuffer: vi.fn().mockResolvedValue(fakeBuffer) };
+        });
+
+        const report = buildReport();
+        const doc = await captureFinalReportDoc(report);
+
+        expect(passes).toBe(4);
+        expect(customerNameFontSize(doc, report.customerName)).toBe(9.5);
+    });
+
+    it("se non entra nemmeno al corpo più piccolo stampa comunque, al minimo", async () => {
+        const report = buildReport();
+        const doc = await captureFinalReportDoc(report);
+
+        // Cinque misure (tutte "non entra") e il PDF finale.
+        expect(createPdf).toHaveBeenCalledTimes(6);
+        expect(customerNameFontSize(doc, report.customerName)).toBe(8.5);
     });
 
     it("la definizione finale contiene i dati del cliente, del dispositivo e l'importo formattato in euro", async () => {

@@ -33,6 +33,14 @@ if ! command -v jq >/dev/null 2>&1; then
     apt-get install -y jq
 fi
 
+# update-server.sh verifies the signature of origin/main with `git verify-commit`, which checks
+# SSH signatures through ssh-keygen (see docs/DEPLOY.md, "Firma dei commit").
+if ! command -v ssh-keygen >/dev/null 2>&1; then
+    echo "ssh-keygen non trovato, installazione..."
+    apt-get update -y
+    apt-get install -y openssh-client
+fi
+
 command -v git >/dev/null 2>&1 || { echo "git non trovato. Installalo (apt-get install -y git) e riprova." >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "docker non trovato. Installa Docker Engine e riprova." >&2; exit 1; }
 

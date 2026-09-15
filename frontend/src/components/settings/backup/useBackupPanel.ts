@@ -29,7 +29,6 @@ const defaultForm: BackupSettingsInput = {
     autoEnabled: false,
     frequencyDays: 1,
     runAt: "02:00",
-    outputDir: "backups",
     maxBackupsToKeep: 14,
     notifyEmailOnFailure: false,
     smbEnabled: false,
@@ -83,6 +82,9 @@ export const useBackupPanel = () => {
     const [lastRestoreFileName, setLastRestoreFileName] = useState<string | null>(null);
     const [secretsToReconfigure, setSecretsToReconfigure] = useState<string[]>([]);
     const [restoreBackupKeyInput, setRestoreBackupKeyInput] = useState("");
+    const [restorePassword, setRestorePassword] = useState("");
+    // Solo da mostrare: la cartella è quella montata dal compose, il server non la fa scegliere.
+    const [outputDir, setOutputDir] = useState("backups");
     const [backupKey, setBackupKey] = useState<string | null>(null);
     const [isLoadingBackupKey, setIsLoadingBackupKey] = useState(false);
 
@@ -97,7 +99,6 @@ export const useBackupPanel = () => {
                 autoEnabled: settings.autoEnabled,
                 frequencyDays: settings.frequencyDays,
                 runAt: settings.runAt,
-                outputDir: settings.outputDir,
                 maxBackupsToKeep: settings.maxBackupsToKeep,
                 notifyEmailOnFailure: settings.notifyEmailOnFailure,
                 smbEnabled: settings.smbEnabled,
@@ -111,6 +112,7 @@ export const useBackupPanel = () => {
             };
             setFormValues(nextValues);
             setSavedValues(nextValues);
+            setOutputDir(settings.outputDir);
             setLastRunAt(settings.lastRunAt);
             setLastRunStatus(settings.lastRunStatus);
             setLastError(settings.lastError);
@@ -168,11 +170,6 @@ export const useBackupPanel = () => {
             return;
         }
 
-        if (formValues.outputDir.trim() === "") {
-            toast.error("Specifica una cartella di destinazione per il dump");
-            return;
-        }
-
         if (!Number.isInteger(formValues.maxBackupsToKeep) || formValues.maxBackupsToKeep <= 0) {
             toast.error("Il numero di backup da mantenere deve essere un numero intero positivo");
             return;
@@ -204,7 +201,6 @@ export const useBackupPanel = () => {
             setIsSaving(true);
             const settings = await updateBackupSettings({
                 ...formValues,
-                outputDir: formValues.outputDir.trim(),
                 smbHost: formValues.smbHost.trim(),
                 smbShare: formValues.smbShare.trim(),
                 smbPath: formValues.smbPath.trim(),
@@ -226,7 +222,6 @@ export const useBackupPanel = () => {
                 autoEnabled: settings.autoEnabled,
                 frequencyDays: settings.frequencyDays,
                 runAt: settings.runAt,
-                outputDir: settings.outputDir,
                 maxBackupsToKeep: settings.maxBackupsToKeep,
                 notifyEmailOnFailure: settings.notifyEmailOnFailure,
                 smbEnabled: settings.smbEnabled,
@@ -345,6 +340,7 @@ export const useBackupPanel = () => {
         setPendingRestore(source);
         setRestoreConfirmText("");
         setRestoreBackupKeyInput("");
+        setRestorePassword("");
     };
 
     const closeRestoreConfirm = () => {
@@ -355,6 +351,7 @@ export const useBackupPanel = () => {
         setPendingRestore(null);
         setRestoreConfirmText("");
         setRestoreBackupKeyInput("");
+        setRestorePassword("");
     };
 
     const handleRevealBackupKey = async () => {
@@ -387,13 +384,20 @@ export const useBackupPanel = () => {
             });
 
             const backupKeyOverride = restoreBackupKeyInput.trim() || undefined;
-            const result = backupKeyOverride
-                ? pendingRestore.type === "existing"
-                    ? await restoreBackupFromExisting(pendingRestore.fileName, resetSchemaOnRestore, backupKeyOverride)
-                    : await restoreBackupFromUpload(pendingRestore.file, resetSchemaOnRestore, backupKeyOverride)
-                : pendingRestore.type === "existing"
-                  ? await restoreBackupFromExisting(pendingRestore.fileName, resetSchemaOnRestore)
-                  : await restoreBackupFromUpload(pendingRestore.file, resetSchemaOnRestore);
+            const result =
+                pendingRestore.type === "existing"
+                    ? await restoreBackupFromExisting(
+                          pendingRestore.fileName,
+                          resetSchemaOnRestore,
+                          restorePassword,
+                          backupKeyOverride
+                      )
+                    : await restoreBackupFromUpload(
+                          pendingRestore.file,
+                          resetSchemaOnRestore,
+                          restorePassword,
+                          backupKeyOverride
+                      );
 
             setLastRestoreAt(result.lastRestoreAt);
             setLastRestoreStatus(result.lastRestoreStatus);
@@ -409,6 +413,7 @@ export const useBackupPanel = () => {
 
             setPendingRestore(null);
             setRestoreConfirmText("");
+            setRestorePassword("");
             setRestoreUploadFile(null);
             setIsRestoring(false);
             setBusy(null);
@@ -440,6 +445,7 @@ export const useBackupPanel = () => {
         formValues,
         setFormValues,
         isDirty,
+        outputDir,
         lastRunAt,
         lastRunStatus,
         lastError,
@@ -468,6 +474,8 @@ export const useBackupPanel = () => {
         secretsToReconfigure,
         restoreBackupKeyInput,
         setRestoreBackupKeyInput,
+        restorePassword,
+        setRestorePassword,
         backupKey,
         isLoadingBackupKey,
         loadDumpFiles,

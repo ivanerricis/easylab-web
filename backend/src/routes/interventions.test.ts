@@ -8,6 +8,7 @@ import request from "supertest";
 vi.mock("../db/queries/intervention", () => ({
     listInterventions: vi.fn(),
     getInterventionById: vi.fn(),
+    getInterventionDetailById: vi.fn(),
     createIntervention: vi.fn(),
     updateInterventionById: vi.fn(),
     deleteInterventionById: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("../db", () => ({
 
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
+    getAppTimeZone: vi.fn(async () => "Europe/Rome"),
 }));
 
 vi.mock("../services/interventionPdf", () => ({
@@ -62,6 +64,7 @@ import {
     createIntervention,
     deleteInterventionById,
     getInterventionById,
+    getInterventionDetailById,
     getInterventionStats,
     listInterventions,
     updateInterventionById,
@@ -74,6 +77,7 @@ import { sendEmail } from "../services/emailManager";
 import { loadPrintableLogo } from "../services/logoManager";
 import interventionsRouter from "./interventions";
 import { errorHandler } from "../middleware/errorHandler";
+import { consumeEmailSendSlot, emailSendMaxPerWindow, resetEmailSendRateLimit } from "../services/emailSendRateLimit";
 
 const buildApp = () => {
     const app = express();
@@ -88,7 +92,11 @@ const labConfig = {
     labEmail: "info@easylab.it",
     labAddress: "Via Roma 1",
     labPhone: "02 1234567",
+    timeZone: "Europe/Rome",
 };
+
+// Quello che finisce nell'intestazione del PDF: il fuso serve solo a scrivere le date.
+const { timeZone: _timeZone, ...labHeader } = labConfig;
 
 // Riga così come la restituisce la query congiunta di `/:id/print` e `/:id/send-email`.
 const printRow = {
@@ -237,13 +245,30 @@ describe("interventions router", () => {
                     problem: "Non si accende",
                     description: "Sostituito alimentatore",
                     note: "Cliente da richiamare",
-                    ...labConfig,
+                    ...labHeader,
                 })
             );
         });
     });
 
     describe("POST /:id/send-email", () => {
+        beforeEach(() => {
+            resetEmailSendRateLimit();
+        });
+
+        it("oltre il tetto orario risponde 429 senza nemmeno caricare l'intervento", async () => {
+            // Questa app di prova non ha `requireAuth`: gli invii finiscono nel contatore di ripiego.
+            for (let sent = 0; sent < emailSendMaxPerWindow; sent += 1) {
+                consumeEmailSendSlot("senza-utente");
+            }
+
+            const response = await request(buildApp()).post("/api/interventions/1/send-email");
+
+            expect(response.status).toBe(429);
+            expect(db.select).not.toHaveBeenCalled();
+            expect(sendEmail).not.toHaveBeenCalled();
+        });
+
         it("risponde 404 quando l'intervento non esiste", async () => {
             vi.mocked(db.select).mockReturnValue(queryResult([]) as never);
 
@@ -332,7 +357,7 @@ describe("interventions router", () => {
 
     describe("GET /:id", () => {
         it("risponde 404 quando l'intervento non esiste", async () => {
-            vi.mocked(getInterventionById).mockResolvedValue([] as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/interventions/999");
 
@@ -340,13 +365,27 @@ describe("interventions router", () => {
             expect(response.body.message).toBe("Intervento non trovato");
         });
 
-        it("restituisce l'intervento trovato", async () => {
-            vi.mocked(getInterventionById).mockResolvedValue([storedIntervention] as never);
+        // Con i nomi: la pagina di dettaglio non scarica più l'elenco dei collaboratori.
+        it("restituisce l'intervento trovato con i nomi di cliente e collaboratore", async () => {
+            vi.mocked(getInterventionDetailById).mockResolvedValue([
+                {
+                    ...storedIntervention,
+                    customerName: "Mario Rossi",
+                    customerPhone: "02 1234567",
+                    collaboratorName: "Luigi Bianchi",
+                },
+            ] as never);
 
             const response = await request(buildApp()).get("/api/interventions/1");
 
             expect(response.status).toBe(200);
-            expect(response.body.id).toBe(1);
+            expect(response.body).toMatchObject({
+                id: 1,
+                customerName: "Mario Rossi",
+                customerPhone: "02 1234567",
+                collaboratorName: "Luigi Bianchi",
+            });
+            expect(getInterventionDetailById).toHaveBeenCalledWith(1);
         });
     });
 

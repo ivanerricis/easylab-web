@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Stesso schema del mock fs usato altrove per i servizi che scrivono su disco: solo
 // `promises` interessa, il resto del modulo non viene toccato dal codice sotto test.
@@ -16,7 +16,9 @@ vi.mock("node:fs", () => {
 });
 
 import {
+    canonicalTimeZone,
     CompanyManagerError,
+    getAppTimeZone,
     getCompanySettings,
     invalidateCompanySettingsCache,
     updateCompanySettings,
@@ -29,7 +31,20 @@ const defaultCompanyState = {
     email: process.env.LAB_EMAIL ?? "info@easylab.local",
     address: process.env.LAB_ADDRESS ?? "Indirizzo laboratorio",
     phone: process.env.LAB_PHONE ?? "+39 000 000 0000",
+    // Il fuso del processo all'avvio, o Europe/Rome se non è impostato: vedi `initialTimeZone`.
+    timeZone: canonicalTimeZone(process.env.TZ ?? "") ?? "Europe/Rome",
 };
+
+// Il modulo scrive `process.env.TZ`: va rimesso com'era, perché resta nel processo dei test.
+const originalTz = process.env.TZ;
+
+afterEach(() => {
+    if (originalTz === undefined) {
+        delete process.env.TZ;
+    } else {
+        process.env.TZ = originalTz;
+    }
+});
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -62,7 +77,13 @@ describe("getCompanySettings", () => {
 
         const state = await getCompanySettings();
 
-        expect(state).toEqual({ name: "Acme", email: "info@acme.it", address: "Via Roma 1", phone: "0123456" });
+        expect(state).toEqual({
+            name: "Acme",
+            email: "info@acme.it",
+            address: "Via Roma 1",
+            phone: "0123456",
+            timeZone: defaultCompanyState.timeZone,
+        });
         expect(writeFile).not.toHaveBeenCalled();
     });
 
@@ -92,6 +113,22 @@ describe("getCompanySettings", () => {
 
         expect(state).toEqual({ ...defaultCompanyState, name: "Acme" });
     });
+
+    it("legge il fuso salvato, lo scrive nel nome canonico e lo fa adottare al processo", async () => {
+        readFile.mockResolvedValue(JSON.stringify({ ...defaultCompanyState, timeZone: "america/new_york" }));
+
+        const state = await getCompanySettings();
+
+        expect(state.timeZone).toBe("America/New_York");
+        expect(process.env.TZ).toBe("America/New_York");
+        expect(await getAppTimeZone()).toBe("America/New_York");
+    });
+
+    it("un fuso che non esiste nel file ricade sul default invece di rompere le date", async () => {
+        readFile.mockResolvedValue(JSON.stringify({ ...defaultCompanyState, timeZone: "Europa/Nessuna" }));
+
+        expect((await getCompanySettings()).timeZone).toBe(defaultCompanyState.timeZone);
+    });
 });
 
 describe("updateCompanySettings", () => {
@@ -105,6 +142,8 @@ describe("updateCompanySettings", () => {
     });
 
     it("sanifica e salva lo stato, aggiornando anche la cache in memoria", async () => {
+        readFile.mockResolvedValue(JSON.stringify(defaultCompanyState));
+
         const result = await updateCompanySettings({
             name: "  Acme  ",
             email: "",
@@ -113,7 +152,14 @@ describe("updateCompanySettings", () => {
         });
 
         // email vuota resta vuota: a differenza del nome, non ha un fallback sul default.
-        expect(result).toEqual({ name: "Acme", email: "", address: "Via X", phone: "123" });
+        // Senza fuso nell'input resta quello salvato.
+        expect(result).toEqual({
+            name: "Acme",
+            email: "",
+            address: "Via X",
+            phone: "123",
+            timeZone: defaultCompanyState.timeZone,
+        });
         expect(writeFile).toHaveBeenCalledTimes(1);
 
         readFile.mockClear();
@@ -121,5 +167,43 @@ describe("updateCompanySettings", () => {
 
         expect(state).toEqual(result);
         expect(readFile).not.toHaveBeenCalled();
+    });
+
+    it("salva il fuso scelto e lo fa adottare subito al processo", async () => {
+        readFile.mockResolvedValue(JSON.stringify(defaultCompanyState));
+
+        const result = await updateCompanySettings({
+            name: "Acme",
+            email: "",
+            address: "",
+            phone: "",
+            timeZone: "Asia/Tokyo",
+        });
+
+        expect(result.timeZone).toBe("Asia/Tokyo");
+        expect(process.env.TZ).toBe("Asia/Tokyo");
+        expect(writeFile).toHaveBeenCalledWith(
+            expect.stringContaining("company-settings.json"),
+            expect.stringContaining('"timeZone": "Asia/Tokyo"'),
+            "utf-8"
+        );
+    });
+
+    it("rifiuta un fuso inesistente senza scrivere nulla", async () => {
+        readFile.mockResolvedValue(JSON.stringify(defaultCompanyState));
+
+        await expect(
+            updateCompanySettings({ name: "Acme", email: "", address: "", phone: "", timeZone: "Marte/Olympus" })
+        ).rejects.toThrow("Fuso orario non riconosciuto");
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+});
+
+describe("canonicalTimeZone", () => {
+    it("restituisce il nome canonico di un fuso valido e null per uno inventato", () => {
+        expect(canonicalTimeZone(" europe/rome ")).toBe("Europe/Rome");
+        expect(canonicalTimeZone("UTC")).toBe("UTC");
+        expect(canonicalTimeZone("Europa/Roma")).toBeNull();
+        expect(canonicalTimeZone("")).toBeNull();
     });
 });

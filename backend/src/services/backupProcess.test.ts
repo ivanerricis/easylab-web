@@ -24,8 +24,9 @@ import { BackupManagerError } from "./backupError";
 import { archiveDataEntry, archiveDumpEntry, backedUpDataEntries } from "./backupFiles";
 import { createBackupArchive, resetPublicSchema, runPgDump, runPsql, runTar } from "./backupProcess";
 
-// Fake child_process minimale: i tre helper usano solo stderr + gli eventi error/close.
+// Fake child_process minimale: gli helper usano stdout/stderr + gli eventi error/close.
 class FakeChild extends EventEmitter {
+    stdout = new EventEmitter();
     stderr = new EventEmitter();
 }
 
@@ -140,14 +141,15 @@ describe("runTar", () => {
         await expect(promise).rejects.toThrow("tar non trovato");
     });
 
-    it("risolve quando tar esce con codice 0", async () => {
+    it("risolve con lo stdout di tar quando esce con codice 0", async () => {
         spawnMock.mockImplementation(() => new FakeChild());
 
-        const promise = runTar(["-czf", "/tmp/a.tar.gz"]);
+        const promise = runTar(["-tvzf", "/tmp/a.tar.gz"]);
         const child = spawnMock.mock.results[0].value as FakeChild;
+        child.stdout.emit("data", Buffer.from("-rw-r--r-- 0/0 2 2026-09-15 07:25:17 dump.sql\n"));
         child.emit("close", 0);
 
-        await expect(promise).resolves.toBeUndefined();
+        await expect(promise).resolves.toBe("-rw-r--r-- 0/0 2 2026-09-15 07:25:17 dump.sql\n");
     });
 });
 

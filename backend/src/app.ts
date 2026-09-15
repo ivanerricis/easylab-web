@@ -33,6 +33,7 @@ import {
 import settingsRouter from "./routes/settings";
 import { getLogoFile } from "./services/logoManager";
 import { requestLogger } from "./middleware/requestLogger";
+import { parseAllowedOrigins, requireSameOrigin } from "./middleware/requireSameOrigin";
 
 const app = express();
 
@@ -49,11 +50,9 @@ app.use(requestLogger);
 // attivarlo è più sicuro che configurarlo, e toglie di mezzo l'unico valore che sarebbe
 // andato aggiornato a ogni cambio di dominio. Resta attivabile in sviluppo, dove Vite gira
 // su :5173 e chiama il backend su :3000, elencando le origin ammesse in CORS_ORIGIN.
-const corsOrigins = process.env.CORS_ORIGIN?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const corsOrigins = parseAllowedOrigins();
 
-if (corsOrigins?.length) {
+if (corsOrigins.length) {
     app.use(cors({ origin: corsOrigins, credentials: true }));
 }
 
@@ -86,6 +85,9 @@ app.get("/assets/logo.jpg", async (_req, res) => {
 });
 app.use("/assets", express.static(path.join(process.cwd(), "public")));
 app.use(userActionLogger);
+// Dopo il registro delle azioni, così un tentativo respinto vi resta annotato; prima di ogni
+// router, login compreso. Vedi middleware/requireSameOrigin.ts.
+app.use("/api", requireSameOrigin);
 
 app.get("/api/health", (_, res) => {
     res.json({ status: "ok" });

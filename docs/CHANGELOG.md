@@ -11,6 +11,169 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Revisione di sicurezza e prestazioni: CSRF, ripristino, fuso orario, PDF
+
+**Contesto.** Revisione del 2026-09-14 alla ricerca di codice morto, falle di sicurezza e margini
+di prestazione, fatta dopo l'audit con gli strumenti di Trail of Bits (EL-01…EL-10) e quindi su
+quello che quell'audit non aveva visto. L'utente ha chiesto di correggere tutto tranne EL-01,
+che resta nel [BACKLOG](BACKLOG.md). Il fuso orario è diventato un'impostazione, valida solo sul
+server.
+
+### Sicurezza
+
+**Una catena, non una falla sola.** Presi uno per uno i punti qui sotto sembrano minori; insieme
+portavano da una pagina web qualsiasi a root sulla VM:
+
+1. l'admin, loggato, apre una pagina compromessa su un **altro sottodominio** dello stesso dominio;
+2. quella pagina manda un POST `multipart` a `/api/settings/backup/restore/upload` con il cookie
+   dell'admin (punto CSRF qui sotto), senza bisogno di leggere la risposta;
+3. il dump caricato contiene `\! comando`, che psql esegue nel container del backend;
+4. da lì, EL-01 (lo stato dell'updater scritto da root in una cartella del backend) porta a root.
+
+- **CSRF dai sottodomini vicini.** La rassegna del 2026-09-07 aveva escluso il CSRF grazie a
+  `SameSite=Lax`, e la conclusione era sbagliata per come l'app è installata: `Lax` protegge dai
+  siti *diversi*, e per il browser `altro.iltuodominio.it` è lo stesso sito di
+  `easylab.iltuodominio.it` (DEPLOY consiglia proprio un sottodominio accanto agli altri
+  servizi). Nuovo [`requireSameOrigin`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/requireSameOrigin.ts),
+  montato su `/api` prima di ogni router, login compreso: le scritture passano solo con
+  `Sec-Fetch-Site: same-origin` (scritto dal browser, non falsificabile da una pagina), o con
+  un'`Origin` fra quelle di `CORS_ORIGIN` (il frontend di sviluppo su un'altra porta); i browser
+  che non mandano `Sec-Fetch-Site` vengono giudicati da `Origin` contro `Host`; le richieste senza
+  nessuno dei due header (curl, script) non vengono da un browser e passano. Provato sul backend
+  vero: 403 da `cross-site` e `same-site`, passano il frontend di sviluppo e `same-origin`.
+- **Cookie `__Host-session`.** Il prefisso fa rifiutare al browser un cookie con quel nome
+  scritto da un sottodominio per il dominio padre: prima `altro.iltuodominio.it` poteva impostare
+  il proprio `session` e far lavorare chi apriva EasyLab dentro un account scelto da lui. In
+  sviluppo, senza HTTPS, il nome resta `session`. La cancellazione del cookie ora porta le stesse
+  opzioni della creazione, altrimenti il browser ignora la cancellazione di un `__Host-`.
+  **Al primo aggiornamento tutti rifanno il login una volta.**
+- **Password per il ripristino.** Le due rotte di ripristino chiedono di nuovo la password
+  dell'admin (`assertOwnPassword`, con il suo limite di tentativi), come le altre operazioni che
+  non si annullano. Il dialogo ha il campo, e il pulsante resta spento finché manca.
+- **Il ripristino accetta solo file e cartelle.** Un archivio con `data/logo/logo.png` che punta
+  a `secret.key` faceva servire la chiave su `/assets/logo.jpg`, che è pubblico: `getLogoFile`
+  controllava il nome in `meta.json`, non che quel file non fosse un collegamento. Nuovo
+  [`archiveSafety.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/archiveSafety.ts):
+  prima di estrarre si legge `tar -tv` e si rifiuta ogni voce che non sia file o cartella; dopo,
+  una passata con `lstat` su tutto quello che è uscito (tipi e `nlink`). Servono entrambi: busybox,
+  il tar dell'immagine, elenca un collegamento fisico come se fosse un file
+  (`-rw-r--r-- … copia.sql -> dump.sql`), e un collegamento a una cartella estratto per primo
+  farebbe scrivere i file successivi fuori dalla cartella di estrazione. Provato con busybox 1.37
+  su un archivio preparato apposta: fermato in entrambi i punti.
+- **psql in modalità ristretta.** Nuovo
+  [`restoreSql.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/restoreSql.ts):
+  il dump si copia in streaming con in testa `\restrict <chiave casuale>`, il meccanismo che
+  PostgreSQL ha introdotto per lo stesso problema (16.10, CVE-2025-8714). Da lì psql rifiuta ogni
+  meta-comando, a inizio riga come in coda a una query, mentre stringhe e dati dei `COPY`
+  passano. Le due righe `\restrict K`/`\unrestrict K` che pg_dump scrive da sé si tolgono solo
+  nella forma esatta (la prima prima di ogni istruzione, la seconda come ultima riga e con la
+  stessa chiave), altrimenti psql rifiuterebbe il `\restrict` del dump. Provato con psql 16.15
+  (quello dell'immagine) su un Postgres di prova: il dump vero del database di sviluppo (20.000
+  report) si ripristina identico in 1,9 s; `\!` a inizio riga, `\!` in coda a una query e
+  `\unrestrict` con una chiave inventata fermano tutti il ripristino senza eseguire nulla.
+- **Firma dei commit nell'updater.** `scripts/update-server.sh` installa `origin/main` solo se il
+  suo ultimo commit è firmato da una chiave di `ops/allowed_signers` (`git verify-commit`), letto
+  dalla versione già installata: un commit non firmato non può aggiungere la propria chiave. Il
+  primo aggiornamento che porta il file passa senza controllo. Se la firma manca l'esito dice
+  perché, e non si tocca nulla. Provato in un repository finto con uno stub di `docker`: commit
+  non firmato e firmato da una chiave fuori lista fermi, firmato bene installato, installazione
+  vecchia senza lista passa una volta. `install-updater.sh` installa `openssh-client` se manca.
+  Istruzioni in [DEPLOY](DEPLOY.md#firma-dei-commit).
+- **Tetto agli invii di email ai clienti**: 30 l'ora per utente
+  ([`emailSendRateLimit.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/emailSendRateLimit.ts)).
+  Un account qualsiasi, anche compromesso, poteva mandare email all'infinito dall'SMTP del
+  laboratorio e rovinarne la reputazione.
+
+### Fuso orario del laboratorio
+
+**Il difetto.** I timestamp sono salvati in UTC, e i filtri per data confrontavano
+`created_at::date`, cioè il giorno UTC: un report creato fra mezzanotte e le 2 (le 1 d'inverno) si
+cercava sul giorno prima. Sulla prima settimana di settembre del database di sviluppo erano 1.603
+report contati per giorni UTC e 1.613 per giorni di Roma. Lo stesso per il mese degli incassi e
+per il "mese corrente" della dashboard.
+
+- **L'impostazione.** Campo "Fuso orario" in Impostazioni > Azienda (nomi IANA suggeriti da un
+  `<datalist>`, con l'ora di adesso in quel fuso come prova). Sta in `company-settings.json`,
+  quindi finisce nei backup e torna col ripristino, da interfaccia e da terminale. Senza scelta
+  vale il `TZ` del processo, cioè `Europe/Rome` nell'immagine: le installazioni esistenti non
+  cambiano comportamento.
+- **Dove vale: solo sul server** (scelta dell'utente). Filtri per data di report e interventi,
+  incassi mensili, date su PDF ed email, ora dei backup automatici e nomi degli archivi. Per questi
+  ultimi il fuso diventa `process.env.TZ`, che Node rilegge quando cambia; se cambia, il prossimo
+  backup tiene il suo giorno e passa all'orario impostato nel fuso nuovo. Il browser continua a
+  mostrare gli orari nel fuso del dispositivo.
+- **Le query.** Gli estremi del giorno si calcolano una volta come costanti
+  ([`timeZone.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/timeZone.ts)),
+  e il confronto resta sulla colonna nuda: l'indice su `created_at` torna utilizzabile. Sul
+  database di sviluppo il conteggio di una settimana è passato da 35 ms (scansione dell'indice con
+  18.397 righe scartate dal filtro) a 0,85 ms (condizione sull'indice). Il fuso entra come
+  parametro: nel `GROUP BY` dei mesi si raggruppa per posizione, perché per Postgres la stessa
+  espressione con `$2` nella SELECT e `$5` nel GROUP BY sono due espressioni diverse.
+
+### Prestazioni
+
+- **PDF della ricevuta, cos'era il problema.** La ricevuta stampa due copie su un A4 e deve
+  arrivare a filo del foglio. pdfmake non sa riempire, sa solo impaginare: il codice impaginava
+  **tre volte** — una misura, una "sonda" con un punto di padding in meno per sapere quanto
+  spazio costa un punto di padding, e il PDF finale. Lavoro di CPU sincrono, che blocca il
+  server per tutta la durata. La sonda ha dato **sempre 54 punti** su tutte le varianti provate
+  (logo o no, testi corti e lunghi, descrizione del lavoro, indirizzo lungo): è una costante della
+  struttura (27 righe, due punti ciascuna), non del contenuto. Ora è `PADDING_COST_PER_POINT`, e
+  un test con pdfmake vero la rimisura su quattro varianti. Da tre a due impaginazioni: misurato
+  nello stesso processo, circa 260 ms contro 360-435 ms sulla stessa macchina (i numeri assoluti
+  cambiano molto con il carico; la proporzione no).
+- **PDF su due pagine, corretto.** Con problema e note entrambi a 255 caratteri (il massimo
+  dell'API) o con una password lunghissima la ricevuta usciva su due fogli: il ramo "non ci sta"
+  abbassava righe e padding ma non il testo. Ora prova, in ordine, le righe da compilare più
+  basse e poi il corpo dei valori a gradini (11,75 → 10,5 → 9,5 → 8,5 punti), fermandosi al primo
+  che entra; poi riempie il foglio come sempre. Solo le ricevute che sforano pagano le misure in
+  più. Verificato a occhio convertendo i PDF in immagini: una pagina, piena fino in fondo.
+- **Sessione in una query.** `getSessionUser`, che gira a ogni richiesta autenticata, faceva due
+  letture (la sessione, poi il primo utente per sapere chi è l'admin); ora una, con una sottoquery.
+- **Indice `report_technician(technician_id)`** (migration 0026): la chiave primaria copre solo la
+  ricerca per report, e la scheda del tecnico e il controllo della chiave esterna a ogni
+  eliminazione di un tecnico leggevano la tabella intera.
+- **Conteggio degli interventi senza join** quando non c'è ricerca, come già per i report.
+- **Controllo degli aggiornamenti fermo con la scheda nascosta**: prima ogni scheda lo chiedeva
+  ogni 5 secondi tutto il giorno, anche in background; ora si ferma e riparte subito quando la
+  scheda torna in vista.
+- **Pagine di dettaglio con i nomi.** `GET /reports/:id` e `GET /interventions/:id` restituiscono
+  anche i nomi di cliente, dispositivo, difetto, collaboratore e tecnico. La pagina del report
+  faceva sei richieste (il report, i quattro cataloghi interi, il cliente), ora una; quella
+  dell'intervento tre, ora una. La scheda del collaboratore usa `getCollaborator(id)` invece
+  dell'elenco intero.
+
+### Codice morto
+
+- Tolte `GET /api/report-technicians` e `GET /api/report-technicians/:reportId/:technicianId`,
+  con le query che servivano solo a loro: il tecnico arriva con il report.
+- `outputDir` non fa più parte dell'input del salvataggio dei backup: il server lo ignorava
+  (la cartella è quella del compose), e il ramo "percorso assoluto" di `toAbsoluteOutputDir` non
+  poteva scattare. Resta in lettura, dove l'interfaccia lo mostra.
+
+### Verifiche
+
+Backend 875 test (uno salta su Windows: il collegamento simbolico, provato a parte su Linux),
+frontend 613, `tsc`, eslint e prettier puliti su entrambi. Nello stack di sviluppo: migration
+applicata, CSRF provato con curl, conteggi dell'API uguali all'SQL sui giorni di Roma,
+statistiche e PDF che rispondono, e il giro con Playwright su dettaglio report, intervento e
+collaboratore, campo del fuso (valido e inventato) e dialogo di ripristino. Il giro visivo ha
+trovato un difetto, corretto: il testo d'aiuto del fuso stava dentro `SettingsField`, che è una
+griglia a due righe, e finiva sopra il campo.
+
+**Da sapere per il server in funzione.**
+
+- Al primo avvio della versione nuova tutti rifanno il login una volta (nome del cookie).
+- La firma dei commit richiede sulla VM **git 2.34 o successivo** e `ssh-keygen`: senza, lo
+  script ora lo dice esplicitamente invece di rispondere "firma non valida". Il primo
+  aggiornamento, quello che porta `ops/allowed_signers`, non verifica niente; il controllo vale
+  dal successivo.
+- Da ora un commit su `main` non firmato (per esempio fatto dal sito di GitHub) blocca
+  l'aggiornamento finché non ne arriva uno firmato sopra.
+- Il container `backend_dev` in esecuzione su questa macchina è stato creato prima che
+  `NODE_ENV=development` entrasse nel compose di sviluppo, quindi usa già il cookie
+  `__Host-session`; Edge lo accetta anche da `http://localhost`. Si allinea ricreandolo.
+
 ## 2026-09-14 — Documentazione riletta contro il codice, e i dati azienda nel ripristino da terminale
 
 **Contesto.** Rilettura dei documenti operativi (README, DEPLOY, BACKUP, OPERATIONS, BACKLOG)

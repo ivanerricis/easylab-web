@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getApiErrorMessage, listCollaborators, listInterventions, listReports } from "@/lib/api";
+import { getApiErrorMessage, getCollaborator, listInterventions, listReports } from "@/lib/api";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -149,12 +149,10 @@ const CollaboratorPage = () => {
             setIsCollaboratorLoading(true);
 
             try {
-                const collaborators = await listCollaborators();
-                const collaborator = collaborators.find((item) => item.id === collaboratorId);
-
-                if (collaborator) {
-                    setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
-                }
+                // Per id, come la scheda del tecnico: prima si scaricava l'elenco intero dei
+                // collaboratori per usarne uno.
+                const collaborator = await getCollaborator(collaboratorId);
+                setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
             } catch (error) {
                 toast.error(getApiErrorMessage(error, "Impossibile caricare il collaboratore"));
             } finally {

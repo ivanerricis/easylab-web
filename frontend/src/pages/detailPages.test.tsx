@@ -87,6 +87,13 @@ const report = {
     collaboratorId: 40,
     technicianId: 50,
     technicianPrice: 25,
+    // I nomi arrivano con il report (`GET /reports/:id`), non dai cataloghi.
+    technicianName: "Paolo",
+    customerName: "Mario Rossi",
+    customerPhone: "06 123456",
+    deviceName: "Notebook",
+    issueName: "Altro",
+    collaboratorName: "Luca Bianchi",
     note: "Graffio sul coperchio",
     password: "0000",
     issueDescription: "Non carica",
@@ -128,8 +135,14 @@ describe("ReportPage", () => {
         await screen.findByRole("heading", { level: 1 });
     };
 
-    it("mostra il report con i nomi risolti dai cataloghi", async () => {
+    it("mostra il report con i nomi che arrivano insieme a lui, senza scaricare i cataloghi", async () => {
         await renderPage();
+
+        expect(api.getReport).toHaveBeenCalledTimes(1);
+        for (const catalog of [api.listDevices, api.listIssues, api.listCollaborators, api.listTechnicians]) {
+            expect(catalog).not.toHaveBeenCalled();
+        }
+        expect(api.getCustomer).not.toHaveBeenCalled();
 
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Mario Rossi");
         expect(document.title).toBe("Report #5 - Mario Rossi · EasyLab");
@@ -160,8 +173,8 @@ describe("ReportPage", () => {
         expect(screen.getByText("Nessun tecnico associato a questo report.")).toBeInTheDocument();
     });
 
-    it("regge un cliente che non si riesce a leggere", async () => {
-        api.getCustomer.mockRejectedValue(new Error("404"));
+    it("regge un report senza nome del cliente", async () => {
+        api.getReport.mockResolvedValue({ ...report, customerName: null });
         await renderPage();
 
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Cliente sconosciuto");
@@ -221,6 +234,9 @@ describe("InterventionPage", () => {
         collaboratorId: 99,
         created_at: "2026-09-01T00:00:00.000Z",
         updated_at: null,
+        customerName: "Mario Rossi",
+        customerPhone: "06 123456",
+        collaboratorName: null,
     };
 
     const renderPage = async () => {
@@ -239,8 +255,9 @@ describe("InterventionPage", () => {
         expect(detailValue("Problema")).toBe("VPN non si collega");
         expect(detailValue("Note")).toBe("Chiamare dopo le 15");
         expect(detailValue("Descrizione")).toBe("-");
-        // Il collaboratore 99 non è nel catalogo.
+        // Senza nome del collaboratore la pagina lo dice, invece di restare vuota.
         expect(detailValue("Collaboratore")).toBe("Collaboratore sconosciuto");
+        expect(api.listCollaborators).not.toHaveBeenCalled();
         expect(screen.getByText("In lavorazione")).toBeInTheDocument();
         expect(screen.getByText("Intervento da remoto")).toBeInTheDocument();
     });

@@ -4,11 +4,13 @@ import multer from "multer";
 import { z } from "zod";
 import { validate } from "./validation";
 import { requireAdmin } from "../middleware/requireAuth";
+import { assertOwnPassword } from "../services/authManager";
 import {
     exportBackupKey,
     getBackupDumpPath,
     getBackupSettings,
     listBackupDumps,
+    refreshBackupSchedule,
     restoreBackupFromExisting,
     restoreBackupFromUpload,
     runBackupNow,
@@ -17,7 +19,7 @@ import {
 } from "../services/backupManager";
 import { maxPageSize } from "../db/queries/pagination";
 import { smbPathPattern, smbPathRequirementsMessage } from "../services/backupSmb";
-import { getCompanySettings, updateCompanySettings } from "../services/companyManager";
+import { canonicalTimeZone, getCompanySettings, updateCompanySettings } from "../services/companyManager";
 import { getEmailSettings, testEmailConnection, updateEmailSettings } from "../services/emailManager";
 import { getLogoStatus, resetLogo, saveLogo } from "../services/logoManager";
 import { getLogFilePath, listLogFiles, readLogEntries } from "../services/logManager";
@@ -51,7 +53,6 @@ const backupSettingsSchema = z
         autoEnabled: z.boolean(),
         frequencyDays: z.coerce.number().int().min(1).max(365),
         runAt: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
-        outputDir: z.string().trim().min(1).max(512),
         maxBackupsToKeep: z.coerce.number().int().min(1).max(365),
         notifyEmailOnFailure: z.boolean(),
         smbEnabled: z.boolean(),
@@ -67,10 +68,16 @@ const backupSettingsSchema = z
 
 const backupKeySchema = z.string().trim().length(64);
 
+// La password dell'admin, chiesta di nuovo come per le altre operazioni che non si annullano:
+// una sessione rubata, o una pagina di un sottodominio vicino che la usa, non deve bastare a
+// sostituire il database.
+const restorePasswordSchema = z.string().min(1).max(512);
+
 const backupRestoreSchema = z
     .object({
         fileName: z.string().trim().min(1).max(255),
         resetSchema: z.boolean(),
+        password: restorePasswordSchema,
         // Serve solo quando l'archivio è cifrato con una chiave diversa da quella di questo
         // server (tipicamente: ripristino su una macchina nuova). Vedi services/backupKey.ts.
         backupKey: backupKeySchema.optional(),
@@ -95,6 +102,14 @@ const companySettingsSchema = z
         email: z.string().trim().max(255),
         address: z.string().trim().max(512),
         phone: z.string().trim().max(50),
+        // Facoltativo: chi non lo manda tiene il fuso salvato. Il nome si verifica qui con lo
+        // stesso criterio del servizio, così un fuso inventato risponde 400 con un messaggio chiaro.
+        timeZone: z
+            .string()
+            .trim()
+            .max(64)
+            .refine((value) => canonicalTimeZone(value) !== null, { message: "Fuso orario non riconosciuto" })
+            .optional(),
     })
     .strict();
 
@@ -247,7 +262,15 @@ settingsRouter.get("/backup/key", async (_req, res) => {
 });
 
 settingsRouter.put("/company", validate({ body: companySettingsSchema }), async (req, res) => {
-    res.json(await updateCompanySettings(req.body));
+    const previousTimeZone = (await getCompanySettings()).timeZone;
+    const saved = await updateCompanySettings(req.body);
+
+    // Il prossimo backup automatico era stato calcolato con l'ora del fuso precedente.
+    if (saved.timeZone !== previousTimeZone) {
+        await refreshBackupSchedule(previousTimeZone);
+    }
+
+    res.json(saved);
 });
 
 settingsRouter.get("/email", async (_req, res) => {
@@ -291,12 +314,14 @@ settingsRouter.get("/backup/download/:fileName", async (req, res) => {
 });
 
 settingsRouter.post("/backup/restore", validate({ body: backupRestoreSchema }), async (req, res) => {
-    const { fileName, resetSchema, backupKey } = req.body as {
+    const { fileName, resetSchema, backupKey, password } = req.body as {
         fileName: string;
         resetSchema: boolean;
         backupKey?: string;
+        password: string;
     };
 
+    await assertOwnPassword(req.user!.id, password);
     res.json(await restoreBackupFromExisting(fileName, resetSchema, backupKey));
 });
 
@@ -305,6 +330,15 @@ settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (
         res.status(400).json({ message: "Nessun file caricato" });
         return;
     }
+
+    const password = restorePasswordSchema.safeParse(req.body.password);
+
+    if (!password.success) {
+        res.status(400).json({ message: "Per ripristinare il database serve la tua password" });
+        return;
+    }
+
+    await assertOwnPassword(req.user!.id, password.data);
 
     const resetSchema = req.body.resetSchema === "true";
     const backupKey = typeof req.body.backupKey === "string" ? req.body.backupKey.trim() || undefined : undefined;

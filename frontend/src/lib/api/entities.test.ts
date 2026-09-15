@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { createCollaborator, deleteCollaborator, listCollaborators, updateCollaborator } from "./collaborators";
+import {
+    createCollaborator,
+    deleteCollaborator,
+    getCollaborator,
+    listCollaborators,
+    updateCollaborator,
+} from "./collaborators";
 import {
     createCustomer,
     deleteCustomer,
@@ -132,9 +138,11 @@ describe("api clienti e tecnici per id", () => {
 
         await expect(getCustomer(7)).resolves.toEqual(mappedRow);
         await expect(getTechnician(7)).resolves.toEqual(mappedRow);
+        await expect(getCollaborator(7)).resolves.toEqual(mappedRow);
 
         expect(get).toHaveBeenNthCalledWith(1, "/customers/7");
         expect(get).toHaveBeenNthCalledWith(2, "/technicians/7");
+        expect(get).toHaveBeenNthCalledWith(3, "/collaborators/7");
     });
 
     it("passa ordinamento e verso all'elenco clienti", async () => {

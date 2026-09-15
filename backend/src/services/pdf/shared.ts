@@ -124,12 +124,26 @@ export const sectionBarRow = (title: string, colSpan: number) => {
     return row;
 };
 
-export const dualFieldRow = (label1: string, value1: string, label2: string, value2: string) => [
-    { text: label1, style: "label" },
-    { text: value1, style: "value" },
-    { text: label2, style: "label" },
-    { text: value2, style: "value" },
-];
+/**
+ * `valueFontSize` sostituisce il corpo dello stile "value": la ricevuta lo riduce quando il
+ * contenuto non entra in un foglio (vedi `reportPdf.ts`). Senza, vale quello dello stile.
+ */
+export const dualFieldRow = (
+    label1: string,
+    value1: string,
+    label2: string,
+    value2: string,
+    valueFontSize?: number
+) => {
+    const valueSize = valueFontSize === undefined ? {} : { fontSize: valueFontSize };
+
+    return [
+        { text: label1, style: "label" },
+        { text: value1, style: "value", ...valueSize },
+        { text: label2, style: "label" },
+        { text: value2, style: "value", ...valueSize },
+    ];
+};
 
 // I PDF vogliono il logo incorporato come data URL; le email lo allegano inline
 // direttamente da `loadPrintableLogo`, perché i client di posta bloccano le immagini `data:`.

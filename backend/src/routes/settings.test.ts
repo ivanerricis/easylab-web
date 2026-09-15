@@ -14,9 +14,12 @@ vi.mock("../services/backupManager", () => ({
     runBackupNow: vi.fn(),
     testSmbConnection: vi.fn(),
     updateBackupSettings: vi.fn(),
+    refreshBackupSchedule: vi.fn(),
 }));
-vi.mock("../services/companyManager", () => ({
-    getCompanySettings: vi.fn().mockResolvedValue({ name: "EasyLab" }),
+// `canonicalTimeZone` resta quello vero: la rotta lo usa per validare il fuso.
+vi.mock("../services/companyManager", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../services/companyManager")>()),
+    getCompanySettings: vi.fn().mockResolvedValue({ name: "EasyLab", timeZone: "Europe/Rome" }),
     updateCompanySettings: vi.fn(),
 }));
 vi.mock("../services/emailManager", () => ({
@@ -33,6 +36,9 @@ vi.mock("../services/logManager", () => ({
     getLogFilePath: vi.fn(),
     listLogFiles: vi.fn().mockResolvedValue([]),
     readLogEntries: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("../services/authManager", () => ({
+    assertOwnPassword: vi.fn(),
 }));
 vi.mock("../services/updateManager", () => ({
     getUpdateStatus: vi.fn().mockResolvedValue({
@@ -53,6 +59,7 @@ import { errorHandler } from "../middleware/errorHandler";
 import { ApiError } from "../services/apiError";
 import {
     getBackupDumpPath,
+    refreshBackupSchedule,
     restoreBackupFromExisting,
     restoreBackupFromUpload,
     runBackupNow,
@@ -64,6 +71,7 @@ import { testEmailConnection, updateEmailSettings } from "../services/emailManag
 import { resetLogo, saveLogo } from "../services/logoManager";
 import { getLogFilePath, readLogEntries } from "../services/logManager";
 import { requestUpdate, requestUpdateCheck } from "../services/updateManager";
+import { assertOwnPassword } from "../services/authManager";
 
 const buildApp = (isAdmin: boolean) => {
     const app = express();
@@ -163,7 +171,6 @@ describe("settings router: cartella remota SMB", () => {
             autoEnabled: true,
             frequencyDays: 1,
             runAt: "02:00",
-            outputDir: "backups",
             maxBackupsToKeep: 14,
             notifyEmailOnFailure: false,
             smbEnabled: true,
@@ -206,9 +213,12 @@ describe("settings router: chiave di backup", () => {
     });
 
     it("rifiuta una chiave incollata di lunghezza sbagliata nel ripristino", async () => {
-        const response = await request(buildApp(true))
-            .post("/api/settings/backup/restore")
-            .send({ fileName: "db-backup-20260101-120000.tar.gz", resetSchema: false, backupKey: "troppo-corta" });
+        const response = await request(buildApp(true)).post("/api/settings/backup/restore").send({
+            fileName: "db-backup-20260101-120000.tar.gz",
+            resetSchema: false,
+            backupKey: "troppo-corta",
+            password: "segreta",
+        });
 
         expect(response.status).toBe(400);
     });
@@ -350,12 +360,61 @@ describe("settings router: esecuzione e ripristino del backup", () => {
         vi.mocked(restoreBackupFromExisting).mockResolvedValue({} as never);
         const key = "cd".repeat(32);
 
-        const response = await request(buildApp(true))
-            .post("/api/settings/backup/restore")
-            .send({ fileName: " db-backup-20260101-120000.tar.gz ", resetSchema: true, backupKey: key });
+        const response = await request(buildApp(true)).post("/api/settings/backup/restore").send({
+            fileName: " db-backup-20260101-120000.tar.gz ",
+            resetSchema: true,
+            backupKey: key,
+            password: "segreta",
+        });
 
         expect(response.status).toBe(200);
+        expect(assertOwnPassword).toHaveBeenCalledWith(1, "segreta");
         expect(restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-20260101-120000.tar.gz", true, key);
+    });
+
+    /**
+     * Il ripristino sostituisce il database: come le altre operazioni che non si annullano chiede
+     * di nuovo la password, così una sessione rubata o una pagina che la sfrutta non bastano.
+     */
+    it("senza password il ripristino di un backup esistente risponde 400 e non tocca nulla", async () => {
+        const response = await request(buildApp(true))
+            .post("/api/settings/backup/restore")
+            .send({ fileName: "db-backup-20260101-120000.tar.gz", resetSchema: false });
+
+        expect(response.status).toBe(400);
+        expect(restoreBackupFromExisting).not.toHaveBeenCalled();
+    });
+
+    it("con la password sbagliata il ripristino si ferma prima di cominciare", async () => {
+        vi.mocked(assertOwnPassword).mockRejectedValueOnce(new ApiError("La password non è corretta", 400));
+
+        const existing = await request(buildApp(true))
+            .post("/api/settings/backup/restore")
+            .send({ fileName: "db-backup-20260101-120000.tar.gz", resetSchema: false, password: "sbagliata" });
+
+        vi.mocked(assertOwnPassword).mockRejectedValueOnce(new ApiError("La password non è corretta", 400));
+
+        const upload = await request(buildApp(true))
+            .post("/api/settings/backup/restore/upload")
+            .field("password", "sbagliata")
+            .attach("dump", Buffer.from("-- dump"), "dump.sql");
+
+        expect(existing.status).toBe(400);
+        expect(upload.status).toBe(400);
+        expect(upload.body.message).toBe("La password non è corretta");
+        expect(restoreBackupFromExisting).not.toHaveBeenCalled();
+        expect(restoreBackupFromUpload).not.toHaveBeenCalled();
+    });
+
+    it("senza password il ripristino da file caricato risponde 400", async () => {
+        const response = await request(buildApp(true))
+            .post("/api/settings/backup/restore/upload")
+            .attach("dump", Buffer.from("-- dump"), "dump.sql");
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toMatch(/password/);
+        expect(assertOwnPassword).not.toHaveBeenCalled();
+        expect(restoreBackupFromUpload).not.toHaveBeenCalled();
     });
 
     it("il ripristino da file caricato senza file risponde 400", async () => {
@@ -372,6 +431,7 @@ describe("settings router: esecuzione e ripristino del backup", () => {
             .post("/api/settings/backup/restore/upload")
             .field("resetSchema", "true")
             .field("backupKey", "   ")
+            .field("password", "segreta")
             .attach("dump", Buffer.from("-- dump"), "db-backup-20260914-020000.tar.gz");
 
         expect(response.status).toBe(200);
@@ -388,6 +448,7 @@ describe("settings router: esecuzione e ripristino del backup", () => {
         await request(buildApp(true))
             .post("/api/settings/backup/restore/upload")
             .field("resetSchema", "si")
+            .field("password", "segreta")
             .field("backupKey", ` ${"ef".repeat(32)} `)
             .attach("dump", Buffer.from("-- dump"), "dump.sql");
 
@@ -451,6 +512,35 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(saved.status).toBe(200);
         expect(updateCompanySettings).toHaveBeenCalledWith({ name: "Laboratorio", email: "", address: "", phone: "" });
         expect(empty.status).toBe(400);
+    });
+
+    it("accetta un fuso orario valido e rifiuta uno inventato", async () => {
+        vi.mocked(updateCompanySettings).mockResolvedValue({ timeZone: "Europe/Rome" } as never);
+        const body = { name: "Laboratorio", email: "", address: "", phone: "" };
+
+        const valid = await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ ...body, timeZone: "Europe/Rome" });
+        const invented = await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ ...body, timeZone: "Europa/Roma" });
+
+        expect(valid.status).toBe(200);
+        expect(invented.status).toBe(400);
+        expect(updateCompanySettings).toHaveBeenCalledTimes(1);
+        // Stesso fuso di prima: il prossimo backup resta dov'era.
+        expect(refreshBackupSchedule).not.toHaveBeenCalled();
+    });
+
+    it("se il fuso cambia ricalcola il prossimo backup, partendo dal fuso precedente", async () => {
+        vi.mocked(updateCompanySettings).mockResolvedValue({ timeZone: "Asia/Tokyo" } as never);
+
+        const response = await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ name: "Laboratorio", email: "", address: "", phone: "", timeZone: "Asia/Tokyo" });
+
+        expect(response.status).toBe(200);
+        expect(refreshBackupSchedule).toHaveBeenCalledWith("Europe/Rome");
     });
 
     const emailBody = {

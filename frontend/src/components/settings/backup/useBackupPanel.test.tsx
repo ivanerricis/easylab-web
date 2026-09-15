@@ -148,7 +148,6 @@ describe("useBackupPanel: salvataggio", () => {
         [{ frequencyDays: 1.5 }, "La frequenza deve essere un numero intero positivo"],
         [{ runAt: "24:00" }, "L'orario deve essere nel formato HH:mm"],
         [{ runAt: "9:00" }, "L'orario deve essere nel formato HH:mm"],
-        [{ outputDir: "   " }, "Specifica una cartella di destinazione per il dump"],
         [{ maxBackupsToKeep: 0 }, "Il numero di backup da mantenere deve essere un numero intero positivo"],
         [{ notifyEmailOnFailure: true }, "Configura prima l'invio email nelle impostazioni per attivare questo avviso"],
         [{ smbEnabled: true, smbHost: "nas" }, "Per il NAS specifica almeno host, condivisione e utente"],
@@ -201,7 +200,6 @@ describe("useBackupPanel: salvataggio", () => {
         const { result } = await renderPanel();
 
         edit(result, {
-            outputDir: " backups/lab ",
             smbEnabled: true,
             smbHost: " nas.local ",
             smbShare: " backup ",
@@ -212,13 +210,15 @@ describe("useBackupPanel: salvataggio", () => {
 
         expect(api.updateBackupSettings).toHaveBeenCalledWith(
             expect.objectContaining({
-                outputDir: "backups/lab",
                 smbHost: "nas.local",
                 smbShare: "backup",
                 smbUsername: "admin",
                 smbPassword: "segreta",
             })
         );
+        // La cartella è quella del compose: il server non la fa scegliere, il form non la manda.
+        expect(api.updateBackupSettings.mock.calls[0][0]).not.toHaveProperty("outputDir");
+        expect(result.current.outputDir).toBe("backups");
         expect(toast.success).toHaveBeenCalledWith("Impostazioni backup salvate");
         expect(result.current.formValues.smbPassword).toBe("");
         // Salvato, il form torna pulito.
@@ -325,12 +325,14 @@ describe("useBackupPanel: ripristino", () => {
         act(() => {
             result.current.setResetSchemaOnRestore(true);
             result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-1.tar.gz" });
+            result.current.setRestorePassword("segreta");
         });
         await act(async () => {
             await result.current.handleConfirmRestore();
         });
 
-        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-1.tar.gz", true);
+        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-1.tar.gz", true, "segreta", undefined);
+        expect(result.current.restorePassword).toBe("");
         expect(toast.success).toHaveBeenCalledWith("Ripristino completato");
         expect(navigate).toHaveBeenCalledWith("/login", { replace: true });
         expect(logout).toHaveBeenCalled();
@@ -346,21 +348,28 @@ describe("useBackupPanel: ripristino", () => {
 
         act(() => {
             result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-1.tar.gz" });
+            result.current.setRestorePassword("segreta");
             result.current.setRestoreBackupKeyInput(`  ${"ab".repeat(32)}  `);
         });
         await act(async () => {
             await result.current.handleConfirmRestore();
         });
 
-        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-1.tar.gz", false, "ab".repeat(32));
+        expect(api.restoreBackupFromExisting).toHaveBeenCalledWith(
+            "db-backup-1.tar.gz",
+            false,
+            "segreta",
+            "ab".repeat(32)
+        );
     });
 
-    it("dimentica la chiave di backup incollata quando si riapre la conferma", async () => {
+    it("dimentica la chiave di backup incollata e la password quando si riapre la conferma", async () => {
         const { result } = await renderPanel();
 
         act(() => {
             result.current.openRestoreConfirm({ type: "existing", fileName: "db-backup-1.tar.gz" });
             result.current.setRestoreBackupKeyInput("ab".repeat(32));
+            result.current.setRestorePassword("segreta");
         });
         act(() => {
             result.current.closeRestoreConfirm();
@@ -370,6 +379,7 @@ describe("useBackupPanel: ripristino", () => {
         });
 
         expect(result.current.restoreBackupKeyInput).toBe("");
+        expect(result.current.restorePassword).toBe("");
     });
 
     it("ripristina da un file caricato, anche se il logout fallisce", async () => {
@@ -380,12 +390,13 @@ describe("useBackupPanel: ripristino", () => {
 
         act(() => {
             result.current.openRestoreConfirm({ type: "upload", file });
+            result.current.setRestorePassword("segreta");
         });
         await act(async () => {
             await result.current.handleConfirmRestore();
         });
 
-        expect(api.restoreBackupFromUpload).toHaveBeenCalledWith(file, false);
+        expect(api.restoreBackupFromUpload).toHaveBeenCalledWith(file, false, "segreta", undefined);
         expect(navigate).toHaveBeenCalledWith("/login", { replace: true });
     });
 

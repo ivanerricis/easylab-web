@@ -162,13 +162,14 @@ describe("requireAdmin", () => {
  * un'immagine avviata senza la variabile mandava il cookie di sessione senza l'attributo.
  */
 describe("sessionCookieOptions", () => {
-    const loadOptions = async (nodeEnv: string | undefined) => {
+    const loadModule = async (nodeEnv: string | undefined) => {
         vi.resetModules();
         vi.stubEnv("NODE_ENV", nodeEnv);
-        const { sessionCookieOptions } = await import("./requireAuth.js");
+        const module = await import("./requireAuth.js");
         vi.unstubAllEnvs();
-        return sessionCookieOptions;
+        return module;
     };
+    const loadOptions = async (nodeEnv: string | undefined) => (await loadModule(nodeEnv)).sessionCookieOptions;
 
     it("è secure per default, anche senza NODE_ENV", async () => {
         expect((await loadOptions(undefined)).secure).toBe(true);
@@ -177,5 +178,22 @@ describe("sessionCookieOptions", () => {
 
     it("rinuncia a secure solo in sviluppo dichiarato", async () => {
         expect((await loadOptions("development")).secure).toBe(false);
+    });
+
+    /**
+     * `__Host-` impedisce a un sottodominio vicino di scrivere un cookie con lo stesso nome per il
+     * dominio padre. Il browser lo accetta solo `Secure`, con `Path=/` e senza `Domain`: le tre
+     * condizioni vanno tenute insieme al nome, altrimenti il login smette di funzionare.
+     */
+    it("in produzione usa il prefisso __Host-, con le opzioni che il prefisso richiede", async () => {
+        const { sessionCookieName, sessionCookieOptions } = await loadModule("production");
+
+        expect(sessionCookieName).toBe("__Host-session");
+        expect(sessionCookieOptions).toMatchObject({ secure: true, path: "/" });
+        expect(sessionCookieOptions).not.toHaveProperty("domain");
+    });
+
+    it("in sviluppo, senza HTTPS, il prefisso non è possibile e il nome resta session", async () => {
+        expect((await loadModule("development")).sessionCookieName).toBe("session");
     });
 });

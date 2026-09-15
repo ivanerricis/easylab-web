@@ -108,7 +108,12 @@ const customersRouter = createCrudRouter({
                     return;
                 }
 
-                const reportsResult = await listReports({ customerId: id, dateFrom, dateTo });
+                const reportsResult = await listReports({
+                    customerId: id,
+                    dateFrom,
+                    dateTo,
+                    timeZone: context.timeZone,
+                });
                 const reports = Array.isArray(reportsResult) ? reportsResult : reportsResult.items;
 
                 const pdfBuffer = await createCustomerReportsPdfBuffer({
@@ -117,7 +122,7 @@ const customersRouter = createCrudRouter({
                     reportCount: reports.length,
                     reports: reports.map((report) => ({
                         id: report.id,
-                        createdAtLabel: formatDateLabel(report.createdAt),
+                        createdAtLabel: formatDateLabel(report.createdAt, context.timeZone),
                         deviceName: report.device,
                         issueDescription: report.issue,
                         closed: report.closed,
@@ -149,7 +154,12 @@ const customersRouter = createCrudRouter({
                     return;
                 }
 
-                const interventionsResult = await listInterventions({ customerId: id, dateFrom, dateTo });
+                const interventionsResult = await listInterventions({
+                    customerId: id,
+                    dateFrom,
+                    dateTo,
+                    timeZone: context.timeZone,
+                });
                 const interventions = Array.isArray(interventionsResult)
                     ? interventionsResult
                     : interventionsResult.items;
@@ -160,7 +170,7 @@ const customersRouter = createCrudRouter({
                     interventionCount: interventions.length,
                     interventions: interventions.map((intervention) => ({
                         id: intervention.id,
-                        createdAtLabel: formatDateLabel(intervention.createdAt),
+                        createdAtLabel: formatDateLabel(intervention.createdAt, context.timeZone),
                         type: intervention.type as "consegna_materiale" | "intervento_sede" | "intervento_remoto",
                         status: intervention.status as "programmato" | "in_lavorazione" | "completato",
                         description: intervention.description,

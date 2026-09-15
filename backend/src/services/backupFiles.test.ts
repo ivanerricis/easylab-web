@@ -72,11 +72,6 @@ describe("backupFileNameScanPattern", () => {
 });
 
 describe("toAbsoluteOutputDir", () => {
-    it("lascia invariato un percorso gia' assoluto", () => {
-        const absolute = path.resolve("/var/backups");
-        expect(toAbsoluteOutputDir(absolute)).toBe(absolute);
-    });
-
     it("risolve un percorso relativo rispetto alla cwd del processo", () => {
         expect(toAbsoluteOutputDir("backups")).toBe(path.join(process.cwd(), "backups"));
     });

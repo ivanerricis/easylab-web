@@ -107,6 +107,47 @@ const computeNextRunAt = (referenceDate: Date, frequencyDays: number, runAt: str
     return candidate.toISOString();
 };
 
+/**
+ * Dopo un cambio di fuso: il prossimo backup tiene il giorno che aveva nel fuso precedente e
+ * passa all'orario impostato nel nuovo. Ricalcolarlo da "adesso" avrebbe spostato anche il
+ * giorno, e con una frequenza di più giorni saltato un backup. Se quell'istante è già passato si
+ * riparte dal calcolo normale. Va chiamata con il processo già nel fuso nuovo (`TZ`), perché
+ * l'orario si compone con l'ora locale di `Date`, come in `computeNextRunAt`.
+ */
+export const moveNextRunToNewTimeZone = (state: BackupSettingsState, previousTimeZone: string, now: Date) => {
+    if (!state.autoEnabled || !state.nextRunAt) {
+        setNextRunIfNeeded(state, now);
+        return;
+    }
+
+    const previousNextRun = new Date(state.nextRunAt);
+
+    if (Number.isNaN(previousNextRun.getTime())) {
+        setNextRunIfNeeded(state, now);
+        return;
+    }
+
+    // "en-CA" scrive le date come YYYY-MM-DD.
+    const [year, month, day] = new Intl.DateTimeFormat("en-CA", {
+        timeZone: previousTimeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    })
+        .format(previousNextRun)
+        .split("-")
+        .map(Number);
+    const { hours, minutes } = parseRunTime(state.runAt);
+    const candidate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+    if (candidate.getTime() <= now.getTime()) {
+        setNextRunIfNeeded(state, now);
+        return;
+    }
+
+    state.nextRunAt = candidate.toISOString();
+};
+
 export const setNextRunIfNeeded = (state: BackupSettingsState, reference: Date) => {
     if (state.autoEnabled) {
         state.nextRunAt = computeNextRunAt(reference, state.frequencyDays, state.runAt);

@@ -271,7 +271,6 @@ describe("updateBackupSettings", () => {
         autoEnabled: false,
         frequencyDays: 1,
         runAt: "02:00",
-        outputDir: "/etc",
         maxBackupsToKeep: 7,
         notifyEmailOnFailure: false,
         smbEnabled: false,
@@ -284,7 +283,7 @@ describe("updateBackupSettings", () => {
     };
 
     /** La cartella di destinazione non è configurabile dal client: è montata dal compose. */
-    it("ignora la cartella scelta dal client, ripulisce i campi del NAS e salva", async () => {
+    it("tiene la cartella montata dal compose, ripulisce i campi del NAS e salva", async () => {
         const result = await updateBackupSettings({
             ...input,
             smbEnabled: true,

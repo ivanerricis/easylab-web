@@ -11,6 +11,7 @@ vi.mock("react-router-dom", async () => {
 
 const api = vi.hoisted(() => ({
     listCollaborators: vi.fn(),
+    getCollaborator: vi.fn(),
     listTechnicians: vi.fn(),
     getTechnician: vi.fn(),
     listReports: vi.fn(),
@@ -74,9 +75,13 @@ const reportRow = {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    api.listCollaborators.mockResolvedValue([
-        { id: 40, firstName: "Luca", lastName: "Bianchi", phoneNumber: null, ...timestamps },
-    ]);
+    api.getCollaborator.mockResolvedValue({
+        id: 40,
+        firstName: "Luca",
+        lastName: "Bianchi",
+        phoneNumber: null,
+        ...timestamps,
+    });
     api.listReports.mockResolvedValue(page([reportRow]));
     api.listInterventions.mockResolvedValue(page([]));
     api.getTechnician.mockResolvedValue({
@@ -101,6 +106,9 @@ describe("CollaboratorPage", () => {
         await renderPage();
 
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Luca Bianchi");
+        // Per id, come la scheda del tecnico: non più l'elenco intero per usarne uno.
+        expect(api.getCollaborator).toHaveBeenCalledWith(40);
+        expect(api.listCollaborators).not.toHaveBeenCalled();
         expect(api.listReports).toHaveBeenCalledWith(
             expect.objectContaining({ collaboratorId: 40, visibility: "all" })
         );

@@ -1,8 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { getSessionUser, type PublicUser } from "../services/authManager";
 
-export const sessionCookieName = "session";
-
 // In produzione l'app è raggiungibile solo dal dominio pubblico servito da Cloudflare
 // Tunnel, quindi sempre in HTTPS: il cookie di sessione non deve mai viaggiare in chiaro.
 // `secure` è quindi il default, e si spegne solo dove lo si chiede esplicitamente: il compose
@@ -11,10 +9,21 @@ export const sessionCookieName = "session";
 // (`secure` solo con NODE_ENV=production): un'immagine avviata senza la variabile perdeva
 // l'attributo senza alcun segnale. Nessun attributo `domain`: il cookie si limita da sé
 // all'host che lo ha emesso, ed è ciò che permette di cambiare dominio senza toccare il codice.
+const secureSessionCookie = process.env.NODE_ENV !== "development";
+
+/**
+ * Il prefisso `__Host-` fa rifiutare al browser qualunque cookie con questo nome che non sia
+ * `Secure`, con `Path=/` e senza `Domain`: cioè uno scritto da un sottodominio vicino per il
+ * dominio padre. Senza, `altro.iltuodominio.it` poteva impostare il proprio `session` e far
+ * lavorare chi apriva EasyLab dentro un account scelto da lui. Il prefisso vuole `Secure`, quindi
+ * in sviluppo (http) il nome resta quello semplice.
+ */
+export const sessionCookieName = secureSessionCookie ? "__Host-session" : "session";
+
 export const sessionCookieOptions = {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV !== "development",
+    secure: secureSessionCookie,
     path: "/",
 };
 
@@ -38,7 +47,9 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const user = await getSessionUser(token);
 
     if (!user) {
-        res.clearCookie(sessionCookieName);
+        // Con le stesse opzioni con cui è nato: un `__Host-` cancellato senza `Secure` il
+        // browser lo scarta, e il cookie scaduto resterebbe dov'è.
+        res.clearCookie(sessionCookieName, sessionCookieOptions);
         res.status(401).json({ message: "Sessione scaduta o non valida" });
         return;
     }

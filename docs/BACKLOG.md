@@ -28,13 +28,12 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   all'apertura. Oggi sono cataloghi piccoli (pochi KB); il tetto delle 5000 righe li
   troncherebbe senza avviso se crescessero. Il cliente invece è già cercato sul server
   (`lib/customerLookup.ts`, 2026-09-11).
-- `GET /api/report-technicians` (l'intera tabella report-tecnico) non ha più chiamanti nel
-  frontend dal 2026-09-11, quando dialogo e dettaglio del report hanno iniziato a ricevere il
-  tecnico con il report. Si può togliere, insieme al suo test; lasciata finché non si è certi che
-  nessuno script esterno la usi.
-- Nessuna cache per i PDF: circa 470 ms per ricevuta, costanti con il volume perché è lavoro di
-  CPU di pdfmake, e sincroni, quindi bloccano il server per quel mezzo secondo. Urgenza bassa
-  finché le stampe restano poche.
+- Nessuna cache per i PDF, e generazione sincrona: il server resta fermo per tutta la durata
+  della stampa. Dal 2026-09-15 una ricevuta costa due impaginazioni invece di tre (CHANGELOG):
+  circa 260 ms su questa macchina sotto carico, un terzo in meno di prima, costanti con il
+  volume. Se le stampe diventassero tante, la strada è spostare pdfmake in un `worker_thread`
+  (il server resta libero) più che una cache, perché una ricevuta si stampa di rado due volte
+  uguale. Urgenza bassa.
 
 **Qualità**
 - La riconciliazione del tecnico esterno al salvataggio di un report (aggiungi / aggiorna il
@@ -53,6 +52,14 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
 
 **Sicurezza e messa in produzione**
+- **L'accesso d'emergenza dalla LAN non permette il login** (da EL-08, 2026-09-14). Il cookie di
+  sessione è `Secure` in produzione (dal 2026-09-15 anche `__Host-`), e il browser scarta un
+  cookie `Secure` ricevuto su `http://` da un indirizzo che non sia `localhost`: aprendo
+  `http://<ip-della-vm>` come descrive il compose, la pagina di login risponde ma l'accesso non
+  resta. Rimedio che funziona già oggi senza toccare nulla: un tunnel SSH dalla postazione,
+  `ssh -L 8080:localhost:80 <utente>@<ip-della-vm>` (dopo aver pubblicato `80:8080` come dice il
+  compose) e poi `http://localhost:8080`, perché `localhost` per il browser è un'origine
+  sicura. Da decidere se documentarlo così o dare alla porta 8080 un cookie non `Secure`.
 - 2FA, collaudo a mano prima di considerarla in produzione: attivazione con un'app reale, login
   da telefono, ripristino di un backup con una `secret.key` diversa. Dal CHANGELOG del
   2026-09-08.

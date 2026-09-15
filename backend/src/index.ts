@@ -2,10 +2,16 @@ import "dotenv/config";
 import app from "./app";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backupManager";
 import { ensureCatchAllIssue } from "./services/issueCatalog";
+import { getCompanySettings } from "./services/companyManager";
 import { ensureDefaultAdmin, startSessionCleanupScheduler, stopSessionCleanupScheduler } from "./services/authManager";
 import { pool } from "./db";
 
 const server = app.listen(3000, "0.0.0.0", () => {
+    // I dati azienda portano il fuso orario del laboratorio, e caricarli lo fa adottare al
+    // processo (`companyManager.applyTimeZone`): va fatto subito, non alla prima richiesta.
+    void getCompanySettings().catch((error: unknown) => {
+        console.error("Lettura dei dati azienda non riuscita:", error);
+    });
     startBackupScheduler();
     startSessionCleanupScheduler();
     // Il `.catch` non è decorativo: senza, un errore qui diventa una rejection non

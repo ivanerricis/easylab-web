@@ -24,7 +24,9 @@ import {
     toPublicState,
 } from "./backupState";
 import { clearUnreadableTwoFactorSecrets } from "./authManager";
-import { invalidateCompanySettingsCache } from "./companyManager";
+import { findNonPlainEntry, findUnsafeTarEntry } from "./archiveSafety";
+import { writeRestrictedSql } from "./restoreSql";
+import { getCompanySettings, invalidateCompanySettingsCache } from "./companyManager";
 import { invalidateEmailSettingsCache } from "./emailManager";
 
 // Estrae l'archivio e restituisce dove trovare dump e impostazioni. Per il formato
@@ -68,7 +70,27 @@ const prepareRestoreSource = async (filePath: string, sourceFileName: string, ba
             }
         }
 
+        // Vedi archiveSafety.ts: un collegamento non deve arrivare sul disco, e se ci arriva
+        // comunque non deve arrivare in `data/`.
+        const unsafeEntry = findUnsafeTarEntry(await runTar(["-tvzf", tarSourcePath]));
+
+        if (unsafeEntry) {
+            throw new BackupManagerError(
+                `Archivio non valido: contiene un collegamento, che un backup non ha mai (${unsafeEntry})`,
+                400
+            );
+        }
+
         await runTar(["-xzf", tarSourcePath, "-C", extractDir]);
+
+        const nonPlainEntry = await findNonPlainEntry(extractDir);
+
+        if (nonPlainEntry) {
+            throw new BackupManagerError(
+                `Archivio non valido: contiene un collegamento, che un backup non ha mai (${nonPlainEntry})`,
+                400
+            );
+        }
     } catch (error) {
         await fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
         throw error;
@@ -112,6 +134,9 @@ const restoreDataEntries = async (dataDir: string) => {
     invalidateBackupStateCache();
     invalidateEmailSettingsCache();
     invalidateCompanySettingsCache();
+    // Ricaricati subito, non alla prima richiesta: i dati azienda portano il fuso orario, che il
+    // processo deve adottare prima che lo scheduler dei backup calcoli il prossimo orario.
+    await getCompanySettings();
 };
 
 const performRestore = async (
@@ -127,15 +152,23 @@ const performRestore = async (
     beginRestore();
     const now = new Date();
     let source: Awaited<ReturnType<typeof prepareRestoreSource>> | undefined;
+    let restrictedSqlDir: string | null = null;
 
     try {
         source = await prepareRestoreSource(filePath, sourceFileName, backupKeyOverride);
+
+        // psql esegue la copia in modalità ristretta, non il dump così com'è: vedi restoreSql.ts.
+        // Va preparata prima di svuotare lo schema, perché un errore qui non deve lasciare il
+        // database vuoto.
+        restrictedSqlDir = await fs.promises.mkdtemp(path.join(settingsDir, "tmp-sql-"));
+        const restrictedSqlPath = path.join(restrictedSqlDir, "restore.sql");
+        await writeRestrictedSql(source.sqlPath, restrictedSqlPath);
 
         if (resetSchema) {
             await resetPublicSchema();
         }
 
-        await runPsql(["-f", source.sqlPath]);
+        await runPsql(["-f", restrictedSqlPath]);
 
         if (source.dataDir) {
             await restoreDataEntries(source.dataDir);
@@ -180,6 +213,10 @@ const performRestore = async (
     } finally {
         endRestore();
         await source?.cleanup();
+
+        if (restrictedSqlDir) {
+            await fs.promises.rm(restrictedSqlDir, { recursive: true, force: true }).catch(() => {});
+        }
     }
 };
 

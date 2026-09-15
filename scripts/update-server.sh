@@ -10,6 +10,13 @@ STATUS_DIR="$REPO_ROOT/ops/update"
 STATUS_FILE="$STATUS_DIR/status.json"
 APPLY_TRIGGER="$STATUS_DIR/apply.trigger"
 LOG_FILE="$(mktemp)"
+# Keys allowed to sign the commits this script installs (see docs/OPERATIONS.md). Read from the
+# version that is *already installed*, before the reset: a commit that is not signed by one of
+# these keys cannot add its own key to the list, because the list it would change is not the one
+# it is checked against. The update that first brings this file in has nothing to be checked
+# against yet and goes through; from then on origin/main must carry a valid signature.
+ALLOWED_SIGNERS="$REPO_ROOT/ops/allowed_signers"
+FAILURE_MESSAGE=""
 
 mkdir -p "$STATUS_DIR"
 rm -f "$APPLY_TRIGGER"
@@ -54,7 +61,7 @@ write_status() {
 on_exit() {
     local exit_code=$?
     if [ "$exit_code" -ne 0 ]; then
-        write_status "failed" "failed" "Aggiornamento fallito (exit $exit_code). Dettagli: journalctl -u easylab-update.service"
+        write_status "failed" "failed" "${FAILURE_MESSAGE:-Aggiornamento fallito (exit $exit_code). Dettagli: journalctl -u easylab-update.service}"
     fi
     rm -f "$LOG_FILE"
 }
@@ -67,6 +74,29 @@ set -euo pipefail
 {
     echo "=== git fetch ==="
     git fetch --all --prune
+    # Whoever can push to main would otherwise run code as root on this VM: `docker compose up
+    # --build` executes whatever the new Dockerfiles say. The signature ties the update to the
+    # owner's signing key, not just to the GitHub account.
+    if [ -f "$ALLOWED_SIGNERS" ]; then
+        echo "=== git verify-commit origin/main ==="
+        if ! command -v ssh-keygen >/dev/null 2>&1; then
+            FAILURE_MESSAGE="ssh-keygen non è installato sulla VM, quindi la firma dei commit non si può verificare: aggiornamento annullato, non è stato cambiato nulla. Installa openssh-client (apt-get install -y openssh-client) e riprova."
+            exit 1
+        fi
+        # SSH signatures arrived in git 2.34: an older git (Debian 11 ships 2.30) would report every
+        # commit as badly signed, which reads like an attack instead of an outdated package.
+        git_version="$(git --version | awk '{print $3}')"
+        if [ "$(printf '%s\n' 2.34 "$git_version" | sort -V | head -n1)" != "2.34" ]; then
+            FAILURE_MESSAGE="La versione di git sulla VM ($git_version) non sa verificare le firme SSH dei commit (serve la 2.34 o successiva): aggiornamento annullato, non è stato cambiato nulla. Aggiorna git (apt-get install -y git da una distribuzione recente) e riprova."
+            exit 1
+        fi
+        if ! git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$ALLOWED_SIGNERS" verify-commit origin/main; then
+            FAILURE_MESSAGE="L'ultimo commit su origin/main non ha una firma valida di una chiave ammessa (ops/allowed_signers): aggiornamento annullato, non è stato cambiato nulla. Vedi docs/DEPLOY.md, \"Firma dei commit\"."
+            exit 1
+        fi
+    else
+        echo "=== ops/allowed_signers not installed yet: signature check skipped this once ==="
+    fi
     echo "=== git reset --hard origin/main ==="
     git reset --hard origin/main
     echo "=== docker compose up --build -d --remove-orphans ==="

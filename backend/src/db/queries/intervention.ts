@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../index";
 import { collaboratorTable, customerTable, interventionTable } from "../schema";
 import type { NewIntervention, UpdateIntervention } from "../types";
 import { takeUnpaginated } from "./pagination";
 import { parseIdSearch } from "./search";
+import { onLocalDays, toLocalTimestamp } from "./timeZone";
 
 type InterventionSortBy = "createdAt" | "interventionDate" | "customer" | "status";
 
@@ -23,6 +24,8 @@ type ListInterventionsParams = {
     collaboratorId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
+    /** Il fuso in cui leggere i giorni delle date di creazione: vedi `timeZone.ts`. */
+    timeZone: string;
 };
 
 export const listInterventions = async ({
@@ -40,6 +43,7 @@ export const listInterventions = async ({
     collaboratorId,
     sortBy = "createdAt",
     sortOrder = "desc",
+    timeZone,
 }: ListInterventionsParams) => {
     const trimmedSearch = search?.trim();
     const searchPattern = `%${trimmedSearch ?? ""}%`;
@@ -62,14 +66,7 @@ export const listInterventions = async ({
         : [];
     const statusCondition = status !== "all" ? eq(interventionTable.status, status) : undefined;
     const typeCondition = type !== "all" ? eq(interventionTable.type, type) : undefined;
-    const dateCondition =
-        dateFrom && dateTo
-            ? sql`${interventionTable.created_at}::date BETWEEN ${dateFrom} AND ${dateTo}`
-            : dateFrom
-              ? sql`${interventionTable.created_at}::date >= ${dateFrom}`
-              : dateTo
-                ? sql`${interventionTable.created_at}::date <= ${dateTo}`
-                : undefined;
+    const dateCondition = onLocalDays(interventionTable.created_at, { from: dateFrom, to: dateTo }, timeZone);
     const scheduledDateCondition = scheduledDate ? eq(interventionTable.interventionDate, scheduledDate) : undefined;
 
     /**
@@ -104,7 +101,8 @@ export const listInterventions = async ({
               ),
               and(
                   sql`${interventionTable.interventionDate} IS NULL`,
-                  inScheduledRange(sql`${interventionTable.created_at}::date`)
+                  // Il giorno di creazione nel fuso del laboratorio, come i filtri qui sopra.
+                  inScheduledRange(sql`(${toLocalTimestamp(interventionTable.created_at, timeZone)})::date`)
               )
           )
         : undefined;
@@ -161,18 +159,28 @@ export const listInterventions = async ({
         return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "interventions");
     }
 
+    /**
+     * Il totale porta i join solo quando la ricerca li usa, come in `listReports`: `customer_id` e
+     * `collaborator_id` sono NOT NULL con chiave esterna, quindi le due inner join non possono né
+     * scartare né duplicare righe, e senza ricerca contare `intervention` da sola dà lo stesso
+     * numero leggendo una tabella invece di tre.
+     */
+    const countSelect = db.select({ total: sql<number>`count(*)` }).from(interventionTable);
+    const countQuery =
+        searchConditions.length > 0
+            ? countSelect
+                  .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
+                  .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
+                  .where(whereClause)
+            : countSelect.where(whereClause);
+
     const [items, totalCountRows] = await Promise.all([
         baseQuery
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(pageSize)
             .offset((page - 1) * pageSize),
-        db
-            .select({ total: sql<number>`count(*)` })
-            .from(interventionTable)
-            .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
-            .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
-            .where(whereClause),
+        countQuery,
     ]);
 
     return {
@@ -198,6 +206,30 @@ export const getInterventionStats = async () => {
 
 export const getInterventionById = (id: number) =>
     db.select().from(interventionTable).where(eq(interventionTable.id, id));
+
+/**
+ * L'intervento con il nome e il telefono del cliente e il nome del collaboratore: la pagina di
+ * dettaglio li mostra, e prima per trovarli scaricava l'intero elenco dei collaboratori più il
+ * cliente con una richiesta a parte.
+ */
+export const getInterventionDetailById = (id: number) =>
+    db
+        .select({
+            ...getTableColumns(interventionTable),
+            customerName: sql<
+                string | null
+            >`nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), '')`,
+            customerPhone: sql<
+                string | null
+            >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
+            collaboratorName: sql<
+                string | null
+            >`nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), '')`,
+        })
+        .from(interventionTable)
+        .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
+        .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
+        .where(eq(interventionTable.id, id));
 
 export const createIntervention = (data: NewIntervention) => db.insert(interventionTable).values(data).returning();
 

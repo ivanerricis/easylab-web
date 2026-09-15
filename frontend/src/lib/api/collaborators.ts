@@ -48,6 +48,10 @@ export async function listCollaborators(params?: ListCollaboratorsParams) {
     };
 }
 
+/** Un collaboratore solo, per id: la sua scheda non ha bisogno dell'elenco intero. */
+export const getCollaborator = async (id: number) =>
+    mapEntityTimestamps((await api.get<EntityWithRawTimestamps<CollaboratorDto>>(`/collaborators/${id}`)).data);
+
 export const createCollaborator = async (payload: CollaboratorCreateInput) =>
     mapEntityTimestamps((await api.post<EntityWithRawTimestamps<CollaboratorDto>>("/collaborators", payload)).data);
 

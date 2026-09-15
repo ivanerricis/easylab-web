@@ -29,6 +29,12 @@ vi.mock("../db/queries/intervention", () => ({
     getInterventionStats: vi.fn(),
 }));
 
+// Le rotte di lista leggono il fuso del laboratorio: qui basta un valore fisso.
+vi.mock("../config/lab", () => ({
+    getLabConfig: vi.fn(),
+    getAppTimeZone: vi.fn(async () => "Europe/Rome"),
+}));
+
 import { listReports } from "../db/queries/report";
 import { listInterventions } from "../db/queries/intervention";
 import reportsRouter from "./reports";

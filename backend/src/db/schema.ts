@@ -148,7 +148,13 @@ export const reportTechnicianTable = pgTable(
             .references(() => technicianTable.id),
         price: integer("price").notNull().default(0),
     },
-    (table) => [primaryKey({ columns: [table.reportId] })]
+    (table) => [
+        primaryKey({ columns: [table.reportId] }),
+        // La chiave primaria copre la ricerca per report, non quella per tecnico: la scheda del
+        // tecnico filtra i report su questa colonna, e Postgres ci passa anche a ogni eliminazione
+        // di un tecnico per controllare la chiave esterna. Senza, entrambe leggevano la tabella intera.
+        index("report_technician_technician_id_idx").on(table.technicianId),
+    ]
 );
 
 export const userTable = pgTable("user", {

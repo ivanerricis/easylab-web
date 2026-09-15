@@ -13,7 +13,14 @@ import { buildArchiveFilePath, getConfiguredOutputDir, pruneOldBackups } from ".
 import { assertNoOperationInProgress, beginDump, endDump, isDumpInProgress } from "./backupLock";
 import { createBackupArchive } from "./backupProcess";
 import { pruneOldSmbBackups, uploadDumpToSmb, type SmbConnectionConfig } from "./backupSmb";
-import { loadState, persistState, setNextRunIfNeeded, toPublicState, type BackupSettingsState } from "./backupState";
+import {
+    loadState,
+    moveNextRunToNewTimeZone,
+    persistState,
+    setNextRunIfNeeded,
+    toPublicState,
+    type BackupSettingsState,
+} from "./backupState";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { getCompanySettings } from "./companyManager";
 import { isEmailConfigured, sendEmail } from "./emailManager";
@@ -53,7 +60,6 @@ export type BackupSettingsInput = Pick<
     | "autoEnabled"
     | "frequencyDays"
     | "runAt"
-    | "outputDir"
     | "maxBackupsToKeep"
     | "notifyEmailOnFailure"
     | "smbEnabled"
@@ -106,6 +112,13 @@ export const updateBackupSettings = async (input: BackupSettingsInput) => {
     await persistState(current);
 
     return await toPublicState(current);
+};
+
+/** Da chiamare dopo un cambio del fuso del laboratorio: vedi `moveNextRunToNewTimeZone`. */
+export const refreshBackupSchedule = async (previousTimeZone: string) => {
+    const state = await loadState();
+    moveNextRunToNewTimeZone(state, previousTimeZone, new Date());
+    await persistState(state);
 };
 
 // L'invio non deve mai far fallire il backup: se non riesce (SMTP giù, credenziali

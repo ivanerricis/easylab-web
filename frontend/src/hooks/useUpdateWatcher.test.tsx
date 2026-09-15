@@ -112,6 +112,39 @@ describe("useUpdateWatcher", () => {
         expect(reload).not.toHaveBeenCalled();
     });
 
+    /**
+     * Una scheda lasciata aperta in background non deve chiedere lo stato ogni 5 secondi tutto il
+     * giorno; tornata in vista chiede subito, senza aspettare il giro successivo.
+     */
+    it("con la scheda nascosta smette di interrogare, e torna a farlo subito quando riappare", async () => {
+        const setHidden = (hidden: boolean) => {
+            Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
+            document.dispatchEvent(new Event("visibilitychange"));
+        };
+        getUpdateState.mockResolvedValue({ state: "idle" });
+        await renderWatcher();
+
+        try {
+            act(() => setHidden(true));
+            const callsWhenHidden = getUpdateState.mock.calls.length;
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(60_000);
+            });
+            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden);
+
+            await act(async () => {
+                setHidden(false);
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden + 1);
+
+            await nextPoll();
+            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden + 2);
+        } finally {
+            Object.defineProperty(document, "hidden", { value: false, configurable: true });
+        }
+    });
+
     it("smette di interrogare allo smontaggio", async () => {
         getUpdateState.mockResolvedValue({ state: "idle" });
         const { unmount } = render(

@@ -30,6 +30,7 @@ vi.mock("../services/interventionPdf", () => ({
 
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
+    getAppTimeZone: vi.fn(async () => "Europe/Rome"),
 }));
 
 import {
@@ -72,6 +73,7 @@ const labConfig = {
     labEmail: "info@lab.it",
     labAddress: "Via Roma 1",
     labPhone: "0212345678",
+    timeZone: "Europe/Rome",
 };
 
 describe("customers router", () => {
@@ -252,7 +254,12 @@ describe("customers router", () => {
             expect(response.status).toBe(200);
             expect(response.headers["content-type"]).toContain("application/pdf");
             expect(response.headers["content-disposition"]).toContain("customer-5-reports.pdf");
-            expect(listReports).toHaveBeenCalledWith({ customerId: 5, dateFrom: "2026-01-01", dateTo: "2026-01-31" });
+            expect(listReports).toHaveBeenCalledWith({
+                customerId: 5,
+                dateFrom: "2026-01-01",
+                dateTo: "2026-01-31",
+                timeZone: "Europe/Rome",
+            });
             expect(createCustomerReportsPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({
                     customerId: 5,
@@ -321,7 +328,12 @@ describe("customers router", () => {
             expect(response.status).toBe(200);
             expect(response.headers["content-type"]).toContain("application/pdf");
             expect(response.headers["content-disposition"]).toContain("customer-5-interventions.pdf");
-            expect(listInterventions).toHaveBeenCalledWith({ customerId: 5, dateFrom: undefined, dateTo: undefined });
+            expect(listInterventions).toHaveBeenCalledWith({
+                customerId: 5,
+                dateFrom: undefined,
+                dateTo: undefined,
+                timeZone: "Europe/Rome",
+            });
             expect(createCustomerInterventionsPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({
                     customerId: 5,

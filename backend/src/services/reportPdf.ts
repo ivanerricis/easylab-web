@@ -146,8 +146,8 @@ const euroIconSvg = `
     <path d="M4.5 13.5h8.5" />
 </svg>`;
 
-const fullWidthRow = (text: string, style: string, margin: number[]) => [
-    { text, style, colSpan: 4, margin },
+const fullWidthRow = (text: string, style: string, margin: number[], fontSize?: number) => [
+    { text, style, colSpan: 4, margin, ...(fontSize === undefined ? {} : { fontSize }) },
     {},
     {},
     {},
@@ -295,40 +295,40 @@ const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[]) => {
 
 const sectionMargin = (compact: boolean) => (compact ? [0, 0, 0, 4] : [0, 0, 0, 5]);
 
-const buildCustomerSection = (report: ReportPrintData, rowPadding: number, compact = false) => ({
+const buildCustomerSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
         widths: [90, "*", 90, "*"],
         body: [
             sectionBarRow("CLIENTE", 4),
-            dualFieldRow("Cliente", report.customerName, "Telefono", report.customerPhone),
+            dualFieldRow("Cliente", report.customerName, "Telefono", report.customerPhone, valueFontSize),
         ],
     },
     layout: reportTableLayout(rowPadding),
     margin: sectionMargin(compact),
 });
 
-const buildDeviceSection = (report: ReportPrintData, rowPadding: number, compact = false) => ({
+const buildDeviceSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
         widths: [90, "*", 90, "*"],
         body: [
             sectionBarRow("DISPOSITIVO", 4),
-            dualFieldRow("Dispositivo", report.deviceName, "Password", report.password),
-            dualFieldRow("Backup dati", yesNo(report.dataBackup), "Alimentatore", yesNo(report.charger)),
+            dualFieldRow("Dispositivo", report.deviceName, "Password", report.password, valueFontSize),
+            dualFieldRow("Backup dati", yesNo(report.dataBackup), "Alimentatore", yesNo(report.charger), valueFontSize),
         ],
     },
     layout: reportTableLayout(rowPadding),
     margin: sectionMargin(compact),
 });
 
-const buildDetailsSection = (report: ReportPrintData, rowPadding: number, compact = false) => ({
+const buildDetailsSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
         widths: [90, "*", 90, "*"],
         body: [
             sectionBarRow("DETTAGLI", 4),
             fullWidthRow("Problema riscontrato", "label", [0, 1, 0, 0]),
-            fullWidthRow(report.issueDescription, "value", [0, 0, 0, 1]),
+            fullWidthRow(report.issueDescription, "value", [0, 0, 0, 1], valueFontSize),
             fullWidthRow("Note", "label", [0, 1, 0, 0]),
-            fullWidthRow(report.note, "value", [0, 0, 0, 1]),
+            fullWidthRow(report.note, "value", [0, 0, 0, 1], valueFontSize),
         ],
     },
     layout: reportTableLayout(rowPadding),
@@ -442,16 +442,31 @@ const buildNotesAndPaymentSection = (report: ReportPrintData, rowPadding: number
     columnGap: 10,
 });
 
-const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataUrl: string | null) => {
-    const copyBlock = (rowPadding: number, compact: boolean) => [
+/**
+ * Come si impagina la ricevuta: altezza delle righe da compilare a mano, padding delle righe e
+ * corpo dei valori (nomi, dispositivo, password, problema, note).
+ */
+type ReceiptLayout = {
+    workRowHeight: number;
+    rowPadding: number;
+    valueFontSize: number;
+};
+
+const buildReceiptDefinition = (
+    report: ReportPrintData,
+    logoDataUrl: string | null,
+    { workRowHeight, rowPadding, valueFontSize }: ReceiptLayout,
+    onMeasure?: MeasureCallback
+) => {
+    const copyBlock = (compact: boolean) => [
         buildHeader(report, logoDataUrl, compact),
-        buildCustomerSection(report, rowPadding, compact),
-        buildDeviceSection(report, rowPadding, compact),
-        buildDetailsSection(report, rowPadding, compact),
+        buildCustomerSection(report, rowPadding, valueFontSize, compact),
+        buildDeviceSection(report, rowPadding, valueFontSize, compact),
+        buildDetailsSection(report, rowPadding, valueFontSize, compact),
         ...(compact ? [] : [buildRetentionNoticeSection()]),
     ];
 
-    const buildDocumentDefinition = (workRowHeight: number, rowPadding: number, onMeasure?: MeasureCallback) => ({
+    return {
         pageSize: "A4",
         pageMargins: [PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN],
         defaultStyle: {
@@ -468,7 +483,7 @@ const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataU
             return false;
         },
         content: [
-            ...copyBlock(rowPadding, false),
+            ...copyBlock(false),
             {
                 canvas: [
                     {
@@ -483,7 +498,7 @@ const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataU
                 ],
                 margin: [0, 6, 0, 8],
             },
-            ...copyBlock(rowPadding, true),
+            ...copyBlock(true),
             buildWorkSection(report, workRowHeight, rowPadding),
             buildNotesAndPaymentSection(report, rowPadding),
             // Sentinella invisibile: la sua posizione di partenza e' la fine del contenuto.
@@ -492,57 +507,102 @@ const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataU
             ...(onMeasure ? [{ id: CONTENT_END_ID, text: " ", fontSize: 1, margin: [0, 0, 0, 0] }] : []),
         ],
         styles: pdfStyles,
-    });
-
-    // Impagina una volta e restituisce dove finisce il contenuto (null se sborda di pagina).
-    const measureContentBottom = async (workRowHeight: number, rowPadding: number) => {
-        let bottom: number | null = null;
-        await pdfmake
-            .createPdf(
-                buildDocumentDefinition(workRowHeight, rowPadding, (top, pageNumber) => {
-                    bottom = pageNumber === 1 ? top : null;
-                })
-            )
-            .getBuffer();
-
-        return bottom as number | null;
     };
+};
 
-    // Righe di lavoro all'altezza voluta: quello che avanza va allargato sul resto.
-    const baseBottom = await measureContentBottom(WORK_ROW_TARGET_HEIGHT, ROW_PADDING_MIN);
+/**
+ * Impagina una volta e restituisce dove finisce il contenuto (null se sborda dal primo foglio).
+ * Esportata per il test che tiene d'occhio `PADDING_COST_PER_POINT`.
+ */
+export const measureReceiptContentBottom = async (
+    report: ReportPrintData,
+    logoDataUrl: string | null,
+    layout: ReceiptLayout
+): Promise<number | null> => {
+    let bottom: number | null = null;
+    await pdfmake
+        .createPdf(
+            buildReceiptDefinition(report, logoDataUrl, layout, (top, pageNumber) => {
+                bottom = pageNumber === 1 ? top : null;
+            })
+        )
+        .getBuffer();
 
-    let workRowHeight = WORK_ROW_MIN_HEIGHT;
-    let rowPadding = ROW_PADDING_MIN;
+    return bottom;
+};
 
-    if (baseBottom !== null) {
-        workRowHeight = WORK_ROW_TARGET_HEIGHT;
-        // Un punto di margine perche' un arrotondamento non spinga l'ultima riga oltre il bordo.
-        const slack = PAGE_HEIGHT - PAGE_MARGIN - baseBottom - 1;
+/**
+ * Quanti punti di altezza costa un punto di padding su tutte le righe della ricevuta: 27 righe
+ * che crescono col padding, due punti ciascuna (sopra e sotto).
+ *
+ * Prima si misurava a ogni stampa con un'impaginazione di prova in più (una "sonda" con un punto
+ * di padding in meno), e una ricevuta costava tre impaginazioni invece di due. Su tutte le
+ * varianti provate il risultato è sempre stato 54 — logo o no, testi corti o lunghi, con o senza
+ * descrizione del lavoro — perché dipende da quante righe ha la struttura, non da cosa c'è
+ * scritto. Il test con pdfmake vero (`reportPdf.render.test.ts`) lo rimisura su più varianti: se
+ * l'impaginato cambia, è lui a dire di aggiornare questo numero.
+ */
+export const PADDING_COST_PER_POINT = 54;
 
-        if (slack > 0) {
-            // Quanto costa un punto di padding va misurato, non stimato: dipende da quante
-            // righe ci sono e da quali hanno un'altezza fissa che se lo assorbe. La sonda
-            // toglie padding invece di aggiungerne: cosi' non puo' sforare di pagina e
-            // restituire null proprio quando il foglio e' quasi pieno.
-            const probeBottom = await measureContentBottom(WORK_ROW_TARGET_HEIGHT, ROW_PADDING_MIN - 1);
-            const costPerPaddingPoint = probeBottom === null ? 0 : baseBottom - probeBottom;
+/**
+ * Il corpo dei valori, dal normale (quello dello stile "value") a scendere: si riduce solo se la
+ * ricevuta non entra in un foglio, cosa che succede con i campi di testo pieni fino al limite
+ * dell'API (problema e note a 255 caratteri entrambi). Sotto 8,5 punti la ricevuta smetterebbe
+ * di essere comoda da leggere per chi la ritira.
+ */
+const VALUE_FONT_SIZES = [pdfStyles.value.fontSize, 10.5, 9.5, 8.5];
 
-            if (costPerPaddingPoint > 0) {
-                const wanted = slack / costPerPaddingPoint;
-                rowPadding = ROW_PADDING_MIN + Math.min(wanted, ROW_PADDING_MAX - ROW_PADDING_MIN);
-            }
+/** Distribuisce lo spazio che avanza: prima sul padding di tutte le righe, poi sulle righe a mano. */
+const fillPage = (layout: ReceiptLayout, contentBottom: number): ReceiptLayout => {
+    // Un punto di margine perche' un arrotondamento non spinga l'ultima riga oltre il bordo.
+    const slack = PAGE_HEIGHT - PAGE_MARGIN - contentBottom - 1;
 
-            // Se il padding da solo non basta (o e' arrivato al tetto), il resto lo
-            // assorbono le righe di "Lavoro eseguito".
-            const leftover = slack - (rowPadding - ROW_PADDING_MIN) * costPerPaddingPoint;
+    if (slack <= 0) {
+        return layout;
+    }
 
-            if (leftover > 0) {
-                workRowHeight += leftover / WORK_ROW_COUNT;
-            }
+    const extraPadding = Math.min(slack / PADDING_COST_PER_POINT, ROW_PADDING_MAX - layout.rowPadding);
+    const leftover = slack - extraPadding * PADDING_COST_PER_POINT;
+
+    return {
+        ...layout,
+        rowPadding: layout.rowPadding + extraPadding,
+        workRowHeight: layout.workRowHeight + (leftover > 0 ? leftover / WORK_ROW_COUNT : 0),
+    };
+};
+
+/**
+ * Sceglie l'impaginazione. Il caso di tutti i giorni costa una sola misura: il contenuto sta nel
+ * foglio con le righe a mano all'altezza voluta, e lo spazio che avanza si ridistribuisce.
+ * Altrimenti si prova, in quest'ordine, ad abbassare le righe a mano e poi a ridurre il testo, un
+ * gradino alla volta: prima la ricevuta usciva su due pagine.
+ */
+const planReceiptLayout = async (report: ReportPrintData, logoDataUrl: string | null): Promise<ReceiptLayout> => {
+    const attempts: ReceiptLayout[] = [
+        { workRowHeight: WORK_ROW_TARGET_HEIGHT, rowPadding: ROW_PADDING_MIN, valueFontSize: VALUE_FONT_SIZES[0] },
+        ...VALUE_FONT_SIZES.map((valueFontSize) => ({
+            workRowHeight: WORK_ROW_MIN_HEIGHT,
+            rowPadding: ROW_PADDING_MIN,
+            valueFontSize,
+        })),
+    ];
+
+    for (const layout of attempts) {
+        const contentBottom = await measureReceiptContentBottom(report, logoDataUrl, layout);
+
+        if (contentBottom !== null) {
+            return fillPage(layout, contentBottom);
         }
     }
 
-    return await pdfmake.createPdf(buildDocumentDefinition(workRowHeight, rowPadding)).getBuffer();
+    // Non entra nemmeno al minimo: succede solo con testi oltre i limiti che l'API accetta.
+    return attempts[attempts.length - 1];
+};
+
+const createSectionedReportPdfBuffer = async (report: ReportPrintData, logoDataUrl: string | null) => {
+    const layout = await planReceiptLayout(report, logoDataUrl);
+
+    return await pdfmake.createPdf(buildReceiptDefinition(report, logoDataUrl, layout)).getBuffer();
 };
 
 export const createReportPdfBuffer = async (report: ReportPrintData) => {

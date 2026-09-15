@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BackupSettingsState } from "./backupState";
 
@@ -8,6 +9,7 @@ const fsPromisesMock = vi.hoisted(() => ({
     cp: vi.fn(),
     writeFile: vi.fn(),
     unlink: vi.fn(),
+    mkdtemp: vi.fn(),
 }));
 
 vi.mock("node:fs", () => ({
@@ -66,7 +68,16 @@ const backupStateMock = vi.hoisted(() => ({
 
 vi.mock("./backupState", () => backupStateMock);
 
-const companyManagerMock = vi.hoisted(() => ({ invalidateCompanySettingsCache: vi.fn() }));
+const archiveSafetyMock = vi.hoisted(() => ({ findUnsafeTarEntry: vi.fn(), findNonPlainEntry: vi.fn() }));
+vi.mock("./archiveSafety", () => archiveSafetyMock);
+
+const restoreSqlMock = vi.hoisted(() => ({ writeRestrictedSql: vi.fn() }));
+vi.mock("./restoreSql", () => restoreSqlMock);
+
+const companyManagerMock = vi.hoisted(() => ({
+    getCompanySettings: vi.fn(),
+    invalidateCompanySettingsCache: vi.fn(),
+}));
 vi.mock("./companyManager", () => companyManagerMock);
 
 const emailManagerMock = vi.hoisted(() => ({ invalidateEmailSettingsCache: vi.fn() }));
@@ -77,6 +88,10 @@ vi.mock("./authManager", () => authManagerMock);
 
 import { BackupManagerError } from "./backupError";
 import { restoreBackupFromExisting, restoreBackupFromUpload } from "./backupRestore";
+
+/** psql non esegue mai il dump originale, ma la sua copia in modalità ristretta (restoreSql.ts). */
+const restrictedSqlDir = "/fake/data/tmp-sql-abc";
+const restrictedSqlPath = path.join(restrictedSqlDir, "restore.sql");
 
 const makeState = (overrides: Partial<BackupSettingsState> = {}): BackupSettingsState => ({
     autoEnabled: false,
@@ -133,6 +148,11 @@ beforeEach(() => {
     // Formato storico o archivio in chiaro: la maggior parte dei test qui sotto non ha
     // nulla a che fare con la cifratura, quindi il default salta subito quel passo.
     backupCryptoMock.isEncryptedArchiveFile.mockResolvedValue(false);
+    fsPromisesMock.mkdtemp.mockResolvedValue(restrictedSqlDir);
+    archiveSafetyMock.findUnsafeTarEntry.mockReturnValue(null);
+    archiveSafetyMock.findNonPlainEntry.mockResolvedValue(null);
+    restoreSqlMock.writeRestrictedSql.mockResolvedValue(undefined);
+    companyManagerMock.getCompanySettings.mockResolvedValue({ timeZone: "Europe/Rome" });
 });
 
 describe("restoreBackupFromExisting", () => {
@@ -171,7 +191,15 @@ describe("restoreBackupFromExisting", () => {
 
         expect(backupLockMock.beginRestore).toHaveBeenCalledTimes(1);
         expect(backupProcessMock.resetPublicSchema).not.toHaveBeenCalled();
-        expect(backupProcessMock.runPsql).toHaveBeenCalledWith(["-f", "/backups/db-dump-20260701-020000.sql"]);
+        expect(restoreSqlMock.writeRestrictedSql).toHaveBeenCalledWith(
+            "/backups/db-dump-20260701-020000.sql",
+            restrictedSqlPath
+        );
+        expect(backupProcessMock.runPsql).toHaveBeenCalledWith(["-f", restrictedSqlPath]);
+        expect(fsPromisesMock.rm).toHaveBeenCalledWith(
+            restrictedSqlDir,
+            expect.objectContaining({ recursive: true, force: true })
+        );
 
         // Formato storico: niente cartella dati, quindi nessuna delle operazioni di
         // restoreDataEntries deve scattare.
@@ -237,6 +265,10 @@ describe("restoreBackupFromExisting", () => {
         expect(backupStateMock.invalidateBackupStateCache).toHaveBeenCalledTimes(1);
         expect(emailManagerMock.invalidateEmailSettingsCache).toHaveBeenCalledTimes(1);
         expect(companyManagerMock.invalidateCompanySettingsCache).toHaveBeenCalledTimes(1);
+        // Ricaricati subito: i dati azienda portano il fuso orario, che il processo adotta al caricamento.
+        expect(companyManagerMock.getCompanySettings.mock.invocationCallOrder[0]).toBeGreaterThan(
+            companyManagerMock.invalidateCompanySettingsCache.mock.invocationCallOrder[0]
+        );
 
         // Solo le due voci effettivamente presenti vengono copiate.
         expect(fsPromisesMock.cp).toHaveBeenCalledTimes(2);
@@ -283,6 +315,58 @@ describe("restoreBackupFromExisting", () => {
     // (prima era fuori: un archivio invalido faceva sì che endRestore() non venisse mai
     // eseguito, e il lock del ripristino restava acquisito indefinitamente). Questo test
     // fissa che il lock si rilascia anche su questo fallimento.
+    it("prepara la copia ristretta prima di svuotare lo schema: se fallisce, il database resta com'era", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-dump-20260701-020000.sql");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(false);
+        restoreSqlMock.writeRestrictedSql.mockRejectedValueOnce(new Error("disco pieno"));
+
+        await expect(restoreBackupFromExisting("db-dump-20260701-020000.sql", true)).rejects.toThrow("disco pieno");
+
+        expect(backupProcessMock.resetPublicSchema).not.toHaveBeenCalled();
+        expect(backupProcessMock.runPsql).not.toHaveBeenCalled();
+        expect(fsPromisesMock.rm).toHaveBeenCalledWith(restrictedSqlDir, expect.anything());
+    });
+
+    /**
+     * Un collegamento nell'archivio, copiato in `data/`, poteva far servire `secret.key` come
+     * logo pubblico. Si guarda l'elenco prima di estrarre, e i file dopo.
+     */
+    it("rifiuta un archivio con un collegamento nell'elenco, senza estrarlo né toccare il database", async () => {
+        const symlinkListing = "lrwxrwxrwx 0/0 0 2026-09-15 data/logo/logo.png -> ../secret.key";
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        backupProcessMock.runTar.mockResolvedValueOnce(symlinkListing);
+        archiveSafetyMock.findUnsafeTarEntry.mockReturnValueOnce("lrwxrwxrwx 0/0 0 2026-09-15 data/logo/logo.png");
+
+        await expect(restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false)).rejects.toThrow(
+            "contiene un collegamento"
+        );
+
+        expect(backupProcessMock.runTar).toHaveBeenCalledTimes(1);
+        expect(backupProcessMock.runTar).toHaveBeenCalledWith(["-tvzf", "/backups/db-backup-20260729-113813.tar.gz"]);
+        expect(archiveSafetyMock.findUnsafeTarEntry).toHaveBeenCalledWith(symlinkListing);
+        expect(backupProcessMock.runPsql).not.toHaveBeenCalled();
+        expect(fsPromisesMock.cp).not.toHaveBeenCalled();
+    });
+
+    it("rifiuta un archivio se dopo l'estrazione trova un collegamento sfuggito all'elenco", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-20260729-113813.tar.gz");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);
+        archiveSafetyMock.findNonPlainEntry.mockResolvedValueOnce("data/logo/logo.png");
+
+        await expect(restoreBackupFromExisting("db-backup-20260729-113813.tar.gz", false)).rejects.toThrow(
+            "(data/logo/logo.png)"
+        );
+
+        expect(archiveSafetyMock.findNonPlainEntry).toHaveBeenCalledWith(expect.stringContaining("tmp-extract-"));
+        expect(backupProcessMock.runPsql).not.toHaveBeenCalled();
+        expect(fsPromisesMock.cp).not.toHaveBeenCalled();
+        expect(fsPromisesMock.rm).toHaveBeenCalledWith(
+            expect.stringContaining("tmp-extract-"),
+            expect.objectContaining({ recursive: true, force: true })
+        );
+    });
+
     it("un archivio senza dump.sql viene rifiutato prima di toccare il database, e il lock si rilascia comunque", async () => {
         backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-backup-corrotto.tar.gz");
         backupFilesMock.isArchiveFileName.mockReturnValueOnce(true);

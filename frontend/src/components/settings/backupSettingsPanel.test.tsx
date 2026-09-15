@@ -113,8 +113,11 @@ describe("BackupSettingsPanel", () => {
         expect(screen.getByRole("listitem")).toHaveTextContent("Password SMTP");
     });
 
-    /** Sovrascrivere il database è irreversibile: il pulsante si sblocca solo con la parola esatta. */
-    it("ripristina un dump solo dopo aver scritto RESTORE", async () => {
+    /**
+     * Sovrascrivere il database è irreversibile: il pulsante si sblocca solo con la parola esatta e
+     * con la password, che il server chiede di nuovo.
+     */
+    it("ripristina un dump solo dopo aver scritto RESTORE e la password", async () => {
         await renderPanel();
 
         await userEvent.click(screen.getByRole("button", { name: "Ripristina db-backup-1.tar.gz" }));
@@ -127,11 +130,20 @@ describe("BackupSettingsPanel", () => {
 
         await userEvent.clear(within(dialog).getByLabelText(/per confermare/));
         await userEvent.type(within(dialog).getByLabelText(/per confermare/), "RESTORE");
+        // Parola giusta ma senza password: ancora bloccato.
+        expect(confirm).toBeDisabled();
+
+        await userEvent.type(within(dialog).getByLabelText("La tua password"), "segreta");
         await userEvent.click(within(dialog).getByLabelText(/Svuota lo schema/));
         await userEvent.click(confirm);
 
         await waitFor(() => {
-            expect(api.restoreBackupFromExisting).toHaveBeenCalledWith("db-backup-1.tar.gz", true);
+            expect(api.restoreBackupFromExisting).toHaveBeenCalledWith(
+                "db-backup-1.tar.gz",
+                true,
+                "segreta",
+                undefined
+            );
         });
         expect(navigate).toHaveBeenCalledWith("/login", { replace: true });
     });
@@ -150,10 +162,11 @@ describe("BackupSettingsPanel", () => {
         const dialog = screen.getByRole("dialog", { name: "Conferma ripristino database" });
         expect(dialog).toHaveAccessibleDescription(expect.stringContaining('"archivio.tar.gz"'));
         await userEvent.type(within(dialog).getByLabelText(/per confermare/), "RESTORE");
+        await userEvent.type(within(dialog).getByLabelText("La tua password"), "segreta");
         await userEvent.click(within(dialog).getByRole("button", { name: "Ripristina" }));
 
         await waitFor(() => {
-            expect(api.restoreBackupFromUpload).toHaveBeenCalledWith(file, false);
+            expect(api.restoreBackupFromUpload).toHaveBeenCalledWith(file, false, "segreta", undefined);
         });
     });
 

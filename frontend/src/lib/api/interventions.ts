@@ -95,8 +95,15 @@ export async function listInterventions(params?: ListInterventionsParams) {
     return response.data;
 }
 
+/** L'intervento come lo restituisce `GET /interventions/:id`: con i nomi di cliente e collaboratore. */
+export type InterventionDetailDto = InterventionEntityDto & {
+    customerName: string | null;
+    customerPhone: string | null;
+    collaboratorName: string | null;
+};
+
 export const getIntervention = async (id: number) =>
-    (await api.get<InterventionEntityDto>(`/interventions/${id}`)).data;
+    (await api.get<InterventionDetailDto>(`/interventions/${id}`)).data;
 
 export const createIntervention = async (payload: InterventionCreateInput) =>
     (await api.post<InterventionEntityDto>("/interventions", payload)).data;

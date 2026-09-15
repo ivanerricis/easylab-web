@@ -11,13 +11,8 @@ import {
     createReportTechnician,
     deleteReportTechnician,
     getApiErrorMessage,
-    getCustomer,
     getReport,
     getReportPrintUrl,
-    listCollaborators,
-    listDevices,
-    listIssues,
-    listTechnicians,
     type ReportEntityDto,
     updateReport,
     updateReportTechnician,
@@ -94,33 +89,17 @@ const ReportPage = () => {
     };
 
     const loadDetails = useCallback(async () => {
-        const [report, devices, issues, collaborators, technicians] = await Promise.all([
-            getReport(reportId),
-            listDevices(),
-            listIssues(),
-            listCollaborators(),
-            listTechnicians(),
-        ]);
-
-        // Il cliente si legge per id, non cercandolo in `listCustomers()`: quell'elenco senza
-        // paginazione si ferma a 5000 righe, e da lì in poi il report diceva "Cliente sconosciuto".
-        const customer = await getCustomer(report.customerId).catch(() => null);
-        const device = devices.find((item) => item.id === report.deviceId);
-        const issue = issues.find((item) => item.id === report.issueId);
-        const collaborator = collaborators.find((item) => item.id === report.collaboratorId);
-
-        // Il tecnico arriva con il report (`technicianId`, `technicianPrice`): prima lo si cercava
-        // scaricando l'intera tabella report-tecnico. Qui serve solo il nome, dal catalogo dei tecnici.
-        const technician = technicians.find((item) => item.id === report.technicianId);
+        // Una richiesta sola: il report arriva con i nomi di cliente, dispositivo, difetto,
+        // collaboratore e tecnico. Prima la pagina li cercava scaricando i cataloghi interi di
+        // dispositivi, difetti, collaboratori e tecnici, più il cliente a parte: sei richieste.
+        const report = await getReport(reportId);
         const technicianDetails =
             report.technicianId == null
                 ? []
                 : [
                       {
                           id: report.technicianId,
-                          name: technician
-                              ? `${technician.firstName} ${technician.lastName ?? ""}`.trim()
-                              : `Tecnico #${report.technicianId}`,
+                          name: report.technicianName ?? `Tecnico #${report.technicianId}`,
                           price: report.technicianPrice,
                       },
                   ];
@@ -129,11 +108,11 @@ const ReportPage = () => {
 
         setDetails({
             report,
-            customerName: customer ? `${customer.firstName} ${customer.lastName ?? ""}`.trim() : "Cliente sconosciuto",
-            customerPhone: customer?.phoneNumber ?? customer?.phoneNumberSecondary ?? null,
-            deviceName: device?.name ?? "Dispositivo sconosciuto",
-            issueName: issue?.description ?? "Difetto sconosciuto",
-            collaboratorName: collaborator ? `${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim() : "-",
+            customerName: report.customerName ?? "Cliente sconosciuto",
+            customerPhone: report.customerPhone,
+            deviceName: report.deviceName,
+            issueName: report.issueName,
+            collaboratorName: report.collaboratorName ?? "-",
             technicians: technicianDetails,
             techniciansTotal,
         });

@@ -3,8 +3,6 @@ import { z } from "zod";
 import {
     createReportTechnician,
     deleteReportTechnicianByIds,
-    getReportTechnicianByIds,
-    listReportTechnicians,
     updateReportTechnicianByIds,
 } from "../db/queries/reportTechnician";
 import { validate } from "./validation";
@@ -30,30 +28,8 @@ const reportTechnicianUpdateBodySchema = z
     })
     .strict();
 
-reportTechniciansRouter.get("/", async (_, res) => {
-    const reportTechnicians = await listReportTechnicians();
-
-    res.json(reportTechnicians);
-});
-
-reportTechniciansRouter.get(
-    "/:reportId/:technicianId",
-    validate({ params: reportTechnicianParamsSchema }),
-    async (req, res) => {
-        const { reportId, technicianId } = req.params as unknown as {
-            reportId: number;
-            technicianId: number;
-        };
-        const reportTechnician = await getReportTechnicianByIds(reportId, technicianId);
-
-        if (reportTechnician.length === 0) {
-            res.status(404).json({ message: "Report technician not found" });
-            return;
-        }
-
-        res.json(reportTechnician[0]);
-    }
-);
+// Nessuna rotta GET: il tecnico di un report arriva con `GET /api/reports/:id`. Le due letture che
+// stavano qui (l'intera tabella, e la singola coppia report-tecnico) non avevano più chiamanti.
 
 reportTechniciansRouter.post("/", validate({ body: reportTechnicianCreateBodySchema }), async (req, res) => {
     const createdReportTechnician = await createReportTechnician(req.body);

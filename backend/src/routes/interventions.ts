@@ -5,6 +5,7 @@ import {
     createIntervention,
     deleteInterventionById,
     getInterventionById,
+    getInterventionDetailById,
     getInterventionStats,
     listInterventions,
     updateInterventionById,
@@ -12,10 +13,11 @@ import {
 import { db } from "../db";
 import { collaboratorTable, customerTable, interventionTable } from "../db/schema";
 import { sendEmail } from "../services/emailManager";
+import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
 import { buildInterventionEmail } from "../services/interventionEmail";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
 import { loadPrintableLogo } from "../services/logoManager";
-import { getLabConfig } from "../config/lab";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
@@ -186,6 +188,7 @@ interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), a
         customerId,
         sortBy,
         sortOrder,
+        timeZone: await getAppTimeZone(),
     });
 
     sendListResponse(res, interventions, page, pageSize);
@@ -231,7 +234,7 @@ const loadInterventionPrintContext = async (id: number) => {
     const intervention = interventionRows[0];
     const customerName = `${intervention.customerFirstName} ${intervention.customerLastName ?? ""}`.trim();
     const collaboratorName = `${intervention.collaboratorFirstName} ${intervention.collaboratorLastName ?? ""}`.trim();
-    const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
+    const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(intervention.customerPhone, intervention.customerPhoneSecondary);
 
     return {
@@ -265,7 +268,7 @@ const loadInterventionPrintContext = async (id: number) => {
             interventionDateLabel: intervention.interventionDate ? formatDayLabel(intervention.interventionDate) : null,
             startTime: intervention.startTime,
             endTime: intervention.endTime,
-            createdAtLabel: formatDateLabel(intervention.createdAt),
+            createdAtLabel: formatDateLabel(intervention.createdAt, timeZone),
         },
     };
 };
@@ -289,6 +292,14 @@ interventionsRouter.get("/:id/print", validate({ params: idParamsSchema }), asyn
 
 interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
+
+    // Vedi services/emailSendRateLimit.ts. La rotta sta dietro `requireAuth`, quindi l'utente
+    // c'è sempre; il ripiego tiene comunque in un unico contatore le chiamate senza utente.
+    if (!consumeEmailSendSlot(String(req.user?.id ?? "senza-utente"))) {
+        res.status(429).json({ message: "Troppe email inviate nell'ultima ora. Riprova più tardi." });
+        return;
+    }
+
     const context = await loadInterventionPrintContext(id);
 
     if (!context) {
@@ -336,16 +347,17 @@ interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema })
     res.json({ message: "Email inviata con successo" });
 });
 
+/** L'intervento con i nomi di cliente e collaboratore: vedi `getInterventionDetailById`. */
 interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
-    const intervention = await getInterventionById(id);
+    const [intervention] = await getInterventionDetailById(id);
 
-    if (intervention.length === 0) {
+    if (!intervention) {
         res.status(404).json({ message: "Intervento non trovato" });
         return;
     }
 
-    res.json(intervention[0]);
+    res.json(intervention);
 });
 
 interventionsRouter.post("/", validate({ body: interventionCreateBodySchema }), async (req, res) => {

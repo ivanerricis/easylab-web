@@ -10,10 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     getApiErrorMessage,
-    getCustomer,
     getIntervention,
     getInterventionPrintUrl,
-    listCollaborators,
     type InterventionEntityDto,
     updateIntervention,
 } from "@/lib/api";
@@ -76,20 +74,15 @@ const InterventionPage = () => {
     };
 
     const loadDetails = useCallback(async () => {
-        const [intervention, collaborators] = await Promise.all([getIntervention(interventionId), listCollaborators()]);
-
-        // Per id e non dentro `listCustomers()`, che senza paginazione si ferma a 5000 righe:
-        // stesso motivo della pagina del report.
-        const customer = await getCustomer(intervention.customerId).catch(() => null);
-        const collaborator = collaborators.find((item) => item.id === intervention.collaboratorId);
+        // Una richiesta sola: l'intervento arriva con i nomi di cliente e collaboratore. Prima la
+        // pagina scaricava l'elenco intero dei collaboratori, più il cliente a parte.
+        const intervention = await getIntervention(interventionId);
 
         setDetails({
             intervention,
-            customerName: customer ? `${customer.firstName} ${customer.lastName ?? ""}`.trim() : "Cliente sconosciuto",
-            customerPhone: customer?.phoneNumber ?? customer?.phoneNumberSecondary ?? null,
-            collaboratorName: collaborator
-                ? `${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim()
-                : "Collaboratore sconosciuto",
+            customerName: intervention.customerName ?? "Cliente sconosciuto",
+            customerPhone: intervention.customerPhone,
+            collaboratorName: intervention.collaboratorName ?? "Collaboratore sconosciuto",
         });
     }, [interventionId]);
 

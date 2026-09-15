@@ -140,7 +140,7 @@ Puoi anche eseguirlo da solo, in qualunque momento:
 
 ## Avvio in produzione
 
-Il server di produzione gira su una **VM Proxmox** (Debian/Ubuntu, systemd) con Docker Engine nativo, non su Docker Desktop. Prerequisiti sulla VM (fuori da qualunque container): `git`, `docker` (Docker Engine + plugin `docker compose`), `jq` (usato dallo script di aggiornamento).
+Il server di produzione gira su una **VM Proxmox** (Debian/Ubuntu, systemd) con Docker Engine nativo, non su Docker Desktop. Prerequisiti sulla VM (fuori da qualunque container): `git` (2.34 o successivo), `docker` (Docker Engine + plugin `docker compose`), `jq` e `ssh-keygen` (pacchetto `openssh-client`), usati dallo script di aggiornamento.
 
 Clona il repo sulla VM, configura `.env` (`scripts/edit-env.sh`), poi avvia:
 
@@ -164,7 +164,7 @@ Comportamento rete:
 - nginx inoltra `/api` e `/assets` al backend interno
 - il dominio non è scritto da nessuna parte nel codice né nella build: cambiarlo è una modifica di configurazione, non una ricompilazione
 
-Nota sicurezza: la funzione di aggiornamento esegue codice preso da `origin/main` sull'host. È protetta dal login, ma ora che l'app è su internet un repository GitHub compromesso diventa una via d'attacco diretta: tieni protetto l'account GitHub del repository (2FA).
+Nota sicurezza: la funzione di aggiornamento esegue codice preso da `origin/main` sull'host. È protetta dal login, e dal 15/09/2026 installa solo commit **firmati** con una chiave ammessa (vedi [Firma dei commit](#firma-dei-commit)): un account GitHub compromesso non basta più a far girare codice sulla VM, serve anche la chiave di firma. Tieni comunque protetto l'account GitHub del repository (2FA).
 
 ## Dominio pubblico e Cloudflare Tunnel
 
@@ -245,6 +245,19 @@ Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 > sessioni sono salvate nel database (ora solo l'hash del token, mai il token stesso), quindi
 > le sessioni aperte vengono invalidate: al primo accesso successivo tutti dovranno rifare il
 > login una volta sola. Le password non cambiano.
+
+> **Nota (aggiornamento del 15/09/2026):** il cookie di sessione cambia nome (`__Host-session`,
+> vedi il CHANGELOG), quindi al primo accesso successivo tutti dovranno rifare il login una
+> volta sola. Le password non cambiano.
+
+### Firma dei commit
+
+L'aggiornamento installa `origin/main` solo se il suo ultimo commit porta una firma valida di una delle chiavi elencate in `ops/allowed_signers` (`git verify-commit`). Senza questo controllo chiunque riuscisse a pubblicare su `main` — un token GitHub rubato, un account compromesso — farebbe eseguire il proprio codice come root sulla VM, perché `docker compose up --build` esegue quello che dicono i Dockerfile nuovi.
+
+- **Da dove si legge la lista.** Dalla versione *già installata*, prima del `reset`: un commit non firmato non può aggiungere la propria chiave, perché la lista che modificherebbe non è quella con cui viene controllato. Il primo aggiornamento che porta il file sulla VM non ha ancora niente con cui confrontarsi e passa; da lì in poi la firma è obbligatoria.
+- **Se la firma manca o non è fra quelle ammesse**, l'aggiornamento si ferma prima di toccare qualunque cosa e Impostazioni > Aggiornamenti mostra il motivo. Succede per esempio con un commit fatto dal sito di GitHub (lo firma la chiave di GitHub, che non è in lista) o da un computer senza la chiave di firma configurata: basta un commit firmato dal computer abituale sopra quello.
+- **Aggiungere una chiave** (un nuovo computer da cui si pubblica): una riga in `ops/allowed_signers` nel formato `email namespaces="git" <chiave pubblica>`, dove l'email è quella del committer. La modifica va pubblicata con un commit firmato da una chiave già in lista.
+- **In emergenza** (chiave persa) l'aggiornamento si fa a mano sulla VM, come nel rollback qui sotto: `git fetch && git reset --hard origin/main && docker compose up --build -d`, dopo aver aggiornato `ops/allowed_signers`.
 
 **Rollback manuale** (nessun rollback automatico in caso di crash post-deploy): sulla VM,
 

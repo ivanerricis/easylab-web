@@ -37,7 +37,13 @@ beforeEach(() => {
 });
 
 describe("CompanySettingsPanel", () => {
-    const company = { name: "EasyLab", email: "info@easylab.it", address: "Via Roma 1", phone: "06 123456" };
+    const company = {
+        name: "EasyLab",
+        email: "info@easylab.it",
+        address: "Via Roma 1",
+        phone: "06 123456",
+        timeZone: "Europe/Rome",
+    };
 
     beforeEach(() => {
         api.getCompanySettings.mockResolvedValue(company);
@@ -74,6 +80,37 @@ describe("CompanySettingsPanel", () => {
             expect(api.updateCompanySettings).toHaveBeenCalledWith(company);
         });
         expect(save).toBeDisabled();
+    });
+
+    it("salva il fuso orario scelto, nel suo nome canonico", async () => {
+        await renderPanel();
+        const timeZone = screen.getByLabelText("Fuso orario");
+        expect(timeZone).toHaveValue("Europe/Rome");
+        expect(screen.getByText(/Adesso lì sono le/)).toBeInTheDocument();
+
+        await userEvent.clear(timeZone);
+        await userEvent.type(timeZone, "asia/tokyo");
+        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+
+        await waitFor(() => {
+            expect(api.updateCompanySettings).toHaveBeenCalledWith({ ...company, timeZone: "Asia/Tokyo" });
+        });
+    });
+
+    it("rifiuta un fuso orario inventato senza chiamare il server", async () => {
+        await renderPanel();
+        const timeZone = screen.getByLabelText("Fuso orario");
+
+        await userEvent.clear(timeZone);
+        await userEvent.type(timeZone, "Europa/Roma");
+
+        expect(timeZone).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByText(/Fuso orario non riconosciuto/)).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+
+        expect(toast.error).toHaveBeenCalledWith("Scegli un fuso orario dall'elenco, per esempio Europe/Rome");
+        expect(api.updateCompanySettings).not.toHaveBeenCalled();
     });
 
     /** Il limite è anche sul server, ma così non si carica per niente un file da 20 MB. */

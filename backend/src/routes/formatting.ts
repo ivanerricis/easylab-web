@@ -1,6 +1,21 @@
 const dateLabelFormatter = new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" });
+const dateLabelFormattersByTimeZone = new Map<string, Intl.DateTimeFormat>();
 
-export const formatDateLabel = (value: Date) => dateLabelFormatter.format(value);
+/**
+ * La data di un istante (la creazione di un report) nel fuso del laboratorio: alle 00:30 di Roma
+ * è già il giorno dopo rispetto all'UTC, e il PDF deve dire il giorno che vede chi lo consegna.
+ * Un formattatore per fuso, riusato: costruirne uno a ogni riga di un resoconto costa.
+ */
+export const formatDateLabel = (value: Date, timeZone: string) => {
+    let formatter = dateLabelFormattersByTimeZone.get(timeZone);
+
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeZone });
+        dateLabelFormattersByTimeZone.set(timeZone, formatter);
+    }
+
+    return formatter.format(value);
+};
 
 // Le date "solo giorno" arrivano come stringhe YYYY-MM-DD: l'ora esplicita evita che
 // vengano interpretate come UTC e slittino al giorno precedente.

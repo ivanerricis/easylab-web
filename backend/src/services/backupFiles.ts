@@ -46,13 +46,9 @@ export const backedUpDataEntries = ["email-settings.json", "backup-settings.json
 
 export const getConfiguredOutputDir = () => defaultOutputDir;
 
-export const toAbsoluteOutputDir = (outputDir: string) => {
-    if (path.isAbsolute(outputDir)) {
-        return outputDir;
-    }
-
-    return path.join(process.cwd(), outputDir);
-};
+// La cartella è sempre quella montata dal compose (`backups/`, relativa alla cartella dell'app):
+// il client non la sceglie, quindi non esiste un percorso assoluto da rispettare.
+export const toAbsoluteOutputDir = (outputDir: string) => path.join(process.cwd(), outputDir);
 
 const getDayTimestamp = (date: Date) => {
     const year = date.getFullYear();

@@ -4,8 +4,6 @@ import request from "supertest";
 
 // Come negli altri test di rotta: il query layer è mockato, niente Postgres in CI.
 vi.mock("../db/queries/reportTechnician", () => ({
-    listReportTechnicians: vi.fn(),
-    getReportTechnicianByIds: vi.fn(),
     createReportTechnician: vi.fn(),
     updateReportTechnicianByIds: vi.fn(),
     deleteReportTechnicianByIds: vi.fn(),
@@ -14,8 +12,6 @@ vi.mock("../db/queries/reportTechnician", () => ({
 import {
     createReportTechnician,
     deleteReportTechnicianByIds,
-    getReportTechnicianByIds,
-    listReportTechnicians,
     updateReportTechnicianByIds,
 } from "../db/queries/reportTechnician";
 import reportTechniciansRouter from "./reportTechnicians";
@@ -36,32 +32,11 @@ describe("reportTechnicians router", () => {
         vi.clearAllMocks();
     });
 
-    it("restituisce la lista, senza paginazione", async () => {
-        vi.mocked(listReportTechnicians).mockResolvedValue([reportTechnician] as never);
-
-        const response = await request(buildApp()).get("/api/report-technicians");
-
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual([reportTechnician]);
-    });
-
-    it("risponde 404 quando l'associazione non esiste", async () => {
-        vi.mocked(getReportTechnicianByIds).mockResolvedValue([] as never);
-
-        const response = await request(buildApp()).get("/api/report-technicians/1/2");
+    /** Le due letture non avevano più chiamanti: il tecnico arriva con il report. */
+    it.each(["/api/report-technicians", "/api/report-technicians/1/2"])("GET %s non esiste più", async (url) => {
+        const response = await request(buildApp()).get(url);
 
         expect(response.status).toBe(404);
-        expect(response.body.message).toBe("Report technician not found");
-    });
-
-    it("recupera un'associazione esistente per coppia di id", async () => {
-        vi.mocked(getReportTechnicianByIds).mockResolvedValue([reportTechnician] as never);
-
-        const response = await request(buildApp()).get("/api/report-technicians/1/2");
-
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual(reportTechnician);
-        expect(getReportTechnicianByIds).toHaveBeenCalledWith(1, 2);
     });
 
     it("crea un'associazione e risponde 201", async () => {
@@ -155,9 +130,9 @@ describe("reportTechnicians router", () => {
     });
 
     it("rifiuta id non positivi nei parametri", async () => {
-        const response = await request(buildApp()).get("/api/report-technicians/0/2");
+        const response = await request(buildApp()).delete("/api/report-technicians/0/2");
 
         expect(response.status).toBe(400);
-        expect(getReportTechnicianByIds).not.toHaveBeenCalled();
+        expect(deleteReportTechnicianByIds).not.toHaveBeenCalled();
     });
 });

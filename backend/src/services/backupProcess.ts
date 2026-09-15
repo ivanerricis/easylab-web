@@ -94,10 +94,16 @@ export const runPgDump = async (outputPath: string) => {
     });
 };
 
-export const runTar = async (args: string[]) => {
-    await new Promise<void>((resolve, reject) => {
+/** Esegue tar e restituisce il suo stdout: serve all'elenco (`-tv`) dell'archivio da ripristinare. */
+export const runTar = async (args: string[]) =>
+    new Promise<string>((resolve, reject) => {
         const child = spawn("tar", args);
         let stderr = "";
+        let stdout = "";
+
+        child.stdout.on("data", (chunk) => {
+            stdout += chunk.toString();
+        });
 
         child.stderr.on("data", (chunk) => {
             stderr += chunk.toString();
@@ -114,14 +120,13 @@ export const runTar = async (args: string[]) => {
 
         child.on("close", (code) => {
             if (code === 0) {
-                resolve();
+                resolve(stdout);
                 return;
             }
 
             reject(new BackupManagerError(stderr.trim() || `tar terminato con codice ${code}`, 500));
         });
     });
-};
 
 // Assembla dump + impostazioni in una cartella temporanea, la comprime e cifra il
 // risultato. Il tar intermedio (in chiaro) resta dentro `stagingDir` e non arriva mai a

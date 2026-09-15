@@ -1,0 +1,4 @@
+# Chiavi SSH ammesse a firmare i commit che l'aggiornamento automatico installa: vedi
+# scripts/update-server.sh e docs/DEPLOY.md ("Firma dei commit"). Formato di ssh-keygen,
+# ALLOWED SIGNERS: indirizzo del committer, namespace, chiave pubblica.
+ivan.erricis@gmail.com namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF+03f6x16snFvgbLptSaXVnVv5iRbK0Cx2/MPrBCgyE

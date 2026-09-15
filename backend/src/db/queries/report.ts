@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, or, sql, type SQLWrapper } from "drizzle-orm";
 import { db } from "../index";
 import {
     collaboratorTable,
@@ -7,10 +7,12 @@ import {
     IssueTable,
     reportTable,
     reportTechnicianTable,
+    technicianTable,
 } from "../schema";
 import type { NewReport, UpdateReport } from "../types";
 import { takeUnpaginated } from "./pagination";
 import { parseIdSearch } from "./search";
+import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
 
 type ReportSortBy = "createdAt" | "customer" | "totalPrice";
 
@@ -27,6 +29,8 @@ type ListReportsParams = {
     technicianId?: number;
     sortBy?: ReportSortBy;
     sortOrder?: "asc" | "desc";
+    /** Il fuso in cui leggere `dateFrom`/`dateTo`: vedi `timeZone.ts`. */
+    timeZone: string;
 };
 
 export const listReports = async ({
@@ -41,6 +45,7 @@ export const listReports = async ({
     technicianId,
     sortBy = "createdAt",
     sortOrder = "desc",
+    timeZone,
 }: ListReportsParams) => {
     const trimmedSearch = search?.trim();
     const searchPattern = `%${trimmedSearch ?? ""}%`;
@@ -74,14 +79,7 @@ export const listReports = async ({
             : visibility === "closed"
               ? eq(reportTable.closed, true)
               : undefined;
-    const dateCondition =
-        dateFrom && dateTo
-            ? sql`${reportTable.created_at}::date BETWEEN ${dateFrom} AND ${dateTo}`
-            : dateFrom
-              ? sql`${reportTable.created_at}::date >= ${dateFrom}`
-              : dateTo
-                ? sql`${reportTable.created_at}::date <= ${dateTo}`
-                : undefined;
+    const dateCondition = onLocalDays(reportTable.created_at, { from: dateFrom, to: dateTo }, timeZone);
     const customerCondition = customerId ? eq(reportTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(reportTable.collaboratorId, collaboratorId) : undefined;
     // Sottoquery e non condizione sul join qui sotto: il conteggio della paginazione non porta
@@ -209,20 +207,24 @@ export const listReports = async ({
     };
 };
 
-const getTrailingMonthKeys = (monthsCount: number) => {
-    const now = new Date();
+/** Gli ultimi `monthsCount` mesi fino a quello corrente del laboratorio, dal più vecchio. */
+const getTrailingMonthKeys = (monthsCount: number, timeZone: string, now = new Date()) => {
+    const [currentYear, currentMonth] = currentMonthKey(timeZone, now).split("-").map(Number);
 
     return Array.from({ length: monthsCount }, (_, index) => {
-        const date = new Date(now.getFullYear(), now.getMonth() - (monthsCount - 1 - index), 1);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        // Date.UTC solo per l'aritmetica dei mesi (gennaio meno uno è dicembre dell'anno prima).
+        const date = new Date(Date.UTC(currentYear, currentMonth - 1 - (monthsCount - 1 - index), 1));
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
     });
 };
 
-export const getReportStats = async (month?: string) => {
-    const seriesMonthKeys = getTrailingMonthKeys(6);
+export const getReportStats = async (month: string | undefined, timeZone: string, now = new Date()) => {
+    const seriesMonthKeys = getTrailingMonthKeys(6, timeZone, now);
     const targetMonthKey = month ?? seriesMonthKeys[seriesMonthKeys.length - 1];
     const earliestMonthKey = [...seriesMonthKeys, targetMonthKey].sort()[0];
-    const rangeStartDate = `${earliestMonthKey}-01`;
+    // Il mese di un report è quello del laboratorio: un report delle 00:30 del primo del mese a
+    // Roma è di quel mese, anche se in UTC è ancora il giorno prima.
+    const localMonth = sql<string>`to_char(${toLocalTimestamp(reportTable.created_at, timeZone)}, 'YYYY-MM')`;
 
     const [statusCountRows, revenueRows] = await Promise.all([
         db
@@ -231,7 +233,7 @@ export const getReportStats = async (month?: string) => {
             .groupBy(reportTable.closed),
         db
             .select({
-                month: sql<string>`to_char(${reportTable.created_at}, 'YYYY-MM')`,
+                month: localMonth,
                 revenue: sql<number>`coalesce(sum(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0)), 0)::int`,
                 // Compenso pagato ai tecnici esterni: l'incasso netto è il totale meno questa
                 // spesa, non un'altra colonna della riga (`report.price` da solo non basta
@@ -242,8 +244,16 @@ export const getReportStats = async (month?: string) => {
             // Stesso join diretto sulla chiave primaria usato da `listReports`: vedi lì il
             // perché il `GROUP BY` non serve.
             .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id))
-            .where(and(eq(reportTable.closed, true), sql`${reportTable.created_at} >= ${rangeStartDate}`))
-            .groupBy(sql`to_char(${reportTable.created_at}, 'YYYY-MM')`),
+            .where(
+                and(
+                    eq(reportTable.closed, true),
+                    gte(reportTable.created_at, localDayStartUtc(`${earliestMonthKey}-01`, timeZone))
+                )
+            )
+            // Per posizione (la prima colonna, `month`), non ripetendo l'espressione: il fuso vi
+            // entra come parametro, e per Postgres `… AT TIME ZONE $2` nella SELECT e
+            // `… AT TIME ZONE $5` nel GROUP BY sono espressioni diverse, quindi un errore.
+            .groupBy(sql`1`),
     ]);
 
     const revenueByMonth = new Map(revenueRows.map((row) => [row.month, Number(row.revenue)]));
@@ -265,6 +275,43 @@ export const getReportStats = async (month?: string) => {
 };
 
 export const getReportById = (id: number) => db.select().from(reportTable).where(eq(reportTable.id, id));
+
+const personName = (firstName: SQLWrapper, lastName: SQLWrapper) =>
+    sql<string | null>`nullif(concat_ws(' ', ${firstName}, ${lastName}), '')`;
+
+/**
+ * Il report con i nomi di ciò a cui rimanda e con il suo tecnico esterno (`technicianId` null e
+ * `technicianPrice` 0 se non ce l'ha).
+ *
+ * La pagina di dettaglio mostra quei nomi, e prima per trovarli scaricava i cataloghi interi di
+ * dispositivi, difetti, collaboratori e tecnici, più il cliente a parte: sei richieste per
+ * aprire un report. Il tecnico ci viaggia per lo stesso motivo: il dialogo di modifica lo vuole
+ * sempre, e prima lo cercava scaricando l'intera `report_technician`.
+ */
+export const getReportDetailById = (id: number) =>
+    db
+        .select({
+            ...getTableColumns(reportTable),
+            customerName: personName(customerTable.firstName, customerTable.lastName),
+            customerPhone: sql<
+                string | null
+            >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
+            deviceName: deviceTable.name,
+            issueName: IssueTable.description,
+            collaboratorName: personName(collaboratorTable.firstName, collaboratorTable.lastName),
+            technicianId: reportTechnicianTable.technicianId,
+            technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
+            technicianName: personName(technicianTable.firstName, technicianTable.lastName),
+        })
+        .from(reportTable)
+        .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
+        .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
+        .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
+        .leftJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
+        // Al più una riga: `report_id` è l'intera chiave primaria di `report_technician`.
+        .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id))
+        .leftJoin(technicianTable, eq(technicianTable.id, reportTechnicianTable.technicianId))
+        .where(eq(reportTable.id, id));
 
 export const createReport = (data: NewReport) => db.insert(reportTable).values(data).returning();
 

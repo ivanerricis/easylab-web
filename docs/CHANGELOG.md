@@ -11,6 +11,22 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Toast di caricamento durante la verifica aggiornamenti
+
+**Cosa.** In
+[`updateSettingsPanel.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/updateSettingsPanel.tsx)
+`handleCheck` ora apre un `toast.loading("Verifica aggiornamenti in corso...")` all'avvio e
+riusa il suo `id` per l'esito finale (`toast.success`, `toast.warning` o `toast.error`), invece
+di aggiungere un toast separato a fine polling.
+
+**Il perché.** Il pulsante "Verifica aggiornamenti" passa a "Verifica in corso..." ma il
+polling dura fino a un minuto (`CHECK_MAX_ATTEMPTS` × `POLL_INTERVAL_MS`) senza alcun feedback
+visibile fuori dal bottone: durante l'attesa non era chiaro se la verifica fosse davvero in
+corso. Il toast di caricamento resta visibile per tutta la durata e si trasforma nell'esito,
+invece di comparire un nuovo toast scollegato da quello iniziale.
+
+---
+
 ## 2026-09-15 — Mobile: le schede delle liste partono sotto i filtri, le schede della dashboard non escono dai bordi
 
 **Cosa.** Il componente `Table` in

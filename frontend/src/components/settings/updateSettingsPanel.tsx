@@ -78,6 +78,7 @@ const UpdateSettingsPanel = () => {
 
         const previousCheckedAt = status?.lastCheckedAt ?? null;
         setIsChecking(true);
+        const toastId = toast.loading("Verifica aggiornamenti in corso...");
 
         try {
             await checkForUpdates();
@@ -93,9 +94,9 @@ const UpdateSettingsPanel = () => {
                     if (result.lastCheckedAt && result.lastCheckedAt !== previousCheckedAt) {
                         setStatus(result);
                         if (result.updateAvailable) {
-                            toast.warning("È disponibile un aggiornamento", { richColors: true });
+                            toast.warning("È disponibile un aggiornamento", { id: toastId, richColors: true });
                         } else {
-                            toast.success("Applicazione già aggiornata");
+                            toast.success("Applicazione già aggiornata", { id: toastId });
                         }
                         return;
                     }
@@ -104,9 +105,9 @@ const UpdateSettingsPanel = () => {
                 }
             }
 
-            toast.error("Verifica aggiornamenti: nessuna risposta, riprova più tardi");
+            toast.error("Verifica aggiornamenti: nessuna risposta, riprova più tardi", { id: toastId });
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile avviare la verifica aggiornamenti"));
+            toast.error(getApiErrorMessage(error, "Impossibile avviare la verifica aggiornamenti"), { id: toastId });
         } finally {
             if (!cancelledRef.current) {
                 setIsChecking(false);

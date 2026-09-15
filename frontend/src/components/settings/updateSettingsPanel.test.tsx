@@ -19,7 +19,12 @@ vi.mock("@/lib/api", async () => {
     return { ...errors, ...forwarded };
 });
 
-const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }));
+const toast = vi.hoisted(() => ({
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    loading: vi.fn(() => "toast-id"),
+}));
 
 vi.mock("sonner", () => ({ toast }));
 
@@ -101,6 +106,7 @@ describe("UpdateSettingsPanel", () => {
 
         await click(screen.getByRole("button", { name: "Verifica aggiornamenti" }));
         expect(screen.getByRole("button", { name: "Verifica in corso..." })).toBeDisabled();
+        expect(toast.loading).toHaveBeenCalledWith("Verifica aggiornamenti in corso...");
 
         // Primo giro: la data non è ancora cambiata.
         await nextPoll();
@@ -109,7 +115,10 @@ describe("UpdateSettingsPanel", () => {
         api.getUpdateStatus.mockResolvedValue({ ...status, lastCheckedAt: "2026-09-11T10:00:00.000Z" });
         await nextPoll();
 
-        expect(toast.warning).toHaveBeenCalledWith("È disponibile un aggiornamento", { richColors: true });
+        expect(toast.warning).toHaveBeenCalledWith("È disponibile un aggiornamento", {
+            id: "toast-id",
+            richColors: true,
+        });
         expect(screen.getByRole("button", { name: "Verifica aggiornamenti" })).toBeEnabled();
     });
 

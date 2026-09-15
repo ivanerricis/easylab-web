@@ -7,6 +7,7 @@ import {
     getLogDownloadUrl,
     getLogRetention,
     listLogEntries,
+    listRecentFailedLogins,
     restoreBackupFromExisting,
     restoreBackupFromUpload,
     updateLogRetention,
@@ -118,6 +119,16 @@ describe("api impostazioni", () => {
 
         await expect(updateLogRetention(30)).resolves.toEqual({ maxDays: 30 });
         expect(put).toHaveBeenCalledWith("/settings/logs/retention", { maxDays: 30 });
+    });
+
+    it("legge gli ultimi accessi falliti, con un limite facoltativo", async () => {
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: [] });
+
+        await listRecentFailedLogins();
+        await listRecentFailedLogins(5);
+
+        expect(get).toHaveBeenNthCalledWith(1, "/settings/logs/failed-logins", { params: { limit: undefined } });
+        expect(get).toHaveBeenNthCalledWith(2, "/settings/logs/failed-logins", { params: { limit: 5 } });
     });
 });
 

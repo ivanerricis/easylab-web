@@ -28,6 +28,7 @@ import {
     getLogFilePath,
     getLogRetentionDays,
     listLogFiles,
+    listRecentFailedLogins,
     readLogEntries,
     setLogRetentionDays,
 } from "./logManager";
@@ -123,6 +124,74 @@ describe("readLogEntries", () => {
 
         expect(entries).toHaveLength(1);
         expect(entries[0].action).toBe("login");
+    });
+});
+
+describe("listRecentFailedLogins", () => {
+    it("attraversa i giorni dal più recente, tenendo solo gli accessi falliti", async () => {
+        readdir.mockResolvedValue([
+            direntFile("user-actions-2026-03-04.log"),
+            direntFile("user-actions-2026-03-05.log"),
+        ]);
+        stat.mockResolvedValue({ size: 10, mtime: new Date("2026-03-05T00:00:00.000Z") });
+        readFile.mockImplementation(async (filePath: unknown) => {
+            if (String(filePath).includes("2026-03-05")) {
+                return [
+                    "2026-03-05T10:00:00.000Z | ip=1.2.3.4 | user=- | action=tentativo di accesso | status=401 | error=Nome utente o password non validi",
+                    "2026-03-05T09:00:00.000Z | ip=1.2.3.4 | user=mario | action=creato /api/devices | status=201",
+                    "2026-03-05T08:00:00.000Z | ip=5.6.7.8 | user=- | action=tentativo di accesso | status=200",
+                ].join("\n");
+            }
+
+            return "2026-03-04T10:00:00.000Z | ip=9.9.9.9 | user=- | action=verifica codice 2FA in accesso | status=401 | error=Codice non valido";
+        });
+
+        const results = await listRecentFailedLogins();
+
+        expect(results.map((entry) => entry.timestamp)).toEqual([
+            "2026-03-05T10:00:00.000Z",
+            "2026-03-04T10:00:00.000Z",
+        ]);
+        expect(results[0].error).toBe("Nome utente o password non validi");
+    });
+
+    it("si ferma al limite indicato senza leggere i giorni successivi", async () => {
+        readdir.mockResolvedValue([
+            direntFile("user-actions-2026-03-01.log"),
+            direntFile("user-actions-2026-03-02.log"),
+        ]);
+        stat.mockResolvedValue({ size: 10, mtime: new Date("2026-03-02T00:00:00.000Z") });
+        readFile.mockResolvedValue(
+            [
+                "2026-03-02T10:00:00.000Z | ip=1.2.3.4 | action=tentativo di accesso | status=401",
+                "2026-03-02T09:00:00.000Z | ip=1.2.3.4 | action=tentativo di accesso | status=401",
+            ].join("\n")
+        );
+
+        const results = await listRecentFailedLogins(1);
+
+        expect(results).toHaveLength(1);
+        expect(readFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("salta un giorno il cui file non si legge, senza fermarsi", async () => {
+        readdir.mockResolvedValue([
+            direntFile("user-actions-2026-03-01.log"),
+            direntFile("user-actions-2026-03-02.log"),
+        ]);
+        stat.mockResolvedValue({ size: 10, mtime: new Date("2026-03-02T00:00:00.000Z") });
+        readFile.mockImplementation(async (filePath: unknown) => {
+            if (String(filePath).includes("2026-03-02")) {
+                throw new Error("ENOENT");
+            }
+
+            return "2026-03-01T10:00:00.000Z | ip=1.2.3.4 | action=tentativo di accesso | status=401";
+        });
+
+        const results = await listRecentFailedLogins();
+
+        expect(results).toHaveLength(1);
+        expect(results[0].timestamp).toBe("2026-03-01T10:00:00.000Z");
     });
 });
 

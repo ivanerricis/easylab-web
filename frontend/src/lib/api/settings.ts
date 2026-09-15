@@ -188,6 +188,9 @@ export const getLogRetention = async () => (await api.get<LogRetentionDto>("/set
 export const updateLogRetention = async (maxDays: number) =>
     (await api.put<LogRetentionDto>("/settings/logs/retention", { maxDays })).data;
 
+export const listRecentFailedLogins = async (limit?: number) =>
+    (await api.get<LogEntryDto[]>("/settings/logs/failed-logins", { params: { limit } })).data;
+
 export type CompanySettingsDto = {
     name: string;
     email: string;

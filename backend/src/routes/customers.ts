@@ -11,9 +11,14 @@ import { listInterventions } from "../db/queries/intervention";
 import { createCustomerReportsPdfBuffer } from "../services/reportPdf";
 import { createCustomerInterventionsPdfBuffer } from "../services/interventionPdf";
 import { getLabConfig } from "../config/lab";
+import { toCsv } from "../services/csv";
 import { buildDateRangeLabel, formatDateLabel, formatPhoneLabel, formatScheduleLabel } from "./formatting";
 import { createCrudRouter, idParamsSchema } from "./crudRouter";
 import { validate } from "./validation";
+
+const customerExportQuerySchema = z.object({
+    search: z.string().trim().max(255).optional(),
+});
 
 const printRangeQuerySchema = z.object({
     dateFrom: z
@@ -92,6 +97,30 @@ const customersRouter = createCrudRouter({
         remove: deleteCustomerById,
     },
     extraRoutes: (router) => {
+        // Prima di "/:id/...": senza, un percorso a un solo segmento come "/export.csv"
+        // resterebbe comunque fuori (le due rotte sotto hanno due segmenti), ma l'ordine è
+        // la stessa convenzione di tutte le altre rotte letterali di questo router.
+        router.get("/export.csv", validate({ query: customerExportQuerySchema }), async (req, res) => {
+            const { search } = req.query as unknown as { search?: string };
+            const customersResult = await listCustomers({ search });
+            const customers = Array.isArray(customersResult) ? customersResult : customersResult.items;
+
+            const csv = toCsv(customers, [
+                { header: "ID", value: (customer) => customer.id },
+                { header: "Nome", value: (customer) => customer.firstName },
+                { header: "Cognome", value: (customer) => customer.lastName },
+                { header: "Email", value: (customer) => customer.email },
+                { header: "Telefono", value: (customer) => customer.phoneNumber },
+                { header: "Telefono secondario", value: (customer) => customer.phoneNumberSecondary },
+                { header: "Città", value: (customer) => customer.city },
+                { header: "Creato il", value: (customer) => customer.created_at },
+            ]);
+
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader("Content-Disposition", "attachment; filename=clienti.csv");
+            res.send(csv);
+        });
+
         router.get(
             "/:id/reports/print",
             validate({ params: idParamsSchema, query: printRangeQuerySchema }),

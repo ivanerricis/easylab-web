@@ -144,6 +144,25 @@ export const deleteReport = async (id: number) => (await api.delete<ReportEntity
 
 export const getReportPrintUrl = (id: number) => api.getUri({ url: `/reports/${id}/print` });
 
+/** Stessi filtri della lista, meno pagina e dimensione pagina: esporta tutto ciò che li passa. */
+export type ReportExportParams = Omit<ListReportsParams, "page" | "pageSize" | "signal">;
+
+export const getReportsExportUrl = (params?: ReportExportParams) =>
+    api.getUri({
+        url: "/reports/export.csv",
+        params: {
+            search: params?.search?.trim() || undefined,
+            visibility: params?.visibility,
+            dateFrom: params?.dateFrom,
+            dateTo: params?.dateTo,
+            collaboratorId: params?.collaboratorId,
+            customerId: params?.customerId,
+            technicianId: params?.technicianId,
+            sortBy: params?.sortBy,
+            sortOrder: params?.sortOrder,
+        },
+    });
+
 export type ReportStatsDto = {
     openCount: number;
     closedCount: number;

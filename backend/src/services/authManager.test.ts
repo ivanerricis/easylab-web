@@ -181,10 +181,12 @@ import {
     ensureDefaultAdmin,
     getSessionUser,
     getTwoFactorStatus,
+    listSessionsForUser,
     listUsers,
     login,
     regeneratePassword,
     regenerateRecoveryCodes,
+    revokeSession,
     setUserActive,
     startSessionCleanupScheduler,
     startTwoFactorSetup,
@@ -1071,6 +1073,71 @@ describe("deleteSession e pulizia periodica delle sessioni", () => {
         await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
         expect(sessionDeletes()).toHaveLength(2);
         consoleError.mockRestore();
+    });
+});
+
+describe("listSessionsForUser / revokeSession", () => {
+    it("elenca le sessioni, marcando quella aperta con il token corrente", async () => {
+        const currentToken = "token-in-chiaro";
+        const currentTokenHash = crypto.createHash("sha256").update(currentToken).digest("hex");
+
+        queueRows("select", userTable, [buildUser({ id: 7 })]);
+        queueRows("select", sessionTable, [
+            {
+                tokenHash: currentTokenHash,
+                createdAt: new Date("2026-01-02T00:00:00Z"),
+                expiresAt: new Date("2026-01-09T00:00:00Z"),
+            },
+            {
+                tokenHash: "altro-hash",
+                createdAt: new Date("2026-01-01T00:00:00Z"),
+                expiresAt: new Date("2026-01-08T00:00:00Z"),
+            },
+        ]);
+
+        const sessions = await listSessionsForUser(7, currentToken);
+
+        expect(sessions).toEqual([
+            {
+                id: currentTokenHash,
+                createdAt: "2026-01-02T00:00:00.000Z",
+                expiresAt: "2026-01-09T00:00:00.000Z",
+                isCurrent: true,
+            },
+            {
+                id: "altro-hash",
+                createdAt: "2026-01-01T00:00:00.000Z",
+                expiresAt: "2026-01-08T00:00:00.000Z",
+                isCurrent: false,
+            },
+        ]);
+    });
+
+    it("senza un token corrente nessuna sessione è marcata come tale", async () => {
+        queueRows("select", userTable, [buildUser({ id: 7 })]);
+        queueRows("select", sessionTable, [
+            {
+                tokenHash: "hash-uno",
+                createdAt: new Date("2026-01-01T00:00:00Z"),
+                expiresAt: new Date("2026-01-08T00:00:00Z"),
+            },
+        ]);
+
+        const sessions = await listSessionsForUser(7);
+
+        expect(sessions[0].isCurrent).toBe(false);
+    });
+
+    it("risponde 404 per un utente che non esiste", async () => {
+        queueRows("select", userTable, []);
+
+        await expect(listSessionsForUser(99)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("revokeSession cancella la sessione indicata", async () => {
+        await revokeSession(7, "hash-uno");
+
+        expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
     });
 });
 

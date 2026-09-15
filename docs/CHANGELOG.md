@@ -11,6 +11,46 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Sessioni per utente, export CSV di clienti e report, accessi falliti in Sicurezza
+
+**Cosa.** Tre buchi delle Impostazioni segnalati dall'utente, chiusi nella stessa sessione:
+
+1. **Sessioni attive per utente.** `authManager.ts` guadagna `listSessionsForUser`/`revokeSession`
+   (nuove rotte `GET`/`DELETE /api/users/:id/sessions[/:sessionId]`); l'id di sessione esposto è
+   lo stesso sha256 già in tabella (`session.tokenHash`), un hash one-way che non permette di
+   ricostruire il cookie. La tabella `session` non ha IP né user agent, quindi
+   [`userSessionsDialog.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/settings/userSessionsDialog.tsx)
+   (aperto dal nuovo pulsante "Sessioni" in
+   [`usersSettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/usersSettingsSection.tsx))
+   mostra solo data di apertura e scadenza, marcando la sessione corrente e disabilitandone la
+   revoca (non ha senso disconnettersi da questo dialogo).
+2. **Esportazione CSV.** Nuovo
+   [`services/csv.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/csv.ts)
+   (RFC 4180, BOM UTF-8 in testa perché Excel su Windows apra gli accenti senza rompersi) dietro
+   `GET /api/customers/export.csv` e `GET /api/reports/export.csv`, quest'ultima con gli stessi
+   filtri della lista (stato, intervallo di date, ordinamento) meno pagina e dimensione pagina:
+   esporta sempre tutto ciò che passa il filtro corrente, mai una sola pagina. I pulsanti
+   "Esporta CSV" nelle pagine Clienti e Report passano i filtri attivi, così il file scaricato
+   corrisponde a quello che si vede a schermo.
+3. **Accessi falliti in un posto solo.** `logManager.ts` guadagna `listRecentFailedLogins`, che
+   attraversa i file di log dal più recente finché non trova `limit` tentativi con le etichette
+   "tentativo di accesso"/"verifica codice 2FA in accesso" e status ≥ 400 (le due sole azioni che
+   `userActionLogger` scrive per un accesso, vedi la voce di ieri). Una nuova card, visibile solo
+   agli amministratori, compare in fondo a
+   [`securitySettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/securitySettingsSection.tsx):
+   prima bisognava aprire il log giorno per giorno e cercarli a mano.
+
+Nello stesso giro, il controllo "Conserva per N giorni" aggiunto ieri al pannello Log è uscito
+dalla propria card (sproporzionata: tutto quel bordo e quell'intestazione per un numero e un
+pulsante) ed è entrato nell'intestazione della card "Log azioni", accanto a "Scarica log
+selezionato".
+
+**Il perché.** Le tre voci erano la risposta a "cosa manca nelle Impostazioni?", chiesta
+dall'utente dopo il giro sui log e sul tema di ieri; ha poi chiesto di implementarle tutte e tre
+nella stessa sessione invece di sceglierne una.
+
+---
+
 ## 2026-09-15 — Log: etichette leggibili, download tracciati, conservazione configurabile; Tema: reset dell'aspetto
 
 **Cosa.** Tre interventi sul registro azioni

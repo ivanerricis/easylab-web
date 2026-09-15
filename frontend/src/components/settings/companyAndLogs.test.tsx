@@ -207,7 +207,7 @@ describe("LogsSettingsPanel", () => {
         api.updateLogRetention.mockResolvedValue({ maxDays: 30 });
         renderWithProviders(<LogsSettingsPanel />);
 
-        const retentionInput = await screen.findByLabelText("Giorni da conservare");
+        const retentionInput = await screen.findByLabelText("Conserva per");
         await waitFor(() => expect(retentionInput).toHaveValue(7));
 
         await userEvent.clear(retentionInput);
@@ -224,7 +224,7 @@ describe("LogsSettingsPanel", () => {
         api.listLogFiles.mockResolvedValue([]);
         renderWithProviders(<LogsSettingsPanel />);
 
-        const retentionInput = await screen.findByLabelText("Giorni da conservare");
+        const retentionInput = await screen.findByLabelText("Conserva per");
         await waitFor(() => expect(retentionInput).toHaveValue(7));
 
         await userEvent.clear(retentionInput);

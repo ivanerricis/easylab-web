@@ -95,3 +95,10 @@ export const getCustomerInterventionsPrintUrl = (id: number, params?: CustomerPr
             dateTo: params?.dateTo,
         },
     });
+
+/** Rispetta lo stesso filtro di ricerca visto in lista: esporta quello che c'è a schermo. */
+export const getCustomersExportUrl = (params?: { search?: string }) =>
+    api.getUri({
+        url: "/customers/export.csv",
+        params: { search: params?.search?.trim() || undefined },
+    });

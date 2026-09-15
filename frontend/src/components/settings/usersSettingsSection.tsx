@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { KeyRound, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
+import { KeyRound, Monitor, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import RefreshButton from "@/components/refresh-button";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CreateUserDialog from "@/components/dialogs/settings/createUserDialog";
 import GeneratedPasswordDialog from "@/components/dialogs/settings/generatedPasswordDialog";
+import UserSessionsDialog from "@/components/dialogs/settings/userSessionsDialog";
 import {
     deleteUser,
     disableUser,
@@ -40,6 +41,7 @@ const UsersSettingsSection = () => {
     const [userPendingTwoFactorReset, setUserPendingTwoFactorReset] = useState<UserDto | null>(null);
     const [isResettingTwoFactor, setIsResettingTwoFactor] = useState(false);
     const [twoFactorResetPassword, setTwoFactorResetPassword] = useState("");
+    const [userViewingSessions, setUserViewingSessions] = useState<UserDto | null>(null);
     const isResettingOwnTwoFactor =
         userPendingTwoFactorReset != null && userPendingTwoFactorReset.id === currentUser?.id;
 
@@ -172,6 +174,10 @@ const UsersSettingsSection = () => {
 
     const renderUserActions = (user: UserDto) => (
         <>
+            <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
+                <Monitor className="size-4" />
+                Sessioni
+            </Button>
             {/* Non sul proprio account: il backend lo rifiuta, perché consegnerebbe una
                 password nuova senza chiedere quella attuale. Per sé c'è "Cambia password". */}
             {user.id !== currentUser?.id ? (
@@ -434,6 +440,16 @@ const UsersSettingsSection = () => {
                 onConfirm={() => void handleConfirmTwoFactorReset()}
                 cancelDisabled={isResettingTwoFactor}
                 confirmDisabled={isResettingTwoFactor}
+            />
+
+            <UserSessionsDialog
+                open={userViewingSessions != null}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                        setUserViewingSessions(null);
+                    }
+                }}
+                user={userViewingSessions}
             />
 
             {generatedPasswordResult ? (

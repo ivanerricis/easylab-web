@@ -177,6 +177,65 @@ describe("reports router", () => {
         });
     });
 
+    describe("GET /export.csv", () => {
+        // Riga così come la restituisce `listReports` non paginato: colonne già leggibili
+        // (nome cliente, dispositivo...), non quelle grezze della tabella.
+        const exportReportRow = {
+            id: 1,
+            customer: "Mario Rossi",
+            customerPhone: "02 1234567",
+            device: "iPhone 12",
+            issue: "Schermo rotto",
+            issueDescription: "Schermo incrinato",
+            serviceDescription: "Sostituito display",
+            technician: "-",
+            internalPrice: 50,
+            technicianPrice: 0,
+            totalPrice: 50,
+            paymentMethod: "cash",
+            closed: true,
+            note: "Richiamare",
+            password: "1234",
+            createdAt: new Date("2026-01-01T10:00:00Z"),
+            updatedAt: null,
+        };
+
+        it("esporta con i filtri passati e le etichette italiane del pagamento", async () => {
+            vi.mocked(listReports).mockResolvedValue([exportReportRow] as never);
+
+            const response = await request(buildApp()).get(
+                "/api/reports/export.csv?visibility=closed&dateFrom=2026-01-01&dateTo=2026-01-31"
+            );
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-type"]).toContain("text/csv");
+            expect(response.headers["content-disposition"]).toContain("report.csv");
+            expect(vi.mocked(listReports).mock.calls[0][0]).toMatchObject({
+                visibility: "closed",
+                dateFrom: "2026-01-01",
+                dateTo: "2026-01-31",
+            });
+            expect(response.text).toContain("Metodo di pagamento");
+            expect(response.text).toContain("Contanti");
+        });
+
+        it("senza filtri la visibilità di default è 'all', a differenza della lista paginata", async () => {
+            vi.mocked(listReports).mockResolvedValue({ items: [exportReportRow], totalItems: 1 } as never);
+
+            const response = await request(buildApp()).get("/api/reports/export.csv");
+
+            expect(response.status).toBe(200);
+            expect(vi.mocked(listReports).mock.calls[0][0]).toMatchObject({ visibility: "all" });
+        });
+
+        it("rifiuta un sortBy fuori dall'insieme consentito, come la lista", async () => {
+            const response = await request(buildApp()).get("/api/reports/export.csv?sortBy=deviceName");
+
+            expect(response.status).toBe(400);
+            expect(listReports).not.toHaveBeenCalled();
+        });
+    });
+
     describe("GET /stats", () => {
         it("senza mese passa undefined alla query", async () => {
             vi.mocked(getReportStats).mockResolvedValue({

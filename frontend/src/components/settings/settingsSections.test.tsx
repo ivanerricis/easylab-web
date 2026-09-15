@@ -8,12 +8,15 @@ const api = vi.hoisted(() => ({
     disableUser: vi.fn(),
     enableUser: vi.fn(),
     deleteUser: vi.fn(),
+    listUserSessions: vi.fn(),
+    revokeUserSession: vi.fn(),
     disableUserTwoFactor: vi.fn(),
     getTwoFactorStatus: vi.fn(),
     startTwoFactorSetup: vi.fn(),
     enableTwoFactor: vi.fn(),
     disableTwoFactor: vi.fn(),
     regenerateRecoveryCodes: vi.fn(),
+    listRecentFailedLogins: vi.fn(),
     getEmailSettings: vi.fn(),
     updateEmailSettings: vi.fn(),
     testEmailConnection: vi.fn(),
@@ -66,6 +69,7 @@ const renderWithUser = (ui: React.ReactElement, user: UserDto = admin) =>
 beforeEach(() => {
     vi.clearAllMocks();
     refresh.mockResolvedValue(undefined);
+    api.listRecentFailedLogins.mockResolvedValue([]);
 });
 
 describe("UsersSettingsSection", () => {
@@ -171,6 +175,40 @@ describe("UsersSettingsSection", () => {
             expect(within(screen.getByRole("table")).queryByText("luigi")).not.toBeInTheDocument();
         });
         expect(api.deleteUser).toHaveBeenCalledWith(2);
+    });
+
+    it("mostra le sessioni di un utente e ne permette la disconnessione", async () => {
+        api.listUserSessions.mockResolvedValue([
+            {
+                id: "hash-corrente",
+                createdAt: "2026-09-14T10:00:00.000Z",
+                expiresAt: "2026-09-21T10:00:00.000Z",
+                isCurrent: true,
+            },
+            {
+                id: "hash-altro",
+                createdAt: "2026-09-10T08:00:00.000Z",
+                expiresAt: "2026-09-17T08:00:00.000Z",
+                isCurrent: false,
+            },
+        ]);
+        api.revokeUserSession.mockResolvedValue(undefined);
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Sessioni" }));
+        const dialog = screen.getByRole("dialog", { name: "Sessioni attive" });
+        expect(api.listUserSessions).toHaveBeenCalledWith(2);
+
+        await within(dialog).findByText("(questa sessione)");
+        const disconnectButtons = within(dialog).getAllByRole("button", { name: "Disconnetti" });
+        expect(disconnectButtons[0]).toBeDisabled();
+        await userEvent.click(disconnectButtons[1]);
+
+        await waitFor(() => {
+            expect(api.revokeUserSession).toHaveBeenCalledWith(2, "hash-altro");
+        });
+        expect(toast.success).toHaveBeenCalledWith("Sessione disconnessa");
     });
 });
 
@@ -327,6 +365,34 @@ describe("SecuritySettingsSection", () => {
                 /ti verrà chiesto di configurarla di nuovo/
             )
         ).toBeInTheDocument();
+    });
+
+    it("un amministratore vede gli ultimi accessi falliti", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.listRecentFailedLogins.mockResolvedValue([
+            {
+                timestamp: "2026-09-14T10:00:00.000Z",
+                ip: "1.2.3.4",
+                user: "-",
+                action: "tentativo di accesso",
+                status: 401,
+                error: "Nome utente o password non validi",
+            },
+        ]);
+        renderWithUser(<SecuritySettingsSection />, admin);
+
+        expect(await screen.findByText("Nome utente o password non validi")).toBeInTheDocument();
+        expect(api.listRecentFailedLogins).toHaveBeenCalled();
+    });
+
+    it("un utente non amministratore non vede la sezione né chiama l'API", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: false, remainingRecoveryCodes: 0 });
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await screen.findByText("Non attiva");
+
+        expect(screen.queryByText("Tentativi di accesso falliti")).not.toBeInTheDocument();
+        expect(api.listRecentFailedLogins).not.toHaveBeenCalled();
     });
 });
 

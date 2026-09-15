@@ -26,6 +26,7 @@ import {
     getLogFilePath,
     getLogRetentionDays,
     listLogFiles,
+    listRecentFailedLogins,
     readLogEntries,
     setLogRetentionDays,
 } from "../services/logManager";
@@ -160,6 +161,8 @@ const logEntriesQuerySchema = z
 
 const logRetentionSchema = z.object({ maxDays: z.coerce.number().int().min(1).max(90) }).strict();
 
+const failedLoginsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(100).optional() }).strict();
+
 // Le uniche letture lasciate a chiunque sia autenticato: sono i dati che l'app mostra
 // già in giro per l'interfaccia (nome del laboratorio, presenza di un logo), non
 // contengono nulla di riservato e non permettono di cambiare niente.
@@ -205,6 +208,13 @@ settingsRouter.put("/logs/retention", validate({ body: logRetentionSchema }), as
     const { maxDays } = req.body as { maxDays: number };
 
     res.json(await setLogRetentionDays(maxDays));
+});
+
+// Anche questa prima di "/logs/:dayKey", per lo stesso motivo di "retention" qui sopra.
+settingsRouter.get("/logs/failed-logins", validate({ query: failedLoginsQuerySchema }), async (req, res) => {
+    const { limit } = req.query as unknown as { limit?: number };
+
+    res.json(await listRecentFailedLogins(limit));
 });
 
 settingsRouter.get(

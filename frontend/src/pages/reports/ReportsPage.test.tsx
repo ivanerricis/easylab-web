@@ -18,6 +18,7 @@ const api = {
     updateReportTechnician: vi.fn(),
     deleteReportTechnician: vi.fn(),
     getReportPrintUrl: vi.fn((id: number) => `/api/reports/${id}/print`),
+    getReportsExportUrl: vi.fn((params: object) => `export:${JSON.stringify(params)}`),
 };
 
 vi.mock("@/lib/api", async () => {
@@ -36,6 +37,7 @@ vi.mock("@/lib/api", async () => {
         updateReportTechnician: forward("updateReportTechnician"),
         deleteReportTechnician: forward("deleteReportTechnician"),
         getReportPrintUrl: forward("getReportPrintUrl"),
+        getReportsExportUrl: forward("getReportsExportUrl"),
     };
 });
 
@@ -207,6 +209,18 @@ describe("ReportsPage", () => {
         await renderPage("/reports?visibility=boh");
 
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ visibility: "open" }));
+    });
+
+    it("esporta i report in CSV con lo stesso filtro di stato e l'ordinamento correnti", async () => {
+        const location = { ...window.location, href: "" };
+        Object.defineProperty(window, "location", { value: location, configurable: true });
+        await renderPage("/reports?visibility=closed");
+
+        await userEvent.click(screen.getByRole("button", { name: "Esporta CSV" }));
+
+        expect(location.href).toBe(
+            'export:{"search":"","visibility":"closed","sortBy":"createdAt","sortOrder":"desc"}'
+        );
     });
 
     it("apre la scheda e stampa dalla riga", async () => {

@@ -173,6 +173,47 @@ export const getLogFilePath = (dayKey: string) => {
     return getDailyLogFilePath(dayKey);
 };
 
+// Le uniche due azioni scritte da userActionLogger per un tentativo di accesso (vedi
+// actionLabelRules lì): un fallimento su una qualunque delle due è un accesso respinto,
+// che sia una password sbagliata o un secondo fattore sbagliato.
+const loginAttemptActions = new Set(["tentativo di accesso", "verifica codice 2FA in accesso"]);
+
+/**
+ * Gli ultimi tentativi di accesso falliti, dal giorno più recente a ritroso finché non se
+ * ne trovano `limit` o finiscono i log conservati. Attraversa i file uno alla volta invece
+ * di caricarli tutti insieme: di norma bastano gli ultimi uno o due giorni.
+ */
+export const listRecentFailedLogins = async (limit = 20): Promise<LogEntry[]> => {
+    const files = await listLogFiles();
+    const results: LogEntry[] = [];
+
+    for (const file of files) {
+        if (results.length >= limit) {
+            break;
+        }
+
+        let entries: LogEntry[];
+
+        try {
+            entries = await readLogEntries(file.dayKey);
+        } catch {
+            continue;
+        }
+
+        for (const entry of entries) {
+            if (results.length >= limit) {
+                break;
+            }
+
+            if (entry.status >= 400 && loginAttemptActions.has(entry.action)) {
+                results.push(entry);
+            }
+        }
+    }
+
+    return results;
+};
+
 export const readLogEntries = async (dayKey: string): Promise<LogEntry[]> => {
     const filePath = getLogFilePath(dayKey);
 

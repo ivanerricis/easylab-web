@@ -2,19 +2,23 @@ import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
+import { SettingsCard, SettingsEmptyBox, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
 import RecoveryCodesDialog from "@/components/dialogs/settings/recoveryCodesDialog";
 import TwoFactorConfirmDialog from "@/components/dialogs/settings/twoFactorConfirmDialog";
 import TwoFactorSetupDialog from "@/components/dialogs/settings/twoFactorSetupDialog";
+import RefreshButton from "@/components/refresh-button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
     disableTwoFactor,
     getApiErrorMessage,
     getTwoFactorStatus,
+    listRecentFailedLogins,
     regenerateRecoveryCodes,
+    type LogEntryDto,
     type TwoFactorStatusDto,
 } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 /**
  * La sezione "Sicurezza" delle impostazioni: riguarda il proprio account, non il laboratorio,
@@ -28,6 +32,30 @@ const SecuritySettingsSection = () => {
     const [isDisableOpen, setIsDisableOpen] = useState(false);
     const [isRegenerateOpen, setIsRegenerateOpen] = useState(false);
     const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+    const [failedLogins, setFailedLogins] = useState<LogEntryDto[] | null>(null);
+    const [isLoadingFailedLogins, setIsLoadingFailedLogins] = useState(false);
+
+    const loadFailedLogins = async () => {
+        setIsLoadingFailedLogins(true);
+
+        try {
+            setFailedLogins(await listRecentFailedLogins());
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare i tentativi di accesso falliti"));
+        } finally {
+            setIsLoadingFailedLogins(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!user?.isAdmin) {
+            return;
+        }
+
+        startTransition(() => {
+            void loadFailedLogins();
+        });
+    }, [user?.isAdmin]);
 
     const loadStatus = async () => {
         setIsLoading(true);
@@ -162,6 +190,50 @@ const SecuritySettingsSection = () => {
                     </div>
                 )}
             </SettingsCard>
+
+            {user?.isAdmin ? (
+                <SettingsCard
+                    title="Tentativi di accesso falliti"
+                    description="Gli ultimi accessi respinti su tutti gli account, dal registro delle azioni."
+                    action={
+                        <RefreshButton
+                            size="icon"
+                            onRefresh={loadFailedLogins}
+                            isRefreshing={isLoadingFailedLogins}
+                            label="Aggiorna tentativi di accesso falliti"
+                        />
+                    }
+                >
+                    {isLoadingFailedLogins && failedLogins === null ? (
+                        <SettingsLoadingBox label="Caricamento tentativi di accesso..." />
+                    ) : !failedLogins || failedLogins.length === 0 ? (
+                        <SettingsEmptyBox>Nessun accesso fallito negli ultimi giorni.</SettingsEmptyBox>
+                    ) : (
+                        <Table containerClassName="max-h-64 overflow-y-auto">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Data e ora</TableHead>
+                                    <TableHead>IP</TableHead>
+                                    <TableHead>Utente</TableHead>
+                                    <TableHead>Errore</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {failedLogins.map((entry, index) => (
+                                    <TableRow key={`${entry.timestamp}-${index}`}>
+                                        <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
+                                        <TableCell>{entry.ip}</TableCell>
+                                        <TableCell>{entry.user}</TableCell>
+                                        <TableCell className="whitespace-normal text-destructive">
+                                            {entry.error ?? ""}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </SettingsCard>
+            ) : null}
 
             <TwoFactorSetupDialog open={isSetupOpen} onOpenChange={setIsSetupOpen} onEnabled={handleEnabled} />
 

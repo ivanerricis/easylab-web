@@ -27,3 +27,17 @@ export const disableUserTwoFactor = async (userId: number, password?: string) =>
 export const deleteUser = async (userId: number) => {
     await api.delete(`/users/${userId}`);
 };
+
+export type SessionDto = {
+    id: string;
+    createdAt: string;
+    expiresAt: string;
+    isCurrent: boolean;
+};
+
+export const listUserSessions = async (userId: number) =>
+    (await api.get<SessionDto[]>(`/users/${userId}/sessions`)).data;
+
+export const revokeUserSession = async (userId: number, sessionId: string) => {
+    await api.delete(`/users/${userId}/sessions/${encodeURIComponent(sessionId)}`);
+};

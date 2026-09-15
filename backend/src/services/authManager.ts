@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
-import { and, asc, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessionTable, userTable } from "../db/schema";
 import {
@@ -416,6 +416,45 @@ export const stopSessionCleanupScheduler = () => {
 };
 
 const deleteAllSessionsForUser = (userId: number) => db.delete(sessionTable).where(eq(sessionTable.userId, userId));
+
+export type SessionSummary = {
+    /**
+     * Lo sha256 del token, lo stesso che sta in tabella: espone un one-way hash, non il
+     * token stesso, e serve solo come identificativo per la revoca (vedi `revokeSession`).
+     */
+    id: string;
+    createdAt: string;
+    expiresAt: string;
+    isCurrent: boolean;
+};
+
+export const listSessionsForUser = async (userId: number, currentToken?: string): Promise<SessionSummary[]> => {
+    await requireUserById(userId);
+
+    const currentTokenHash = currentToken ? hashSessionToken(currentToken) : null;
+    const rows = await db
+        .select({
+            tokenHash: sessionTable.tokenHash,
+            createdAt: sessionTable.createdAt,
+            expiresAt: sessionTable.expiresAt,
+        })
+        .from(sessionTable)
+        .where(eq(sessionTable.userId, userId))
+        .orderBy(desc(sessionTable.createdAt));
+
+    return rows.map((row) => ({
+        id: row.tokenHash,
+        createdAt: row.createdAt.toISOString(),
+        expiresAt: row.expiresAt.toISOString(),
+        isCurrent: row.tokenHash === currentTokenHash,
+    }));
+};
+
+/** Filtrata per userId: anche se l'hash non si indovina, resta scorretto revocare la
+ * sessione di un altro utente passando un id che non gli appartiene. */
+export const revokeSession = async (userId: number, sessionId: string): Promise<void> => {
+    await db.delete(sessionTable).where(and(eq(sessionTable.userId, userId), eq(sessionTable.tokenHash, sessionId)));
+};
 
 const deleteOtherSessionsForUser = (userId: number, currentToken: string) =>
     db

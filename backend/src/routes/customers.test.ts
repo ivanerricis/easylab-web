@@ -100,6 +100,19 @@ describe("customers router", () => {
         expect(response.body).toMatchObject({ totalItems: 15, page: 2, pageSize: 10, totalPages: 2 });
     });
 
+    it("esporta i clienti come CSV con intestazione italiana e filtro di ricerca", async () => {
+        vi.mocked(listCustomers).mockResolvedValue([customer] as never);
+
+        const response = await request(buildApp()).get("/api/customers/export.csv?search=mario");
+
+        expect(response.status).toBe(200);
+        expect(response.headers["content-type"]).toContain("text/csv");
+        expect(response.headers["content-disposition"]).toContain("clienti.csv");
+        expect(listCustomers).toHaveBeenCalledWith({ search: "mario" });
+        expect(response.text).toContain("ID,Nome,Cognome,Email,Telefono,Telefono secondario,Città,Creato il");
+        expect(response.text).toContain("5,Mario,Rossi,mario@example.com,0212345678,,Milano,");
+    });
+
     it("risponde 404 quando il cliente non esiste", async () => {
         vi.mocked(getCustomerById).mockResolvedValue([] as never);
 

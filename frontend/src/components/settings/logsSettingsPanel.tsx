@@ -154,50 +154,48 @@ const LogsSettingsPanel = () => {
     return (
         <SettingsSection className="flex h-full min-h-0 flex-col">
             <SettingsCard
-                title="Conservazione"
-                description="Per quanti giorni tenere i registri prima di eliminarli automaticamente."
-            >
-                <div className="flex flex-wrap items-end gap-2">
-                    <div className="grid gap-2">
-                        <Label htmlFor="log-retention-days">Giorni da conservare</Label>
-                        <Input
-                            id="log-retention-days"
-                            type="number"
-                            min={minRetentionDays}
-                            max={maxRetentionDays}
-                            className="w-28"
-                            disabled={isLoadingRetention}
-                            value={retentionDays ?? ""}
-                            onChange={(event) => setRetentionDays(Number(event.target.value))}
-                        />
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={
-                            isLoadingRetention ||
-                            isSavingRetention ||
-                            retentionDays === null ||
-                            !Number.isInteger(retentionDays) ||
-                            retentionDays < minRetentionDays ||
-                            retentionDays > maxRetentionDays
-                        }
-                        onClick={() => void handleSaveRetention()}
-                    >
-                        {isSavingRetention ? "Salvataggio..." : "Salva"}
-                    </Button>
-                </div>
-            </SettingsCard>
-
-            <SettingsCard
                 title="Log azioni"
                 description="Consulta il registro delle azioni eseguite sull'applicazione, giorno per giorno."
                 className="min-h-0 flex-1"
                 contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3 pt-4"}
                 action={
-                    <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
-                        Scarica log selezionato
-                    </Button>
+                    <>
+                        <div className="flex items-center gap-1.5">
+                            <Label htmlFor="log-retention-days" className="text-sm whitespace-nowrap">
+                                Conserva per
+                            </Label>
+                            <Input
+                                id="log-retention-days"
+                                type="number"
+                                min={minRetentionDays}
+                                max={maxRetentionDays}
+                                className="w-16 text-center"
+                                disabled={isLoadingRetention}
+                                value={retentionDays ?? ""}
+                                onChange={(event) => setRetentionDays(Number(event.target.value))}
+                            />
+                            <span className="text-sm whitespace-nowrap text-muted-foreground">giorni</span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                    isLoadingRetention ||
+                                    isSavingRetention ||
+                                    retentionDays === null ||
+                                    !Number.isInteger(retentionDays) ||
+                                    retentionDays < minRetentionDays ||
+                                    retentionDays > maxRetentionDays
+                                }
+                                onClick={() => void handleSaveRetention()}
+                            >
+                                {isSavingRetention ? "Salvataggio..." : "Salva"}
+                            </Button>
+                        </div>
+                        <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
+                            Scarica log selezionato
+                        </Button>
+                    </>
                 }
             >
                 {isLoadingFiles && logFiles.length === 0 ? (

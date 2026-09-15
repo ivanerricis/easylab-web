@@ -5,10 +5,13 @@ import {
     assertOwnPassword,
     createUser,
     deleteUser,
+    listSessionsForUser,
     listUsers,
     regeneratePassword,
+    revokeSession,
     setUserActive,
 } from "../services/authManager";
+import { sessionCookieName } from "../middleware/requireAuth";
 import { idParamsSchema } from "./crudRouter";
 import { validate } from "./validation";
 
@@ -19,6 +22,14 @@ const createUserBodySchema = z
         username: z.string().trim().min(1).max(50),
     })
     .strict();
+
+const sessionParamsSchema = idParamsSchema.extend({
+    // sha256 esadecimale, la stessa forma con cui la sessione è salvata in tabella.
+    sessionId: z
+        .string()
+        .trim()
+        .regex(/^[0-9a-f]{64}$/),
+});
 
 usersRouter.get("/", async (_req, res) => {
     res.json(await listUsers());
@@ -107,6 +118,20 @@ usersRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res
     }
 
     await deleteUser(id);
+    res.status(204).end();
+});
+
+usersRouter.get("/:id/sessions", validate({ params: idParamsSchema }), async (req, res) => {
+    const { id } = req.params as unknown as { id: number };
+    const currentToken = req.cookies?.[sessionCookieName] as string | undefined;
+
+    res.json(await listSessionsForUser(id, currentToken));
+});
+
+usersRouter.delete("/:id/sessions/:sessionId", validate({ params: sessionParamsSchema }), async (req, res) => {
+    const { id, sessionId } = req.params as unknown as { id: number; sessionId: string };
+
+    await revokeSession(id, sessionId);
     res.status(204).end();
 });
 

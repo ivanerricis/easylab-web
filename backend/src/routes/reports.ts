@@ -14,6 +14,7 @@ import { db } from "../db";
 import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTable } from "../db/schema";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
+import { toCsv } from "../services/csv";
 import { formatDateLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
@@ -124,6 +125,71 @@ reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, r
     });
 
     sendListResponse(res, reports, page, pageSize);
+});
+
+// Gli stessi filtri della lista, meno pagina e dimensione pagina: l'export scarica sempre
+// tutto ciò che passa il filtro, mai una sola pagina.
+const reportExportQuerySchema = reportListQuerySchema.omit({ page: true, pageSize: true });
+
+const reportPaymentMethodLabels: Record<ReportPaymentMethod, string> = {
+    non_paid: "Non pagato",
+    cash: "Contanti",
+    card: "Carta",
+};
+
+reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), async (req, res) => {
+    const { search, visibility, dateFrom, dateTo, collaboratorId, customerId, technicianId, sortBy, sortOrder } =
+        req.query as unknown as {
+            search?: string;
+            visibility?: "all" | "open" | "closed";
+            dateFrom?: string;
+            dateTo?: string;
+            collaboratorId?: number;
+            customerId?: number;
+            technicianId?: number;
+            sortBy?: (typeof reportSortFields)[number];
+            sortOrder?: "asc" | "desc";
+        };
+
+    const reports = await listReports({
+        search,
+        visibility: visibility ?? "all",
+        dateFrom,
+        dateTo,
+        collaboratorId,
+        customerId,
+        technicianId,
+        sortBy,
+        sortOrder,
+        timeZone: await getAppTimeZone(),
+    });
+    const rows = Array.isArray(reports) ? reports : reports.items;
+
+    const csv = toCsv(rows, [
+        { header: "ID", value: (report) => report.id },
+        { header: "Cliente", value: (report) => report.customer },
+        { header: "Telefono cliente", value: (report) => report.customerPhone },
+        { header: "Dispositivo", value: (report) => report.device },
+        { header: "Difetto", value: (report) => report.issue },
+        { header: "Descrizione problema", value: (report) => report.issueDescription },
+        { header: "Intervento", value: (report) => report.serviceDescription },
+        { header: "Tecnico esterno", value: (report) => report.technician },
+        { header: "Prezzo interno", value: (report) => report.internalPrice },
+        { header: "Compenso tecnico", value: (report) => report.technicianPrice },
+        { header: "Prezzo totale", value: (report) => report.totalPrice },
+        {
+            header: "Metodo di pagamento",
+            value: (report) => reportPaymentMethodLabels[report.paymentMethod as ReportPaymentMethod],
+        },
+        { header: "Chiuso", value: (report) => report.closed },
+        { header: "Note", value: (report) => report.note },
+        { header: "Password", value: (report) => report.password },
+        { header: "Creato il", value: (report) => report.createdAt },
+    ]);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=report.csv");
+    res.send(csv);
 });
 
 const reportStatsQuerySchema = z.object({

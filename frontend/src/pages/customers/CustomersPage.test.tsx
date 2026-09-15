@@ -26,6 +26,7 @@ vi.mock("@/lib/api", async () => {
         deleteCustomer: (...args: unknown[]) => api.deleteCustomer(...args),
         getCustomerReportsPrintUrl: (id: number, range: object) => `reports:${id}:${JSON.stringify(range)}`,
         getCustomerInterventionsPrintUrl: (id: number, range: object) => `interventions:${id}:${JSON.stringify(range)}`,
+        getCustomersExportUrl: (params: { search?: string }) => `export:${JSON.stringify(params)}`,
     };
 });
 
@@ -149,6 +150,17 @@ describe("CustomersPage", () => {
         await userEvent.click(within(table()).getByRole("button", { name: "Apri cliente 3" }));
 
         expect(navigate).toHaveBeenCalledWith("/clients/3");
+    });
+
+    it("esporta i clienti in CSV rispettando la ricerca corrente", async () => {
+        const location = { ...window.location, href: "" };
+        Object.defineProperty(window, "location", { value: location, configurable: true });
+        await renderPage();
+
+        await userEvent.type(screen.getByPlaceholderText("Cerca cliente..."), "mario");
+        await userEvent.click(screen.getByRole("button", { name: "Esporta CSV" }));
+
+        expect(location.href).toBe('export:{"search":"mario"}');
     });
 
     it("elimina dopo la conferma con il nome nella domanda", async () => {

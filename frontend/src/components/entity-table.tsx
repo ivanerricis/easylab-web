@@ -129,8 +129,10 @@ const EntityTable = <TRow,>({
                 ref={tableRef}
                 style={tableStyle}
                 aria-busy={isInitialLoading || isRefetching}
+                // Si nasconde il contenitore, non la tabella: vedi `containerClassName` in `Table`.
+                containerClassName="hidden sm:block"
                 className={cn(
-                    "hidden bg-background sm:table",
+                    "bg-background",
                     // Attenuare è sufficiente a dire "sto ricaricando" e non impedisce di
                     // leggere né di cliccare: chi sta cercando vede la lista precedente finché
                     // non arriva quella nuova. Il conteggio sotto la tabella ha `role="status"`,

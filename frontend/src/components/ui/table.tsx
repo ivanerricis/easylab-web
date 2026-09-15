@@ -2,9 +2,19 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * `containerClassName` va al contenitore che scorre, non alla tabella. Serve soprattutto per
+ * nasconderla su mobile, dove al suo posto ci sono le schede: con `hidden` sulla sola `<table>`
+ * il contenitore restava lì con il suo `h-full`, cioè alto quanto tutta l'area della lista e
+ * vuoto, e le schede cominciavano sotto, fuori dal primo schermo.
+ */
+function Table({
+    className,
+    containerClassName,
+    ...props
+}: React.ComponentProps<"table"> & { containerClassName?: string }) {
     return (
-        <div data-slot="table-container" className="relative h-full w-full overflow-auto">
+        <div data-slot="table-container" className={cn("relative h-full w-full overflow-auto", containerClassName)}>
             <table data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />
         </div>
     );

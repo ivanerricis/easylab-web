@@ -241,7 +241,7 @@ const UsersSettingsSection = () => {
                     <SettingsLoadingBox label="Caricamento utenti..." />
                 ) : (
                     <>
-                        <Table className="hidden sm:table">
+                        <Table containerClassName="hidden sm:block">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Nome utente</TableHead>

@@ -11,6 +11,44 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Mobile: le schede delle liste partono sotto i filtri, le schede della dashboard non escono dai bordi
+
+**Cosa.** Il componente `Table` in
+[`ui/table.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/ui/table.tsx)
+accetta `containerClassName`, che va al contenitore che scorre invece che alla `<table>`.
+[`entity-table.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/entity-table.tsx)
+e la sezione utenti delle impostazioni
+([`usersSettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/usersSettingsSection.tsx))
+lo usano per nascondere la tabella su mobile. Nella dashboard
+([`cardDashboard.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/dashboard/components/cardDashboard.tsx),
+[`DashboardPage.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/dashboard/DashboardPage.tsx))
+su mobile l'icona delle schede sta sulla riga del numero.
+
+**Il perché.** Segnalato dall'utente: su mobile c'era un enorme spazio vuoto prima delle schede
+che sostituiscono le tabelle. Era `hidden sm:table` sulla sola `<table>`: il suo contenitore
+restava visibile con `h-full`, cioè alto quanto tutta l'area della lista e vuoto, e le schede
+cominciavano sotto. Misurato a 390 px, il vuoto era 516–604 px nelle liste (a schermo non
+compariva nemmeno una scheda, solo filtri e paginazione) e 286–556 px nelle liste delle pagine
+di cliente, tecnico e collaboratore. Colpiva tutte e dodici le liste (le sette pagine più le
+cinque dentro le schede di dettaglio), perché passano tutte da `EntityTable`. Ora il contenitore è alto 0 e l'altezza scorrevole di ogni lista si è ridotta
+esattamente del vuoto (report: da 4494 a 3978 px, −516). Su desktop non cambia niente: il
+contenitore resta `h-full` ed è ancora lui a scorrere sotto l'intestazione fissa.
+
+Nello stesso giro, un controllo di tutte le pagine a 320, 360, 375, 390 e 412 px, scorrendo
+ognuna fino in fondo: nessuna pagina scorre in orizzontale, e l'unico altro difetto era nelle
+schede della dashboard. Su mobile sono larghe un terzo dello schermo e l'etichetta divideva la
+riga con l'icona. A 360 px "Programmati" spingeva l'icona 3,7 px oltre il bordo interno, a
+320 px 17 px, cioè fuori dalla scheda. "Incassi mese" veniva troncato fino a 375 px. Con l'icona
+sulla riga del numero l'etichetta ha tutta la larghezza: nessuna sporgenza a nessuna larghezza,
+e "In lavorazione" sta su una riga da 360 px in su. La scheda degli incassi è un pulsante e non
+passa da `CardDashboard`, e prima ne ricopiava a mano le classi: ora usa le stesse, esportate da
+`cardDashboard.tsx`. Sempre su mobile i sei pallini dell'importo nascosto hanno la spaziatura
+normale, perché con `tracking-widest` a 320 px finivano 2,7 px sopra l'icona dell'euro. Da `sm`
+in su le schede sono come prima.
+
+Verificato con Playwright sulla app vera (sessione di test, dati del database di sviluppo), con
+misure prima e dopo sulle stesse pagine. `tsc`, `eslint`, Prettier e i 613 test passano.
+
 ## 2026-09-15 — Il controllo degli aggiornamenti torna continuo, anche con la scheda nascosta
 
 **Tolta, lo stesso giorno, una modifica della revisione qui sotto.** Per risparmiare richieste,

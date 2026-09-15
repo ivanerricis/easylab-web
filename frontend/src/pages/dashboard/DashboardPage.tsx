@@ -1,5 +1,10 @@
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleDashed, Euro, Loader } from "lucide-react";
-import CardDashboard from "./components/cardDashboard";
+import CardDashboard, {
+    dashboardCardIconClassName,
+    dashboardCardLabelClassName,
+    dashboardCardLayoutClassName,
+    dashboardCardValueClassName,
+} from "./components/cardDashboard";
 import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import CreateInterventionDialog, {
     type CreateInterventionSubmitValues,
@@ -288,16 +293,21 @@ const DashboardPage = () => {
                         <Button
                             type="button"
                             variant="outline"
-                            className="h-auto w-full flex-1 flex-col items-start gap-0.5 rounded-lg border-primary/20 p-2 shadow sm:min-w-56 sm:gap-1 sm:p-4"
+                            // `whitespace-normal` e `text-left` annullano quelli del pulsante: qui
+                            // l'etichetta deve poter andare a capo come nelle altre schede.
+                            className={cn(
+                                dashboardCardLayoutClassName,
+                                "h-auto justify-items-start border-primary/20 text-left whitespace-normal"
+                            )}
                         >
-                            <div className="flex w-full items-start justify-between gap-1">
-                                <span className="truncate text-xs font-medium text-primary sm:text-base">
-                                    Incassi mese
-                                </span>
-                                <Euro className="size-4 shrink-0 text-action-print sm:size-5" />
-                            </div>
+                            <span className={cn(dashboardCardLabelClassName, "font-medium text-primary")}>
+                                Incassi mese
+                            </span>
+                            <Euro className={cn(dashboardCardIconClassName, "text-action-print")} />
                             <span
-                                className="text-lg font-bold tracking-widest sm:text-2xl"
+                                // Spaziatura larga solo da `sm`: a 320px i sei pallini la usavano
+                                // per arrivare sopra l'icona dell'euro.
+                                className={cn(dashboardCardValueClassName, "sm:tracking-widest")}
                                 aria-label="Importo nascosto, apri la card per visualizzarlo"
                             >
                                 ••••••

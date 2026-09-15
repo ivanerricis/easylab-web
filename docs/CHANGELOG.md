@@ -11,6 +11,23 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-15 — Il controllo degli aggiornamenti torna continuo, anche con la scheda nascosta
+
+**Tolta, lo stesso giorno, una modifica della revisione qui sotto.** Per risparmiare richieste,
+`useUpdateWatcher` aveva smesso di chiedere lo stato dell'aggiornamento quando la scheda era
+nascosta, e riprendeva appena tornava in vista. Provato in produzione, le altre postazioni non
+si accorgevano più della fine dell'aggiornamento: una scheda in background non vedeva mai lo
+stato `running`, e tornata in vista leggeva `success` senza sapere che l'aggiornamento era
+partito mentre lei era aperta. La regola che evita di ricaricare per un `success` vecchio (quello
+dell'aggiornamento precedente, rimasto in `status.json`) la trattava quindi come una scheda
+appena aperta: niente ricarica, e la versione vecchia restava in pagina.
+
+Scelta dell'utente: tornare a come era prima, un controllo ogni 5 secondi in ogni scheda aperta,
+visibile o no. Il costo sono le richieste di una scheda dimenticata aperta, che è quello che la
+modifica voleva risparmiare; si è preferito che ogni postazione veda sempre l'aggiornamento.
+Nuovo test in `useUpdateWatcher.test.tsx`: una scheda nascosta vede partire e finire
+l'aggiornamento e si ricarica. Fallisce con la versione tolta, passa con questa.
+
 ## 2026-09-15 — Gli errori sotto i campi non spostano più i campi vicini
 
 **Cosa.** `items-start` sulle griglie di campi di altri tre dialoghi:
@@ -164,7 +181,8 @@ per il "mese corrente" della dashboard.
 - **Conteggio degli interventi senza join** quando non c'è ricerca, come già per i report.
 - **Controllo degli aggiornamenti fermo con la scheda nascosta**: prima ogni scheda lo chiedeva
   ogni 5 secondi tutto il giorno, anche in background; ora si ferma e riparte subito quando la
-  scheda torna in vista.
+  scheda torna in vista. *Tolto lo stesso giorno: le postazioni in background non vedevano più la
+  fine dell'aggiornamento (voce qui sopra).*
 - **Pagine di dettaglio con i nomi.** `GET /reports/:id` e `GET /interventions/:id` restituiscono
   anche i nomi di cliente, dispositivo, difetto, collaboratore e tecnico. La pagina del report
   faceva sei richieste (il report, i quattro cataloghi interi, il cliente), ora una; quella

@@ -113,10 +113,12 @@ describe("useUpdateWatcher", () => {
     });
 
     /**
-     * Una scheda lasciata aperta in background non deve chiedere lo stato ogni 5 secondi tutto il
-     * giorno; tornata in vista chiede subito, senza aspettare il giro successivo.
+     * Il 2026-09-15 il controllo era stato fermato con la scheda nascosta, per risparmiare
+     * richieste, ed è stato tolto lo stesso giorno: una postazione in background non vedeva
+     * partire l'aggiornamento, e tornata in vista leggeva "success" senza sapere di doverlo
+     * considerare suo, quindi restava con la versione vecchia. Deve vedere tutto il giro.
      */
-    it("con la scheda nascosta smette di interrogare, e torna a farlo subito quando riappare", async () => {
+    it("continua a interrogare con la scheda nascosta, e ricarica a fine aggiornamento", async () => {
         const setHidden = (hidden: boolean) => {
             Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
             document.dispatchEvent(new Event("visibilitychange"));
@@ -126,20 +128,13 @@ describe("useUpdateWatcher", () => {
 
         try {
             act(() => setHidden(true));
-            const callsWhenHidden = getUpdateState.mock.calls.length;
-            await act(async () => {
-                await vi.advanceTimersByTimeAsync(60_000);
-            });
-            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden);
 
-            await act(async () => {
-                setHidden(false);
-                await vi.advanceTimersByTimeAsync(0);
-            });
-            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden + 1);
-
+            getUpdateState.mockResolvedValue({ state: "running" });
             await nextPoll();
-            expect(getUpdateState).toHaveBeenCalledTimes(callsWhenHidden + 2);
+            getUpdateState.mockResolvedValue({ state: "success" });
+            await nextPoll();
+
+            expect(reload).toHaveBeenCalledTimes(1);
         } finally {
             Object.defineProperty(document, "hidden", { value: false, configurable: true });
         }

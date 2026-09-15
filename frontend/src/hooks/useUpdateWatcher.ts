@@ -59,45 +59,12 @@ export const useUpdateWatcher = () => {
             }
         };
 
-        /**
-         * Solo con la scheda in vista. Una scheda dimenticata aperta in background chiedeva lo
-         * stato ogni 5 secondi tutto il giorno — 720 richieste l'ora, ognuna con la sua lettura
-         * della sessione nel database — per aggiornare un blocco a schermo che nessuno guardava.
-         * Quando torna in vista chiede subito, così un aggiornamento avvenuto nel frattempo si
-         * vede senza aspettare il giro successivo.
-         */
-        let intervalId: number | undefined;
-
-        const start = () => {
-            if (intervalId === undefined) {
-                void poll();
-                intervalId = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
-            }
-        };
-
-        const stop = () => {
-            window.clearInterval(intervalId);
-            intervalId = undefined;
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                stop();
-            } else {
-                start();
-            }
-        };
-
-        if (!document.hidden) {
-            start();
-        }
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
+        void poll();
+        const intervalId = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
 
         return () => {
             cancelled = true;
-            stop();
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.clearInterval(intervalId);
         };
     }, [setBusy]);
 };

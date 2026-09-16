@@ -49,7 +49,8 @@ const SessionsList = ({
     return (
         <div className="grid gap-2">
             {sessions.map((session) => {
-                const isStale = !session.isCurrent && loadedAt - new Date(session.lastSeenAt).getTime() > staleSessionMs;
+                const isStale =
+                    !session.isCurrent && loadedAt - new Date(session.lastSeenAt).getTime() > staleSessionMs;
 
                 return (
                     <div

@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { changeOwnPassword, getMe, listOwnSessions, login, logout, revokeOwnSession, verifyTwoFactorLogin } from "./auth";
+import {
+    changeOwnPassword,
+    getMe,
+    listOwnSessions,
+    login,
+    logout,
+    revokeOwnSession,
+    verifyTwoFactorLogin,
+} from "./auth";
 import {
     disableTwoFactor,
     enableTwoFactor,

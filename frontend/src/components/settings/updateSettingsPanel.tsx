@@ -147,6 +147,19 @@ const UpdateSettingsPanel = () => {
         }
     };
 
+    // `activeStepKey: null` è "oltre l'ultima fase": usato a fine aggiornamento per spuntare
+    // anche l'ultima invece di lasciarla segnata come ancora in corso durante l'attesa prima
+    // del reload (vedi il commento su BusyGuardState.activeStepKey).
+    const setUpdateBusy = (activeStepKey: string | null) => {
+        setBusy({
+            title: "Aggiornamento in corso...",
+            description:
+                "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
+            steps: updatePhaseSteps,
+            activeStepKey,
+        });
+    };
+
     const handleUpdate = async () => {
         if (isChecking || isUpdating) {
             return;
@@ -155,13 +168,7 @@ const UpdateSettingsPanel = () => {
         setIsConfirmOpen(false);
         const previousCommit = status?.currentCommit ?? null;
         setIsUpdating(true);
-        setBusy({
-            title: "Aggiornamento in corso...",
-            description:
-                "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
-            steps: updatePhaseSteps,
-            activeStepKey: "verify",
-        });
+        setUpdateBusy("verify");
 
         try {
             await runUpdateNow();
@@ -183,6 +190,7 @@ const UpdateSettingsPanel = () => {
 
                     if (result.state === "success" && result.currentCommit !== previousCommit) {
                         setStatus(result);
+                        setUpdateBusy(null);
                         toast.success("Aggiornamento completato. Ricarico la pagina...");
                         await sleep(1500);
                         window.location.reload();
@@ -193,13 +201,7 @@ const UpdateSettingsPanel = () => {
                     // non arriva più nulla per quella finestra, ma la fase resta quella scritta
                     // prima del riavvio finché il polling successivo non ne legge una nuova.
                     if (result.state === "running" && result.phase) {
-                        setBusy({
-                            title: "Aggiornamento in corso...",
-                            description:
-                                "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
-                            steps: updatePhaseSteps,
-                            activeStepKey: result.phase,
-                        });
+                        setUpdateBusy(result.phase);
                     }
                 } catch {
                     // atteso: i container vengono ricreati durante l'aggiornamento

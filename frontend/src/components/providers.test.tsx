@@ -112,6 +112,40 @@ describe("BusyGuardProvider", () => {
         expect(screen.getByText("Passo A").closest("li")).not.toHaveAttribute("aria-current");
         expect(screen.getByText("Passo C").closest("li")).not.toHaveAttribute("aria-current");
     });
+
+    /**
+     * `activeStepKey: null` è "oltre l'ultimo passo": serve a spuntare anche l'ultimo quando
+     * l'operazione è riuscita, invece di lasciarlo segnato come ancora in corso finché
+     * l'overlay non sparisce (bug osservato sull'ultima fase dell'aggiornamento).
+     */
+    it("con activeStepKey a null spunta anche l'ultimo passo", () => {
+        let setBusy: ReturnType<typeof useBusyGuard>["setBusy"] = () => {};
+        const Capture = () => {
+            setBusy = useBusyGuard().setBusy;
+            return null;
+        };
+        render(
+            <BusyGuardProvider>
+                <Capture />
+            </BusyGuardProvider>
+        );
+
+        act(() =>
+            setBusy({
+                title: "Aggiornamento",
+                description: "",
+                steps: [
+                    { key: "a", label: "Passo A" },
+                    { key: "b", label: "Passo B" },
+                ],
+                activeStepKey: null,
+            })
+        );
+
+        expect(screen.getByText("Passo A").closest("li")).toHaveAttribute("data-status", "done");
+        expect(screen.getByText("Passo B").closest("li")).toHaveAttribute("data-status", "done");
+        expect(screen.queryByText("Passo A")?.closest("li")).not.toHaveAttribute("aria-current");
+    });
 });
 
 describe("ThemeProvider", () => {

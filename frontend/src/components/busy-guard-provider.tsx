@@ -8,18 +8,24 @@ const BusySteps = ({ steps, activeStepKey }: { steps: BusyGuardState["steps"]; a
         return null;
     }
 
-    const activeIndex = steps.findIndex((step) => step.key === activeStepKey);
+    // `null` è esplicito e diverso da "nessuna chiave nota ancora arrivata" (`undefined`, o una
+    // stringa che non combacia con nessuno step): significa "oltre l'ultimo passo", cioè tutto
+    // fatto. Chi chiama lo usa per dire "operazione riuscita" senza dover inventare una quinta
+    // fase finta solo per spuntare anche l'ultima. Vedi updateSettingsPanel.tsx.
+    const activeIndex = activeStepKey === null ? steps.length : steps.findIndex((step) => step.key === activeStepKey);
 
     return (
         <ol className="grid w-full max-w-xs gap-1.5 text-left">
             {steps.map((step, index) => {
-                const isDone = activeIndex >= 0 && index < activeIndex;
+                const isDone = index < activeIndex;
                 const isActive = index === activeIndex;
+                const status = isDone ? "done" : isActive ? "active" : "pending";
 
                 return (
                     <li
                         key={step.key}
                         aria-current={isActive ? "step" : undefined}
+                        data-status={status}
                         className={cn(
                             "flex items-center gap-2 text-sm",
                             isActive ? "font-medium text-foreground" : "text-muted-foreground"

@@ -191,6 +191,15 @@ describe("UpdateSettingsPanel", () => {
 
         api.getUpdateStatus.mockResolvedValue({ ...status, state: "success", currentCommit: "def5678" });
         await nextPoll();
+
+        // Bug osservato: a operazione riuscita l'ultima fase restava segnata come "ancora in
+        // corso" durante l'attesa prima del reload, invece di spuntarsi come le altre.
+        expect(within(overlay).getByText("Pulizia delle immagini vecchie").closest("li")).toHaveAttribute(
+            "data-status",
+            "done"
+        );
+        expect(overlay.querySelector('[aria-current="step"]')).not.toBeInTheDocument();
+
         await nextPoll(1500);
         expect(reload).toHaveBeenCalled();
     });

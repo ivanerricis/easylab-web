@@ -11,6 +11,22 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — L'ultima fase dell'aggiornamento restava segnata come "in corso"
+
+**Il problema.** Quando l'aggiornamento arrivava a `state: "success"`, il pannello smetteva di
+aggiornare `activeStepKey` (lo faceva solo mentre `state === "running"`): l'ultima fase raggiunta
+("Pulizia delle immagini vecchie") restava quindi con lo spinner acceso per tutta l'attesa di
+1,5s prima del reload, anche se l'operazione era già finita — dava l'impressione che
+l'aggiornamento fosse ancora bloccato lì.
+
+**Cosa.** `BusyGuardState.activeStepKey` accetta ora esplicitamente `null` con il significato
+"oltre l'ultima fase": tutti i passi, ultimo compreso, si spuntano. `updateSettingsPanel.tsx` lo
+passa non appena rileva `state: "success"`, prima del conto alla rovescia verso il reload. Le tre
+chiamate quasi identiche a `setBusy` (fase iniziale, cambio fase, fine) sono raccolte in un unico
+`setUpdateBusy(activeStepKey)` per non doverle tenere allineate a mano.
+
+---
+
 ## 2026-09-16 — Pagamento pagato/non pagato anche sugli interventi
 
 **Il problema.** I report distinguono da tempo se un lavoro è stato pagato, con tanto e carta

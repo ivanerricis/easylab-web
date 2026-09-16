@@ -271,6 +271,29 @@ describe("ReportsPage", () => {
         );
     });
 
+    /**
+     * "Pulisci date" chiamava `onDateFromChange` e `onDateToChange` in sequenza: entrambi
+     * scrivono nello stesso `URLSearchParams` tramite `updateParams`, e due chiamate
+     * sincrone leggono lo stesso indirizzo di partenza — l'ultima vinceva e da sola
+     * toglieva solo la data di fine, lasciando quella di inizio nell'indirizzo.
+     */
+    it("pulire le date le toglie entrambe dall'indirizzo", async () => {
+        renderWithProviders(
+            <>
+                <ReportsPage />
+                <LocationProbe />
+            </>,
+            { route: "/reports?from=2026-09-01&to=2026-09-30" }
+        );
+        await within(table()).findByText("Cliente 1");
+
+        await userEvent.click(screen.getByRole("button", { name: "Pulisci date" }));
+
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({});
+        });
+    });
+
     it("cambiare filtro torna alla prima pagina e non tocca il resto", async () => {
         api.listReports.mockResolvedValue({ ...page([buildReport(1)]), totalItems: 40, totalPages: 4 });
         renderWithProviders(

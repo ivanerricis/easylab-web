@@ -25,6 +25,7 @@ type InterventionsFiltersProps = {
     onDateFromChange: (value: string | undefined) => void;
     dateTo: string | undefined;
     onDateToChange: (value: string | undefined) => void;
+    onClearDates: () => void;
     onRefresh: () => void | Promise<unknown>;
     isRefreshing?: boolean;
     /** Il menu "Colonne", in fondo alla riga dei filtri. */
@@ -44,6 +45,7 @@ const InterventionsFilters = ({
     onDateFromChange,
     dateTo,
     onDateToChange,
+    onClearDates,
     onRefresh,
     isRefreshing,
     columnsMenu,
@@ -91,6 +93,7 @@ const InterventionsFilters = ({
                     onDateFromChange={onDateFromChange}
                     dateTo={dateTo}
                     onDateToChange={onDateToChange}
+                    onClearDates={onClearDates}
                 />
 
                 {columnsMenu}

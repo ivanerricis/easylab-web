@@ -15,6 +15,10 @@ const Harness = ({ initialFrom, initialTo }: { initialFrom?: string; initialTo?:
             onDateFromChange={setDateFrom}
             dateTo={dateTo}
             onDateToChange={setDateTo}
+            onClearDates={() => {
+                setDateFrom(undefined);
+                setDateTo(undefined);
+            }}
         />
     );
 };

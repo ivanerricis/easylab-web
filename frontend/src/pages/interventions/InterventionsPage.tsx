@@ -294,6 +294,9 @@ const InterventionsPage = () => {
                     onDateFromChange={(value) => updateParams({ [listUrlParams.dateFrom]: value })}
                     dateTo={dateTo}
                     onDateToChange={(value) => updateParams({ [listUrlParams.dateTo]: value })}
+                    onClearDates={() =>
+                        updateParams({ [listUrlParams.dateFrom]: null, [listUrlParams.dateTo]: null })
+                    }
                     columnsMenu={
                         <ColumnVisibilityMenu
                             columns={interventionColumns}

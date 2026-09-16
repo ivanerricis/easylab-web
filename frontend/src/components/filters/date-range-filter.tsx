@@ -7,6 +7,14 @@ type DateRangeFilterProps = {
     onDateFromChange: (value: string | undefined) => void;
     dateTo: string | undefined;
     onDateToChange: (value: string | undefined) => void;
+    /**
+     * Azzera entrambe le date in un colpo solo. Non basta chiamare `onDateFromChange` e
+     * `onDateToChange` in sequenza: in Report e Interventi entrambi scrivono nello stesso
+     * `URLSearchParams` tramite `updateParams`, e due chiamate sincrone nello stesso gestore
+     * leggono entrambe l'indirizzo di partenza — l'ultima vince e riscrive da sola quella
+     * precedente, così "Pulisci date" toglieva solo la data di fine.
+     */
+    onClearDates: () => void;
 };
 
 /**
@@ -18,23 +26,24 @@ type DateRangeFilterProps = {
  * avevano due copie identiche carattere per carattere, e quella regola è comportamento,
  * non impaginazione — due copie di una regola sono due occasioni perché una cambi da sola.
  */
-const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }: DateRangeFilterProps) => {
-    const handleClearDates = () => {
-        onDateFromChange(undefined);
-        onDateToChange(undefined);
-    };
-
+const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange, onClearDates }: DateRangeFilterProps) => {
     return (
         <>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 <Input
                     type="date"
                     aria-label="Data di inizio"
                     value={dateFrom ?? ""}
                     max={dateTo}
                     onChange={(event) => onDateFromChange(event.target.value || undefined)}
-                    // 40px come gli altri controlli della barra (vedi `SearchInput`).
-                    className="h-10 w-36 sm:w-40"
+                    // Sotto `md` il testo è a 16px (vedi `Input`, evita lo zoom automatico di
+                    // iOS): misurato via `getComputedStyle` sul campo reale, a quella dimensione
+                    // il controllo nativo riserva da solo ~32px di padding a destra per la sua
+                    // icona, oltre al testo "31/12/2026" (~126px) — 144px fisse tagliavano
+                    // cifre e icona. `flex-wrap` sul contenitore lascia che il secondo campo vada
+                    // a capo da solo sui telefoni più stretti, invece di restringersi sotto la
+                    // soglia leggibile.
+                    className="h-10 w-44 md:w-40"
                 />
                 <span className="text-sm text-muted-foreground">-</span>
                 <Input
@@ -43,7 +52,7 @@ const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }:
                     value={dateTo ?? ""}
                     min={dateFrom}
                     onChange={(event) => onDateToChange(event.target.value || undefined)}
-                    className="h-10 w-36 sm:w-40"
+                    className="h-10 w-44 md:w-40"
                 />
             </div>
 
@@ -52,7 +61,7 @@ const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }:
                     variant="ghost"
                     size="lg"
                     className="gap-2 px-2 sm:ml-auto sm:px-4"
-                    onClick={handleClearDates}
+                    onClick={onClearDates}
                     aria-label="Pulisci date"
                 >
                     <FilterX className="size-4" />

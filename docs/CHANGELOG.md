@@ -11,6 +11,42 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — "Pulisci date" azzerava solo la data di fine, cifre tagliate su mobile
+
+**Il problema (1).** In Report e Interventi, "Pulisci date" chiamava `onDateFromChange(undefined)`
+poi `onDateToChange(undefined)` in sequenza. Entrambi passano da `updateParams`, che scrive nello
+stesso `URLSearchParams` tramite il `setSearchParams` di React Router: due chiamate sincrone nello
+stesso gestore leggono entrambe l'indirizzo di partenza (non ancora aggiornato dalla prima), e
+l'ultima naviga da sola sovrascrivendo la prima — il risultato era che restava solo la data di
+inizio nell'indirizzo, e "fine" spariva mentre "inizio" no. Riprodotto e verificato con un test
+che richiama esattamente quella sequenza (`ReportsPage.test.tsx`, "pulire le date le toglie
+entrambe dall'indirizzo") prima e dopo la correzione.
+
+**Cosa (1).** `DateRangeFilter` prende ora un prop `onClearDates` dedicato invece di derivare la
+pulizia da due `onChange` separati; Report e Interventi lo implementano con **una sola**
+chiamata a `updateParams` che toglie entrambe le chiavi (`from`, `to`) nello stesso aggiornamento.
+
+**Il problema (2).** Sotto `md` (768px) l'`Input` usa `text-base` (16px, evita lo zoom automatico
+di iOS) ma i campi data erano larghi 144px fisse (`w-36`): misurato con `getComputedStyle` sul
+campo reale, a 16px il controllo nativo riserva da solo ~32px di padding a destra per la propria
+icona, più ~126px per il testo "31/12/2026" — sopra ai 144px disponibili, quindi cifre e/o icona
+finivano tagliate. Il controllo nativo del selettore data non si può ispezionare da fuori
+(è fuori dal DOM), quindi il taglio non era visibile testando da desktop con la sola emulazione
+di viewport.
+
+**Cosa (2).** Campi data a 176px fisse sotto `md` (sufficienti secondo la misura sopra, con
+margine), 160px da `md` in su (dove il testo torna a 14px). Il contenitore ha `flex-wrap`: sui
+telefoni più stretti (< ~390px) i due campi non stanno più affiancati e la seconda data va a capo
+per conto suo, invece di restringersi sotto la soglia leggibile.
+
+**Il perché.** Entrambi i problemi erano invisibili dal desktop: il primo perché uno `useState`
+di prova non ha la stessa corsa fra scritture del vero stato in indirizzo; il secondo perché il
+controllo nativo del browser desktop rende il campo data in modo più compatto di quello mobile.
+Verificato con Playwright (Edge, `isMobile: true`, viewport 320–414px) sulla pagina Report da
+autenticato, sia per il click su "Pulisci date" sia per le dimensioni reali dei campi.
+
+---
+
 ## 2026-09-16 — Pulsante "Pulisci date" sempre etichettato su mobile
 
 **Il problema.** Sotto il breakpoint `sm` (640px) il pulsante "Pulisci date" del filtro data

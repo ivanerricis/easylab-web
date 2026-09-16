@@ -1,0 +1,55 @@
+site_name: Documentazione easylab-web
+site_description: Applicazione full stack per la gestione di un laboratorio
+site_url: https://ivanerricis.github.io/easylab-web/
+repo_url: https://github.com/ivanerricis/easylab-web
+repo_name: ivanerricis/easylab-web
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: it
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Passa al tema scuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Passa al tema chiaro
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+edit_uri: edit/main/docs/
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Deploy e configurazione server: DEPLOY.md
+  - Backup, restore e migrazione: BACKUP.md
+  - Sicurezza account e accesso: OPERATIONS.md
+  - "Piano 2FA (storico)": 2FA-PLAN.md
+  - Changelog: CHANGELOG.md
+  - Backlog: BACKLOG.md

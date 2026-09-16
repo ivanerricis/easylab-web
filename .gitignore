@@ -27,6 +27,7 @@ build/
 coverage/
 backend/dist/
 frontend/dist/
+site/
 
 # Vite
 frontend/.vite/

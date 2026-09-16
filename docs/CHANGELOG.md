@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Documentazione pubblicata come sito con MkDocs Material
+
+I file in `docs/` erano Markdown letto solo su GitHub: niente ricerca, niente indice per
+pagina, l'estetica dipendeva dal renderer di GitHub. Ora la stessa cartella viene compilata
+in un sito statico con [MkDocs Material](https://squidfunk.github.io/mkdocs-material/):
+sidebar di navigazione, indice per pagina, ricerca full-text, blocchi di codice con copia
+rapida, tema chiaro/scuro. I contenuti restano i file `.md` esistenti, `mkdocs.yml` in radice
+si limita a definirne la navigazione e il tema.
+
+Il sito si pubblica da solo: `docs.yml` compila con `mkdocs build --strict` (fallisce su link
+o riferimenti rotti) e pubblica su GitHub Pages a ogni push su `main` che tocchi `docs/**` o
+`mkdocs.yml`. Serve però un passaggio manuale una tantum nelle impostazioni del repository
+(Settings → Pages → Source: GitHub Actions) per attivare Pages: senza quello il workflow
+compila ma il deploy fallisce. File: `mkdocs.yml`, `docs/requirements.txt`,
+`.github/workflows/docs.yml`.
+
+---
+
 ## 2026-09-16 — Il cliente come link anche nelle righe; barre sopra le tabelle tutte alte uguali
 
 **Il cliente come link nelle liste, e nell'intestazione delle schede.** Nella voce precedente il

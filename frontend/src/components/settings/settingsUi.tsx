@@ -43,7 +43,10 @@ export const SettingsCard = ({
     <Card size="sm" className={cn("shadow-sm", destructive ? "border-destructive/30" : "border-primary/15", className)}>
         <CardHeader
             className={cn(
-                "border-b",
+                // Il padding verticale della card sta sul contenitore, non sull'header: senza
+                // annullarlo con -mt e ridarlo con pt, lo sfondo colorato lascerebbe una striscia
+                // bianca sopra, non arrivando all'angolo arrotondato della card.
+                "-mt-4 border-b pt-4",
                 destructive ? "border-destructive/15 bg-destructive/5" : "border-primary/10 bg-muted/20"
             )}
         >

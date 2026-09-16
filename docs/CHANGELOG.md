@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — L'header colorato delle card di Impostazioni non arrivava all'angolo arrotondato
+
+**Cosa.** In `SettingsCard`
+([`settingsUi.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/settingsUi.tsx))
+il padding verticale sta sul contenitore `Card` (`py-4`), non sull'`CardHeader`: lo sfondo
+tinto dell'header (rosso per le card `destructive` come "Ripristino da file esterno" in
+Backup, grigio per le altre) partiva quindi dopo quel padding, lasciando una striscia bianca
+fra il colore e il bordo arrotondato in alto. Con il rosso, molto più visibile del grigio
+tenue usato altrove, il difetto saltava all'occhio. Corretto annullando il padding del
+contenitore sull'header (`-mt-4`) e ridandolo come `pt-4` proprio sull'header, così lo sfondo
+arriva fino all'angolo.
+
+**Il perché.** Segnalato dall'utente guardando la pagina Backup: l'header sembrava "fatto a
+metà". Il fix è nel componente condiviso, quindi vale per ogni card di Impostazioni con header
+colorato, non solo per quella del ripristino.
+
+---
+
 ## 2026-09-16 — Le proprie sessioni gestibili da Sicurezza, non solo dall'admin su un altro utente
 
 **Cosa.** `UserSessionsDialog` (vedere e disconnettere le sessioni aperte di un account) era

@@ -24,8 +24,13 @@ UNIT_DEST_DIR="/etc/systemd/system"
 
 echo "Repo: $REPO_ROOT"
 
-mkdir -p "$REPO_ROOT/ops/update"
-chmod 777 "$REPO_ROOT/ops/update"
+# ops/update receives the trigger files from the backend container, whose entrypoint makes it the
+# owner: nobody else needs to write there, so no 777. ops/update-status is root's alone and is
+# mounted read-only into the container (see scripts/update-status-lib.sh).
+mkdir -p "$REPO_ROOT/ops/update" "$REPO_ROOT/ops/update-status"
+chmod 755 "$REPO_ROOT/ops/update"
+chown root:root "$REPO_ROOT/ops/update-status"
+chmod 755 "$REPO_ROOT/ops/update-status"
 
 if ! command -v jq >/dev/null 2>&1; then
     echo "jq non trovato, installazione..."

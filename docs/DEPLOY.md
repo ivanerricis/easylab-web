@@ -229,13 +229,22 @@ Sulla VM Proxmox, la pagina **Impostazioni > Aggiornamenti** permette di verific
 
 Il backend gira in un container senza accesso a `git`/Docker (scelta di sicurezza): quando si clicca "Aggiorna adesso", il backend scrive solo un file trigger in una cartella condivisa (`ops/update/`); sull'host, un **systemd path unit** osserva quel file ed esegue realmente l'aggiornamento. Un timer periodico (ogni 30 minuti) controlla in background se è disponibile un nuovo commit su `origin/main`.
 
+Le cartelle sono due, una per direzione, e la separazione è una scelta di sicurezza:
+
+| Cartella sull'host | Nel backend | Chi scrive | Contenuto |
+|---|---|---|---|
+| `ops/update/` | `/app/update-signal` | il backend (uid 1000) | `apply.trigger`, `check.trigger` |
+| `ops/update-status/` | `/app/update-status` (sola lettura) | root, dagli script sull'host | `status.json` (esito, log, commit) |
+
+Gli script dell'host girano come root: nella cartella dei trigger si limitano a cancellarli e non leggono nulla, perché lì il backend può mettere anche un collegamento simbolico. Fino al 2026-09-16 lo stato stava accanto ai trigger, e un backend compromesso poteva far copiare a root le credenziali del tunnel o rendere scrivibile un file di sistema (EL-01, vedi [CHANGELOG](CHANGELOG.md)). Il codice che applica la regola sta in `scripts/update-status-lib.sh`.
+
 **Setup una tantum sulla VM** (dopo il primo `docker compose up --build -d`):
 
 ```bash
 sudo ./scripts/install-updater.sh
 ```
 
-Lo script installa ed abilita le unit systemd in `ops/systemd/` (`easylab-update.path`, `easylab-check-updates.path`, `easylab-check-updates.timer`), installa `jq` se mancante e imposta i permessi sulla cartella `ops/update/`.
+Lo script installa ed abilita le unit systemd in `ops/systemd/` (`easylab-update.path`, `easylab-check-updates.path`, `easylab-check-updates.timer`), installa `jq` se mancante e imposta i permessi delle cartelle `ops/update/` e `ops/update-status/`. Le due cartelle si creano comunque da sole al primo avvio o controllo: rilanciare lo script dopo un aggiornamento non è necessario.
 
 Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 - **Verifica aggiornamenti**: esegue un `git fetch` e mostra se è disponibile un nuovo commit, senza modificare nulla.
@@ -291,7 +300,8 @@ Alcuni accorgimenti per limitare lo spazio occupato su una VM di produzione a lu
 - `frontend/Dockerfile.dev`: frontend sviluppo (vite)
 - `frontend/nginx.conf`: reverse proxy frontend verso backend
 - `ops/systemd/`: unit systemd (template) usate da `scripts/install-updater.sh` sulla VM Proxmox per l'aggiornamento da UI
-- `ops/update/`: cartella condivisa (bind mount, non versionata) tra backend e host per il meccanismo di aggiornamento
+- `ops/update/`: cartella condivisa (bind mount, non versionata) in cui il backend deposita le richieste di aggiornamento
+- `ops/update-status/`: stato dell'aggiornamento, scritto da root sull'host e montato in sola lettura nel backend (non versionata)
 
 ### Volumi persistenti (produzione)
 
@@ -310,5 +320,6 @@ macchina virtuale. Non serve nessun intervento manuale sui permessi — `backend
 parte come root, corregge il proprietario dei quattro percorsi montati (compresi quelli creati
 prima di questa modifica, che appartengono a root) e poi cede i privilegi. Vale anche per
 `BACKUP_HOST_DIR` e `ops/update/` sull'host, che dopo il primo avvio risultano di uid 1000.
+`ops/update-status/` invece resta di root: è montata in sola lettura e l'entrypoint non la tocca.
 
 `backend_logs` è un volume proprio perché senza di esso i log starebbero nel layer scrivibile del container, che viene ricreato ad ogni `up --build`: si azzererebbero ad ogni aggiornamento.

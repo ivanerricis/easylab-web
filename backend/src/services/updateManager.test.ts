@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -54,6 +55,18 @@ describe("getUpdateStatus", () => {
 
         expect(status.state).toBe("unknown");
         expect(status.updateAvailable).toBe(false);
+    });
+
+    /**
+     * Lo stato sta in una cartella di root montata in sola lettura, non accanto ai trigger
+     * che scrive il backend: lì un link messo dal container veniva seguito dagli script di root.
+     */
+    it("legge lo stato da update-status, non dalla cartella dei trigger", async () => {
+        await getUpdateStatus();
+
+        const [statusPath] = readFile.mock.calls[0] as [string];
+        expect(path.basename(path.dirname(statusPath))).toBe("update-status");
+        expect(path.basename(statusPath)).toBe("status.json");
     });
 
     it("legge e normalizza lo stato scritto dallo script sull'host", async () => {
@@ -117,6 +130,9 @@ describe("requestUpdate", () => {
 
         expect(mkdir).toHaveBeenCalledWith(expect.stringContaining("update-signal"), { recursive: true });
         expect(writeFile).toHaveBeenCalledWith(expect.stringContaining("apply.trigger"), "", "utf-8");
+        // I trigger restano nella cartella del backend: le unit systemd sull'host guardano lì.
+        const [triggerPath] = writeFile.mock.calls[0] as [string];
+        expect(path.basename(path.dirname(triggerPath))).toBe("update-signal");
         expect(writeFile).not.toHaveBeenCalledWith(
             expect.stringContaining("check.trigger"),
             expect.anything(),

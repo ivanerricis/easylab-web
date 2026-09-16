@@ -11,6 +11,62 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Aggiornamento automatico: lo stato esce dalla cartella che il backend controlla (EL-01)
+
+**Il problema.** Finding EL-01 dell'audit del 2026-09-14, severità alta, rimandato allora per
+capire cosa rompesse. `ops/update/` è montata nel backend (`/app/update-signal`) e
+`docker-entrypoint.sh` la assegna a `node`: chi esegue codice nel backend decide cosa c'è
+dentro, collegamenti simbolici compresi. Lì dentro, però, gli script dell'host che girano come
+root (`check-updates.sh`, `update-server.sh`) leggevano e riscrivevano `status.json`:
+- `cat "$STATUS_FILE"` seguiva un collegamento a `ops/cloudflared/<tunnel>.json`, che è un
+  oggetto JSON: jq lo fondeva nello stato nuovo e le credenziali del tunnel finivano in un
+  file leggibile dal backend. Riprodotto con lo script vecchio in un container usa e getta:
+  riesce sempre, al primo controllo;
+- `chmod 666 "$STATUS_FILE"` dopo il `mv` seguiva un collegamento messo in quell'istante:
+  con la gara vinta, un file di sistema scrivibile da tutti, cioè root sulla VM.
+
+Serve codice già in esecuzione nel backend, ma è esattamente il caso che l'utente non
+privilegiato del container dovrebbe contenere.
+
+**Cosa.** Una cartella per direzione.
+- Le richieste restano in `ops/update/`: le unit systemd installate in `/etc` guardano quei
+  percorsi e non si aggiornano con `git pull`, quindi non vanno reinstallate. Lì root ora fa
+  solo `mkdir -p` e `rm -f` su nomi fissi (su un collegamento `rm` toglie il collegamento).
+- Lo stato va in `ops/update-status/`, di root con permessi 755, montata in sola lettura su
+  `/app/update-status`, fuori dal ciclo di `chown` dell'entrypoint (su un mount `:ro`
+  fallirebbe e, con `set -e`, fermerebbe il container). Il file nasce `mktemp` in quella
+  cartella, prende i permessi 0644 finché è ancora temporaneo e poi sostituisce `status.json`
+  con `mv`. Il `chmod 666` sul percorso finale non esiste più.
+- Le due regole stanno in un file solo, `scripts/update-status-lib.sh`, incluso dai due
+  script: prima la scrittura dello stato era copiata in tre punti. La cartella dello stato
+  viene riportata a root/755 a ogni giro (Docker la crea già così se manca), e se è un
+  collegamento lo script si ferma invece di scriverci attraverso. Uno stato illeggibile si
+  riparte da `{}` invece di bloccare ogni scrittura successiva.
+- Il vecchio `ops/update/status.json` (e gli eventuali `.status.*`) viene cancellato senza
+  essere letto: migrarlo significherebbe proprio leggerlo.
+- `install-updater.sh` non mette più `chmod 777` su `ops/update/` (il proprietario lo sistema
+  l'entrypoint) e prepara anche la cartella nuova.
+- `updateManager.ts` legge lo stato da `update-status/`; i trigger restano in `update-signal/`.
+
+**Verifica.** Oltre ai test del backend (percorsi di stato e trigger in `updateManager.test.ts`)
+e a `shellcheck`, gli script sono stati provati come root in un container Debian con un finto
+repository e `ops/update` di uid 1000: il collegamento alle credenziali viene rimosso senza che
+il loro contenuto compaia da nessuna parte e senza toccare il file puntato; lo stato nasce
+root/0644 in una cartella root/755; una cartella di stato con proprietario sbagliato viene
+sistemata; uno `status.json` rotto viene sostituito; un `running` rimasto appeso diventa
+`failed`; una cartella di stato che è un collegamento fa fermare lo script; `update-server.sh`
+scrive `success` o `failed` con il log. La stessa prova con lo script vecchio stampa le
+credenziali.
+
+**Effetto sul primo aggiornamento.** L'aggiornamento che porta questa modifica gira ancora con
+lo `update-server.sh` precedente, che scrive il proprio esito nel vecchio percorso; il backend
+nuovo legge quello nuovo. La pagina Aggiornamenti mostra quindi lo stato "sconosciuto", senza
+l'ultimo esito e senza log, finché non gira un controllo (entro 30 minuti, o subito con
+"Verifica aggiornamenti"), che cancella anche il vecchio file. Lo stato "sconosciuto" non blocca
+né l'interfaccia né un nuovo aggiornamento. Nessun intervento manuale sulla VM è necessario.
+
+---
+
 ## 2026-09-16 — Rimosso il piano della 2FA, a lavoro concluso
 
 `docs/2FA-PLAN.md` era il documento di progettazione della verifica in due passaggi: tutte

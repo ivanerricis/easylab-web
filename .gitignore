@@ -51,6 +51,8 @@ backend/backups/
 # Scritta a runtime da updateManager per chiedere all'host un controllo aggiornamenti.
 backend/update-signal/
 ops/update/
+# Stato dell'aggiornamento, scritto da root sull'host (scripts/update-status-lib.sh).
+ops/update-status/
 
 # Credenziali del tunnel Cloudflare (cert.pem + <tunnel>.json): sono segreti della VM,
 # generati da scripts/install-tunnel.sh. Chi le ottiene può pubblicare sul dominio.

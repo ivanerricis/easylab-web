@@ -2,13 +2,16 @@
 # Applies an update: git reset --hard origin/main + docker compose rebuild.
 # Triggered by easylab-update.path (see ops/systemd/) when ops/update/apply.trigger appears.
 # Never add `git clean` here: untracked paths (.env, backend/data, backend/backups,
-# ops/update) must survive an update.
+# ops/update, ops/update-status) must survive an update.
+#
+# Runs as root next to a directory the backend container owns: see update-status-lib.sh for the
+# rule that keeps the two apart.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-STATUS_DIR="$REPO_ROOT/ops/update"
-STATUS_FILE="$STATUS_DIR/status.json"
-APPLY_TRIGGER="$STATUS_DIR/apply.trigger"
+# shellcheck source=scripts/update-status-lib.sh
+. "$SCRIPT_DIR/update-status-lib.sh"
+APPLY_TRIGGER="$TRIGGER_DIR/apply.trigger"
 LOG_FILE="$(mktemp)"
 # Keys allowed to sign the commits this script installs (see docs/OPERATIONS.md). Read from the
 # version that is *already installed*, before the reset: a commit that is not signed by one of
@@ -18,7 +21,10 @@ LOG_FILE="$(mktemp)"
 ALLOWED_SIGNERS="$REPO_ROOT/ops/allowed_signers"
 FAILURE_MESSAGE=""
 
-mkdir -p "$STATUS_DIR"
+prepare_update_dirs || {
+    rm -f "$LOG_FILE"
+    exit 1
+}
 rm -f "$APPLY_TRIGGER"
 cd "$REPO_ROOT"
 
@@ -26,16 +32,13 @@ write_status() {
     local state="$1"
     local last_status="$2"
     local error_msg="$3"
-    local now current_commit log_tail existing tmp_file
+    local now current_commit log_tail
 
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     current_commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
     log_tail="$(tail -c 4000 "$LOG_FILE" 2>/dev/null || true)"
-    existing="{}"
-    [ -f "$STATUS_FILE" ] && existing="$(cat "$STATUS_FILE")"
-    tmp_file="$(mktemp "$STATUS_DIR/.status.XXXXXX")"
 
-    echo "$existing" | jq \
+    update_status \
         --arg state "$state" \
         --arg currentCommit "$current_commit" \
         --arg now "$now" \
@@ -53,9 +56,7 @@ write_status() {
         # After a successful apply, HEAD now matches the commit we just fetched
         # from origin/main, so clear the stale "update available" flag left
         # over from the last check instead of waiting for the next timer run.
-        + (if $lastUpdateStatus == "success" then { remoteCommit: $currentCommit, updateAvailable: false } else {} end)' > "$tmp_file"
-    mv "$tmp_file" "$STATUS_FILE"
-    chmod 666 "$STATUS_FILE" 2>/dev/null || true
+        + (if $lastUpdateStatus == "success" then { remoteCommit: $currentCommit, updateAvailable: false } else {} end)'
 }
 
 on_exit() {

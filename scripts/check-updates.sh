@@ -3,15 +3,20 @@
 # Never touches the working tree. Triggered by easylab-check-updates.path (on-demand from
 # the UI) and easylab-check-updates.timer (every 30 min) — see ops/systemd/.
 
+#
+# This runs as root, next to a directory the backend container owns (see update-status-lib.sh
+# for the rule that keeps the two apart): trigger files come in through ops/update/, the
+# status goes out through ops/update-status/.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-STATUS_DIR="$REPO_ROOT/ops/update"
-STATUS_FILE="$STATUS_DIR/status.json"
-CHECK_TRIGGER="$STATUS_DIR/check.trigger"
+# shellcheck source=scripts/update-status-lib.sh
+. "$SCRIPT_DIR/update-status-lib.sh"
+CHECK_TRIGGER="$TRIGGER_DIR/check.trigger"
 
-mkdir -p "$STATUS_DIR"
+prepare_update_dirs || exit 1
 rm -f "$CHECK_TRIGGER"
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 current_state="idle"
 if [ -f "$STATUS_FILE" ]; then
@@ -36,15 +41,11 @@ if [ "$current_state" = "running" ]; then
 
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     stale_error="Aggiornamento interrotto prima della fine (riavvio del server o processo terminato): nessun esito registrato. Verifica lo stato dell'applicazione e, se serve, riprova."
-    tmp_file="$(mktemp "$STATUS_DIR/.status.XXXXXX")"
 
-    jq \
+    update_status \
         --arg now "$now" \
         --arg lastError "$stale_error" \
-        '. + { state: "failed", lastUpdateAt: $now, lastUpdateStatus: "failed", lastError: $lastError }' \
-        "$STATUS_FILE" > "$tmp_file"
-    mv "$tmp_file" "$STATUS_FILE"
-    chmod 666 "$STATUS_FILE" 2>/dev/null || true
+        '. + { state: "failed", lastUpdateAt: $now, lastUpdateStatus: "failed", lastError: $lastError }'
 fi
 
 git fetch --all --prune >/dev/null 2>&1 || exit 0
@@ -58,11 +59,7 @@ if [ "$local_commit" != "$remote_commit" ]; then
     update_available="true"
 fi
 
-existing="{}"
-[ -f "$STATUS_FILE" ] && existing="$(cat "$STATUS_FILE")"
-tmp_file="$(mktemp "$STATUS_DIR/.status.XXXXXX")"
-
-echo "$existing" | jq \
+update_status \
     --arg currentCommit "$local_commit" \
     --arg remoteCommit "$remote_commit" \
     --arg now "$now" \
@@ -73,6 +70,4 @@ echo "$existing" | jq \
         updateAvailable: $updateAvailable,
         lastCheckedAt: $now,
         state: (if (.state // "idle") == "running" then .state else "idle" end)
-    }' > "$tmp_file"
-mv "$tmp_file" "$STATUS_FILE"
-chmod 666 "$STATUS_FILE" 2>/dev/null || true
+    }'

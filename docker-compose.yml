@@ -40,7 +40,14 @@ services:
     # aggirare nginx, e con esso l'unico punto in cui l'IP reale del client è affidabile.
     volumes:
       - ${BACKUP_HOST_DIR}:/app/backups
+      # Due cartelle per l'aggiornamento automatico, una per direzione (vedi
+      # scripts/update-status-lib.sh): in update-signal il backend deposita le richieste, e root
+      # sull'host lì dentro si limita a cancellarle; lo stato lo scrive root in update-status, che
+      # qui è in sola lettura, così il backend non può metterci un link che root seguirebbe.
+      # update-status non va aggiunta al `chown` di docker-entrypoint.sh: su un mount `:ro`
+      # fallirebbe, e con `set -e` fermerebbe il container.
       - ./ops/update:/app/update-signal
+      - ./ops/update-status:/app/update-status:ro
       - backend_data:/app/data
       # Senza questo volume i log azioni utente stanno nel layer scrivibile del
       # container, che viene ricreato a ogni `up --build`: si perderebbero a ogni

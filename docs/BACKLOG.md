@@ -21,7 +21,12 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   subito sono nel CHANGELOG dello stesso giorno):
   - **Password del dispositivo in chiaro.** La lista report ha una colonna Password, e la
     scheda la mostra per intero: chi passa davanti allo schermo al banco la legge. Proposta:
-    `••••` con un pulsante per mostrarla o copiarla, in lista e in scheda.
+    `••••` con un pulsante per mostrarla o copiarla, in lista e in scheda. Da decidere
+    insieme: l'export CSV dei report (Impostazioni → Esportazione) contiene la stessa colonna
+    Password ed è scaricabile da qualunque utente autenticato, non solo dall'admin. I dati
+    erano già consultabili pagina per pagina, ma l'export li consegna tutti in un file che poi
+    gira fuori dall'app. Le strade: togliere la colonna dall'export, oppure riservare l'export
+    all'admin (revisione di sicurezza del 2026-09-16).
   - **Azioni rapide nella scheda del report.** Chiudere il report o segnare "Avvisato" oggi
     passa dal dialogo di modifica. Proposta: due pulsanti diretti, e il telefono come link
     `tel:` (ed eventualmente WhatsApp per avvisare il cliente). Il nome del cliente come link
@@ -101,22 +106,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   0.18.1, cioè una versione più vecchia e incompatibile. Va risolto con un aggiornamento di
   `drizzle-kit` quando la catena `@esbuild-kit` sparirà dalle sue dipendenze. Rilevato
   nell'audit del 2026-09-14.
-- **Updater: gli script root seguono i symlink di una cartella che il backend controlla**
-  (finding EL-01 dell'audit del 2026-09-14, severità alta). `ops/update` è montata nel
-  backend, che la possiede (`docker-entrypoint.sh` la assegna a `node`), e `check-updates.sh` /
-  `update-server.sh` girano come root e ci fanno `cat`, `>` e `chmod 666` per percorso. Con
-  codice in esecuzione nel backend: `status.json` → symlink a `../cloudflared/easylab.json` e
-  un `check.trigger` bastano a far copiare da root le credenziali del tunnel in un file
-  leggibile (deterministico); con una race sul `chmod 666`, root sulla VM. Rimandato per
-  valutare cosa rompe. La strada che non richiede interventi a mano sulla VM: **lasciare i
-  trigger dove sono** (le unit systemd installate in `/etc` guardano `ops/update/*.trigger` e
-  non si aggiornano con `git pull`) e **spostare solo lo stato** in una cartella sorella di
-  root, per esempio `ops/update-status/`, montata `:ro` in un percorso diverso (non dentro
-  `/app/update-signal`, e fuori dal ciclo di `chown` dell'entrypoint, che su un mount in sola
-  lettura fallirebbe e con `set -e` fermerebbe il container). Da mettere in conto: il primo
-  aggiornamento che porta la modifica scrive il suo esito ancora nel vecchio percorso, quindi
-  la pagina Aggiornamenti perde una volta l'ultimo esito e il log; `install-updater.sh` va
-  rilanciato solo se si vuole togliere il `chmod 777`.
 
 ---
 
@@ -175,7 +164,7 @@ sbagliati). Controllare tutte e tre le intensità, in chiaro e in scuro.
 
 ## Test sul database vero
 
-**Il problema.** Nessuno degli 810 test del backend parla con un database: le query sono
+**Il problema.** Nessuno dei test del backend (circa 950 a settembre 2026) parla con un database: le query sono
 sostituite da un finto che restituisce le righe scritte nel test. Si verifica così cosa fa il
 codice *con* quelle righe (permessi, validazione, errori), ma l'SQL mandato a Postgres non lo
 esegue nessun test: se è sbagliato, resta tutto verde. Il query layer (`backend/src/db/queries/*`)

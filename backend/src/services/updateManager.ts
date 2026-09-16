@@ -6,8 +6,14 @@ import { ApiError } from "./apiError";
 // on the VM host, triggered by a systemd path unit watching these files (see
 // ops/systemd/ and scripts/update-server.sh / scripts/check-updates.sh). The
 // backend container has no docker/git access on purpose.
+//
+// Two directories, one per direction (see scripts/update-status-lib.sh): the triggers go
+// into `update-signal`, which this container owns; the status comes from `update-status`,
+// written by root on the host and mounted read-only. The status used to sit next to the
+// triggers, where code running here could replace it with a symlink that the root scripts
+// then followed (EL-01 in docs/CHANGELOG.md).
 const signalDir = path.join(process.cwd(), "update-signal");
-const statusFilePath = path.join(signalDir, "status.json");
+const statusFilePath = path.join(process.cwd(), "update-status", "status.json");
 const applyTriggerPath = path.join(signalDir, "apply.trigger");
 const checkTriggerPath = path.join(signalDir, "check.trigger");
 

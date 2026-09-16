@@ -25,7 +25,10 @@ const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, cl
     return (
         // Su mobile prende lo spazio che resta accanto al pulsante di aggiornamento invece di
         // restare fisso a 240px; da `sm` in su torna alla larghezza di prima.
-        <InputGroup className={cn("min-w-0 flex-1 border-primary! sm:w-60 sm:flex-none", className)}>
+        // `h-10` come gli altri controlli della barra sopra le tabelle (pulsante Aggiorna, filtri,
+        // date, menu Colonne): con l'altezza di serie (36px) il campo restava più basso dei
+        // pulsanti accanto, e la riga non era allineata.
+        <InputGroup className={cn("h-10 min-w-0 flex-1 border-primary! sm:w-60 sm:flex-none", className)}>
             <InputGroupAddon>
                 <Search className="size-5 text-primary" aria-hidden="true" />
             </InputGroupAddon>

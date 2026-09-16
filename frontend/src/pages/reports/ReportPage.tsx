@@ -229,7 +229,10 @@ const ReportPage = () => {
 
                             <div className="min-w-0">
                                 <h1 className="text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">
-                                    Report #{details.report.id} - {details.customerName}
+                                    Report #{details.report.id} -{" "}
+                                    {/* Il nome in alto è il primo che si guarda: è lui a portare al
+                                        cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
+                                    <CustomerLink customerId={details.report.customerId} name={details.customerName} />
                                 </h1>
                             </div>
                         </div>
@@ -328,10 +331,7 @@ const ReportPage = () => {
                         <CardTitle className="text-primary">Anagrafica</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem
-                            label="Cliente"
-                            value={<CustomerLink customerId={details.report.customerId} name={details.customerName} />}
-                        />
+                        <DetailItem label="Cliente" value={details.customerName} />
                         <DetailItem label="Telefono" value={details.customerPhone ?? "-"} />
                         <DetailItem label="Collaboratore" value={details.collaboratorName} />
                         <DetailItem label="Dispositivo" value={details.deviceName} />

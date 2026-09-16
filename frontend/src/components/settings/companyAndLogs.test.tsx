@@ -33,6 +33,13 @@ import CompanySettingsPanel from "./companySettingsPanel";
 import LogsSettingsPanel from "./logsSettingsPanel";
 import { renderWithProviders } from "@/test/render";
 
+/**
+ * I test che aprono menu e select di Radix con userEvent superano i 5 secondi di default quando
+ * girano insieme al resto della suite (da soli ne bastano due): stesso margine degli altri file
+ * con dialoghi e select.
+ */
+vi.setConfig({ testTimeout: 20000 });
+
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();

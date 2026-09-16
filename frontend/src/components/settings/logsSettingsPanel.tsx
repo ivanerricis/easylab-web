@@ -206,7 +206,7 @@ const LogsSettingsPanel = () => {
                     <>
                         <div className="flex flex-wrap items-center gap-2">
                             <Select value={selectedDayKey} onValueChange={setSelectedDayKey}>
-                                <SelectTrigger className="w-full sm:w-auto sm:min-w-[220px]">
+                                <SelectTrigger className="w-full data-[size=default]:h-10 sm:w-auto sm:min-w-[220px]">
                                     <SelectValue placeholder="Seleziona una data" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -218,8 +218,8 @@ const LogsSettingsPanel = () => {
                                 </SelectContent>
                             </Select>
 
+                            {/* Stessa altezza della ricerca accanto: 40px, come nelle barre delle liste. */}
                             <RefreshButton
-                                size="icon"
                                 onRefresh={handleRefresh}
                                 isRefreshing={isLoadingEntries || isLoadingFiles}
                                 label="Aggiorna elenco log"

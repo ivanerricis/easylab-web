@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -154,8 +154,12 @@ describe("ReportPage", () => {
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Mario Rossi");
         expect(document.title).toBe("Report #5 - Mario Rossi · EasyLab");
         expect(detailValue("Telefono")).toBe("06 123456");
-        // Il cliente porta alla sua scheda: prima era solo testo.
-        expect(screen.getByRole("link", { name: "Mario Rossi" })).toHaveAttribute("href", "/clients/30");
+        // Il nome del cliente nell'intestazione porta alla sua scheda; in anagrafica resta testo.
+        expect(
+            within(screen.getByRole("heading", { level: 1 })).getByRole("link", { name: "Mario Rossi" })
+        ).toHaveAttribute("href", "/clients/30");
+        expect(screen.getAllByRole("link", { name: "Mario Rossi" })).toHaveLength(1);
+        expect(detailValue("Cliente")).toBe("Mario Rossi");
         expect(detailValue("Dispositivo")).toBe("Notebook");
         expect(detailValue("Difetto catalogo")).toBe("Altro");
         expect(detailValue("Collaboratore")).toBe("Luca Bianchi");
@@ -274,7 +278,9 @@ describe("InterventionPage", () => {
         await renderPage();
 
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Mario Rossi");
-        expect(screen.getByRole("link", { name: "Mario Rossi" })).toHaveAttribute("href", "/clients/30");
+        expect(
+            within(screen.getByRole("heading", { level: 1 })).getByRole("link", { name: "Mario Rossi" })
+        ).toHaveAttribute("href", "/clients/30");
         expect(detailValue("Problema")).toBe("VPN non si collega");
         expect(detailValue("Note")).toBe("Chiamare dopo le 15");
         expect(detailValue("Descrizione")).toBe("-");

@@ -1,3 +1,4 @@
+import CustomerLink from "@/components/customer-link";
 import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro } from "@/lib/utils";
@@ -21,7 +22,7 @@ export const reportColumns: ReportColumn[] = [
         sortKey: "customer",
         hideable: false,
         cardSlot: "title",
-        render: (row) => row.customer,
+        render: (row) => <CustomerLink customerId={row.customerId} name={row.customer} tone="inherit" />,
     },
     {
         // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga

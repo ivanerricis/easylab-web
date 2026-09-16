@@ -33,7 +33,8 @@ const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }:
                     value={dateFrom ?? ""}
                     max={dateTo}
                     onChange={(event) => onDateFromChange(event.target.value || undefined)}
-                    className="w-36 sm:w-40"
+                    // 40px come gli altri controlli della barra (vedi `SearchInput`).
+                    className="h-10 w-36 sm:w-40"
                 />
                 <span className="text-sm text-muted-foreground">-</span>
                 <Input
@@ -42,13 +43,14 @@ const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }:
                     value={dateTo ?? ""}
                     min={dateFrom}
                     onChange={(event) => onDateToChange(event.target.value || undefined)}
-                    className="w-36 sm:w-40"
+                    className="h-10 w-36 sm:w-40"
                 />
             </div>
 
             {dateFrom || dateTo ? (
                 <Button
                     variant="ghost"
+                    size="lg"
                     className="gap-2 px-2 sm:ml-auto sm:px-4"
                     onClick={handleClearDates}
                     aria-label="Pulisci date"

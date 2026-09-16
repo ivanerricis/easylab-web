@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { LucideIcon } from "lucide-react";
@@ -46,7 +47,12 @@ const FilterSelect = <TValue extends string>({
 
     return (
         <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
-            <SelectTrigger className={isCompact ? "w-auto px-2" : "w-56"} aria-label={label}>
+            {/* 40px come gli altri controlli della barra (vedi `SearchInput`). L'altezza di serie
+                del trigger sta in `data-[size=default]:h-9`, che vince su un `h-10` semplice. */}
+            <SelectTrigger
+                className={cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")}
+                aria-label={label}
+            >
                 {isCompact ? <Icon className="size-4" /> : <SelectValue placeholder={label} />}
             </SelectTrigger>
             <SelectContent position="popper">

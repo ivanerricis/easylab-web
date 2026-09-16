@@ -1,3 +1,4 @@
+import CustomerLink from "@/components/customer-link";
 import type { EntityCardSlot } from "@/components/entity-card-list";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
@@ -39,7 +40,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
         key: "customer",
         header: "Cliente",
         cardSlot: "title",
-        render: (row) => row.customer,
+        render: (row) => <CustomerLink customerId={row.customerId} name={row.customer} tone="inherit" />,
     },
     {
         key: "customerPhone",
@@ -88,7 +89,7 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
         key: "customer",
         header: "Cliente",
         cardSlot: "title",
-        render: (row) => row.customer,
+        render: (row) => <CustomerLink customerId={row.customerId} name={row.customer} tone="inherit" />,
     },
     {
         key: "customerPhone",

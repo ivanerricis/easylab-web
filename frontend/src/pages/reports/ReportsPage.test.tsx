@@ -108,6 +108,13 @@ vi.mock("@/components/dialogs/edit/editReportDialog", () => ({
 }));
 
 import ReportsPage from "./ReportsPage";
+
+/**
+ * I test che aprono menu e select di Radix con userEvent superano i 5 secondi di default quando
+ * girano insieme al resto della suite (da soli ne bastano due): stesso margine degli altri file
+ * con dialoghi e select.
+ */
+vi.setConfig({ testTimeout: 20000 });
 import { renderWithProviders } from "@/test/render";
 import { currentLocation } from "@/test/currentLocation";
 import { LocationProbe } from "@/test/locationProbe";
@@ -371,6 +378,21 @@ describe("ReportsPage", () => {
         await userEvent.click(within(table()).getByRole("button", { name: "Stampa report 1" }));
 
         expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/1/print");
+    });
+
+    /** Il nome del cliente porta alla sua scheda; il doppio clic sul nome non apre anche il report. */
+    it("il nome del cliente nella riga è un link alla sua scheda", async () => {
+        await renderPage();
+
+        const link = within(table()).getByRole("link", { name: "Cliente 1" });
+        expect(link).toHaveAttribute("href", "/clients/30");
+
+        await userEvent.dblClick(link);
+        expect(navigate).not.toHaveBeenCalledWith("/reports/1");
+
+        // Sul resto della riga il doppio clic continua ad aprire il report.
+        await userEvent.dblClick(within(table()).getAllByText("Notebook")[0]);
+        expect(navigate).toHaveBeenCalledWith("/reports/1");
     });
 
     it("passa al dialogo di modifica il report e il nome del cliente", async () => {

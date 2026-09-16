@@ -11,6 +11,38 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Il cliente come link anche nelle righe; barre sopra le tabelle tutte alte uguali
+
+**Il cliente come link nelle liste, e nell'intestazione delle schede.** Nella voce precedente il
+nome del cliente era diventato un link solo nel riquadro "Anagrafica" delle schede di report e
+intervento. Ma il nome che si guarda per primo è quello in alto, accanto alla freccia per
+tornare indietro ("Report #5 - Mario Rossi"): il link ora sta lì, e l'anagrafica torna testo,
+così il cliente non compare come link due volte nella stessa pagina. Il nome è un link anche
+nelle righe delle liste di report e interventi e nelle tabelle delle schede di collaboratore e
+tecnico, compreso il titolo delle schede su mobile. Nelle righe il link tiene il colore della
+riga ed è segnato dalla sola sottolineatura: le righe sono colorate in base allo stato, e il blu
+dei link su rosso o verde si leggerebbe male. Il doppio clic sulla riga continua ad aprire il
+report; sul nome, il doppio clic non arriva alla riga (il primo clic ha già aperto il cliente).
+File: `customer-link.tsx`, `ReportPage.tsx`, `InterventionPage.tsx`, `report-columns.tsx`,
+`intervention-columns.tsx`, `collaborator-detail-columns.tsx`, `technician-detail-columns.tsx`.
+
+**Controlli sopra le tabelle alla stessa altezza.** Nella barra sopra le liste il pulsante
+Aggiorna e il menu Colonne erano alti 40px, mentre ricerca, filtri, campi data e "Pulisci
+date" restavano a 36px, l'altezza di serie dei componenti: la riga appariva a scalini. Ora sono
+tutti 40px, la misura dei pulsanti che c'erano già e la più comoda da toccare. Per i filtri
+l'altezza va scritta come `data-[size=default]:h-10`, perché quella di serie del trigger dei
+select sta su quel selettore e vince su un `h-10` semplice. Stesso allineamento nella barra dei
+log in Impostazioni, dove il pulsante Aggiorna era invece più piccolo (36px). File:
+`search-input.tsx`, `filter-select.tsx`, `date-range-filter.tsx`, `logsSettingsPanel.tsx`.
+
+**Test.** Il link nelle righe e il doppio clic (`ReportsPage.test.tsx`); il link
+nell'intestazione, uno solo per pagina (`detailPages.test.tsx`). Due file di test
+(`ReportsPage.test.tsx`, `companyAndLogs.test.tsx`) superavano i 5 secondi di default quando
+giravano con tutta la suite, pur passando da soli: hanno ora il margine di 20 secondi che
+avevano già gli altri file con dialoghi e select.
+
+---
+
 ## 2026-09-16 — Tabelle: ordinamento dalle intestazioni e menu "Colonne"; il cliente come link
 
 **Contesto.** Seconda parte della revisione dell'interfaccia (vedi la voce qui sotto): tre dei

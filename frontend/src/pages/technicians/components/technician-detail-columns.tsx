@@ -1,3 +1,4 @@
+import CustomerLink from "@/components/customer-link";
 import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro } from "@/lib/utils";
@@ -20,7 +21,7 @@ export const technicianReportColumns: EntityColumn<ReportDto>[] = [
         key: "customer",
         header: "Cliente",
         cardSlot: "title",
-        render: (row) => row.customer,
+        render: (row) => <CustomerLink customerId={row.customerId} name={row.customer} tone="inherit" />,
     },
     {
         key: "customerPhone",

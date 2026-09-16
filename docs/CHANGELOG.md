@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Pulsante "Pulisci date" sempre etichettato su mobile
+
+**Il problema.** Sotto il breakpoint `sm` (640px) il pulsante "Pulisci date" del filtro data
+(`frontend/src/components/filters/date-range-filter.tsx`, condiviso da Report e Interventi)
+mostrava solo l'icona: il testo aveva `className="hidden sm:inline"`. La riga dei filtri va a
+capo su schermi stretti e quel pulsante, senza testo, spesso finiva da solo sulla riga
+successiva, a sinistra, senza alcun collegamento visivo con i campi data sopra — sembrava
+un'icona rotta o fuori posto invece di un'azione riconoscibile. Verificato con Playwright
+(Edge, viewport 320–414px) sulla pagina Report da autenticato.
+
+**Cosa.** Rimosso `hidden sm:inline`: l'etichetta "Pulisci date" è sempre visibile, anche
+quando il pulsante va a capo da solo.
+
+**Il perché.** Il testo costa niente in più quando il pulsante è già su una riga tutta sua, e
+rende chiaro cosa fa senza bisogno di indovinare dall'icona.
+
+---
+
 ## 2026-09-16 — Aggiornamenti delle dipendenze automatizzati (Dependabot)
 
 **Il problema.** `npm audit` è pulito oggi su frontend e backend, ma è una foto dello stato

@@ -56,7 +56,9 @@ const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange }:
                     aria-label="Pulisci date"
                 >
                     <FilterX className="size-4" />
-                    <span className="hidden sm:inline">Pulisci date</span>
+                    {/* Sempre visibile: sotto `sm` questo pulsante può finire da solo a
+                        capo (vedi i commit di questo file), e senza testo sembra rotto. */}
+                    <span>Pulisci date</span>
                 </Button>
             ) : null}
         </>

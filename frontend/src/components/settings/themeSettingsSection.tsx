@@ -61,6 +61,11 @@ const optionButtonClasses = (isActive: boolean) =>
         isActive && "border-primary bg-primary/10 dark:border-primary dark:bg-primary/10"
     );
 
+// Sotto `sm` ogni riquadro mostra solo icona e titolo: la riga più chiara che spiega la scelta
+// (es. "Interfaccia luminosa e pulita.") si vede già dall'icona e dall'etichetta, ed è lei a
+// far crescere ogni pulsante più del necessario sui telefoni.
+const optionDescriptionClasses = "hidden text-xs font-normal text-muted-foreground sm:block";
+
 // Le barrette prendono i colori dalle variabili del livello: l'attributo qui sopra le
 // isola dall'intensità attiva, così ogni pulsante mostra davvero il proprio livello.
 const IntensityPreview = ({ intensityKey }: { intensityKey: TableRowIntensityKey }) => (
@@ -187,9 +192,7 @@ const ThemeSettingsSection = () => {
                                 <Icon className="mt-0.5 size-4 shrink-0" />
                                 <span className="grid gap-0.5">
                                     <span className="text-sm font-semibold">{option.label}</span>
-                                    <span className="text-xs font-normal text-muted-foreground">
-                                        {option.description}
-                                    </span>
+                                    <span className={optionDescriptionClasses}>{option.description}</span>
                                 </span>
                             </Button>
                         );
@@ -216,7 +219,7 @@ const ThemeSettingsSection = () => {
                             />
                             <span className="grid gap-0.5">
                                 <span className="text-sm font-semibold">{preset.label}</span>
-                                <span className="text-xs font-normal text-muted-foreground">{preset.description}</span>
+                                <span className={optionDescriptionClasses}>{preset.description}</span>
                             </span>
                         </Button>
                     ))}
@@ -239,7 +242,7 @@ const ThemeSettingsSection = () => {
                             <RadiusPreview radius={preset.radius} />
                             <span className="grid gap-0.5">
                                 <span className="text-sm font-semibold">{preset.label}</span>
-                                <span className="text-xs font-normal text-muted-foreground">{preset.description}</span>
+                                <span className={optionDescriptionClasses}>{preset.description}</span>
                             </span>
                         </Button>
                     ))}
@@ -262,9 +265,7 @@ const ThemeSettingsSection = () => {
                             <IntensityPreview intensityKey={intensity.key} />
                             <span className="grid gap-0.5">
                                 <span className="text-sm font-semibold">{intensity.label}</span>
-                                <span className="text-xs font-normal text-muted-foreground">
-                                    {intensity.description}
-                                </span>
+                                <span className={optionDescriptionClasses}>{intensity.description}</span>
                             </span>
                         </Button>
                     ))}
@@ -299,7 +300,7 @@ const ThemeSettingsSection = () => {
                             <DensityPreview densityKey={density.key} />
                             <span className="grid gap-0.5">
                                 <span className="text-sm font-semibold">{density.label}</span>
-                                <span className="text-xs font-normal text-muted-foreground">{density.description}</span>
+                                <span className={optionDescriptionClasses}>{density.description}</span>
                             </span>
                         </Button>
                     ))}
@@ -319,9 +320,7 @@ const ThemeSettingsSection = () => {
                             <FontSizePreview fontSizeKey={fontSize.key} />
                             <span className="grid gap-0.5">
                                 <span className="text-sm font-semibold">{fontSize.label}</span>
-                                <span className="text-xs font-normal text-muted-foreground">
-                                    {fontSize.description}
-                                </span>
+                                <span className={optionDescriptionClasses}>{fontSize.description}</span>
                             </span>
                         </Button>
                     ))}

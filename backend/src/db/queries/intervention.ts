@@ -145,6 +145,7 @@ export const listInterventions = async ({
             // intero: `problem` e `note`, che arrivano a 4000 caratteri, restano invece fuori
             // per non gonfiare ogni pagina dell'elenco con testo che nessuno legge lì.
             price: interventionTable.price,
+            paid: interventionTable.paid,
             status: interventionTable.status,
             interventionDate: interventionTable.interventionDate,
             startTime: interventionTable.startTime,

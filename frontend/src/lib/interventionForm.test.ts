@@ -8,6 +8,7 @@ const shared = {
     problem: "Rete assente",
     note: "Richiamare lunedì",
     price: 80,
+    paid: true,
     collaboratorId: 40,
     interventionDate: "2026-09-10",
     startTime: "09:00",

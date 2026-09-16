@@ -128,6 +128,7 @@ const storedIntervention = {
     description: "Consegnato alimentatore",
     problem: null,
     note: null,
+    paid: false,
     status: "programmato",
     interventionDate: "2026-01-10",
     startTime: null,
@@ -214,6 +215,7 @@ describe("interventions router", () => {
             endTime: "10:30",
             description: "Sostituito alimentatore",
             price: 120,
+            paid: true,
             createdAt: new Date("2026-01-10T10:00:00Z"),
         };
 
@@ -237,6 +239,7 @@ describe("interventions router", () => {
             expect(response.text).toContain("Intervento in sede");
             expect(response.text).toContain("Completato");
             expect(response.text).toContain("Sostituito alimentatore");
+            expect(response.text).toContain("Pagato");
         });
 
         /** Senza filtri l'export scarica tutto: `status` e `type` tornano a "all". */
@@ -526,6 +529,25 @@ describe("interventions router", () => {
 
             expect(response.status).toBe(201);
             expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ price: 45 }));
+        });
+
+        it("senza indicarlo il pagamento resta non pagato", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            await request(buildApp()).post("/api/interventions").send(minimalBody);
+
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ paid: false }));
+        });
+
+        it("crea un intervento già pagato", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...minimalBody, paid: true });
+
+            expect(response.status).toBe(201);
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ paid: true }));
         });
 
         it("rifiuta un prezzo negativo", async () => {

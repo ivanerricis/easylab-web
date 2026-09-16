@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Pagamento pagato/non pagato anche sugli interventi
+
+**Il problema.** I report distinguono da tempo se un lavoro è stato pagato, con tanto e carta
+come mezzo. Gli interventi non avevano nessuna traccia dell'incasso: un intervento con un
+prezzo indicato risultava identico, a schermo e in stampa, a uno mai saldato.
+
+**Cosa.** Colonna `paid` (booleana, default `false`) sulla tabella `intervention`
+(`0029_add_intervention_paid.sql`). A differenza dei report qui non conta il mezzo di
+pagamento, solo se è stato saldato: niente distinzione contanti/carta, quindi niente
+`payment_method` da tre valori. In lista e stampa non cambia nulla; l'esportazione CSV
+guadagna una colonna "Pagato" (Sì/No, come già fa `closed` sui report). In creazione e modifica
+compare un selettore "Pagamento" a due voci (Pagato/Non pagato), stessa resa a schermo del
+`PaymentMethodSelector` dei report ma in `paid-status-selector.tsx`, componente a parte perché
+le opzioni sono due e booleane, non tre stringhe. La scheda dell'intervento mostra lo stato
+accanto al prezzo.
+
+---
+
 ## 2026-09-16 — Fasi dell'aggiornamento visibili invece del solo spinner
 
 **Il problema.** `scripts/update-server.sh` attraversa già dei passaggi distinti (verifica

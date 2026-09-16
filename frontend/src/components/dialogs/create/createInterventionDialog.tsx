@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import InputWithAdd from "@/components/inputWithAdd";
 import DatePickerField from "@/components/date-picker-field";
+import PaidStatusSelector from "@/components/paid-status-selector";
 import { createCustomer, getApiErrorMessage, listCollaborators, listCustomers } from "@/lib/api";
 import {
     getInterventionValidationError,
@@ -53,6 +54,8 @@ export type CreateInterventionSubmitValues = {
     note: string | null;
     /** Facoltativo per qualunque tipo di intervento. */
     price: number | null;
+    /** A differenza dei report: solo pagato/non pagato, senza distinguere contanti/carta. */
+    paid: boolean;
     customer: string;
     customerId: number | null;
     collaboratorId: number;
@@ -90,6 +93,7 @@ const buildEmptyFormValues = (initialDate?: string) => ({
     problem: "",
     note: "",
     price: "",
+    paid: false,
     customer: "",
     collaboratorId: "",
     // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
@@ -214,6 +218,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 problem: isOnSite ? formValues.problem.trim() : null,
                 note: formValues.note.trim() || null,
                 price,
+                paid: formValues.paid,
                 customer: formValues.customer,
                 customerId: customerIdByOption[formValues.customer] ?? null,
                 collaboratorId: Number(formValues.collaboratorId),
@@ -414,6 +419,14 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                         }}
                                     />
                                     <FieldError id="price" error={errors.price} />
+                                </div>
+
+                                <div className="grid gap-1">
+                                    <Label className="text-lg">Pagamento</Label>
+                                    <PaidStatusSelector
+                                        value={formValues.paid}
+                                        onValueChange={(paid) => setFormValues((prev) => ({ ...prev, paid }))}
+                                    />
                                 </div>
 
                                 {isOnSite ? (

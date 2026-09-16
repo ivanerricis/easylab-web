@@ -77,6 +77,8 @@ const interventionBodySchema = z
         note: z.string().trim().max(4000).nullable().optional(),
         // Facoltativo: alcuni interventi (es. consegne materiale) non hanno un prezzo da segnare.
         price: z.coerce.number().int().min(0).nullable().optional(),
+        // A differenza dei report: solo pagato/non pagato, senza distinguere il mezzo.
+        paid: z.boolean().optional(),
         status: z.enum(interventionStatuses).optional(),
         customerId: z.coerce.number().int().positive(),
         collaboratorId: z.coerce.number().int().positive(),
@@ -263,6 +265,7 @@ interventionsRouter.get("/export.csv", validate({ query: interventionExportQuery
         { header: "Ora fine", value: (intervention) => intervention.endTime },
         { header: "Descrizione", value: (intervention) => intervention.description },
         { header: "Prezzo", value: (intervention) => intervention.price },
+        { header: "Pagato", value: (intervention) => intervention.paid },
         { header: "Creato il", value: (intervention) => intervention.createdAt },
     ]);
 
@@ -448,6 +451,7 @@ interventionsRouter.post("/", validate({ body: interventionCreateBodySchema }), 
         problem: isOnSite ? (req.body.problem ?? null) : null,
         note: req.body.note || null,
         price: req.body.price ?? null,
+        paid: req.body.paid ?? false,
         status: req.body.status ?? "programmato",
         customerId: req.body.customerId,
         collaboratorId: req.body.collaboratorId,

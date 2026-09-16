@@ -131,6 +131,8 @@ export const interventionDateLabel = (value: InterventionType) =>
 
 export const formatInterventionTime = (value: string | null) => (value ? value.slice(0, 5) : "-");
 
+export const formatPaidStatus = (value: boolean) => (value ? "Pagato" : "Non pagato");
+
 export const getTodayDateString = () => {
     const now = new Date();
     const year = now.getFullYear();

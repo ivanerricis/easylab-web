@@ -12,6 +12,8 @@ export type InterventionEntityDto = {
     note: string | null;
     /** Facoltativo per qualunque tipo di intervento. */
     price: number | null;
+    /** A differenza dei report: solo pagato/non pagato, senza distinguere contanti/carta. */
+    paid: boolean;
     status: InterventionStatus;
     interventionDate: string | null;
     startTime: string | null;
@@ -28,6 +30,7 @@ export type InterventionCreateInput = {
     problem?: string | null;
     note?: string | null;
     price?: number | null;
+    paid?: boolean;
     status?: InterventionStatus;
     customerId: number;
     collaboratorId: number;

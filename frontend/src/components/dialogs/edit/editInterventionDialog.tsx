@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import DatePickerField from "@/components/date-picker-field";
+import PaidStatusSelector from "@/components/paid-status-selector";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
     getInterventionValidationError,
@@ -48,6 +49,8 @@ export type EditInterventionSubmitValues = {
     note: string | null;
     /** Facoltativo per qualunque tipo di intervento. */
     price: number | null;
+    /** A differenza dei report: solo pagato/non pagato, senza distinguere contanti/carta. */
+    paid: boolean;
     collaboratorId: number;
     interventionDate: string | null;
     startTime: string | null;
@@ -95,6 +98,7 @@ const EditInterventionDialog = ({
         problem: "",
         note: "",
         price: "",
+        paid: false,
         collaboratorId: "",
         interventionDate: "",
         startTime: "",
@@ -138,6 +142,7 @@ const EditInterventionDialog = ({
                     problem: intervention.problem ?? "",
                     note: intervention.note ?? "",
                     price: intervention.price != null ? String(intervention.price) : "",
+                    paid: intervention.paid,
                     collaboratorId: String(intervention.collaboratorId),
                     interventionDate: intervention.interventionDate ?? "",
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
@@ -205,6 +210,7 @@ const EditInterventionDialog = ({
                 problem: isOnSite ? formValues.problem.trim() : null,
                 note: formValues.note.trim() || null,
                 price,
+                paid: formValues.paid,
                 collaboratorId,
                 interventionDate: formValues.interventionDate,
                 startTime: isOnSite ? formValues.startTime || null : null,
@@ -389,6 +395,14 @@ const EditInterventionDialog = ({
                                             }}
                                         />
                                         <FieldError id="price" error={errors.price} />
+                                    </div>
+
+                                    <div className="grid gap-1">
+                                        <Label className="text-lg">Pagamento</Label>
+                                        <PaidStatusSelector
+                                            value={formValues.paid}
+                                            onValueChange={(paid) => setFormValues((prev) => ({ ...prev, paid }))}
+                                        />
                                     </div>
 
                                     {isOnSite ? (

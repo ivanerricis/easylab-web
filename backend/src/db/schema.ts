@@ -273,6 +273,11 @@ export const interventionTable = pgTable(
         note: text("note"),
         /** Facoltativo: alcuni interventi (es. consegne materiale) non hanno un prezzo da segnare. */
         price: integer("price"),
+        /**
+         * A differenza dei report, qui non conta il mezzo (contanti/carta): solo se
+         * l'intervento è stato pagato o no.
+         */
+        paid: boolean("paid").notNull().default(false),
         status: varchar("status", { length: 20 }).notNull().default("programmato"),
         interventionDate: date("intervention_date"),
         startTime: time("start_time"),

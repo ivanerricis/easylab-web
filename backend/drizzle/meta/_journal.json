@@ -204,6 +204,13 @@
       "when": 1776370005000,
       "tag": "0028_add_session_user_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776370006000,
+      "tag": "0029_add_intervention_paid",
+      "breakpoints": true
     }
   ]
 }

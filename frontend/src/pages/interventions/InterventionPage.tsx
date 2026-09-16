@@ -25,6 +25,7 @@ import {
     formatInterventionStatus,
     formatInterventionTime,
     formatInterventionType,
+    formatPaidStatus,
     isOnSiteInterventionType,
 } from "@/lib/interventions";
 import { ArrowLeft, Pencil, Printer } from "lucide-react";
@@ -305,6 +306,7 @@ const InterventionPage = () => {
                             label="Prezzo"
                             value={details.intervention.price != null ? formatEuro(details.intervention.price) : "-"}
                         />
+                        <DetailItem label="Pagamento" value={formatPaidStatus(details.intervention.paid)} />
                         <DetailItem label="Creato il" value={formatDateTime(details.intervention.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"

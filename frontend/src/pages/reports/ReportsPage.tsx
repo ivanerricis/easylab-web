@@ -5,8 +5,6 @@ import { toReportUpdatePayload } from "@/lib/reportForm";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
 import {
     createReportTechnician,
     createReport,
@@ -14,7 +12,6 @@ import {
     deleteReport,
     getApiErrorMessage,
     getReportPrintUrl,
-    getReportsExportUrl,
     updateReport,
     updateReportTechnician,
 } from "@/lib/api";
@@ -202,33 +199,16 @@ const ReportsPage = () => {
         openPrintWindow(getReportPrintUrl(id));
     };
 
-    const handleExportReports = () => {
-        const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer" | "totalPrice", "asc" | "desc"];
-
-        window.location.href = getReportsExportUrl({
-            search: searchText,
-            visibility: visibilityFilter,
-            dateFrom,
-            dateTo,
-            sortBy,
-            sortOrder,
-        });
-    };
-
     return (
         <div className="relative flex h-full min-h-0 w-full flex-col gap-4">
             <>
                 <PageHeader
                     title="Report"
                     description="Gestisci i report del laboratorio."
+                    // L'esportazione CSV sta in Impostazioni → Esportazione: è un'operazione
+                    // sull'archivio, non una delle azioni quotidiane di questa pagina.
                     action={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button type="button" variant="outline" onClick={handleExportReports}>
-                                <Download className="size-4" />
-                                Esporta CSV
-                            </Button>
-                            <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
-                        </div>
+                        <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
                     }
                 />
 

@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
     deleteUser: vi.fn(),
     listUserSessions: vi.fn(),
     revokeUserSession: vi.fn(),
+    listOwnSessions: vi.fn(),
+    revokeOwnSession: vi.fn(),
     disableUserTwoFactor: vi.fn(),
     getTwoFactorStatus: vi.fn(),
     startTwoFactorSetup: vi.fn(),
@@ -70,6 +72,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     refresh.mockResolvedValue(undefined);
     api.listRecentFailedLogins.mockResolvedValue([]);
+    api.listOwnSessions.mockResolvedValue([]);
 });
 
 describe("UsersSettingsSection", () => {
@@ -183,12 +186,19 @@ describe("UsersSettingsSection", () => {
                 id: "hash-corrente",
                 createdAt: "2026-09-14T10:00:00.000Z",
                 expiresAt: "2026-09-21T10:00:00.000Z",
+                lastSeenAt: new Date().toISOString(),
+                device: "Chrome su Windows",
                 isCurrent: true,
             },
             {
                 id: "hash-altro",
                 createdAt: "2026-09-10T08:00:00.000Z",
                 expiresAt: "2026-09-17T08:00:00.000Z",
+                // Aperta giorni fa e mai più usata: è il caso che prima risultava attivo come
+                // gli altri, e che ora il dialogo deve marcare come inattivo.
+                lastSeenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+                // Le sessioni aperte prima che l'header venisse salvato non hanno dispositivo.
+                device: null,
                 isCurrent: false,
             },
         ]);
@@ -201,6 +211,10 @@ describe("UsersSettingsSection", () => {
         expect(api.listUserSessions).toHaveBeenCalledWith(2);
 
         await within(dialog).findByText("(questa sessione)");
+        within(dialog).getByText("Chrome su Windows");
+        within(dialog).getByText("Dispositivo sconosciuto");
+        within(dialog).getByText("In uso adesso");
+        within(dialog).getByText("Ultimo utilizzo 3 giorni fa (inattiva)");
         const disconnectButtons = within(dialog).getAllByRole("button", { name: "Disconnetti" });
         expect(disconnectButtons[0]).toBeDisabled();
         await userEvent.click(disconnectButtons[1]);

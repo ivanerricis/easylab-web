@@ -18,6 +18,19 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   di cliente, collaboratore e tecnico, citate nella stessa voce, sono state coperte il 09-10 e
   il 09-11.
 
+- Nome scelto per il dispositivo di una sessione. Oggi l'elenco di Impostazioni → Utenti mostra
+  l'etichetta ricavata dallo `User-Agent` ("Chrome su Windows", vedi CHANGELOG del 2026-09-16):
+  basta finché i dispositivi di una persona si distinguono fra loro, non se ha due macchine
+  uguali (due PC Windows con Chrome), dove le due righe restano identiche. La strada *non* è un
+  nome sulla sessione — dura al massimo sette giorni e muore al logout, quindi andrebbe riscritto
+  a ogni accesso — ma un'identità di dispositivo: un secondo cookie di lunga durata
+  (`__Host-device`, un id casuale) più una tabella `user_device(user_id, device_id, nome)` a cui
+  la sessione si collega, così il nome sopravvive ai login. Da tenere presente: il nome può
+  darlo solo chi è su quel dispositivo (un amministratore che guarda le sessioni altrui non sa
+  quale sia il portatile di chi), e cancellare i cookie fa comparire un dispositivo nuovo senza
+  nome. Rimandato il 2026-09-16 dopo averlo valutato: si fa se in pratica due macchine risultano
+  indistinguibili.
+
 **Prestazioni**
 - Ricerca libera su report e interventi: la condizione `OR` attraversa cinque tabelle, quindi il
   database non può usare gli indici trigram e la scansione cresce con l'archivio. Soluzione

@@ -27,7 +27,6 @@ import { pdfStyles } from "./pdf/shared";
 import {
     createCustomerInterventionsPdfBuffer,
     createInterventionPdfBuffer,
-    formatInterventionType,
     type CustomerInterventionSummaryItem,
     type CustomerInterventionsPrintData,
     type InterventionPrintData,
@@ -104,14 +103,6 @@ const captureCustomerInterventionsDoc = async (customer: CustomerInterventionsPr
     await createCustomerInterventionsPdfBuffer(customer);
     return createPdf.mock.calls[0][0] as Record<string, unknown>;
 };
-
-describe("formatInterventionType", () => {
-    it("mappa ciascun valore di InterventionType nella sua etichetta italiana", () => {
-        expect(formatInterventionType("consegna_materiale")).toBe("Consegna materiale");
-        expect(formatInterventionType("intervento_sede")).toBe("Intervento in sede");
-        expect(formatInterventionType("intervento_remoto")).toBe("Intervento da remoto");
-    });
-});
 
 describe("createInterventionPdfBuffer", () => {
     it("carica il logo del laboratorio e risolve nel buffer prodotto da pdfmake", async () => {

@@ -16,11 +16,13 @@ import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
 import { buildInterventionEmail } from "../services/interventionEmail";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
+import { formatInterventionStatus, formatInterventionType } from "../services/interventionLabels";
 import { loadPrintableLogo } from "../services/logoManager";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
+import { toCsv } from "../services/csv";
 
 const interventionsRouter = Router();
 
@@ -192,6 +194,79 @@ interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), a
     });
 
     sendListResponse(res, interventions, page, pageSize);
+});
+
+// Come in `reports.ts`: gli stessi filtri della lista meno pagina e dimensione pagina, perché
+// l'export scarichi tutto ciò che li passa e non una schermata sola.
+const interventionExportQuerySchema = interventionListQuerySchema.omit({ page: true, pageSize: true });
+
+// Prima di "/:id": un percorso a un solo segmento come "/export.csv" finirebbe altrimenti
+// nella rotta del dettaglio, che lo rifiuterebbe come id non numerico.
+interventionsRouter.get("/export.csv", validate({ query: interventionExportQuerySchema }), async (req, res) => {
+    const {
+        search,
+        status,
+        type,
+        dateFrom,
+        dateTo,
+        scheduledFrom,
+        scheduledTo,
+        collaboratorId,
+        customerId,
+        sortBy,
+        sortOrder,
+    } = req.query as unknown as {
+        search?: string;
+        status?: "all" | (typeof interventionStatuses)[number];
+        type?: "all" | InterventionType;
+        dateFrom?: string;
+        dateTo?: string;
+        scheduledFrom?: string;
+        scheduledTo?: string;
+        collaboratorId?: number;
+        customerId?: number;
+        sortBy?: (typeof interventionSortFields)[number];
+        sortOrder?: "asc" | "desc";
+    };
+
+    const interventions = await listInterventions({
+        search,
+        status: status ?? "all",
+        type: type ?? "all",
+        dateFrom,
+        dateTo,
+        scheduledFrom,
+        scheduledTo,
+        collaboratorId,
+        customerId,
+        sortBy,
+        sortOrder,
+        timeZone: await getAppTimeZone(),
+    });
+    const rows = Array.isArray(interventions) ? interventions : interventions.items;
+
+    const csv = toCsv(rows, [
+        { header: "ID", value: (intervention) => intervention.id },
+        { header: "Cliente", value: (intervention) => intervention.customer },
+        { header: "Telefono cliente", value: (intervention) => intervention.customerPhone },
+        { header: "Collaboratore", value: (intervention) => intervention.collaborator },
+        { header: "Tipo", value: (intervention) => formatInterventionType(intervention.type as InterventionType) },
+        {
+            header: "Stato",
+            value: (intervention) =>
+                formatInterventionStatus(intervention.status as (typeof interventionStatuses)[number]),
+        },
+        { header: "Data intervento", value: (intervention) => intervention.interventionDate },
+        { header: "Ora inizio", value: (intervention) => intervention.startTime },
+        { header: "Ora fine", value: (intervention) => intervention.endTime },
+        { header: "Descrizione", value: (intervention) => intervention.description },
+        { header: "Prezzo", value: (intervention) => intervention.price },
+        { header: "Creato il", value: (intervention) => intervention.createdAt },
+    ]);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=interventi.csv");
+    res.send(csv);
 });
 
 interventionsRouter.get("/stats", async (_req, res) => {

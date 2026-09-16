@@ -56,6 +56,46 @@ export function formatDate(value: string | null | undefined) {
     }).format(date);
 }
 
+/**
+ * "5 minuti fa", "2 giorni fa": la distanza da adesso, per i dati in cui conta quanto sono
+ * recenti più della data esatta (l'ultimo utilizzo di una sessione, per esempio). Sotto il
+ * minuto non si scrive "0 minuti fa" ma "adesso", e le date future — orologi non allineati
+ * fra browser e server — si appiattiscono lì invece di diventare "fra 3 secondi".
+ */
+export function formatRelativeTime(value: string | null | undefined, now: Date = new Date()) {
+    if (!value) {
+        return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "-";
+    }
+
+    const elapsedSeconds = Math.round((now.getTime() - date.getTime()) / 1000);
+    if (elapsedSeconds < 60) {
+        return "adesso";
+    }
+
+    const formatter = new Intl.RelativeTimeFormat("it-IT", { numeric: "always" });
+    const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+        ["minute", 60],
+        ["hour", 60 * 60],
+        ["day", 24 * 60 * 60],
+        ["month", 30 * 24 * 60 * 60],
+        ["year", 365 * 24 * 60 * 60],
+    ];
+
+    let [unit, seconds] = steps[0];
+    for (const [stepUnit, stepSeconds] of steps) {
+        if (elapsedSeconds >= stepSeconds) {
+            [unit, seconds] = [stepUnit, stepSeconds];
+        }
+    }
+
+    return formatter.format(-Math.floor(elapsedSeconds / seconds), unit);
+}
+
 export function formatFileSize(sizeBytes: number) {
     if (sizeBytes < 1024) {
         return `${sizeBytes} B`;

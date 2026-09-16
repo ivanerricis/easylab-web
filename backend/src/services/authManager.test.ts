@@ -434,6 +434,35 @@ describe("login", () => {
         expect(JSON.stringify(inserted?.values)).not.toContain(token);
     });
 
+    /** Serve a distinguere due accessi dello stesso utente da macchine diverse: l'etichetta
+     * la ricava `describeUserAgent` al momento della lettura, qui si fissa che l'header
+     * dell'accesso venga davvero registrato, ripulito e tagliato alla colonna. */
+    it("registra il dispositivo da cui è stato fatto l'accesso", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        await login(
+            "mario",
+            "password-giusta",
+            "1.2.3.4",
+            `Mozilla/5.0 (Windows NT 10.0)
+${"x".repeat(400)}`
+        );
+
+        const inserted = dbCalls.find((call) => call.op === "insert" && call.table === sessionTable);
+        expect(inserted?.values?.userAgent).toBe(`Mozilla/5.0 (Windows NT 10.0) ${"x".repeat(400)}`.slice(0, 255));
+    });
+
+    it("senza header non inventa un dispositivo", async () => {
+        queueRows("select", userTable, [buildUser()]);
+        queueAdminIdLookup(1);
+
+        await login("mario", "password-giusta", "1.2.3.4");
+
+        const inserted = dbCalls.find((call) => call.op === "insert" && call.table === sessionTable);
+        expect(inserted?.values?.userAgent).toBeNull();
+    });
+
     it("è amministratore solo l'utente con l'id più basso", async () => {
         queueRows("select", userTable, [buildUser({ id: 7 })]);
         queueAdminIdLookup(7);
@@ -502,6 +531,7 @@ describe("login", () => {
 describe("getSessionUser", () => {
     const sessionRow = (overrides: Record<string, unknown> = {}) => ({
         expiresAt: new Date(Date.now() + 60_000),
+        lastSeenAt: new Date(),
         id: 7,
         username: "mario",
         created_at: new Date("2026-01-01T00:00:00Z"),
@@ -566,6 +596,27 @@ describe("getSessionUser", () => {
 
         expect(user).toBeNull();
         expect(dbCalls.some((call) => call.op === "delete" && call.table === sessionTable)).toBe(true);
+    });
+
+    /**
+     * La colonna serve a distinguere, nell'elenco delle sessioni, quella in uso da quella
+     * aperta e poi abbandonata: senza questa scrittura resterebbero identiche.
+     */
+    it("segna l'ultimo utilizzo quando è passato abbastanza tempo", async () => {
+        queueRows("select", sessionTable, [sessionRow({ lastSeenAt: new Date(Date.now() - 10 * 60 * 1000) })]);
+
+        await getSessionUser("token-in-chiaro");
+
+        const update = dbCalls.find((call) => call.op === "update" && call.table === sessionTable);
+        expect(update?.values?.lastSeenAt).toBeInstanceOf(Date);
+    });
+
+    it("non riscrive l'ultimo utilizzo a ogni richiesta", async () => {
+        queueRows("select", sessionTable, [sessionRow({ lastSeenAt: new Date(Date.now() - 60 * 1000) })]);
+
+        await getSessionUser("token-in-chiaro");
+
+        expect(dbCalls.some((call) => call.op === "update")).toBe(false);
     });
 
     it("token sconosciuto: nessun utente e niente da cancellare", async () => {
@@ -1087,11 +1138,17 @@ describe("listSessionsForUser / revokeSession", () => {
                 tokenHash: currentTokenHash,
                 createdAt: new Date("2026-01-02T00:00:00Z"),
                 expiresAt: new Date("2026-01-09T00:00:00Z"),
+                lastSeenAt: new Date("2026-01-05T10:00:00Z"),
+                userAgent:
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             },
             {
                 tokenHash: "altro-hash",
                 createdAt: new Date("2026-01-01T00:00:00Z"),
                 expiresAt: new Date("2026-01-08T00:00:00Z"),
+                lastSeenAt: new Date("2026-01-01T00:10:00Z"),
+                // Aperta prima che l'header venisse salvato: fuori esce `device: null`.
+                userAgent: null,
             },
         ]);
 
@@ -1102,12 +1159,16 @@ describe("listSessionsForUser / revokeSession", () => {
                 id: currentTokenHash,
                 createdAt: "2026-01-02T00:00:00.000Z",
                 expiresAt: "2026-01-09T00:00:00.000Z",
+                lastSeenAt: "2026-01-05T10:00:00.000Z",
+                device: "Chrome su Windows",
                 isCurrent: true,
             },
             {
                 id: "altro-hash",
                 createdAt: "2026-01-01T00:00:00.000Z",
                 expiresAt: "2026-01-08T00:00:00.000Z",
+                lastSeenAt: "2026-01-01T00:10:00.000Z",
+                device: null,
                 isCurrent: false,
             },
         ]);
@@ -1120,6 +1181,7 @@ describe("listSessionsForUser / revokeSession", () => {
                 tokenHash: "hash-uno",
                 createdAt: new Date("2026-01-01T00:00:00Z"),
                 expiresAt: new Date("2026-01-08T00:00:00Z"),
+                lastSeenAt: new Date("2026-01-01T00:00:00Z"),
             },
         ]);
 

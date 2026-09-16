@@ -18,6 +18,8 @@ vi.mock("../services/authManager", () => ({
     regenerateRecoveryCodes: vi.fn(),
     changeOwnPassword: vi.fn(),
     deleteSession: vi.fn(),
+    listSessionsForUser: vi.fn(),
+    revokeSession: vi.fn(),
 }));
 
 import {
@@ -28,8 +30,10 @@ import {
     disableTwoFactor,
     getSessionUser,
     getTwoFactorStatus,
+    listSessionsForUser,
     login,
     regenerateRecoveryCodes,
+    revokeSession,
     startTwoFactorSetup,
 } from "../services/authManager";
 import authRouter from "./auth";
@@ -363,6 +367,49 @@ describe("PUT /api/auth/password", () => {
 
         expect(response.status).toBe(401);
         expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+});
+
+describe("le proprie sessioni", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+    });
+
+    it("elenca le sessioni dell'utente della sessione corrente, non un id passato dal chiamante", async () => {
+        vi.mocked(listSessionsForUser).mockResolvedValue([]);
+
+        const response = await request(buildApp()).get("/api/auth/sessions").set("Cookie", sessionCookie("un-token"));
+
+        expect(response.status).toBe(200);
+        expect(listSessionsForUser).toHaveBeenCalledWith(publicUser.id, "un-token");
+    });
+
+    it("senza sessione risponde 401", async () => {
+        const response = await request(buildApp()).get("/api/auth/sessions");
+
+        expect(response.status).toBe(401);
+        expect(listSessionsForUser).not.toHaveBeenCalled();
+    });
+
+    it("revoca una propria sessione", async () => {
+        const sessionId = "a".repeat(64);
+
+        const response = await request(buildApp())
+            .delete(`/api/auth/sessions/${sessionId}`)
+            .set("Cookie", sessionCookie("un-token"));
+
+        expect(response.status).toBe(204);
+        expect(revokeSession).toHaveBeenCalledWith(publicUser.id, sessionId);
+    });
+
+    it("rifiuta un id di sessione che non è uno sha256 esadecimale", async () => {
+        const response = await request(buildApp())
+            .delete("/api/auth/sessions/non-un-hash")
+            .set("Cookie", sessionCookie("un-token"));
+
+        expect(response.status).toBe(400);
+        expect(revokeSession).not.toHaveBeenCalled();
     });
 });
 

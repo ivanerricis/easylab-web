@@ -8,6 +8,7 @@ vi.mock("@/components/settings/securitySettingsSection", () => ({ default: () =>
 vi.mock("@/components/settings/usersSettingsSection", () => ({ default: () => <h2>Sezione utenti</h2> }));
 vi.mock("@/components/settings/companySettingsPanel", () => ({ default: () => <h2>Sezione azienda</h2> }));
 vi.mock("@/components/settings/emailSettingsPanel", () => ({ default: () => <h2>Sezione email</h2> }));
+vi.mock("@/components/settings/exportSettingsSection", () => ({ default: () => <h2>Sezione esportazione</h2> }));
 vi.mock("@/components/settings/backupSettingsPanel", () => ({ default: () => <h2>Sezione backup</h2> }));
 vi.mock("@/components/settings/updateSettingsPanel", () => ({ default: () => <h2>Sezione aggiornamenti</h2> }));
 vi.mock("@/components/settings/logsSettingsPanel", () => ({ default: () => <h2>Sezione log</h2> }));
@@ -55,10 +56,13 @@ describe("SettingsPage", () => {
      * Le sezioni sulla macchina (backup, log, SMTP, aggiornamenti...) il backend le riserva
      * all'amministratore: a un altro utente risponderebbero solo 403, quindi non si mostrano.
      */
-    it("a chi non è amministratore mostra solo tema e sicurezza", () => {
+    it("a chi non è amministratore mostra solo tema, sicurezza ed esportazione", () => {
         renderPage("/settings", user);
 
-        expect(sectionButtons()).toEqual(["Tema", "Sicurezza"]);
+        // L'esportazione CSV c'è per tutti: le rotte `export.csv` non sono riservate
+        // all'amministratore, e prima del trasloco in Impostazioni il pulsante stava nelle
+        // pagine Clienti e Report, che ogni utente apre.
+        expect(sectionButtons()).toEqual(["Tema", "Sicurezza", "Esportazione"]);
     });
 
     it("ignora nell'indirizzo una sezione che l'utente non può aprire", () => {
@@ -77,6 +81,7 @@ describe("SettingsPage", () => {
             "Utenti",
             "Azienda",
             "Email",
+            "Esportazione",
             "Backup",
             "Aggiornamenti",
             "Log",

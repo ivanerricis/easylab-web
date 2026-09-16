@@ -198,6 +198,73 @@ describe("interventions router", () => {
         });
     });
 
+    describe("GET /export.csv", () => {
+        // Riga così come la restituisce `listInterventions` non paginato: cliente e
+        // collaboratore già come nomi, non come id.
+        const exportInterventionRow = {
+            id: 4,
+            customer: "Mario Rossi",
+            customerPhone: "02 1234567",
+            collaborator: "Luigi Verdi",
+            type: "intervento_sede",
+            status: "completato",
+            interventionDate: "2026-01-15",
+            startTime: "09:00",
+            endTime: "10:30",
+            description: "Sostituito alimentatore",
+            price: 120,
+            createdAt: new Date("2026-01-10T10:00:00Z"),
+        };
+
+        it("esporta con i filtri passati e le etichette italiane di tipo e stato", async () => {
+            vi.mocked(listInterventions).mockResolvedValue([exportInterventionRow] as never);
+
+            const response = await request(buildApp()).get(
+                "/api/interventions/export.csv?status=completato&type=intervento_sede&dateFrom=2026-01-01&dateTo=2026-01-31"
+            );
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-type"]).toContain("text/csv");
+            expect(response.headers["content-disposition"]).toContain("interventi.csv");
+            expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({
+                status: "completato",
+                type: "intervento_sede",
+                dateFrom: "2026-01-01",
+                dateTo: "2026-01-31",
+            });
+            expect(response.text).toContain("Intervento in sede");
+            expect(response.text).toContain("Completato");
+            expect(response.text).toContain("Sostituito alimentatore");
+        });
+
+        /** Senza filtri l'export scarica tutto: `status` e `type` tornano a "all". */
+        it("senza filtri scarica l'archivio intero", async () => {
+            vi.mocked(listInterventions).mockResolvedValue({ items: [exportInterventionRow], totalItems: 1 } as never);
+
+            const response = await request(buildApp()).get("/api/interventions/export.csv");
+
+            expect(response.status).toBe(200);
+            expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({ status: "all", type: "all" });
+        });
+
+        /** La rotta sta prima di "/:id": senza, "export.csv" finirebbe nel dettaglio. */
+        it("non viene scambiata per il dettaglio di un intervento", async () => {
+            vi.mocked(listInterventions).mockResolvedValue([] as never);
+
+            const response = await request(buildApp()).get("/api/interventions/export.csv");
+
+            expect(response.status).toBe(200);
+            expect(getInterventionDetailById).not.toHaveBeenCalled();
+        });
+
+        it("rifiuta un filtro di stato che non esiste", async () => {
+            const response = await request(buildApp()).get("/api/interventions/export.csv?status=annullato");
+
+            expect(response.status).toBe(400);
+            expect(listInterventions).not.toHaveBeenCalled();
+        });
+    });
+
     describe("GET /stats", () => {
         it("restituisce il conteggio per stato", async () => {
             vi.mocked(getInterventionStats).mockResolvedValue({

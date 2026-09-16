@@ -186,6 +186,20 @@ export const sessionTable = pgTable(
             .references(() => userTable.id, { onDelete: "cascade" }),
         expiresAt: timestamp("expires_at").notNull(),
         createdAt: timestamp("created_at").defaultNow().notNull(),
+        /**
+         * Ultima richiesta autenticata fatta con questo token. Senza, l'elenco delle sessioni
+         * non distingueva quella in uso da quella aperta giorni fa su un browser mai più
+         * riaperto: entrambe risultavano "attive" fino alla scadenza. Aggiornato al massimo
+         * una volta ogni `sessionTouchIntervalMs` (vedi authManager), per non trasformare
+         * ogni richiesta in una scrittura.
+         */
+        lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+        /**
+         * L'header `User-Agent` del login, grezzo: `describeUserAgent` lo traduce in
+         * "Chrome su Windows" a ogni lettura, così migliorare le regole migliora anche le
+         * sessioni già aperte. Nullable perché le sessioni nate prima non l'hanno.
+         */
+        userAgent: varchar("user_agent", { length: 255 }),
     },
     (table) => [index("session_user_id_idx").on(table.userId)]
 );

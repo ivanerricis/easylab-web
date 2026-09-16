@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { SessionDto } from "./users";
 
 export type UserDto = {
     id: number;
@@ -52,4 +53,11 @@ export type ChangePasswordInput = {
 
 export const changeOwnPassword = async (payload: ChangePasswordInput) => {
     await api.put("/auth/password", payload);
+};
+
+/** Le proprie sessioni aperte. La versione per l'admin, su un altro utente, sta in `users.ts`. */
+export const listOwnSessions = async () => (await api.get<SessionDto[]>("/auth/sessions")).data;
+
+export const revokeOwnSession = async (sessionId: string) => {
+    await api.delete(`/auth/sessions/${encodeURIComponent(sessionId)}`);
 };

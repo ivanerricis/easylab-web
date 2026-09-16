@@ -1,10 +1,8 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { LogOut } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
-import { Button } from "@/components/ui/button";
+import SessionsList from "@/components/settings/sessionsList";
 import { getApiErrorMessage, listUserSessions, revokeUserSession, type SessionDto, type UserDto } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
 
 type Props = {
     open: boolean;
@@ -13,11 +11,16 @@ type Props = {
 };
 
 /**
- * Non c'è IP né dispositivo in tabella (`session` ha solo l'hash del token e le due date):
- * qui si mostra solo quello che il server sa davvero, non un dato inventato o dedotto.
+ * Quello che il server sa davvero e niente di più: l'hash del token (mai il cookie), le date,
+ * l'ultimo utilizzo e il dispositivo ricavato dallo User-Agent del login. Nessun IP, nessuna
+ * posizione: non sono in tabella e non si inventano.
  */
+
 const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
     const [sessions, setSessions] = useState<SessionDto[]>([]);
+    /** Il momento della lettura: l'età di una sessione si misura da lì, non da un `Date.now()`
+     * chiamato mentre si disegna, che cambierebbe risultato a ogni re-render. */
+    const [loadedAt, setLoadedAt] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [revokingId, setRevokingId] = useState<string | null>(null);
 
@@ -29,7 +32,9 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
         setIsLoading(true);
 
         try {
-            setSessions(await listUserSessions(user.id));
+            const loaded = await listUserSessions(user.id);
+            setSessions(loaded);
+            setLoadedAt(Date.now());
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile caricare le sessioni"));
         } finally {
@@ -75,43 +80,14 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
             cancelLabel="Chiudi"
             onCancel={() => onOpenChange(false)}
             content={
-                <div className="grid gap-2 py-2">
-                    {isLoading ? (
-                        <p className="text-sm text-muted-foreground">Caricamento sessioni...</p>
-                    ) : sessions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nessuna sessione aperta.</p>
-                    ) : (
-                        sessions.map((session) => (
-                            <div
-                                key={session.id}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/15 bg-muted/20 p-3"
-                            >
-                                <div className="grid gap-0.5 text-sm">
-                                    <span className="font-medium">
-                                        Aperta il {formatDateTime(session.createdAt)}
-                                        {session.isCurrent ? (
-                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                                (questa sessione)
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        Scade il {formatDateTime(session.expiresAt)}
-                                    </span>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={session.isCurrent || revokingId === session.id}
-                                    onClick={() => void handleRevoke(session)}
-                                >
-                                    <LogOut className="size-4" />
-                                    Disconnetti
-                                </Button>
-                            </div>
-                        ))
-                    )}
+                <div className="py-2">
+                    <SessionsList
+                        sessions={sessions}
+                        isLoading={isLoading}
+                        loadedAt={loadedAt}
+                        revokingId={revokingId}
+                        onRevoke={(session) => void handleRevoke(session)}
+                    />
                 </div>
             }
         />

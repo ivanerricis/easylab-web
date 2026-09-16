@@ -8,7 +8,16 @@ vi.mock("sonner", () => ({
     },
 }));
 
-import { cn, formatDate, formatDateTime, formatEuro, formatFileSize, openPrintWindow, trimOrNull } from "./utils";
+import {
+    cn,
+    formatDate,
+    formatDateTime,
+    formatEuro,
+    formatFileSize,
+    formatRelativeTime,
+    openPrintWindow,
+    trimOrNull,
+} from "./utils";
 
 beforeEach(() => {
     toastError.mockClear();
@@ -37,6 +46,28 @@ describe("formatDate / formatDateTime", () => {
             expect(format("")).toBe("-");
             expect(format("non è una data")).toBe("-");
         }
+    });
+});
+
+describe("formatRelativeTime", () => {
+    const now = new Date(2026, 8, 16, 12, 0, 0);
+    const agoIso = (seconds: number) => new Date(now.getTime() - seconds * 1000).toISOString();
+
+    it("sceglie l'unità in base alla distanza da adesso", () => {
+        expect(formatRelativeTime(agoIso(30), now)).toBe("adesso");
+        expect(formatRelativeTime(agoIso(5 * 60), now)).toBe("5 minuti fa");
+        expect(formatRelativeTime(agoIso(3 * 60 * 60), now)).toBe("3 ore fa");
+        expect(formatRelativeTime(agoIso(2 * 24 * 60 * 60), now)).toBe("2 giorni fa");
+        expect(formatRelativeTime(agoIso(60 * 24 * 60 * 60), now)).toBe("2 mesi fa");
+    });
+
+    it("non guarda al futuro se l'orologio del server è avanti", () => {
+        expect(formatRelativeTime(agoIso(-120), now)).toBe("adesso");
+    });
+
+    it("mostra un trattino per un valore assente o non valido", () => {
+        expect(formatRelativeTime(null, now)).toBe("-");
+        expect(formatRelativeTime("non è una data", now)).toBe("-");
     });
 });
 

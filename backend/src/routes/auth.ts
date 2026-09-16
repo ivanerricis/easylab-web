@@ -7,8 +7,10 @@ import {
     deleteSession,
     disableTwoFactor,
     getTwoFactorStatus,
+    listSessionsForUser,
     login,
     regenerateRecoveryCodes,
+    revokeSession,
     startTwoFactorSetup,
 } from "../services/authManager";
 import {
@@ -65,6 +67,16 @@ const twoFactorPasswordAndCodeBodySchema = z
     })
     .strict();
 
+const sessionParamsSchema = z
+    .object({
+        // sha256 esadecimale, la stessa forma con cui la sessione è salvata in tabella.
+        sessionId: z
+            .string()
+            .trim()
+            .regex(/^[0-9a-f]{64}$/),
+    })
+    .strict();
+
 /**
  * Le rotte che gestiscono il *proprio* secondo fattore. `requirePasswordChangeCompleted` va
  * ripetuto qui a mano: è applicato su `/api` dopo questo router, che quindi ne sarebbe
@@ -76,7 +88,7 @@ const twoFactorGuards = [requireAuth, requirePasswordChangeCompleted] as const;
 
 authRouter.post("/login", validate({ body: loginBodySchema }), async (req, res) => {
     const { username, password } = req.body as { username: string; password: string };
-    const result = await login(username, password, getClientIp(req));
+    const result = await login(username, password, getClientIp(req), req.get("user-agent"));
 
     if (result.status === "twoFactorRequired") {
         // Nessun cookie: finché il secondo fattore manca non esiste una sessione. Il
@@ -92,7 +104,7 @@ authRouter.post("/login", validate({ body: loginBodySchema }), async (req, res) 
 
 authRouter.post("/login/2fa", validate({ body: twoFactorLoginBodySchema }), async (req, res) => {
     const { challengeId, code } = req.body as { challengeId: string; code: string };
-    const result = await completeTwoFactorLogin(challengeId, code, getClientIp(req));
+    const result = await completeTwoFactorLogin(challengeId, code, getClientIp(req), req.get("user-agent"));
 
     if (result.status !== "authenticated") {
         // Irraggiungibile: `completeTwoFactorLogin` o autentica o solleva. Il ramo esiste
@@ -124,6 +136,25 @@ authRouter.put("/password", requireAuth, validate({ body: passwordBodySchema }),
 
     await changeOwnPassword(req.user!.id, currentPassword, newPassword, currentToken);
     res.status(204).send();
+});
+
+/**
+ * Le proprie sessioni aperte, non quelle di un altro utente: a differenza delle rotte
+ * gemelle sotto `/api/users/:id/sessions` (riservate all'admin), qui basta `requireAuth`,
+ * perché `listSessionsForUser`/`revokeSession` filtrano già per `req.user!.id` e non per un
+ * id passato dal chiamante.
+ */
+authRouter.get("/sessions", requireAuth, async (req, res) => {
+    const currentToken = req.cookies?.[sessionCookieName] as string | undefined;
+
+    res.json(await listSessionsForUser(req.user!.id, currentToken));
+});
+
+authRouter.delete("/sessions/:sessionId", requireAuth, validate({ params: sessionParamsSchema }), async (req, res) => {
+    const { sessionId } = req.params as unknown as { sessionId: string };
+
+    await revokeSession(req.user!.id, sessionId);
+    res.status(204).end();
 });
 
 authRouter.get("/2fa", ...twoFactorGuards, async (req, res) => {

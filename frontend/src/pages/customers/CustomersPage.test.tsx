@@ -152,15 +152,11 @@ describe("CustomersPage", () => {
         expect(navigate).toHaveBeenCalledWith("/clients/3");
     });
 
-    it("esporta i clienti in CSV rispettando la ricerca corrente", async () => {
-        const location = { ...window.location, href: "" };
-        Object.defineProperty(window, "location", { value: location, configurable: true });
+    /** L'esportazione è passata in Impostazioni → Esportazione: qui non deve ricomparire. */
+    it("non ha il pulsante di esportazione", async () => {
         await renderPage();
 
-        await userEvent.type(screen.getByPlaceholderText("Cerca cliente..."), "mario");
-        await userEvent.click(screen.getByRole("button", { name: "Esporta CSV" }));
-
-        expect(location.href).toBe('export:{"search":"mario"}');
+        expect(screen.queryByRole("button", { name: /Esporta/ })).not.toBeInTheDocument();
     });
 
     it("elimina dopo la conferma con il nome nella domanda", async () => {

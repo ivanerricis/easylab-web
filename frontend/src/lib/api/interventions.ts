@@ -116,6 +116,25 @@ export const deleteIntervention = async (id: number) =>
 
 export const getInterventionPrintUrl = (id: number) => api.getUri({ url: `/interventions/${id}/print` });
 
+/** Gli stessi filtri della lista, meno pagina e dimensione pagina: esporta tutto ciò che li passa. */
+export type InterventionExportParams = Pick<
+    ListInterventionsParams,
+    "status" | "type" | "dateFrom" | "dateTo" | "collaboratorId" | "customerId"
+>;
+
+export const getInterventionsExportUrl = (params?: InterventionExportParams) =>
+    api.getUri({
+        url: "/interventions/export.csv",
+        params: {
+            status: params?.status,
+            type: params?.type,
+            dateFrom: params?.dateFrom,
+            dateTo: params?.dateTo,
+            collaboratorId: params?.collaboratorId,
+            customerId: params?.customerId,
+        },
+    });
+
 export const sendInterventionEmail = async (id: number) =>
     (await api.post<{ message: string }>(`/interventions/${id}/send-email`)).data;
 

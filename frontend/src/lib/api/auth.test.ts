@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { changeOwnPassword, getMe, login, logout, verifyTwoFactorLogin } from "./auth";
+import { changeOwnPassword, getMe, listOwnSessions, login, logout, revokeOwnSession, verifyTwoFactorLogin } from "./auth";
 import {
     disableTwoFactor,
     enableTwoFactor,
@@ -68,6 +68,27 @@ describe("login", () => {
         expect(post).toHaveBeenCalledWith("/auth/logout");
         expect(get).toHaveBeenCalledWith("/auth/me");
         expect(put).toHaveBeenCalledWith("/auth/password", { currentPassword: "a", newPassword: "b" });
+    });
+});
+
+describe("le proprie sessioni", () => {
+    it("usa le rotte /auth/sessions", async () => {
+        const session = {
+            id: "a".repeat(64),
+            createdAt: "2026-01-01T00:00:00.000Z",
+            expiresAt: "2026-01-08T00:00:00.000Z",
+            lastSeenAt: "2026-01-01T00:00:00.000Z",
+            device: "Chrome su Windows",
+            isCurrent: true,
+        };
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: [session] });
+        const del = vi.spyOn(api, "delete").mockResolvedValue({ data: undefined });
+
+        await expect(listOwnSessions()).resolves.toEqual([session]);
+        await revokeOwnSession(session.id);
+
+        expect(get).toHaveBeenCalledWith("/auth/sessions");
+        expect(del).toHaveBeenCalledWith(`/auth/sessions/${session.id}`);
     });
 });
 

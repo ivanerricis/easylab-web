@@ -137,6 +137,11 @@ export const listInterventions = async ({
             id: interventionTable.id,
             type: interventionTable.type,
             description: interventionTable.description,
+            // Nell'elenco a schermo non si vede, ma è una delle colonne dell'esportazione CSV,
+            // che parte proprio da questa query per avere gli stessi filtri della lista. È un
+            // intero: `problem` e `note`, che arrivano a 4000 caratteri, restano invece fuori
+            // per non gonfiare ogni pagina dell'elenco con testo che nessuno legge lì.
+            price: interventionTable.price,
             status: interventionTable.status,
             interventionDate: interventionTable.interventionDate,
             startTime: interventionTable.startTime,

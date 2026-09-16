@@ -4,10 +4,8 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import PageHeader from "@/components/page-header";
 import TablePagination from "@/components/table-pagination";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download } from "lucide-react";
 import {
     createCustomer,
     deleteCustomer,
@@ -15,7 +13,6 @@ import {
     updateCustomer,
     getCustomerReportsPrintUrl,
     getCustomerInterventionsPrintUrl,
-    getCustomersExportUrl,
 } from "@/lib/api";
 import { useState } from "react";
 import type { CustomerDto } from "@/types/dtos";
@@ -102,10 +99,6 @@ const CustomersPage = () => {
         navigate(`/clients/${id}`);
     };
 
-    const handleExportCustomers = () => {
-        window.location.href = getCustomersExportUrl({ search: searchText });
-    };
-
     const handlePrintCustomer = (id: number) => {
         setPrintKind("reports");
         setPrintCustomerId(id);
@@ -147,15 +140,9 @@ const CustomersPage = () => {
             <PageHeader
                 title="Clienti"
                 description="Gestisci i clienti del laboratorio."
-                action={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button type="button" variant="outline" onClick={handleExportCustomers}>
-                            <Download className="size-4" />
-                            Esporta CSV
-                        </Button>
-                        <CreateEntityButton label="Crea nuovo cliente" onClick={() => setIsCreateDialogOpen(true)} />
-                    </div>
-                }
+                // L'esportazione CSV sta in Impostazioni → Esportazione: è un'operazione
+                // sull'archivio, non una delle azioni quotidiane di questa pagina.
+                action={<CreateEntityButton label="Crea nuovo cliente" onClick={() => setIsCreateDialogOpen(true)} />}
             />
 
             {isCreateDialogOpen && (

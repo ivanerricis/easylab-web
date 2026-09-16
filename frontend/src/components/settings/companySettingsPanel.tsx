@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
     uploadLogo,
     type CompanySettingsInput,
 } from "@/lib/api";
+import TimeZoneField from "@/components/settings/timeZoneField";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
 import { formatDateTime } from "@/lib/utils";
 
@@ -63,9 +64,6 @@ const CompanySettingsPanel = () => {
     const logoInputRef = useRef<HTMLInputElement>(null);
 
     const isDirty = isSettingsFormDirty(formValues, savedValues);
-    // Tutti i fusi che il browser conosce, per i suggerimenti del campo: sono gli stessi nomi IANA
-    // che il server accetta.
-    const timeZoneOptions = useMemo(() => Intl.supportedValuesOf("timeZone"), []);
     const selectedTimeZone = formValues.timeZone.trim() ? canonicalTimeZone(formValues.timeZone) : null;
 
     const loadSettings = async () => {
@@ -247,24 +245,13 @@ const CompanySettingsPanel = () => {
                             <SettingsFieldRow>
                                 <SettingsField>
                                     <Label htmlFor="companyTimeZone">Fuso orario</Label>
-                                    <Input
+                                    <TimeZoneField
                                         id="companyTimeZone"
-                                        list="companyTimeZoneOptions"
-                                        placeholder="es: Europe/Rome"
-                                        autoComplete="off"
+                                        value={formValues.timeZone}
+                                        onValueChange={(timeZone) => setFormValues((prev) => ({ ...prev, timeZone }))}
                                         aria-invalid={formValues.timeZone.trim() !== "" && !selectedTimeZone}
                                         aria-describedby="companyTimeZoneHint"
-                                        value={formValues.timeZone}
-                                        onChange={(event) =>
-                                            setFormValues((prev) => ({ ...prev, timeZone: event.target.value }))
-                                        }
                                     />
-                                    {/* Nascosto, non occupa righe della griglia: dà solo i suggerimenti. */}
-                                    <datalist id="companyTimeZoneOptions">
-                                        {timeZoneOptions.map((timeZone) => (
-                                            <option key={timeZone} value={timeZone} />
-                                        ))}
-                                    </datalist>
                                 </SettingsField>
                             </SettingsFieldRow>
 

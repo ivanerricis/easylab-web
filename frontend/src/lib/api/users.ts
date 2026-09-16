@@ -32,6 +32,10 @@ export type SessionDto = {
     id: string;
     createdAt: string;
     expiresAt: string;
+    /** Ultima richiesta fatta con questa sessione: distingue quelle vive dalle abbandonate. */
+    lastSeenAt: string;
+    /** "Chrome su Windows": lo ricava il server dallo User-Agent del login, `null` se non basta. */
+    device: string | null;
     isCurrent: boolean;
 };
 

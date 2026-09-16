@@ -211,16 +211,11 @@ describe("ReportsPage", () => {
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ visibility: "open" }));
     });
 
-    it("esporta i report in CSV con lo stesso filtro di stato e l'ordinamento correnti", async () => {
-        const location = { ...window.location, href: "" };
-        Object.defineProperty(window, "location", { value: location, configurable: true });
-        await renderPage("/reports?visibility=closed");
+    /** L'esportazione è passata in Impostazioni → Esportazione: qui non deve ricomparire. */
+    it("non ha il pulsante di esportazione", async () => {
+        await renderPage();
 
-        await userEvent.click(screen.getByRole("button", { name: "Esporta CSV" }));
-
-        expect(location.href).toBe(
-            'export:{"search":"","visibility":"closed","sortBy":"createdAt","sortOrder":"desc"}'
-        );
+        expect(screen.queryByRole("button", { name: /Esporta/ })).not.toBeInTheDocument();
     });
 
     it("apre la scheda e stampa dalla riga", async () => {

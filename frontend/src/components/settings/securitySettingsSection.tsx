@@ -1,8 +1,9 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsCard, SettingsEmptyBox, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
+import SessionsList from "@/components/settings/sessionsList";
 import RecoveryCodesDialog from "@/components/dialogs/settings/recoveryCodesDialog";
 import TwoFactorConfirmDialog from "@/components/dialogs/settings/twoFactorConfirmDialog";
 import TwoFactorSetupDialog from "@/components/dialogs/settings/twoFactorSetupDialog";
@@ -12,9 +13,12 @@ import {
     disableTwoFactor,
     getApiErrorMessage,
     getTwoFactorStatus,
+    listOwnSessions,
     listRecentFailedLogins,
     regenerateRecoveryCodes,
+    revokeOwnSession,
     type LogEntryDto,
+    type SessionDto,
     type TwoFactorStatusDto,
 } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
@@ -34,6 +38,47 @@ const SecuritySettingsSection = () => {
     const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
     const [failedLogins, setFailedLogins] = useState<LogEntryDto[] | null>(null);
     const [isLoadingFailedLogins, setIsLoadingFailedLogins] = useState(false);
+    const [sessions, setSessions] = useState<SessionDto[]>([]);
+    const [sessionsLoadedAt, setSessionsLoadedAt] = useState(0);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+    const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+
+    const loadSessions = useCallback(async () => {
+        setIsLoadingSessions(true);
+
+        try {
+            setSessions(await listOwnSessions());
+            setSessionsLoadedAt(Date.now());
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile caricare le sessioni"));
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        startTransition(() => {
+            void loadSessions();
+        });
+    }, [loadSessions]);
+
+    const handleRevokeSession = async (session: SessionDto) => {
+        if (revokingSessionId) {
+            return;
+        }
+
+        setRevokingSessionId(session.id);
+
+        try {
+            await revokeOwnSession(session.id);
+            setSessions((prev) => prev.filter((existing) => existing.id !== session.id));
+            toast.success("Sessione disconnessa");
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile disconnettere la sessione"));
+        } finally {
+            setRevokingSessionId(null);
+        }
+    };
 
     const loadFailedLogins = async () => {
         setIsLoadingFailedLogins(true);
@@ -189,6 +234,27 @@ const SecuritySettingsSection = () => {
                         )}
                     </div>
                 )}
+            </SettingsCard>
+
+            <SettingsCard
+                title="Le tue sessioni"
+                description="Gli accessi aperti col tuo account, su questo e altri dispositivi."
+                action={
+                    <RefreshButton
+                        size="icon"
+                        onRefresh={loadSessions}
+                        isRefreshing={isLoadingSessions}
+                        label="Aggiorna sessioni"
+                    />
+                }
+            >
+                <SessionsList
+                    sessions={sessions}
+                    isLoading={isLoadingSessions}
+                    loadedAt={sessionsLoadedAt}
+                    revokingId={revokingSessionId}
+                    onRevoke={(session) => void handleRevokeSession(session)}
+                />
             </SettingsCard>
 
             {user?.isAdmin ? (

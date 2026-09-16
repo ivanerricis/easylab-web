@@ -84,14 +84,20 @@ describe("CompanySettingsPanel", () => {
         expect(save).toBeDisabled();
     });
 
-    it("salva il fuso orario scelto, nel suo nome canonico", async () => {
+    it("sceglie il fuso orario da tutto l'elenco IANA, non solo da quello impostato", async () => {
         await renderPanel();
         const timeZone = screen.getByLabelText("Fuso orario");
-        expect(timeZone).toHaveValue("Europe/Rome");
+        expect(timeZone).toHaveTextContent("Europe/Rome");
         expect(screen.getByText(/Adesso lì sono le/)).toBeInTheDocument();
 
-        await userEvent.clear(timeZone);
-        await userEvent.type(timeZone, "asia/tokyo");
+        await userEvent.click(timeZone);
+        // Il motivo per cui il campo è cambiato: con il `<datalist>` di prima, aperto sul valore
+        // corrente, il browser mostrava solo i suggerimenti che combaciavano con "Europe/Rome".
+        const options = within(screen.getByRole("listbox", { name: "Fusi orari" })).getAllByRole("option");
+        expect(options.length).toBeGreaterThan(100);
+
+        await userEvent.type(screen.getByLabelText("Cerca fuso orario"), "tokyo");
+        await userEvent.click(screen.getByRole("option", { name: /Asia\/Tokyo/ }));
         await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
 
         await waitFor(() => {
@@ -99,16 +105,24 @@ describe("CompanySettingsPanel", () => {
         });
     });
 
-    it("rifiuta un fuso orario inventato senza chiamare il server", async () => {
+    it("cerca anche per città, senza il trattino basso del nome IANA", async () => {
         await renderPanel();
-        const timeZone = screen.getByLabelText("Fuso orario");
 
-        await userEvent.clear(timeZone);
-        await userEvent.type(timeZone, "Europa/Roma");
+        await userEvent.click(screen.getByLabelText("Fuso orario"));
+        await userEvent.type(screen.getByLabelText("Cerca fuso orario"), "buenos aires");
 
-        expect(timeZone).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByRole("option", { name: /Buenos_Aires/ })).toBeInTheDocument();
+    });
+
+    /** Il fuso arriva dal server: se è uno che il browser non conosce, il salvataggio si ferma. */
+    it("rifiuta un fuso orario che il browser non riconosce, senza chiamare il server", async () => {
+        api.getCompanySettings.mockResolvedValue({ ...company, timeZone: "Europa/Roma" });
+        await renderPanel();
+
+        expect(screen.getByLabelText("Fuso orario")).toHaveAttribute("aria-invalid", "true");
         expect(screen.getByText(/Fuso orario non riconosciuto/)).toBeInTheDocument();
 
+        await userEvent.type(screen.getByLabelText("Nome"), "!");
         await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
 
         expect(toast.error).toHaveBeenCalledWith("Scegli un fuso orario dall'elenco, per esempio Europe/Rome");

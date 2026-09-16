@@ -1,9 +1,10 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSearchParams } from "react-router-dom";
-import { Building2, Database, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
+import { Building2, Database, FileDown, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
 import BackupSettingsPanel from "@/components/settings/backupSettingsPanel";
 import CompanySettingsPanel from "@/components/settings/companySettingsPanel";
 import EmailSettingsPanel from "@/components/settings/emailSettingsPanel";
+import ExportSettingsSection from "@/components/settings/exportSettingsSection";
 import LogsSettingsPanel from "@/components/settings/logsSettingsPanel";
 import UpdateSettingsPanel from "@/components/settings/updateSettingsPanel";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,8 @@ import ThemeSettingsSection from "@/components/settings/themeSettingsSection";
 import UsersSettingsSection from "@/components/settings/usersSettingsSection";
 import { useAuth } from "@/components/use-auth";
 
-type SettingsSectionKey = "theme" | "security" | "users" | "company" | "email" | "backup" | "update" | "logs";
+type SettingsSectionKey =
+    "theme" | "security" | "users" | "company" | "email" | "export" | "backup" | "update" | "logs";
 
 const settingsSectionKeys: SettingsSectionKey[] = [
     "theme",
@@ -22,6 +24,7 @@ const settingsSectionKeys: SettingsSectionKey[] = [
     "users",
     "company",
     "email",
+    "export",
     "backup",
     "update",
     "logs",
@@ -62,6 +65,12 @@ const settingsSections: Array<{
         label: "Email",
         description: "Configurazione SMTP per l'invio email",
         icon: Mail,
+    },
+    {
+        key: "export",
+        label: "Esportazione",
+        description: "Scarica clienti e report in CSV",
+        icon: FileDown,
     },
     {
         key: "backup",
@@ -175,6 +184,8 @@ const SettingsPage = () => {
                     <CompanySettingsPanel />
                 ) : activeSection === "email" ? (
                     <EmailSettingsPanel />
+                ) : activeSection === "export" ? (
+                    <ExportSettingsSection />
                 ) : activeSection === "backup" ? (
                     <BackupSettingsPanel />
                 ) : activeSection === "update" && user?.isAdmin ? (

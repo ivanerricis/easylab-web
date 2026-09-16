@@ -11,6 +11,134 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Le proprie sessioni gestibili da Sicurezza, non solo dall'admin su un altro utente
+
+**Cosa.** `UserSessionsDialog` (vedere e disconnettere le sessioni aperte di un account) era
+raggiungibile solo dal pannello Utenti, riservato all'amministratore: un utente normale non
+aveva modo di vedere da dove aveva effettuato l'accesso, né di disconnettere un dispositivo
+perso, senza chiedere all'admin.
+
+Nuove rotte self-service in `authRouter`
+([`auth.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/auth.ts)) —
+`GET /api/auth/sessions` e `DELETE /api/auth/sessions/:sessionId` — che riusano
+`listSessionsForUser`/`revokeSession` di `authManager.ts` ma con `req.user!.id`, non un id
+passato dal chiamante: bastano `requireAuth`, senza `requireAdmin`, perché il filtro
+sull'utente proprietario è già dentro la query e non nel router. Nuova card "Le tue sessioni"
+in
+[`securitySettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/securitySettingsSection.tsx),
+visibile a chiunque, come il resto della pagina Sicurezza.
+
+Il markup dell'elenco — la logica "inattiva" oltre le 24 ore, l'etichetta del dispositivo, il
+pulsante disabilitato sulla sessione corrente — era scritto una sola volta dentro
+`userSessionsDialog.tsx`: estratto in
+[`sessionsList.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/sessionsList.tsx),
+condiviso fra il dialogo dell'admin e la nuova card, così le due viste restano identiche per
+costruzione invece che per copia-incolla.
+
+**Il perché.** Individuato rivedendo cosa manca nelle Impostazioni: l'endpoint e il componente
+per vedere le proprie sessioni esistevano già per l'admin su un altro utente, ma non su sé
+stessi — un buco di funzionalità, non di sicurezza (nessun dato era esposto a chi non doveva
+vederlo), quindi da colmare senza toccare i permessi altrove.
+
+---
+
+## 2026-09-16 — Esportazione CSV (anche degli interventi) in Impostazioni; fuso orario scegliibile fra tutti
+
+**Cosa.** Tre richieste dell'utente nella stessa sessione.
+
+1. **L'esportazione CSV trasloca.** I pulsanti "Esporta CSV" stavano nell'intestazione delle
+   pagine Clienti e Report, accanto a "Crea nuovo": scaricare l'archivio è un'operazione sui
+   dati, non una delle azioni quotidiane di quelle pagine, che intanto si erano riempite di
+   pulsanti. Nuova sezione "Esportazione" in Impostazioni
+   ([`exportSettingsSection.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/exportSettingsSection.tsx)),
+   con una card per i clienti, una per i report e — nuova, prima non esisteva in nessuna forma —
+   una per gli **interventi** (`GET /api/interventions/export.csv`, con gli stessi filtri della
+   lista meno pagina e dimensione pagina, come già fa la rotta dei report). Per le altre due le
+   rotte del server non cambiano.
+   Il filtro non si è perso nel trasloco, è diventato esplicito: stato, tipo (solo interventi) e
+   periodo, riusando `DateRangeFilter`. È sparita invece la ricerca libera, che prima filtrava
+   anche l'export: in un file da archiviare "quello che stavo cercando" non è un criterio.
+   La sezione è visibile a tutti e non solo all'amministratore, perché `GET /api/*/export.csv`
+   non è mai stata una rotta riservata e prima il pulsante stava in pagine che tutti aprono.
+
+   Due conseguenze sul backend. `listInterventions` seleziona anche `price`, che nell'elenco a
+   schermo non si vede ma è una colonna del CSV: è un intero, mentre `problem` e `note` (4000
+   caratteri l'uno) restano fuori per non gonfiare ogni pagina dell'elenco. E le etichette
+   italiane di tipo e stato sono uscite da `interventionPdf.ts` — che per servirle trascinava
+   dentro pdfmake, tanto che i test di email e CSV dovevano mockarlo — verso il nuovo
+   [`interventionLabels.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionLabels.ts),
+   senza dipendenze: una mappa sola per PDF, email e CSV.
+2. **Fuso orario: si vedono tutti.** Il campo conteneva già l'elenco IANA completo, ma come
+   `<datalist>` di un `<input>`: il browser mostra solo i suggerimenti che combaciano con il
+   testo già presente, quindi con "Europe/Rome" dentro ne compariva uno solo e l'elenco sembrava
+   avere una voce sola. Nuovo
+   [`timeZoneField.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/timeZoneField.tsx):
+   un selettore con ricerca separata dal valore, che apre tutti i 418 fusi con il loro
+   scostamento da GMT accanto. La ricerca ignora `/` e `_`, così "buenos aires" trova
+   `America/Buenos_Aires`. Gli scostamenti sono in cache: un `Intl.DateTimeFormat` per riga a
+   ogni battuta si sentiva. Nessuna dipendenza nuova: Popover e Input erano già in casa.
+
+**Il perché.** Richieste dell'utente: "l'esportazione in csv dei dati non deve stare nelle pagine
+report e cliente", poi "negli export non sarebbe meglio anche mettere gli interventi?" (erano
+l'unica delle tre entità principali senza esportazione), e infine "nella sezione Azienda vedo che
+c'è solo Europe/Rome, popoliamolo con tutti i fusi orari". Il secondo caso è istruttivo: i dati c'erano già tutti, era il controllo a farli
+sembrare uno solo.
+
+---
+
+## 2026-09-16 — Sessioni: si vede quale è viva, quale abbandonata e da quale dispositivo; header allineato alle pagine
+
+**Cosa.** L'elenco "Sessioni attive" mostrava solo apertura e scadenza, e ogni riga sembrava
+uguale alle altre: una sessione aperta giorni fa su un browser chiuso senza fare logout
+risultava attiva come quella in uso, e restava lì per i sette giorni della scadenza.
+
+1. **Ultimo utilizzo.** Nuova colonna `session.last_seen_at`
+   ([`0027_add_session_last_seen.sql`](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0027_add_session_last_seen.sql)),
+   scritta da `getSessionUser` — l'unico punto attraversato da ogni richiesta autenticata — al
+   massimo una volta ogni cinque minuti per sessione, perché il tocco non trasformi ogni lettura
+   dell'applicazione in una scrittura. Le righe già esistenti partono dalla data di apertura, il
+   dato più prudente. Il dialogo
+   ([`userSessionsDialog.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/settings/userSessionsDialog.tsx))
+   mostra "In uso adesso" per la propria e "Ultimo utilizzo N giorni fa" per le altre, con
+   l'etichetta "(inattiva)" e il bordo tratteggiato oltre le 24 ore: si capisce a colpo d'occhio
+   quale disconnettere. L'elenco è ordinato per ultimo utilizzo, non più per data di apertura.
+2. **Niente sessioni scadute nell'elenco.** `listSessionsForUser` filtra `expiresAt > now()`:
+   la pulizia periodica gira ogni ora, e nel frattempo le righe già scadute comparivano fra
+   quelle aperte. Il filtro le esclude a prescindere da quando è passata la pulizia.
+3. **Dispositivo della sessione.** Al login si registra l'header `User-Agent`
+   ([`0028_add_session_user_agent.sql`](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0028_add_session_user_agent.sql)),
+   l'unico indizio sul dispositivo che il browser manda da sé: niente IP, niente posizione.
+   In tabella finisce l'header grezzo (ripulito dai caratteri di controllo e tagliato a 255
+   caratteri, perché un header assurdo non faccia fallire il login) e la traduzione in
+   "Chrome su Windows" avviene a ogni lettura in
+   [`deviceLabel.ts`](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/deviceLabel.ts):
+   migliorare le regole migliora anche le sessioni già aperte. Il riconoscimento è volutamente
+   grossolano — nessuna versione, nessuna libreria di parsing da tenere aggiornata — e l'ordine
+   dei controlli conta, perché ogni Chromium scrive anche "Safari" e ogni derivato di Chrome
+   scrive anche "Chrome". Quando non si riconosce niente l'interfaccia dice "Dispositivo
+   sconosciuto" invece di inventare: è il caso delle sessioni aperte prima di questo
+   aggiornamento. Resta un'indicazione e non una prova — l'header lo sceglie il client — quindi
+   non entra in nessuna decisione di sicurezza.
+4. **Header allineato.** L'intestazione dell'applicazione aveva `px-2` mentre `<main>` ha `p-3`:
+   il pulsante del menu e il badge utente stavano 4px più vicini al bordo dello schermo del
+   contenuto sottostante. Su mobile, dove le schede arrivano a filo dei due bordi, lo scalino era
+   evidente ([`MainLayout.tsx`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/MainLayout.tsx)).
+
+Nel giro è nato anche `formatRelativeTime` in
+[`lib/utils.ts`](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/utils.ts)
+("adesso", "5 minuti fa", "2 giorni fa"): le date future — orologi non allineati fra browser e
+server — si appiattiscono su "adesso" invece di diventare "fra 3 secondi".
+
+**Il perché.** Segnalazione dell'utente: "nella sezione sicurezza mi porta per ogni utente più
+sessioni come è giusto che sia, ma anche quelle vecchie risultano attive". Il problema non era
+il conteggio — più sessioni per utente sono normali, non c'è alcun limite di accessi
+contemporanei — ma il fatto che nulla distinguesse quelle vive dalle abbandonate. Il dispositivo
+è arrivato dalla domanda successiva ("c'è un modo per specificare il dispositivo della
+sessione?"): fra due accessi dello stesso utente è il dato che permette di riconoscere il
+proprio.
+
+---
+
 ## 2026-09-15 — Sessioni per utente, export CSV di clienti e report, accessi falliti in Sicurezza
 
 **Cosa.** Tre buchi delle Impostazioni segnalati dall'utente, chiusi nella stessa sessione:

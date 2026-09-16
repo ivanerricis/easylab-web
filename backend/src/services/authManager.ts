@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
-import { and, asc, desc, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { sessionTable, userTable } from "../db/schema";
 import {
@@ -21,6 +21,7 @@ import {
     registerSuccessfulLogin,
     rememberLoginSource,
 } from "./loginRateLimit";
+import { describeUserAgent, sanitizeUserAgent } from "./deviceLabel";
 import { generateCompliantPassword } from "./passwordPolicy";
 import { generateRecoveryCodes, hashRecoveryCode, looksLikeRecoveryCode } from "./recoveryCodes";
 import { buildOtpauthUri, generateTotpSecret, verifyTotp } from "./totp";
@@ -42,6 +43,12 @@ const scryptKeyLength = 64;
 const sessionTokenBytes = 32;
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
 const sessionCleanupIntervalMs = 60 * 60 * 1000;
+/**
+ * Ogni quanto si riscrive `lastSeenAt` di una sessione in uso. Aggiornarlo a ogni richiesta
+ * significherebbe una scrittura per ogni lettura dell'applicazione; con cinque minuti la
+ * colonna resta abbastanza precisa per distinguere una sessione viva da una abbandonata.
+ */
+const sessionTouchIntervalMs = 5 * 60 * 1000;
 
 export class AuthManagerError extends ApiError {}
 
@@ -271,16 +278,29 @@ export type LoginResult =
  * L'unico punto che scrive in `sessionTable`: i due passi del login ci arrivano da strade
  * diverse ma devono produrre esattamente la stessa sessione, cookie compreso.
  */
-const createSessionForUser = async (user: UserRow): Promise<LoginResult> => {
+const createSessionForUser = async (user: UserRow, userAgent?: string | null): Promise<LoginResult> => {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + sessionDurationMs);
-    await db.insert(sessionTable).values({ tokenHash: hashSessionToken(token), userId: user.id, expiresAt });
+    // Il dispositivo si registra solo qui, all'apertura: l'header può cambiare sotto la stessa
+    // sessione (un aggiornamento del browser) e riscriverlo a ogni richiesta significherebbe
+    // una scrittura in più per un dato che serve solo a riconoscere chi ha fatto l'accesso.
+    await db.insert(sessionTable).values({
+        tokenHash: hashSessionToken(token),
+        userId: user.id,
+        expiresAt,
+        userAgent: sanitizeUserAgent(userAgent),
+    });
 
     const adminId = await getAdminUserId();
     return { status: "authenticated", token, expiresAt, user: toPublicUser(user, user.id === adminId) };
 };
 
-export const login = async (username: string, password: string, ip: string): Promise<LoginResult> => {
+export const login = async (
+    username: string,
+    password: string,
+    ip: string,
+    userAgent?: string | null
+): Promise<LoginResult> => {
     const subject = rateLimitSubject(ip);
     const accountRateLimitKey = loginAttemptRateLimitKey(subject, username);
     assertIpLoginRateLimit(subject);
@@ -321,7 +341,7 @@ export const login = async (username: string, password: string, ip: string): Pro
 
     registerSuccessfulLogin(accountRateLimitKey);
     rememberLoginSource(username, subject);
-    return createSessionForUser(user);
+    return createSessionForUser(user, userAgent);
 };
 
 /**
@@ -336,6 +356,7 @@ export const getSessionUser = async (token: string): Promise<PublicUser | null> 
     const rows = await db
         .select({
             expiresAt: sessionTable.expiresAt,
+            lastSeenAt: sessionTable.lastSeenAt,
             id: userTable.id,
             username: userTable.username,
             created_at: userTable.created_at,
@@ -354,9 +375,21 @@ export const getSessionUser = async (token: string): Promise<PublicUser | null> 
         return null;
     }
 
-    if (row.expiresAt.getTime() <= Date.now() || !row.active) {
+    const now = Date.now();
+
+    if (row.expiresAt.getTime() <= now || !row.active) {
         await db.delete(sessionTable).where(eq(sessionTable.tokenHash, tokenHash));
         return null;
+    }
+
+    // Questa è l'unica occasione in cui si sa che la sessione è davvero in uso: è qui che
+    // passa ogni richiesta autenticata. Si scrive solo se l'ultimo segno di vita è vecchio
+    // (vedi `sessionTouchIntervalMs`), altrimenti ogni pagina aperta costerebbe una UPDATE.
+    if (now - row.lastSeenAt.getTime() >= sessionTouchIntervalMs) {
+        await db
+            .update(sessionTable)
+            .set({ lastSeenAt: new Date(now) })
+            .where(eq(sessionTable.tokenHash, tokenHash));
     }
 
     return toPublicUser(row, row.isAdmin === true);
@@ -425,6 +458,10 @@ export type SessionSummary = {
     id: string;
     createdAt: string;
     expiresAt: string;
+    /** Ultima richiesta autenticata fatta con questa sessione (vedi `getSessionUser`). */
+    lastSeenAt: string;
+    /** "Chrome su Windows", o `null` se l'header non dice abbastanza (vedi `describeUserAgent`). */
+    device: string | null;
     isCurrent: boolean;
 };
 
@@ -437,15 +474,25 @@ export const listSessionsForUser = async (userId: number, currentToken?: string)
             tokenHash: sessionTable.tokenHash,
             createdAt: sessionTable.createdAt,
             expiresAt: sessionTable.expiresAt,
+            lastSeenAt: sessionTable.lastSeenAt,
+            userAgent: sessionTable.userAgent,
         })
         .from(sessionTable)
-        .where(eq(sessionTable.userId, userId))
-        .orderBy(desc(sessionTable.createdAt));
+        // Le scadute non sono sessioni aperte: restano in tabella al massimo un'ora, finché
+        // non passa `deleteExpiredSessions`, ma nel frattempo comparivano nell'elenco come
+        // tutte le altre. Il filtro le esclude a prescindere da quando gira la pulizia.
+        .where(and(eq(sessionTable.userId, userId), gt(sessionTable.expiresAt, new Date())))
+        // Prima l'ultima usata, non l'ultima aperta: è l'ordine in cui si cerca la propria.
+        .orderBy(desc(sessionTable.lastSeenAt));
 
     return rows.map((row) => ({
         id: row.tokenHash,
         createdAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString(),
+        lastSeenAt: row.lastSeenAt.toISOString(),
+        // Fuori esce l'etichetta, non l'header: al chiamante serve riconoscere il dispositivo,
+        // non la stringa con cui il browser si presenta.
+        device: describeUserAgent(row.userAgent),
         isCurrent: row.tokenHash === currentTokenHash,
     }));
 };
@@ -729,7 +776,12 @@ const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFa
     return result;
 };
 
-export const completeTwoFactorLogin = async (challengeId: string, code: string, ip: string): Promise<LoginResult> => {
+export const completeTwoFactorLogin = async (
+    challengeId: string,
+    code: string,
+    ip: string,
+    userAgent?: string | null
+): Promise<LoginResult> => {
     const subject = rateLimitSubject(ip);
     assertIpLoginRateLimit(subject);
 
@@ -790,7 +842,7 @@ export const completeTwoFactorLogin = async (challengeId: string, code: string, 
         });
     }
 
-    return createSessionForUser(user);
+    return createSessionForUser(user, userAgent);
 };
 
 export type TwoFactorStatus = { enabled: boolean; remainingRecoveryCodes: number };

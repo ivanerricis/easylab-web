@@ -1,5 +1,4 @@
-import type { InterventionType } from "./interventionPdf";
-import { formatInterventionType } from "./interventionPdf";
+import { formatInterventionType, type InterventionType } from "./interventionLabels";
 
 /**
  * L'email che accompagna il PDF dell'intervento. Sta in un modulo suo perché il testo

@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// `formatInterventionType` vive in `interventionPdf`, che trascina dentro pdfmake: qui interessa
-// solo la mappatura tipo -> etichetta, quindi si mocka senza caricare la macchina PDF reale.
-const formatInterventionType = vi.fn<(value: string) => string>(() => "Tipo di prova");
-
-vi.mock("./interventionPdf", () => ({
-    formatInterventionType: (value: string) => formatInterventionType(value) as string,
-}));
+// Le etichette dei tipi arrivano da `interventionLabels`, un modulo senza dipendenze: prima
+// stavano in `interventionPdf` e andavano mockate per non caricare pdfmake in questo test.
+// Adesso si usa quello vero, e l'etichetta attesa è quella che vedrà davvero il cliente.
 
 import { buildInterventionEmail, type InterventionEmailData } from "./interventionEmail";
 
@@ -25,7 +21,6 @@ const baseData = (overrides: Partial<InterventionEmailData> = {}): InterventionE
 
 beforeEach(() => {
     vi.clearAllMocks();
-    formatInterventionType.mockReturnValue("Intervento in sede");
 });
 
 describe("buildInterventionEmail", () => {
@@ -57,12 +52,9 @@ describe("buildInterventionEmail", () => {
         expect(text).not.toMatch(/#\d+/);
     });
 
-    it("passa il tipo a formatInterventionType e lo riporta in testo e html", () => {
-        formatInterventionType.mockReturnValue("Consegna materiale");
-
+    it("riporta l'etichetta italiana del tipo in testo e html", () => {
         const { text, html } = buildInterventionEmail(baseData({ type: "consegna_materiale" }));
 
-        expect(formatInterventionType).toHaveBeenCalledWith("consegna_materiale");
         expect(text).toContain("Consegna materiale");
         expect(html).toContain("Consegna materiale");
     });

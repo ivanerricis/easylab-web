@@ -8,9 +8,12 @@ import {
     sectionBarRow,
     tableLayout,
 } from "./pdf/shared";
-
-export type InterventionType = "consegna_materiale" | "intervento_sede" | "intervento_remoto";
-export type InterventionStatus = "programmato" | "in_lavorazione" | "completato";
+import {
+    formatInterventionStatus,
+    formatInterventionType,
+    type InterventionStatus,
+    type InterventionType,
+} from "./interventionLabels";
 
 export type InterventionPrintData = {
     id: number;
@@ -59,30 +62,6 @@ export type CustomerInterventionsPrintData = {
     rangeLabel?: string;
     interventionCount: number;
     interventions: CustomerInterventionSummaryItem[];
-};
-
-export const formatInterventionType = (value: InterventionType) => {
-    if (value === "consegna_materiale") {
-        return "Consegna materiale";
-    }
-
-    if (value === "intervento_sede") {
-        return "Intervento in sede";
-    }
-
-    return "Intervento da remoto";
-};
-
-const formatInterventionStatus = (value: InterventionStatus) => {
-    if (value === "in_lavorazione") {
-        return "In lavorazione";
-    }
-
-    if (value === "completato") {
-        return "Completato";
-    }
-
-    return "Programmato";
 };
 
 const formatTime = (value: string | null) => (value ? value.slice(0, 5) : "-");

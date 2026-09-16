@@ -11,6 +11,20 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Esposizione su dominio pubblico completata
+
+**Cosa.** Tolta dal BACKLOG la voce "Esposizione su dominio pubblico". La parte applicativa era
+pronta dal 2026-08-03 (voce "Esposizione su dominio pubblico via Cloudflare Tunnel"); restavano
+i passi sul conto Cloudflare e l'installazione del tunnel sulla VM, descritti in
+[DEPLOY](DEPLOY.md#dominio-pubblico-e-cloudflare-tunnel). Sono stati fatti: `cloudflared` gira
+sulla VM di produzione da una settimana e l'app risponde dal dominio pubblico (confermato
+dall'utente il 2026-09-16).
+
+**Il perché.** La voce stessa chiedeva di essere tolta a lavoro fatto: lasciarla avrebbe fatto
+sembrare aperta una messa in produzione già conclusa.
+
+---
+
 ## 2026-09-16 — Aggiornamento automatico: lo stato esce dalla cartella che il backend controlla (EL-01)
 
 **Il problema.** Finding EL-01 dell'audit del 2026-09-14, severità alta, rimandato allora per

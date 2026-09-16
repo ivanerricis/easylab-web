@@ -4,6 +4,9 @@ import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import OpenEntityButton from "@/components/open-entity-button";
+import NotFoundState from "@/components/not-found-state";
+import { useGoBack } from "@/hooks/useGoBack";
+import { entityPaths } from "@/lib/entityPaths";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     getApiErrorMessage,
+    getApiErrorStatus,
     getCustomer,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
@@ -73,9 +77,9 @@ const CustomerPage = () => {
 
     const hasValidCustomerId = useMemo(() => Number.isInteger(customerId) && customerId > 0, [customerId]);
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+    // Vedi lo stesso stato in `ReportPage`: un cliente che non esiste si mostra come tale.
+    const [isNotFound, setIsNotFound] = useState(false);
+    const handleBack = useGoBack("/clients");
 
     const handleTabChange = (value: string) => {
         navigate(value === "interventions" ? `/clients/${customerId}/interventions` : `/clients/${customerId}`, {
@@ -96,11 +100,11 @@ const CustomerPage = () => {
     };
 
     const handleOpenReport = (reportId: number) => {
-        navigate(`/reports/${reportId}`);
+        navigate(entityPaths.report(reportId));
     };
 
     const handleOpenIntervention = (interventionId: number) => {
-        navigate(`/interventions/${interventionId}`);
+        navigate(entityPaths.intervention(interventionId));
     };
 
     // Come nella scheda collaboratore: le due liste si impaginano per conto proprio.
@@ -162,6 +166,11 @@ const CustomerPage = () => {
         try {
             setCustomer(await getCustomer(customerId));
         } catch (error) {
+            if (getApiErrorStatus(error) === 404) {
+                setIsNotFound(true);
+                return;
+            }
+
             toast.error(getApiErrorMessage(error, "Impossibile caricare il cliente"));
         }
     }, [customerId]);
@@ -170,16 +179,9 @@ const CustomerPage = () => {
         await Promise.all([loadCustomer(), reloadReports(), reloadInterventions()]);
     }, [loadCustomer, reloadInterventions, reloadReports]);
 
-    useEffect(() => {
-        if (!hasValidCustomerId) {
-            toast.error("Cliente non valido");
-            navigate("/clients");
-        }
-    }, [hasValidCustomerId, navigate]);
-
-    // Separato dall'effetto qui sopra perché `navigate` cambia identità a ogni cambio di
-    // indirizzo, e cambiare tab cambia l'indirizzo: con `navigate` fra le dipendenze, ogni
-    // cambio di tab ricaricava il cliente e copriva la pagina con lo spinner per un istante.
+    // Senza `navigate` fra le dipendenze: cambia identità a ogni cambio di indirizzo, e
+    // cambiare tab cambia l'indirizzo, quindi ogni cambio di tab ricaricava il cliente e
+    // copriva la pagina con lo spinner per un istante.
     useEffect(() => {
         if (!hasValidCustomerId) {
             return;
@@ -196,6 +198,17 @@ const CustomerPage = () => {
             }
         })();
     }, [hasValidCustomerId, loadCustomer]);
+
+    if (!hasValidCustomerId || isNotFound) {
+        return (
+            <NotFoundState
+                title="Cliente non trovato"
+                description="Il cliente che cerchi non esiste, oppure è stato eliminato."
+                backTo="/clients"
+                backLabel="Vai ai clienti"
+            />
+        );
+    }
 
     if (isCustomerLoading) {
         return <LoadingPage />;
@@ -293,7 +306,7 @@ const CustomerPage = () => {
                             renderRowActions={(row) => (
                                 <OpenEntityButton
                                     size="icon-lg"
-                                    onClick={() => handleOpenReport(row.id)}
+                                    to={entityPaths.report(row.id)}
                                     aria-label={`Apri report ${row.id}`}
                                 />
                             )}
@@ -345,7 +358,7 @@ const CustomerPage = () => {
                             renderRowActions={(row) => (
                                 <OpenEntityButton
                                     size="icon-lg"
-                                    onClick={() => handleOpenIntervention(row.id)}
+                                    to={entityPaths.intervention(row.id)}
                                     aria-label={`Apri intervento ${row.id}`}
                                 />
                             )}

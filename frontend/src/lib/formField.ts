@@ -31,3 +31,16 @@ export const fieldErrorAria = (id: string, error?: string) => ({
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? fieldErrorId(id) : undefined,
 });
+
+/**
+ * Se un modulo è diverso da com'era all'apertura: è ciò che decide se chiudere il dialogo
+ * chiede conferma (vedi `isDirty` in `CustomDialog`).
+ *
+ * Il confronto è per valore e non per riferimento, perché ogni battitura crea un oggetto
+ * nuovo: scrivere una lettera e cancellarla riporta il modulo "pulito", come ci si aspetta.
+ * I valori dei moduli sono stringhe, numeri e booleani, quindi `JSON.stringify` basta —
+ * purché i due oggetti abbiano le chiavi nello stesso ordine, e qui nascono sempre dalla
+ * stessa funzione o dallo stesso letterale.
+ */
+export const hasFormChanged = <T extends object>(current: T, initial: T) =>
+    JSON.stringify(current) !== JSON.stringify(initial);

@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps } from "@/lib/formField";
+import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,6 +131,10 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         closed: false,
     });
 
+    // I valori come sono arrivati dal server: vedi lo stesso stato in `EditInterventionDialog`.
+    const [savedFormValues, setSavedFormValues] = useState<typeof formValues | null>(null);
+    const isDirty = loadedReportId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
+
     useEffect(() => {
         if (!open || !reportId) {
             return;
@@ -159,7 +163,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 setCollaborators(collaboratorsData);
                 setTechnicians(techniciansData);
                 setExistingTechnicianId(report.technicianId);
-                setFormValues({
+                const loadedFormValues = {
                     customerId: String(report.customerId),
                     deviceId: String(report.deviceId),
                     issueId: String(report.issueId),
@@ -176,7 +180,9 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                     charger: report.charger,
                     alerted: report.alerted,
                     closed: report.closed,
-                });
+                };
+                setFormValues(loadedFormValues);
+                setSavedFormValues(loadedFormValues);
                 setLoadedReportId(report.id);
             } catch (error) {
                 toast.error(getApiErrorMessage(error, "Impossibile caricare i dati del report"));
@@ -294,6 +300,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={reportId ? `Modifica report #${reportId}` : "Modifica report"}
             contentClassName="sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
             preventOutsideClose

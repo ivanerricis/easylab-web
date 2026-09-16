@@ -2,7 +2,7 @@ import { asc, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../index";
 import { customerTable } from "../schema";
 import type { NewCustomer, UpdateCustomer } from "../types";
-import { takeUnpaginated } from "./pagination";
+import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { parseIdSearch } from "./search";
 
 type ListCustomersParams = {
@@ -11,6 +11,8 @@ type ListCustomersParams = {
     search?: string;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
+    /** Tetto e comportamento senza paginazione: gli export passano `exportRowLimit`. */
+    unpaginatedLimit?: UnpaginatedLimit;
 };
 
 export const listCustomers = async ({
@@ -19,6 +21,7 @@ export const listCustomers = async ({
     search,
     sortBy = "createdAt",
     sortOrder = "desc",
+    unpaginatedLimit,
 }: ListCustomersParams) => {
     const trimmedSearch = search?.trim();
     const searchPattern = `%${trimmedSearch ?? ""}%`;
@@ -48,7 +51,7 @@ export const listCustomers = async ({
         .orderBy(...orderByClause);
 
     if (page == null || pageSize == null) {
-        return takeUnpaginated(baseQuery, "customers");
+        return takeUnpaginated(baseQuery, "customers", unpaginatedLimit);
     }
 
     const [items, totalCountRows] = await Promise.all([

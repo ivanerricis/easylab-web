@@ -77,6 +77,7 @@ import { sendEmail } from "../services/emailManager";
 import { loadPrintableLogo } from "../services/logoManager";
 import interventionsRouter from "./interventions";
 import { errorHandler } from "../middleware/errorHandler";
+import { exportRowLimit } from "../db/queries/pagination";
 import { consumeEmailSendSlot, emailSendMaxPerWindow, resetEmailSendRateLimit } from "../services/emailSendRateLimit";
 
 const buildApp = () => {
@@ -231,6 +232,7 @@ describe("interventions router", () => {
                 type: "intervento_sede",
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
+                unpaginatedLimit: exportRowLimit,
             });
             expect(response.text).toContain("Intervento in sede");
             expect(response.text).toContain("Completato");

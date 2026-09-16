@@ -1,11 +1,11 @@
 import { listReports } from "@/lib/api";
 import type { ReportDto } from "@/types/dtos";
 import { useCallback } from "react";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import type { ReportSortOption, ReportVisibilityFilter } from "../components/types";
 
 type UseReportsRowsParams = {
+    /** Già rallentato dal chiamante (vedi `useUrlSearchText`): qui si cerca subito. */
     searchText: string;
     visibilityFilter: ReportVisibilityFilter;
     sortOption: ReportSortOption;
@@ -24,7 +24,6 @@ export const useReportsRows = ({
     currentPage,
     pageSize,
 }: UseReportsRowsParams) => {
-    const debouncedSearchText = useDebouncedValue(searchText);
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer" | "totalPrice", "asc" | "desc"];
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
         usePaginatedRows<ReportDto>({
@@ -32,7 +31,7 @@ export const useReportsRows = ({
                 listReports({
                     page: currentPage,
                     pageSize,
-                    search: debouncedSearchText,
+                    search: searchText,
                     visibility: visibilityFilter,
                     sortBy,
                     sortOrder,
@@ -40,7 +39,7 @@ export const useReportsRows = ({
                     dateTo,
                     signal,
                 }),
-            queryKey: [currentPage, pageSize, debouncedSearchText, visibilityFilter, sortOption, dateFrom, dateTo],
+            queryKey: [currentPage, pageSize, searchText, visibilityFilter, sortOption, dateFrom, dateTo],
             errorMessage: "Impossibile caricare i report",
             initialLoading: false,
         });

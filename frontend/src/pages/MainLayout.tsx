@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import LoadingPage from "@/components/loadingPage";
 // import { ModeToggle } from "@/components/mode-toggle"
+import GlobalSearch from "@/components/global-search";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { UserBadge } from "@/components/user-badge";
 import MainSidebar from "@/components/main-sidebar";
@@ -31,6 +32,9 @@ export const MainLayout = () => {
                 <header className="flex h-13 items-center justify-between border-b px-3">
                     <SidebarTrigger />
                     <div className="flex items-center gap-2">
+                        {/* La ricerca sta qui e non in una pagina: vale per tutta l'app, e
+                            Ctrl+K la apre da qualunque punto. */}
+                        <GlobalSearch />
                         <NotificationsMenu />
                         {/* <ModeToggle /> */}
                         <UserBadge />

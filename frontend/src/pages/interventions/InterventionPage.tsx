@@ -1,6 +1,9 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem from "@/components/detail-item";
+import CustomerLink from "@/components/customer-link";
 import LoadingPage from "@/components/loadingPage";
+import NotFoundState from "@/components/not-found-state";
+import { useGoBack } from "@/hooks/useGoBack";
 import RefreshButton from "@/components/refresh-button";
 import EditInterventionDialog, {
     type EditInterventionSubmitValues,
@@ -10,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     getApiErrorMessage,
+    getApiErrorStatus,
     getIntervention,
     getInterventionPrintUrl,
     type InterventionEntityDto,
@@ -61,9 +65,10 @@ const InterventionPage = () => {
         [interventionId]
     );
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+    // Un id che non esiste (404) non è un errore da segnalare e da cui scappare: è una scheda
+    // da mostrare come "non trovata", lasciando l'indirizzo com'è. Vedi `NotFoundState`.
+    const [isNotFound, setIsNotFound] = useState(false);
+    const handleBack = useGoBack("/interventions");
 
     const handlePrintIntervention = () => {
         if (!details) {
@@ -102,8 +107,6 @@ const InterventionPage = () => {
 
     useEffect(() => {
         if (!hasValidInterventionId) {
-            toast.error("Intervento non valido");
-            navigate("/interventions");
             return;
         }
 
@@ -112,6 +115,11 @@ const InterventionPage = () => {
                 setIsLoading(true);
                 await loadDetails();
             } catch (error) {
+                if (getApiErrorStatus(error) === 404) {
+                    setIsNotFound(true);
+                    return;
+                }
+
                 toast.error(getApiErrorMessage(error, "Impossibile caricare l'intervento"));
                 navigate("/interventions");
             } finally {
@@ -121,6 +129,17 @@ const InterventionPage = () => {
 
         void loadData();
     }, [hasValidInterventionId, navigate, loadDetails]);
+
+    if (!hasValidInterventionId || isNotFound) {
+        return (
+            <NotFoundState
+                title="Intervento non trovato"
+                description="L'intervento che cerchi non esiste, oppure è stato eliminato."
+                backTo="/interventions"
+                backLabel="Vai agli interventi"
+            />
+        );
+    }
 
     if (isLoading) {
         return <LoadingPage />;
@@ -262,7 +281,15 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Anagrafica</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem label="Cliente" value={details.customerName} />
+                        <DetailItem
+                            label="Cliente"
+                            value={
+                                <CustomerLink
+                                    customerId={details.intervention.customerId}
+                                    name={details.customerName}
+                                />
+                            }
+                        />
                         <DetailItem label="Telefono" value={details.customerPhone ?? "-"} />
                         <DetailItem label="Collaboratore" value={details.collaboratorName} />
                     </CardContent>

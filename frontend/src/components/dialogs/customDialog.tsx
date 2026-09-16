@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +49,16 @@ type Props = Readonly<{
 
     destructive?: boolean;
     preventOutsideClose?: boolean;
+    /**
+     * Il modulo ha modifiche non salvate. In quel caso Esc, la X e il clic fuori non chiudono
+     * subito: prima chiedono se buttare via quello che si è scritto.
+     *
+     * "Annulla" invece chiude senza chiedere, perché è già una scelta esplicita di rinunciare;
+     * anche la chiusura dopo un salvataggio riuscito non passa di qui, perché i dialoghi la
+     * fanno chiamando direttamente il proprio `onOpenChange(false)`. La domanda serve per i
+     * gesti che si fanno per sbaglio: un Esc di troppo su un report da venti campi.
+     */
+    isDirty?: boolean;
 }>;
 
 const CustomDialog = ({
@@ -70,10 +80,27 @@ const CustomDialog = ({
     showConfirmButton = true,
     destructive = false,
     preventOutsideClose = false,
+    isDirty = false,
     contentClassName,
 }: Props) => {
+    const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen && isDirty) {
+            setIsDiscardConfirmOpen(true);
+            return;
+        }
+
+        onOpenChange?.(nextOpen);
+    };
+
+    const handleDiscard = () => {
+        setIsDiscardConfirmOpen(false);
+        onOpenChange?.(false);
+    };
+
     return (
-        <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
+        <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={handleOpenChange}>
             {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
 
             <DialogContent
@@ -149,6 +176,42 @@ const CustomDialog = ({
                         </DialogFooter>
                     )}
                 </form>
+
+                {/* Annidato nel dialogo del modulo, non accanto: Radix gestisce così lo
+                    strato sopra lo strato, e Esc chiude solo questa domanda. */}
+                <Dialog open={isDiscardConfirmOpen} onOpenChange={setIsDiscardConfirmOpen}>
+                    <DialogContent className="border! border-destructive! sm:max-w-md" showCloseButton={false}>
+                        <DialogHeader>
+                            <DialogTitle className="text-lg">Modifiche non salvate</DialogTitle>
+                            <DialogDescription>
+                                Se chiudi adesso, quello che hai inserito in questa finestra andrà perso.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="mt-2">
+                            <Button
+                                type="button"
+                                size="lg"
+                                className="text-lg"
+                                variant="outline"
+                                // Il pulsante sicuro prende il focus: un Invio di troppo non
+                                // deve buttare via il modulo.
+                                autoFocus
+                                onClick={() => setIsDiscardConfirmOpen(false)}
+                            >
+                                Continua a modificare
+                            </Button>
+                            <Button
+                                type="button"
+                                size="lg"
+                                className="text-lg"
+                                variant="destructive"
+                                onClick={handleDiscard}
+                            >
+                                Chiudi senza salvare
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </DialogContent>
         </Dialog>
     );

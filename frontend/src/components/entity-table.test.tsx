@@ -40,6 +40,85 @@ const renderTable = (props: Partial<Parameters<typeof EntityTable<Row>>[0]> = {}
         />
     );
 
+describe("EntityTable: ordinamento dalle intestazioni", () => {
+    const sortableColumns: EntityColumn<Row>[] = columns.map((column) =>
+        column.key === "firstName"
+            ? { ...column, sortKey: "name" }
+            : column.key === "id"
+              ? { ...column, sortKey: "createdAt", defaultSortDirection: "desc" }
+              : column
+    );
+
+    it("rende cliccabili solo le colonne che il server sa ordinare, e segna quella in uso", () => {
+        renderTable({
+            columns: sortableColumns,
+            sort: { key: "name", direction: "asc" },
+            onSortChange: vi.fn(),
+        });
+        const table = screen.getByRole("table");
+
+        expect(within(table).getByRole("button", { name: "Nome" })).toBeInTheDocument();
+        expect(within(table).getByRole("button", { name: "ID" })).toBeInTheDocument();
+        expect(within(table).queryByRole("button", { name: "Email" })).not.toBeInTheDocument();
+        expect(within(table).getByRole("columnheader", { name: "Nome" })).toHaveAttribute("aria-sort", "ascending");
+        expect(within(table).getByRole("columnheader", { name: "ID" })).not.toHaveAttribute("aria-sort");
+    });
+
+    it("il primo clic usa il verso della colonna, il secondo lo inverte", () => {
+        const onSortChange = vi.fn();
+        const { rerender } = renderTable({
+            columns: sortableColumns,
+            sort: { key: "name", direction: "asc" },
+            onSortChange,
+        });
+        const table = screen.getByRole("table");
+
+        fireEvent.click(within(table).getByRole("button", { name: "ID" }));
+        expect(onSortChange).toHaveBeenLastCalledWith({ key: "createdAt", direction: "desc" });
+
+        fireEvent.click(within(table).getByRole("button", { name: "Nome" }));
+        expect(onSortChange).toHaveBeenLastCalledWith({ key: "name", direction: "desc" });
+
+        rerender(
+            <EntityTable<Row>
+                tableKey="test"
+                columns={sortableColumns}
+                rows={rows}
+                getRowKey={(row) => row.id}
+                emptyMessage="Nessun elemento."
+                renderRowActions={() => null}
+                sort={{ key: "name", direction: "desc" }}
+                onSortChange={onSortChange}
+            />
+        );
+        expect(within(table).getByRole("columnheader", { name: "Nome" })).toHaveAttribute("aria-sort", "descending");
+        fireEvent.click(within(table).getByRole("button", { name: "Nome" }));
+        expect(onSortChange).toHaveBeenLastCalledWith({ key: "name", direction: "asc" });
+    });
+
+    it("senza onSortChange le intestazioni restano testo", () => {
+        renderTable({ columns: sortableColumns, sort: { key: "name", direction: "asc" } });
+
+        expect(within(screen.getByRole("table")).queryByRole("button", { name: "Nome" })).not.toBeInTheDocument();
+    });
+});
+
+describe("EntityTable: colonne nascoste", () => {
+    it("toglie le colonne dalla tabella ma non dalle schede", () => {
+        renderTable({ hiddenColumnKeys: ["email", "id"] });
+        const table = screen.getByRole("table");
+
+        expect(
+            within(table)
+                .getAllByRole("columnheader")
+                .map((cell) => cell.textContent)
+        ).toEqual(["Nome", "Cognome", "Stato", "Azioni"]);
+        expect(within(table).queryByText("mario@example.com")).not.toBeInTheDocument();
+        // Nelle schede (mobile) l'email c'è ancora: lì il menu non esiste.
+        expect(screen.getByText("mario@example.com")).toBeInTheDocument();
+    });
+});
+
 describe("EntityTable", () => {
     it("disegna intestazioni, valori e azioni di ogni riga", () => {
         renderTable();

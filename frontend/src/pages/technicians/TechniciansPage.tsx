@@ -5,7 +5,7 @@ import SimpleEntityPage from "@/components/simple-entity-page";
 import { createTechnician, deleteTechnician, listTechnicians, updateTechnician } from "@/lib/api";
 import { trimOrNull } from "@/lib/utils";
 import type { TechnicianDto } from "@/types/dtos";
-import { useNavigate } from "react-router-dom";
+import { entityPaths } from "@/lib/entityPaths";
 import { technicianColumns } from "./components/technician-columns";
 
 const toPayload = (values: TechnicianSubmitValues) => ({
@@ -16,8 +16,6 @@ const toPayload = (values: TechnicianSubmitValues) => ({
 });
 
 const TechniciansPage = () => {
-    const navigate = useNavigate();
-
     return (
         <SimpleEntityPage<TechnicianDto, TechnicianSubmitValues>
             title="Tecnici esterni"
@@ -42,7 +40,7 @@ const TechniciansPage = () => {
             deleteFallbackDescription="Sei sicuro di voler eliminare questo tecnico?"
             deleteSuccessMessage="Tecnico eliminato con successo"
             deleteErrorMessage="Impossibile eliminare il tecnico"
-            onOpenRow={(id) => void navigate(`/technicians/${id}`)}
+            getOpenPath={entityPaths.technician}
         />
     );
 };

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, getTableColumns, or, sql, type SQL } from "drizzle-
 import { db } from "../index";
 import { collaboratorTable, customerTable, interventionTable } from "../schema";
 import type { NewIntervention, UpdateIntervention } from "../types";
-import { takeUnpaginated } from "./pagination";
+import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { parseIdSearch } from "./search";
 import { onLocalDays, toLocalTimestamp } from "./timeZone";
 
@@ -26,6 +26,8 @@ type ListInterventionsParams = {
     sortOrder?: "asc" | "desc";
     /** Il fuso in cui leggere i giorni delle date di creazione: vedi `timeZone.ts`. */
     timeZone: string;
+    /** Tetto e comportamento senza paginazione: gli export passano `exportRowLimit`. */
+    unpaginatedLimit?: UnpaginatedLimit;
 };
 
 export const listInterventions = async ({
@@ -43,6 +45,7 @@ export const listInterventions = async ({
     collaboratorId,
     sortBy = "createdAt",
     sortOrder = "desc",
+    unpaginatedLimit,
     timeZone,
 }: ListInterventionsParams) => {
     const trimmedSearch = search?.trim();
@@ -161,7 +164,7 @@ export const listInterventions = async ({
         .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId));
 
     if (page == null || pageSize == null) {
-        return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "interventions");
+        return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "interventions", unpaginatedLimit);
     }
 
     /**

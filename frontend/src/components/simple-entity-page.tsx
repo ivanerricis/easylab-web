@@ -7,7 +7,7 @@ import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
 import TablePagination from "@/components/table-pagination";
 import { useSearchableRows } from "@/hooks/useSearchableRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
+import { listUrlParams, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { getApiErrorMessage } from "@/lib/api";
 import type { PaginatedResponse } from "@/lib/api/client";
@@ -59,8 +59,8 @@ type SimpleEntityPageProps<TRow extends { id: number }, TValues> = {
     deleteFallbackDescription: string;
     deleteSuccessMessage: string;
     deleteErrorMessage: string;
-    /** Solo per le entità che hanno una scheda propria: dove portare il pulsante "Apri". */
-    onOpenRow?: (id: number) => void;
+    /** Solo per le entità che hanno una scheda propria: dove porta il pulsante "Apri". */
+    getOpenPath?: (id: number) => string;
     /** Righe che il server non lascia modificare né eliminare: vedi `EntityCrudTable`. */
     isRowLocked?: (row: TRow) => boolean;
 };
@@ -99,22 +99,26 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     deleteFallbackDescription,
     deleteSuccessMessage,
     deleteErrorMessage,
-    onOpenRow,
+    getOpenPath,
     isRowLocked,
 }: SimpleEntityPageProps<TRow, TValues>) => {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [searchText, setSearchText] = useState("");
+    // Ricerca e pagina stanno nell'indirizzo, come nelle altre liste: vedi `useListUrlState`.
+    const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
+    const committedSearchText = searchParams.get(listUrlParams.search) ?? "";
+    const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
+        updateParams({ [listUrlParams.search]: value })
+    );
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [rowToEdit, setRowToEdit] = useState<TRow | null>(null);
     const [rowToDelete, setRowToDelete] = useState<TRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [pageSize, setPageSize] = useTableRowsPerPage(tableKey);
-    const { currentPage, setCurrentPage } = useTablePagination({ resetDependencies: [searchText, pageSize] });
+    const [pageSize, setStoredPageSize] = useTableRowsPerPage(tableKey);
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } = useSearchableRows<TRow>(
         {
             fetchRows: listRows,
-            searchText,
+            searchText: committedSearchText,
             currentPage,
             pageSize,
             errorMessage: loadErrorMessage,
@@ -125,7 +129,12 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     // primo elemento, una ricerca senza esiti è un vicolo cieco da cui bisogna poter uscire —
     // e chi cerca "mrio" per errore deve capire che il problema è quello che ha scritto.
     const resolvedEmptyMessage =
-        searchText.trim() === "" ? emptyMessage : `Nessun risultato per "${searchText.trim()}".`;
+        committedSearchText.trim() === "" ? emptyMessage : `Nessun risultato per "${committedSearchText.trim()}".`;
+
+    const setPageSize = (nextPageSize: typeof pageSize) => {
+        setStoredPageSize(nextPageSize);
+        resetPage();
+    };
 
     const handleCreate = async (values: TValues) => {
         await onCreate(values);
@@ -227,7 +236,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                         rows={rows}
                         emptyMessage={resolvedEmptyMessage}
                         entityLabel={entityLabel}
-                        onOpen={onOpenRow}
+                        getOpenPath={getOpenPath}
                         onEdit={handleOpenEditDialog}
                         onDelete={handleOpenDeleteDialog}
                         isRowLocked={isRowLocked}

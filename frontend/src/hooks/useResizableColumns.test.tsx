@@ -25,6 +25,18 @@ describe("resolveWidthsToPersist", () => {
         expect(persisted).not.toHaveProperty("actions");
     });
 
+    /** Una colonna nascosta dal menu "Colonne" non deve perdere la larghezza scelta. */
+    it("tiene le larghezze delle colonne che ora non si vedono", () => {
+        const persisted = resolveWidthsToPersist(
+            ["id", "customer", "actions"],
+            { id: 60, customer: 200, actions: 180 },
+            { customer: 320, device: 150 },
+            "actions"
+        );
+
+        expect(persisted).toEqual({ device: 150, id: 60, customer: 320 });
+    });
+
     it("non inventa voci per le colonne di cui non si conosce ancora la larghezza", () => {
         const persisted = resolveWidthsToPersist(columnKeys, null, { customer: 320 }, "actions");
 

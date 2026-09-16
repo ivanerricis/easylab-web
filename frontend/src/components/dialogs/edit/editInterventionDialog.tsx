@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps } from "@/lib/formField";
+import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -101,6 +101,12 @@ const EditInterventionDialog = ({
         endTime: "",
     });
 
+    // I valori come sono arrivati dal server: finché non ci sono (caricamento), il modulo non
+    // può essere "modificato", e chiudere non chiede niente.
+    const [savedFormValues, setSavedFormValues] = useState<typeof formValues | null>(null);
+    const isDirty =
+        loadedInterventionId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
+
     const isOnSite = isOnSiteInterventionType(formValues.type);
     // Un intervento ancora da svolgere non ha orari né lavoro da descrivere: i campi
     // restano compilabili, ma smettono di essere obbligatori e l'etichetta lo dice.
@@ -125,7 +131,7 @@ const EditInterventionDialog = ({
                 ]);
 
                 setCollaborators(collaboratorsData);
-                setFormValues({
+                const loadedFormValues = {
                     type: intervention.type,
                     status: intervention.status,
                     description: intervention.description ?? "",
@@ -136,7 +142,9 @@ const EditInterventionDialog = ({
                     interventionDate: intervention.interventionDate ?? "",
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
                     endTime: intervention.endTime?.slice(0, 5) ?? "",
-                });
+                };
+                setFormValues(loadedFormValues);
+                setSavedFormValues(loadedFormValues);
                 setLoadedInterventionId(intervention.id);
             } catch (error) {
                 toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dell'intervento"));
@@ -216,6 +224,7 @@ const EditInterventionDialog = ({
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={interventionId ? `Modifica intervento #${interventionId}` : "Modifica intervento"}
             contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
             preventOutsideClose

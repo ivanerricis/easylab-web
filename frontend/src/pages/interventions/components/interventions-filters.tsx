@@ -2,6 +2,7 @@ import DateRangeFilter from "@/components/filters/date-range-filter";
 import FilterSelect from "@/components/filters/filter-select";
 import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
+import type { ReactNode } from "react";
 import { interventionTypeOptions, interventionStatusOptions } from "@/lib/interventions";
 import { ArrowUpDown, ListFilter, Tag } from "lucide-react";
 import {
@@ -26,6 +27,8 @@ type InterventionsFiltersProps = {
     onDateToChange: (value: string | undefined) => void;
     onRefresh: () => void | Promise<unknown>;
     isRefreshing?: boolean;
+    /** Il menu "Colonne", in fondo alla riga dei filtri. */
+    columnsMenu?: ReactNode;
 };
 
 const InterventionsFilters = ({
@@ -43,6 +46,7 @@ const InterventionsFilters = ({
     onDateToChange,
     onRefresh,
     isRefreshing,
+    columnsMenu,
 }: InterventionsFiltersProps) => {
     return (
         // Refresh e ricerca stanno nella loro riga: se i filtri finissero sulla stessa riga
@@ -88,6 +92,8 @@ const InterventionsFilters = ({
                     dateTo={dateTo}
                     onDateToChange={onDateToChange}
                 />
+
+                {columnsMenu}
             </div>
         </div>
     );

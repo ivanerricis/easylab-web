@@ -45,9 +45,14 @@ vi.mock("@/lib/utils", async () => {
 });
 
 const toastError = vi.fn();
+const toastSuccess = vi.fn();
 
 vi.mock("sonner", () => ({
-    toast: { error: (...args: unknown[]) => toastError(...args), success: vi.fn(), warning: vi.fn() },
+    toast: {
+        error: (...args: unknown[]) => toastError(...args),
+        success: (...args: unknown[]) => toastSuccess(...args),
+        warning: vi.fn(),
+    },
 }));
 
 /**
@@ -176,6 +181,11 @@ describe("DashboardPage", () => {
         expect(within(dialog).getByText(/1520,50/)).toBeInTheDocument();
         expect(within(dialog).getByText(/1320,50/)).toBeInTheDocument();
         expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
+        // Il confronto con il mese prima, scritto e non solo colorato: (1520,50 - 900) / 900.
+        expect(within(dialog).getByText(/\+69% rispetto ad agosto 2026/)).toBeInTheDocument();
+        // Gli importi stanno sopra le barre, non solo nel fumetto del mouse.
+        expect(within(dialog).getByText(/^900\s€$/)).toBeInTheDocument();
+        expect(within(dialog).getByRole("button", { name: /^set: / })).toHaveAttribute("aria-pressed", "true");
         // Il mese corrente è l'ultimo: non si va nel futuro.
         expect(within(dialog).getByRole("button", { name: "Mese successivo" })).toBeDisabled();
 
@@ -186,6 +196,8 @@ describe("DashboardPage", () => {
         });
         expect(within(dialog).getByText("agosto 2026")).toBeInTheDocument();
         expect(within(dialog).getByRole("button", { name: "Mese successivo" })).toBeEnabled();
+        // Luglio non è nella serie: senza il mese precedente il confronto non si inventa.
+        expect(within(dialog).queryByText(/rispetto/)).not.toBeInTheDocument();
     });
 
     it("segnala se i contatori non si caricano", async () => {
@@ -200,7 +212,6 @@ describe("DashboardPage", () => {
     it("crea un intervento dal calendario con la nota, poi aggiorna calendario e contatori", async () => {
         resolveCustomerId.mockResolvedValue(30);
         api.createIntervention.mockResolvedValue({ id: 77 });
-        vi.spyOn(window, "confirm").mockReturnValue(false);
         interventionValues = {
             type: "consegna_materiale",
             status: "programmato",
@@ -230,6 +241,7 @@ describe("DashboardPage", () => {
             expect(api.listInterventions).toHaveBeenCalledTimes(2);
         });
         expect(api.getReportStats).toHaveBeenCalledTimes(2);
+        expect(toastSuccess).toHaveBeenCalledWith("Intervento #77 creato", expect.any(Object));
         expect(openPrintWindow).not.toHaveBeenCalled();
     });
 

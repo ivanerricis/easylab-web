@@ -5,7 +5,7 @@ import SimpleEntityPage from "@/components/simple-entity-page";
 import { createCollaborator, deleteCollaborator, listCollaborators, updateCollaborator } from "@/lib/api";
 import { trimOrNull } from "@/lib/utils";
 import type { CollaboratorDto } from "@/types/dtos";
-import { useNavigate } from "react-router-dom";
+import { entityPaths } from "@/lib/entityPaths";
 import { collaboratorColumns } from "./components/collaborator-columns";
 
 const toPayload = (values: CollaboratorSubmitValues) => ({
@@ -15,8 +15,6 @@ const toPayload = (values: CollaboratorSubmitValues) => ({
 });
 
 const CollaboratorsPage = () => {
-    const navigate = useNavigate();
-
     return (
         <SimpleEntityPage<CollaboratorDto, CollaboratorSubmitValues>
             title="Collaboratori"
@@ -41,7 +39,7 @@ const CollaboratorsPage = () => {
             deleteFallbackDescription="Sei sicuro di voler eliminare questo collaboratore?"
             deleteSuccessMessage="Collaboratore eliminato con successo"
             deleteErrorMessage="Impossibile eliminare il collaboratore"
-            onOpenRow={(id) => void navigate(`/collaborators/${id}`)}
+            getOpenPath={entityPaths.collaborator}
         />
     );
 };

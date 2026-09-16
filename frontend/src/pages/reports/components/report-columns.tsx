@@ -1,15 +1,12 @@
-import type { EntityCardSlot } from "@/components/entity-card-list";
+import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
-import type { ReactNode } from "react";
 
-export type ReportColumn = {
+// Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
+// di questa entità.
+export type ReportColumn = Omit<EntityColumn<ReportDto>, "key"> & {
     key: keyof ReportDto | "actions";
-    header: string;
-    className?: string;
-    render: (row: ReportDto) => ReactNode;
-    cardSlot?: EntityCardSlot;
 };
 
 export const reportColumns: ReportColumn[] = [
@@ -21,6 +18,8 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "customer",
         header: "Cliente",
+        sortKey: "customer",
+        hideable: false,
         cardSlot: "title",
         render: (row) => row.customer,
     },
@@ -58,21 +57,25 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "dataBackup",
         header: "Backup dati",
-        render: (row) => (row.dataBackup ? "Si" : "No"),
+        render: (row) => (row.dataBackup ? "Sì" : "No"),
     },
     {
         key: "charger",
         header: "Alimentatore",
-        render: (row) => (row.charger ? "Si" : "No"),
+        render: (row) => (row.charger ? "Sì" : "No"),
     },
     {
         key: "totalPrice",
         header: "Prezzo totale",
+        sortKey: "totalPrice",
+        defaultSortDirection: "desc",
         render: (row) => formatEuro(row.totalPrice),
     },
     {
         key: "createdAt",
         header: "Creato il",
+        sortKey: "createdAt",
+        defaultSortDirection: "desc",
         render: (row) => formatDateTime(row.createdAt),
     },
     {

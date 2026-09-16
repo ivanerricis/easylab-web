@@ -77,7 +77,11 @@ export const resolveWidthsToPersist = (
     widths: Record<string, number>,
     elasticColumnKey?: string
 ): Record<string, number> => {
-    const resolved: Record<string, number> = {};
+    // Le colonne che ora non si vedono (nascoste dal menu "Colonne") tengono la larghezza che
+    // avevano: senza, nasconderne una e poi trascinare un bordo la faceva dimenticare.
+    const resolved: Record<string, number> = Object.fromEntries(
+        Object.entries(widths).filter(([columnKey]) => !columnKeys.includes(columnKey))
+    );
 
     for (const columnKey of columnKeys) {
         if (columnKey === elasticColumnKey) {
@@ -121,7 +125,16 @@ export const useResizableColumns = ({
     canMeasure,
 }: UseResizableColumnsOptions) => {
     const tableRef = useRef<HTMLTableElement>(null);
-    const [naturalWidths, setNaturalWidths] = useState<Record<string, number> | null>(null);
+    const [measuredWidths, setNaturalWidths] = useState<Record<string, number> | null>(null);
+    // Una colonna che ricompare dal menu "Colonne" non ha una larghezza naturale: era nascosta
+    // quando la tabella è stata misurata. Allora le misure non valgono più, la tabella torna in
+    // `table-layout: auto` per un render e si rimisura tutta, come al caricamento dei font (vedi
+    // sotto). Le larghezze scelte dall'utente restano in `widths` e hanno la precedenza.
+    const naturalWidths =
+        measuredWidths &&
+        columnKeys.every((columnKey) => columnKey === elasticColumnKey || measuredWidths[columnKey] !== undefined)
+            ? measuredWidths
+            : null;
     const [widths, setWidths] = useState<Record<string, number>>(() => getStoredTableColumnWidths(tableKey));
 
     // Le larghezze naturali servono anche fuori dal render (al salvataggio e al termine del

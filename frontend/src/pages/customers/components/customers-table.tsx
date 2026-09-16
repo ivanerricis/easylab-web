@@ -1,5 +1,7 @@
 import EntityTable from "@/components/entity-table";
+import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
+import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import type { CustomerDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
@@ -16,6 +18,10 @@ type CustomersTableProps = {
     isInitialLoading?: boolean;
     isRefetching?: boolean;
     skeletonRowCount?: number;
+    /** Ordinamento dalle intestazioni e colonne nascoste: vedi `EntityTable`. */
+    sort?: TableSort;
+    onSortChange?: (sort: TableSort) => void;
+    hiddenColumnKeys?: readonly string[];
 };
 
 const CustomersTable = ({
@@ -28,14 +34,13 @@ const CustomersTable = ({
     isInitialLoading,
     isRefetching,
     skeletonRowCount,
+    sort,
+    onSortChange,
+    hiddenColumnKeys,
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
         <>
-            <OpenEntityButton
-                size="icon-lg"
-                onClick={() => onOpenCustomer(row.id)}
-                aria-label={`Apri cliente ${row.id}`}
-            />
+            <OpenEntityButton size="icon-lg" to={entityPaths.customer(row.id)} aria-label={`Apri cliente ${row.id}`} />
             <TableActionButton
                 variant="default"
                 size="icon-lg"
@@ -77,6 +82,9 @@ const CustomersTable = ({
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}
+            sort={sort}
+            onSortChange={onSortChange}
+            hiddenColumnKeys={hiddenColumnKeys}
         />
     );
 };

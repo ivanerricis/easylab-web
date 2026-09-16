@@ -10,7 +10,7 @@ import {
     technicianTable,
 } from "../schema";
 import type { NewReport, UpdateReport } from "../types";
-import { takeUnpaginated } from "./pagination";
+import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { parseIdSearch } from "./search";
 import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
 
@@ -31,6 +31,8 @@ type ListReportsParams = {
     sortOrder?: "asc" | "desc";
     /** Il fuso in cui leggere `dateFrom`/`dateTo`: vedi `timeZone.ts`. */
     timeZone: string;
+    /** Tetto e comportamento senza paginazione: gli export passano `exportRowLimit`. */
+    unpaginatedLimit?: UnpaginatedLimit;
 };
 
 export const listReports = async ({
@@ -45,6 +47,7 @@ export const listReports = async ({
     technicianId,
     sortBy = "createdAt",
     sortOrder = "desc",
+    unpaginatedLimit,
     timeZone,
 }: ListReportsParams) => {
     const trimmedSearch = search?.trim();
@@ -164,7 +167,7 @@ export const listReports = async ({
         .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id));
 
     if (page == null || pageSize == null) {
-        return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "reports");
+        return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "reports", unpaginatedLimit);
     }
 
     /**

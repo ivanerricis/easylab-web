@@ -1,5 +1,7 @@
 import EntityTable from "@/components/entity-table";
+import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
+import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import type { ReportDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
@@ -16,6 +18,10 @@ type ReportsTableProps = {
     isInitialLoading?: boolean;
     isRefetching?: boolean;
     skeletonRowCount?: number;
+    /** Ordinamento dalle intestazioni e colonne nascoste: vedi `EntityTable`. */
+    sort?: TableSort;
+    onSortChange?: (sort: TableSort) => void;
+    hiddenColumnKeys?: readonly string[];
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
@@ -33,14 +39,13 @@ const ReportsTable = ({
     isInitialLoading,
     isRefetching,
     skeletonRowCount,
+    sort,
+    onSortChange,
+    hiddenColumnKeys,
 }: ReportsTableProps) => {
     const renderRowActions = (row: ReportDto) => (
         <>
-            <OpenEntityButton
-                size="icon-lg"
-                onClick={() => onOpenReport(row.id)}
-                aria-label={`Apri report ${row.id}`}
-            />
+            <OpenEntityButton size="icon-lg" to={entityPaths.report(row.id)} aria-label={`Apri report ${row.id}`} />
             <TableActionButton
                 variant="default"
                 size="icon-lg"
@@ -83,6 +88,9 @@ const ReportsTable = ({
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}
+            sort={sort}
+            onSortChange={onSortChange}
+            hiddenColumnKeys={hiddenColumnKeys}
         />
     );
 };

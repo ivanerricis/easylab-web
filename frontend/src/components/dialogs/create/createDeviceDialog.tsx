@@ -27,6 +27,7 @@ const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", ini
     const [name, setName] = useState("");
     const [nameError, setNameError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isDirty = name !== (initialValues?.name ?? "");
 
     useEffect(() => {
         if (open) {
@@ -71,6 +72,7 @@ const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", ini
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={mode === "edit" ? "Modifica dispositivo" : "Nuovo dispositivo"}
             description={
                 mode === "edit"

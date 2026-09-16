@@ -2,7 +2,9 @@ import EntityCardList, { type EntityCardSlot } from "@/components/entity-card-li
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
+import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 export type EntityColumn<TRow> = {
@@ -13,7 +15,22 @@ export type EntityColumn<TRow> = {
     render: (row: TRow) => ReactNode;
     /** Dove va la colonna nella scheda su mobile: vedi `EntityCardSlot`. */
     cardSlot?: EntityCardSlot;
+    /**
+     * Il campo `sortBy` dell'API che ordina per questa colonna. Solo le colonne che il server
+     * sa ordinare ce l'hanno: un'intestazione cliccabile che non fa niente sarebbe peggio di
+     * una ferma.
+     */
+    sortKey?: string;
+    /** Il verso del primo clic: di norma "asc" per i testi e "desc" per date e importi. */
+    defaultSortDirection?: SortDirection;
+    /**
+     * Se il menu "Colonne" può nasconderla (di norma sì). No per le colonne che identificano la
+     * riga, come il cliente: senza, la tabella diventa un elenco di valori senza padrone.
+     */
+    hideable?: boolean;
 };
+
+const ariaSortValue = { asc: "ascending", desc: "descending" } as const;
 
 type EntityTableProps<TRow> = {
     /**
@@ -56,6 +73,19 @@ type EntityTableProps<TRow> = {
     isRefetching?: boolean;
     /** Quante righe-scheletro disegnare: di norma le righe per pagina della tabella. */
     skeletonRowCount?: number;
+    /** L'ordinamento in vigore, per disegnare la freccia sulla colonna giusta. */
+    sort?: TableSort;
+    /**
+     * Con questa, le colonne che hanno un `sortKey` si ordinano cliccando l'intestazione. È un
+     * modo in più, non l'unico: il menu "Ordina per" resta, perché su mobile le intestazioni
+     * non ci sono (la tabella diventa un elenco di schede).
+     */
+    onSortChange?: (sort: TableSort) => void;
+    /**
+     * Colonne da non disegnare, scelte dal menu "Colonne". Valgono solo per la tabella: le
+     * schede su mobile mostrano già un sottoinsieme deciso da `cardSlot`, e lì il menu non c'è.
+     */
+    hiddenColumnKeys?: readonly string[];
 };
 
 /** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
@@ -97,7 +127,7 @@ const maxSkeletonRows = 15;
  */
 const EntityTable = <TRow,>({
     tableKey,
-    columns,
+    columns: allColumns,
     rows,
     getRowKey,
     emptyMessage,
@@ -107,7 +137,17 @@ const EntityTable = <TRow,>({
     isInitialLoading = false,
     isRefetching = false,
     skeletonRowCount = 5,
+    sort,
+    onSortChange,
+    hiddenColumnKeys,
 }: EntityTableProps<TRow>) => {
+    const columns = useMemo(
+        () =>
+            hiddenColumnKeys?.length
+                ? allColumns.filter((column) => !hiddenColumnKeys.includes(column.key))
+                : allColumns,
+        [allColumns, hiddenColumnKeys]
+    );
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
     const visibleSkeletonRows = Math.min(skeletonRowCount, maxSkeletonRows);
 
@@ -151,13 +191,51 @@ const EntityTable = <TRow,>({
                     <TableRow>
                         {columns.map((column) => {
                             const resizeHandleProps = getResizeHandleProps(column.key, column.header);
+                            const sortKey = onSortChange ? column.sortKey : undefined;
+                            const sortDirection = sortKey != null && sort?.key === sortKey ? sort.direction : undefined;
+                            const SortIcon =
+                                sortDirection === "asc" ? ArrowUp : sortDirection === "desc" ? ArrowDown : ArrowUpDown;
 
                             return (
                                 <TableHead
                                     key={column.key}
+                                    // `aria-sort` sulla colonna ordinata: è ciò che fa dire a uno
+                                    // screen reader "ordinata in modo crescente" arrivando lì.
+                                    aria-sort={sortDirection ? ariaSortValue[sortDirection] : undefined}
                                     className={cn("relative", truncateClassName(column.key), column.className)}
                                 >
-                                    {column.header}
+                                    {sortKey != null && onSortChange ? (
+                                        <button
+                                            type="button"
+                                            className={cn(
+                                                // `max-w-full` e `truncate` tengono il titolo dentro la
+                                                // colonna; `pr-2` lascia libera la maniglia di
+                                                // ridimensionamento, che sta sul bordo destro.
+                                                "inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm pr-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                                                sortDirection && "font-semibold"
+                                            )}
+                                            onClick={() =>
+                                                onSortChange({
+                                                    key: sortKey,
+                                                    // Un secondo clic sulla stessa colonna inverte il verso.
+                                                    direction:
+                                                        sortDirection === "asc"
+                                                            ? "desc"
+                                                            : sortDirection === "desc"
+                                                              ? "asc"
+                                                              : (column.defaultSortDirection ?? "asc"),
+                                                })
+                                            }
+                                        >
+                                            <span className="truncate">{column.header}</span>
+                                            <SortIcon
+                                                aria-hidden="true"
+                                                className={cn("size-3.5 shrink-0", !sortDirection && "opacity-50")}
+                                            />
+                                        </button>
+                                    ) : (
+                                        column.header
+                                    )}
                                     {resizeHandleProps ? (
                                         // La maniglia sta dentro il `th` e non a cavallo del bordo:
                                         // l'intestazione è in `overflow: hidden` per troncare il
@@ -234,7 +312,7 @@ const EntityTable = <TRow,>({
 
             <EntityCardList
                 className={cn("sm:hidden", isRefetching && "opacity-60 transition-opacity")}
-                columns={columns.filter((column) => column.key !== actionsColumnKey)}
+                columns={allColumns.filter((column) => column.key !== actionsColumnKey)}
                 rows={rows}
                 getRowKey={getRowKey}
                 getStatusColor={getRowStatusColor}

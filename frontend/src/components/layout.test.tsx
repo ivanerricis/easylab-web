@@ -50,31 +50,47 @@ describe("MainSidebar", () => {
             { route }
         );
 
+    const currentLinks = () =>
+        screen.getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page");
+
     /** Anche dentro una scheda (`/clients/3`) la voce della sezione resta evidenziata. */
     it("evidenzia la sezione corrente, anche nelle sottopagine", () => {
         renderSidebar("/clients/3");
 
-        const active = screen.getAllByRole("button").filter((button) => button.getAttribute("data-active") === "true");
-        expect(active.map((button) => button.textContent)).toEqual(["Clienti"]);
+        expect(currentLinks().map((link) => link.textContent)).toEqual(["Clienti"]);
+        expect(currentLinks()[0]).toHaveAttribute("data-active", "true");
     });
 
     it("non confonde sezioni con lo stesso prefisso", () => {
         // "/reportsx" non è la sezione Report.
         renderSidebar("/reportsx");
 
-        expect(screen.getAllByRole("button").filter((button) => button.getAttribute("data-active") === "true")).toEqual(
-            []
-        );
+        expect(currentLinks()).toEqual([]);
     });
 
-    it("naviga alla voce scelta, impostazioni comprese", async () => {
+    /**
+     * Link veri, non pulsanti: è quello che permette Ctrl+clic e "apri in un'altra scheda".
+     * Il clic normale resta una navigazione interna (qui niente `navigate`: la fa il `Link`).
+     */
+    it("le voci sono link alle sezioni, impostazioni comprese", async () => {
         renderSidebar("/dashboard");
 
-        await userEvent.click(screen.getByRole("button", { name: "Tecnici esterni" }));
-        await userEvent.click(screen.getByRole("button", { name: "Impostazioni" }));
+        expect(screen.getByRole("link", { name: "Tecnici esterni" })).toHaveAttribute("href", "/technicians");
+        expect(screen.getByRole("link", { name: "Impostazioni" })).toHaveAttribute("href", "/settings");
 
-        expect(navigate).toHaveBeenCalledWith("/technicians");
-        expect(navigate).toHaveBeenCalledWith("/settings");
+        await userEvent.click(screen.getByRole("link", { name: "Impostazioni" }));
+
+        await waitFor(() => {
+            expect(screen.getByRole("link", { name: "Impostazioni" })).toHaveAttribute("aria-current", "page");
+        });
+    });
+
+    it("la documentazione si apre in un'altra scheda", () => {
+        renderSidebar("/dashboard");
+
+        const docs = screen.getByRole("link", { name: "Documentazione" });
+        expect(docs).toHaveAttribute("target", "_blank");
+        expect(docs).toHaveAttribute("rel", "noopener noreferrer");
     });
 });
 

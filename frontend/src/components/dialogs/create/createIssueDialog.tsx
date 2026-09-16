@@ -27,6 +27,7 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
     const [description, setDescription] = useState("");
     const [descriptionError, setDescriptionError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isDirty = description !== (initialValues?.description ?? "");
 
     useEffect(() => {
         if (open) {
@@ -71,6 +72,7 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={mode === "edit" ? "Modifica difetto" : "Nuovo difetto"}
             description={
                 mode === "edit"

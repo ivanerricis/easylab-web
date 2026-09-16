@@ -147,9 +147,7 @@ describe("CustomersPage", () => {
     it("apre la scheda del cliente", async () => {
         await renderPage();
 
-        await userEvent.click(within(table()).getByRole("button", { name: "Apri cliente 3" }));
-
-        expect(navigate).toHaveBeenCalledWith("/clients/3");
+        expect(within(table()).getByRole("link", { name: "Apri cliente 3" })).toHaveAttribute("href", "/clients/3");
     });
 
     /** L'esportazione è passata in Impostazioni → Esportazione: qui non deve ricomparire. */

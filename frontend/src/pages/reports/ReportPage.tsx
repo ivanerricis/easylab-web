@@ -1,6 +1,9 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem from "@/components/detail-item";
+import CustomerLink from "@/components/customer-link";
 import LoadingPage from "@/components/loadingPage";
+import NotFoundState from "@/components/not-found-state";
+import { useGoBack } from "@/hooks/useGoBack";
 import RefreshButton from "@/components/refresh-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import { toReportUpdatePayload } from "@/lib/reportForm";
@@ -11,6 +14,7 @@ import {
     createReportTechnician,
     deleteReportTechnician,
     getApiErrorMessage,
+    getApiErrorStatus,
     getReport,
     getReportPrintUrl,
     type ReportEntityDto,
@@ -34,7 +38,7 @@ type ReportPageDetails = {
     techniciansTotal: number;
 };
 
-const yesNo = (value: boolean) => (value ? "Si" : "No");
+const yesNo = (value: boolean) => (value ? "Sì" : "No");
 
 const paymentMethodLabel = (value: ReportEntityDto["paymentMethod"]) => {
     if (value === "cash") {
@@ -76,9 +80,10 @@ const ReportPage = () => {
 
     const hasValidReportId = useMemo(() => Number.isInteger(reportId) && reportId > 0, [reportId]);
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+    // Un id che non esiste (404) non è un errore da segnalare e da cui scappare: è una scheda
+    // da mostrare come "non trovata", lasciando l'indirizzo com'è. Vedi `NotFoundState`.
+    const [isNotFound, setIsNotFound] = useState(false);
+    const handleBack = useGoBack("/reports");
 
     const handlePrintReport = () => {
         if (!details) {
@@ -155,8 +160,6 @@ const ReportPage = () => {
 
     useEffect(() => {
         if (!hasValidReportId) {
-            toast.error("Report non valido");
-            navigate("/reports");
             return;
         }
 
@@ -165,6 +168,11 @@ const ReportPage = () => {
                 setIsLoading(true);
                 await loadDetails();
             } catch (error) {
+                if (getApiErrorStatus(error) === 404) {
+                    setIsNotFound(true);
+                    return;
+                }
+
                 toast.error(getApiErrorMessage(error, "Impossibile caricare il report"));
                 navigate("/reports");
             } finally {
@@ -174,6 +182,17 @@ const ReportPage = () => {
 
         void loadData();
     }, [hasValidReportId, navigate, loadDetails]);
+
+    if (!hasValidReportId || isNotFound) {
+        return (
+            <NotFoundState
+                title="Report non trovato"
+                description="Il report che cerchi non esiste, oppure è stato eliminato."
+                backTo="/reports"
+                backLabel="Vai ai report"
+            />
+        );
+    }
 
     if (isLoading) {
         return <LoadingPage />;
@@ -309,7 +328,10 @@ const ReportPage = () => {
                         <CardTitle className="text-primary">Anagrafica</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem label="Cliente" value={details.customerName} />
+                        <DetailItem
+                            label="Cliente"
+                            value={<CustomerLink customerId={details.report.customerId} name={details.customerName} />}
+                        />
                         <DetailItem label="Telefono" value={details.customerPhone ?? "-"} />
                         <DetailItem label="Collaboratore" value={details.collaboratorName} />
                         <DetailItem label="Dispositivo" value={details.deviceName} />

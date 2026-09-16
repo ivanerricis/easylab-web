@@ -23,6 +23,7 @@ import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting"
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
 import { toCsv } from "../services/csv";
+import { exportRowLimit } from "../db/queries/pagination";
 
 const interventionsRouter = Router();
 
@@ -242,6 +243,7 @@ interventionsRouter.get("/export.csv", validate({ query: interventionExportQuery
         sortBy,
         sortOrder,
         timeZone: await getAppTimeZone(),
+        unpaginatedLimit: exportRowLimit,
     });
     const rows = Array.isArray(interventions) ? interventions : interventions.items;
 

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
     createReportTechnician,
     getApiErrorMessage,
+    getApiErrorStatus,
     getTechnician,
     listReports,
     deleteReportTechnician,
@@ -26,6 +27,9 @@ import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import OpenEntityButton from "@/components/open-entity-button";
+import NotFoundState from "@/components/not-found-state";
+import { useGoBack } from "@/hooks/useGoBack";
+import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
@@ -59,12 +63,12 @@ const TechnicianPage = () => {
 
     const hasValidTechnicianId = useMemo(() => Number.isInteger(technicianId) && technicianId > 0, [technicianId]);
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+    // Vedi lo stesso stato in `ReportPage`: un tecnico che non esiste si mostra come tale.
+    const [isNotFound, setIsNotFound] = useState(false);
+    const handleBack = useGoBack("/technicians");
 
     const handleOpenReport = (reportId: number) => {
-        navigate(`/reports/${reportId}`);
+        navigate(entityPaths.report(reportId));
     };
 
     const handleOpenEditDialog = (report: ReportDto) => {
@@ -124,6 +128,11 @@ const TechnicianPage = () => {
         try {
             setTechnician(await getTechnician(technicianId));
         } catch (error) {
+            if (getApiErrorStatus(error) === 404) {
+                setIsNotFound(true);
+                return;
+            }
+
             toast.error(getApiErrorMessage(error, "Impossibile caricare il tecnico"));
         }
     }, [technicianId]);
@@ -134,8 +143,6 @@ const TechnicianPage = () => {
 
     useEffect(() => {
         if (!hasValidTechnicianId) {
-            toast.error("Tecnico non valido");
-            navigate("/technicians");
             return;
         }
 
@@ -148,7 +155,18 @@ const TechnicianPage = () => {
                 setIsTechnicianLoading(false);
             }
         })();
-    }, [hasValidTechnicianId, loadTechnician, navigate]);
+    }, [hasValidTechnicianId, loadTechnician]);
+
+    if (!hasValidTechnicianId || isNotFound) {
+        return (
+            <NotFoundState
+                title="Tecnico non trovato"
+                description="Il tecnico che cerchi non esiste, oppure è stato eliminato."
+                backTo="/technicians"
+                backLabel="Vai ai tecnici esterni"
+            />
+        );
+    }
 
     if (isTechnicianLoading) {
         return <LoadingPage />;
@@ -215,7 +233,7 @@ const TechnicianPage = () => {
                             <>
                                 <OpenEntityButton
                                     size="icon-lg"
-                                    onClick={() => handleOpenReport(row.id)}
+                                    to={entityPaths.report(row.id)}
                                     aria-label={`Apri report ${row.id}`}
                                 />
                                 <TableActionButton

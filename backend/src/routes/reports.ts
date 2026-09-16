@@ -15,6 +15,7 @@ import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTa
 import { createReportPdfBuffer } from "../services/reportPdf";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
+import { exportRowLimit } from "../db/queries/pagination";
 import { formatDateLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
@@ -162,6 +163,7 @@ reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), a
         sortBy,
         sortOrder,
         timeZone: await getAppTimeZone(),
+        unpaginatedLimit: exportRowLimit,
     });
     const rows = Array.isArray(reports) ? reports : reports.items;
 

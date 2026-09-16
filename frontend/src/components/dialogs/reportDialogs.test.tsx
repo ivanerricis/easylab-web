@@ -146,7 +146,7 @@ describe("CreateReportDialog", () => {
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
         expect(screen.queryByLabelText(/^Problema riscontrato/)).not.toBeInTheDocument();
         await userEvent.type(screen.getByLabelText("Password sblocco"), "1234");
-        await chooseOption(/^Alimentatore presente/, "Si");
+        await chooseOption(/^Alimentatore presente/, "Sì");
         await chooseOption(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
@@ -164,7 +164,8 @@ describe("CreateReportDialog", () => {
             dataBackup: false,
         });
         expect(listCustomers).toHaveBeenCalledWith({ pageSize: 8, search: "mario" });
-        expect(toastSuccess).toHaveBeenCalledWith("Report creato con successo");
+        // L'avviso di creazione lo dà la pagina, con il numero e le azioni (`showCreatedToast`).
+        expect(toastSuccess).not.toHaveBeenCalled();
     });
 
     /**
@@ -181,7 +182,7 @@ describe("CreateReportDialog", () => {
         await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "smart", "Smartphone");
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "alt", "Altro");
         await chooseOption(/^Alimentatore presente/, "No");
-        await chooseOption(/^Backup dati/, "Si");
+        await chooseOption(/^Backup dati/, "Sì");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         expect(screen.getByRole("alert")).toHaveTextContent('Con il difetto "Altro" va descritto il problema');

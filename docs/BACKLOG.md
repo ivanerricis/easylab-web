@@ -17,6 +17,21 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   ultime tabelle scritte a mano fuori da `EntityTable`. Dal CHANGELOG del 2026-09-08; le schede
   di cliente, collaboratore e tecnico, citate nella stessa voce, sono state coperte il 09-10 e
   il 09-11.
+- Proposte dalla revisione dell'interfaccia del 2026-09-16, da decidere se farle (quelle scelte
+  subito sono nel CHANGELOG dello stesso giorno):
+  - **Password del dispositivo in chiaro.** La lista report ha una colonna Password, e la
+    scheda la mostra per intero: chi passa davanti allo schermo al banco la legge. Proposta:
+    `••••` con un pulsante per mostrarla o copiarla, in lista e in scheda.
+  - **Azioni rapide nella scheda del report.** Chiudere il report o segnare "Avvisato" oggi
+    passa dal dialogo di modifica. Proposta: due pulsanti diretti, e il telefono come link
+    `tel:` (ed eventualmente WhatsApp per avvisare il cliente). Il nome del cliente come link
+    è già fatto (CHANGELOG del 2026-09-16).
+  - **Menu "Colonne" e ordinamento nelle altre tabelle.** Fatti per report, interventi e
+    clienti (CHANGELOG del 2026-09-16). Restano fuori le quattro anagrafiche, che hanno poche
+    colonne e un server che non le ordina, e le tabelle dentro le schede di cliente,
+    collaboratore e tecnico.
+  - **Selezione multipla nelle liste.** Per esempio chiudere o stampare più report insieme.
+    Priorità bassa: ha senso solo se capita spesso.
 
 - Nome scelto per il dispositivo di una sessione. Oggi l'elenco di Impostazioni → Utenti mostra
   l'etichetta ricavata dallo `User-Agent` ("Chrome su Windows", vedi CHANGELOG del 2026-09-16):

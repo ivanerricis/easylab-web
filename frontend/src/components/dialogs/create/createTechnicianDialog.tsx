@@ -1,10 +1,10 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
-import { fieldProps } from "@/lib/formField";
+import { fieldProps, hasFormChanged } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api";
 import type { TechnicianDto } from "@/types/dtos";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -38,19 +38,25 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
     const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const initialFormValues = useMemo(
+        () => ({
+            firstName: initialValues?.firstName ?? "",
+            lastName: initialValues?.lastName ?? "",
+            phoneNumber: initialValues?.phoneNumber ?? "",
+            vatNumber: initialValues?.vatNumber ?? "",
+        }),
+        [initialValues]
+    );
+    const isDirty = hasFormChanged(formValues, initialFormValues);
+
     useEffect(() => {
         if (open) {
             startTransition(() => {
-                setFormValues({
-                    firstName: initialValues?.firstName ?? "",
-                    lastName: initialValues?.lastName ?? "",
-                    phoneNumber: initialValues?.phoneNumber ?? "",
-                    vatNumber: initialValues?.vatNumber ?? "",
-                });
+                setFormValues(initialFormValues);
                 setErrors({});
             });
         }
-    }, [open, initialValues]);
+    }, [open, initialFormValues]);
 
     const handleConfirm = async () => {
         // Tutti gli errori insieme, non uno alla volta: prima il primo campo vuoto faceva
@@ -102,6 +108,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={mode === "edit" ? "Modifica tecnico" : "Nuovo tecnico"}
             description={
                 mode === "edit"

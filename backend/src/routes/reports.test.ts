@@ -62,6 +62,7 @@ import { getLabConfig } from "../config/lab";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import reportsRouter from "./reports";
 import { errorHandler } from "../middleware/errorHandler";
+import { ExportTooLargeError, exportRowLimit } from "../db/queries/pagination";
 
 const buildApp = () => {
     const app = express();
@@ -214,6 +215,7 @@ describe("reports router", () => {
                 visibility: "closed",
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
+                unpaginatedLimit: exportRowLimit,
             });
             expect(response.text).toContain("Metodo di pagamento");
             expect(response.text).toContain("Contanti");
@@ -226,6 +228,17 @@ describe("reports router", () => {
 
             expect(response.status).toBe(200);
             expect(vi.mocked(listReports).mock.calls[0][0]).toMatchObject({ visibility: "all" });
+        });
+
+        /** Un file troncato sembrerebbe completo: meglio un errore che chieda di restringere i filtri. */
+        it("oltre il tetto dell'export risponde 400 con il messaggio della query, senza file", async () => {
+            vi.mocked(listReports).mockRejectedValue(new ExportTooLargeError("L'esportazione supera il tetto", 400));
+
+            const response = await request(buildApp()).get("/api/reports/export.csv");
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toBe("L'esportazione supera il tetto");
+            expect(response.headers["content-type"]).not.toContain("text/csv");
         });
 
         it("rifiuta un sortBy fuori dall'insieme consentito, come la lista", async () => {

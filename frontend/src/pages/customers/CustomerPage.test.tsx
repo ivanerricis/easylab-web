@@ -144,18 +144,18 @@ describe("CustomerPage", () => {
     it("apre il report dalla riga", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
-        await userEvent.click(await within(screen.getByRole("table")).findByRole("button", { name: "Apri report 5" }));
-
-        expect(navigate).toHaveBeenCalledWith("/reports/5");
+        expect(await within(screen.getByRole("table")).findByRole("link", { name: "Apri report 5" })).toHaveAttribute(
+            "href",
+            "/reports/5"
+        );
     });
 
-    it("torna all'elenco con un id non valido", async () => {
+    it("mostra 'non trovato' con un id non valido", async () => {
         renderWithProviders(<CustomerPage />, { route: "/clients/0", path: "/clients/:id" });
 
-        await waitFor(() => {
-            expect(navigate).toHaveBeenCalledWith("/clients");
-        });
-        expect(toastError).toHaveBeenCalledWith("Cliente non valido");
+        expect(await screen.findByRole("heading", { name: "Cliente non trovato" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Vai ai clienti" })).toHaveAttribute("href", "/clients");
+        expect(toastError).not.toHaveBeenCalled();
         expect(api.getCustomer).not.toHaveBeenCalled();
     });
 });

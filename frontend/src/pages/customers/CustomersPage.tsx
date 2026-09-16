@@ -3,6 +3,9 @@ import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/di
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import PageHeader from "@/components/page-header";
+import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useHiddenColumns } from "@/hooks/useHiddenColumns";
+import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,11 +24,14 @@ import { useNavigate } from "react-router-dom";
 import { customerColumns } from "./components/customer-columns";
 import CustomersFilters from "./components/customers-filters";
 import CustomersTable from "./components/customers-table";
-import { DEFAULT_CUSTOMER_SORT_OPTION, type CustomerSortOption } from "./components/types";
+import { customerSortOptions, DEFAULT_CUSTOMER_SORT_OPTION, type CustomerSortOption } from "./components/types";
 import { useCustomersRows } from "./hooks/useCustomersRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
+import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow, trimOrNull } from "@/lib/utils";
+import { entityPaths } from "@/lib/entityPaths";
+
+const sortOptionValues = customerSortOptions.map((option) => option.value);
 
 type CustomerPrintKind = "reports" | "interventions";
 
@@ -42,25 +48,41 @@ const CustomersPage = () => {
     const navigate = useNavigate();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [searchText, setSearchText] = useState("");
-    const [sortOption, setSortOption] = useState<CustomerSortOption>(DEFAULT_CUSTOMER_SORT_OPTION);
+    // Ricerca, ordinamento e pagina stanno nell'indirizzo: vedi `useListUrlState`.
+    const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
+    const sortOption = readEnumParam(searchParams, listUrlParams.sort, sortOptionValues, DEFAULT_CUSTOMER_SORT_OPTION);
+    const committedSearchText = searchParams.get(listUrlParams.search) ?? "";
+    const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
+        updateParams({ [listUrlParams.search]: value })
+    );
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [customerToEdit, setCustomerToEdit] = useState<CustomerDto | null>(null);
     const [customerToDelete, setCustomerToDelete] = useState<CustomerDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [printCustomerId, setPrintCustomerId] = useState<number | null>(null);
     const [printKind, setPrintKind] = useState<CustomerPrintKind>("reports");
-    const [pageSize, setPageSize] = useTableRowsPerPage("customers");
-    const { currentPage, setCurrentPage } = useTablePagination({
-        resetDependencies: [searchText, sortOption, pageSize],
-    });
+    const [pageSize, setStoredPageSize] = useTableRowsPerPage("customers");
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("customers");
     const { customerRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadCustomers } =
         useCustomersRows({
-            searchText,
+            searchText: committedSearchText,
             sortOption,
             currentPage,
             pageSize,
         });
+
+    const handleSortOptionChange = (value: CustomerSortOption) =>
+        updateParams({ [listUrlParams.sort]: value === DEFAULT_CUSTOMER_SORT_OPTION ? null : value });
+
+    // Dalle intestazioni arrivano solo le coppie campo/verso che le colonne dichiarano, e sono
+    // tutte fra le opzioni del menu: il cast non allarga niente.
+    const handleTableSortChange = (nextSort: TableSort) =>
+        handleSortOptionChange(formatSortOption(nextSort) as CustomerSortOption);
+
+    const setPageSize = (nextPageSize: typeof pageSize) => {
+        setStoredPageSize(nextPageSize);
+        resetPage();
+    };
 
     const handleCreateCustomer = async (values: CustomerSubmitValues) => {
         await createCustomer(toCustomerPayload(values));
@@ -96,7 +118,7 @@ const CustomersPage = () => {
     };
 
     const handleOpenCustomer = (id: number) => {
-        navigate(`/clients/${id}`);
+        navigate(entityPaths.customer(id));
     };
 
     const handlePrintCustomer = (id: number) => {
@@ -219,7 +241,15 @@ const CustomersPage = () => {
                 searchText={searchText}
                 onSearchTextChange={setSearchText}
                 sortOption={sortOption}
-                onSortOptionChange={setSortOption}
+                onSortOptionChange={handleSortOptionChange}
+                columnsMenu={
+                    <ColumnVisibilityMenu
+                        columns={customerColumns}
+                        hiddenColumnKeys={hiddenColumnKeys}
+                        onColumnVisibleChange={setColumnVisible}
+                        onShowAll={showAllColumns}
+                    />
+                }
                 onRefresh={loadCustomers}
                 isRefreshing={isLoading}
             />
@@ -231,6 +261,9 @@ const CustomersPage = () => {
                         isRefetching={isRefetching}
                         skeletonRowCount={pageSize}
                         columns={customerColumns}
+                        sort={parseSortOption(sortOption)}
+                        onSortChange={handleTableSortChange}
+                        hiddenColumnKeys={hiddenColumnKeys}
                         rows={customerRows}
                         onOpenCustomer={handleOpenCustomer}
                         onPrintCustomer={handlePrintCustomer}

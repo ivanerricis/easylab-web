@@ -2,13 +2,16 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import OpenEntityButton from "@/components/open-entity-button";
+import NotFoundState from "@/components/not-found-state";
+import { useGoBack } from "@/hooks/useGoBack";
+import { entityPaths } from "@/lib/entityPaths";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getApiErrorMessage, getCollaborator, listInterventions, listReports } from "@/lib/api";
+import { getApiErrorMessage, getApiErrorStatus, getCollaborator, listInterventions, listReports } from "@/lib/api";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -63,16 +66,16 @@ const CollaboratorPage = () => {
         [collaboratorId]
     );
 
-    const handleBack = () => {
-        navigate(-1);
-    };
+    // Vedi lo stesso stato in `ReportPage`: un collaboratore che non esiste si mostra come tale.
+    const [isNotFound, setIsNotFound] = useState(false);
+    const handleBack = useGoBack("/collaborators");
 
     const handleOpenReport = (reportId: number) => {
-        navigate(`/reports/${reportId}`);
+        navigate(entityPaths.report(reportId));
     };
 
     const handleOpenIntervention = (interventionId: number) => {
-        navigate(`/interventions/${interventionId}`);
+        navigate(entityPaths.intervention(interventionId));
     };
 
     // Le due sezioni si impaginano per conto proprio: righe per pagina e pagina corrente sono
@@ -137,8 +140,6 @@ const CollaboratorPage = () => {
 
     useEffect(() => {
         if (!hasValidCollaboratorId) {
-            toast.error("Collaboratore non valido");
-            navigate("/collaborators");
             return;
         }
 
@@ -154,12 +155,28 @@ const CollaboratorPage = () => {
                 const collaborator = await getCollaborator(collaboratorId);
                 setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
             } catch (error) {
+                if (getApiErrorStatus(error) === 404) {
+                    setIsNotFound(true);
+                    return;
+                }
+
                 toast.error(getApiErrorMessage(error, "Impossibile caricare il collaboratore"));
             } finally {
                 setIsCollaboratorLoading(false);
             }
         })();
-    }, [collaboratorId, hasValidCollaboratorId, navigate]);
+    }, [collaboratorId, hasValidCollaboratorId]);
+
+    if (!hasValidCollaboratorId || isNotFound) {
+        return (
+            <NotFoundState
+                title="Collaboratore non trovato"
+                description="Il collaboratore che cerchi non esiste, oppure è stato eliminato."
+                backTo="/collaborators"
+                backLabel="Vai ai collaboratori"
+            />
+        );
+    }
 
     if (isCollaboratorLoading) {
         return <LoadingPage />;
@@ -223,7 +240,7 @@ const CollaboratorPage = () => {
                             renderRowActions={(row) => (
                                 <OpenEntityButton
                                     size="icon-lg"
-                                    onClick={() => handleOpenReport(row.id)}
+                                    to={entityPaths.report(row.id)}
                                     aria-label={`Apri report ${row.id}`}
                                 />
                             )}
@@ -276,7 +293,7 @@ const CollaboratorPage = () => {
                             renderRowActions={(row) => (
                                 <OpenEntityButton
                                     size="icon-lg"
-                                    onClick={() => handleOpenIntervention(row.id)}
+                                    to={entityPaths.intervention(row.id)}
                                     aria-label={`Apri intervento ${row.id}`}
                                 />
                             )}

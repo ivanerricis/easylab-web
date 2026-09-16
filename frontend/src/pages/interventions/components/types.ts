@@ -8,7 +8,9 @@ export type InterventionSortOption =
     | "interventionDate:asc"
     | "interventionDate:desc"
     | "customer:asc"
-    | "customer:desc";
+    | "customer:desc"
+    | "status:desc"
+    | "status:asc";
 
 export const DEFAULT_INTERVENTION_SORT_OPTION: InterventionSortOption = "createdAt:desc";
 
@@ -19,4 +21,6 @@ export const interventionSortOptions: { value: InterventionSortOption; label: st
     { value: "interventionDate:desc", label: "Data intervento decrescente" },
     { value: "customer:asc", label: "Cliente (A-Z)" },
     { value: "customer:desc", label: "Cliente (Z-A)" },
+    { value: "status:desc", label: "Stato (prima i programmati)" },
+    { value: "status:asc", label: "Stato (prima i completati)" },
 ];

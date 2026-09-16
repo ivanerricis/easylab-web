@@ -47,6 +47,7 @@ import { createCustomerInterventionsPdfBuffer } from "../services/interventionPd
 import { getLabConfig } from "../config/lab";
 import customersRouter from "./customers";
 import { errorHandler } from "../middleware/errorHandler";
+import { exportRowLimit } from "../db/queries/pagination";
 
 const buildApp = () => {
     const app = express();
@@ -108,7 +109,7 @@ describe("customers router", () => {
         expect(response.status).toBe(200);
         expect(response.headers["content-type"]).toContain("text/csv");
         expect(response.headers["content-disposition"]).toContain("clienti.csv");
-        expect(listCustomers).toHaveBeenCalledWith({ search: "mario" });
+        expect(listCustomers).toHaveBeenCalledWith({ search: "mario", unpaginatedLimit: exportRowLimit });
         expect(response.text).toContain("ID,Nome,Cognome,Email,Telefono,Telefono secondario,Città,Creato il");
         expect(response.text).toContain("5,Mario,Rossi,mario@example.com,0212345678,,Milano,");
     });

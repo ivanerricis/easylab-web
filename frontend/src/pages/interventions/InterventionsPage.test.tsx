@@ -148,10 +148,9 @@ describe("InterventionsPage", () => {
     });
 
     /** La nota era raccolta dal dialogo e poi scartata dalla pagina: ora deve arrivare all'API. */
-    it("crea l'intervento passando anche la nota, e propone di stamparlo", async () => {
+    it("crea l'intervento passando anche la nota, e offre di aprirlo o stamparlo", async () => {
         resolveCustomerId.mockResolvedValue(30);
         createIntervention.mockResolvedValue({ id: 77 });
-        vi.spyOn(window, "confirm").mockReturnValue(true);
         submitValues = { ...formValues, customer: "Mario Rossi - 333", customerId: null };
         await renderPage();
 
@@ -159,10 +158,23 @@ describe("InterventionsPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
-            expect(openPrintWindow).toHaveBeenCalledWith("/api/interventions/77/print");
+            expect(toastSuccess).toHaveBeenCalledWith("Intervento #77 creato", expect.any(Object));
         });
         expect(resolveCustomerId).toHaveBeenCalledWith(null, "Mario Rossi - 333");
         expect(createIntervention).toHaveBeenCalledWith({ ...formValues, customerId: 30 });
+        // Niente stampa finché non la si chiede dall'avviso.
+        expect(openPrintWindow).not.toHaveBeenCalled();
+
+        const options = toastSuccess.mock.calls[0][1] as {
+            action: { label: string; onClick: () => void };
+            cancel: { label: string; onClick: () => void };
+        };
+        expect(options.action.label).toBe("Stampa");
+        expect(options.cancel.label).toBe("Apri");
+        options.action.onClick();
+        options.cancel.onClick();
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/interventions/77/print");
+        expect(navigate).toHaveBeenCalledWith("/interventions/77");
     });
 
     it("lascia al dialogo l'errore di creazione, senza mostrarlo una seconda volta", async () => {
@@ -231,9 +243,11 @@ describe("InterventionsPage", () => {
         deleteIntervention.mockResolvedValue({});
         await renderPage();
 
-        await userEvent.click(within(table()).getByRole("button", { name: "Apri intervento 9" }));
+        expect(within(table()).getByRole("link", { name: "Apri intervento 9" })).toHaveAttribute(
+            "href",
+            "/interventions/9"
+        );
         await userEvent.click(within(table()).getByRole("button", { name: "Stampa intervento 9" }));
-        expect(navigate).toHaveBeenCalledWith("/interventions/9");
         expect(openPrintWindow).toHaveBeenCalledWith("/api/interventions/9/print");
 
         await userEvent.click(within(table()).getByRole("button", { name: "Elimina intervento 9" }));

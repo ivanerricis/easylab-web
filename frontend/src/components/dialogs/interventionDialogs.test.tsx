@@ -146,7 +146,8 @@ describe("CreateInterventionDialog", () => {
                 endTime: null,
             });
         });
-        expect(toastSuccess).toHaveBeenCalledWith("Intervento creato con successo");
+        // L'avviso di creazione lo dà la pagina, con il numero e le azioni (`showCreatedToast`).
+        expect(toastSuccess).not.toHaveBeenCalled();
     });
 
     it("il prezzo è facoltativo ma, se indicato, viaggia come numero", async () => {

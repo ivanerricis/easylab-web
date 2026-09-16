@@ -128,13 +128,13 @@ describe("CollaboratorPage", () => {
         ).toBeInTheDocument();
     });
 
-    it("torna all'elenco con un id non valido", async () => {
+    it("mostra 'non trovato' con un id non valido", async () => {
         renderWithProviders(<CollaboratorPage />, { route: "/collaborators/x", path: "/collaborators/:id" });
 
-        await waitFor(() => {
-            expect(navigate).toHaveBeenCalledWith("/collaborators");
-        });
-        expect(toastError).toHaveBeenCalledWith("Collaboratore non valido");
+        expect(await screen.findByRole("heading", { name: "Collaboratore non trovato" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Vai ai collaboratori" })).toHaveAttribute("href", "/collaborators");
+        expect(navigate).not.toHaveBeenCalled();
+        expect(toastError).not.toHaveBeenCalled();
     });
 });
 
@@ -185,17 +185,19 @@ describe("elenchi di collaboratori e tecnici", () => {
             page([{ id: 50, firstName: "Paolo", lastName: "Neri", phoneNumber: null, vatNumber: null, ...timestamps }])
         );
 
+        // "Apri" è un link (si apre anche in un'altra scheda); il doppio clic naviga.
         const { unmount } = renderWithProviders(<CollaboratorsPage />);
-        await userEvent.click(
-            await within(screen.getByRole("table")).findByRole("button", { name: "Apri collaboratore 40" })
-        );
+        expect(
+            await within(screen.getByRole("table")).findByRole("link", { name: "Apri collaboratore 40" })
+        ).toHaveAttribute("href", "/collaborators/40");
+        await userEvent.dblClick(within(screen.getByRole("table")).getByText("Luca"));
         expect(navigate).toHaveBeenCalledWith("/collaborators/40");
         unmount();
 
         renderWithProviders(<TechniciansPage />);
-        await userEvent.click(
-            await within(screen.getByRole("table")).findByRole("button", { name: "Apri tecnico 50" })
+        expect(await within(screen.getByRole("table")).findByRole("link", { name: "Apri tecnico 50" })).toHaveAttribute(
+            "href",
+            "/technicians/50"
         );
-        expect(navigate).toHaveBeenCalledWith("/technicians/50");
     });
 });

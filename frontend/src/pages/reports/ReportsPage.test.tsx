@@ -109,6 +109,8 @@ vi.mock("@/components/dialogs/edit/editReportDialog", () => ({
 
 import ReportsPage from "./ReportsPage";
 import { renderWithProviders } from "@/test/render";
+import { currentLocation } from "@/test/currentLocation";
+import { LocationProbe } from "@/test/locationProbe";
 
 const buildReport = (id: number, overrides: Record<string, unknown> = {}) => ({
     id,
@@ -205,6 +207,150 @@ describe("ReportsPage", () => {
         expect(screen.getByRole("combobox", { name: "Filtra per stato" })).toHaveTextContent("Report chiusi");
     });
 
+    /**
+     * Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: tornando da una scheda con
+     * "Indietro" (o da un link) la lista si ripresenta com'era.
+     */
+    it("riprende ricerca, ordinamento, date e pagina dall'indirizzo", async () => {
+        api.listReports.mockResolvedValue({ ...page([buildReport(1)]), totalItems: 40, totalPages: 4 });
+        renderWithProviders(<ReportsPage />, {
+            route: "/reports?visibility=all&q=rossi&sort=customer:asc&from=2026-09-01&to=2026-09-30&page=3",
+        });
+        await within(table()).findByText("Cliente 1");
+
+        expect(api.listReports).toHaveBeenCalledTimes(1);
+        expect(api.listReports).toHaveBeenCalledWith(
+            expect.objectContaining({
+                page: 3,
+                search: "rossi",
+                visibility: "all",
+                sortBy: "customer",
+                sortOrder: "asc",
+                dateFrom: "2026-09-01",
+                dateTo: "2026-09-30",
+            })
+        );
+        expect(screen.getByRole("searchbox", { name: "Cerca report..." })).toHaveValue("rossi");
+    });
+
+    it("scrive la ricerca nell'indirizzo dopo la pausa, tornando alla prima pagina", async () => {
+        api.listReports.mockResolvedValue({ ...page([buildReport(1)]), totalItems: 40, totalPages: 4 });
+        renderWithProviders(
+            <>
+                <ReportsPage />
+                <LocationProbe />
+            </>,
+            { route: "/reports?page=3&sort=customer:asc" }
+        );
+        await within(table()).findByText("Cliente 1");
+
+        await userEvent.type(screen.getByRole("searchbox", { name: "Cerca report..." }), "mario");
+
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({ q: "mario", sort: "customer:asc" });
+        });
+        await waitFor(() => {
+            expect(api.listReports).toHaveBeenLastCalledWith(expect.objectContaining({ search: "mario", page: 1 }));
+        });
+        // Una richiesta per la pagina iniziale e una per la ricerca, non una per tasto.
+        expect(api.listReports).toHaveBeenCalledTimes(2);
+    });
+
+    it("un valore sconosciuto nell'indirizzo ricade sul default", async () => {
+        await renderPage("/reports?sort=boh&from=ieri&page=-2");
+
+        expect(api.listReports).toHaveBeenCalledWith(
+            expect.objectContaining({ sortBy: "createdAt", sortOrder: "desc", dateFrom: undefined, page: 1 })
+        );
+    });
+
+    it("cambiare filtro torna alla prima pagina e non tocca il resto", async () => {
+        api.listReports.mockResolvedValue({ ...page([buildReport(1)]), totalItems: 40, totalPages: 4 });
+        renderWithProviders(
+            <>
+                <ReportsPage />
+                <LocationProbe />
+            </>,
+            { route: "/reports?page=2&q=rossi" }
+        );
+        await within(table()).findByText("Cliente 1");
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Filtra per stato" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Report chiusi" }));
+
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({ q: "rossi", visibility: "closed" });
+        });
+    });
+
+    /** Le intestazioni ordinano come il menu "Ordina per", e scrivono lo stesso parametro. */
+    it("ordina cliccando l'intestazione, e il menu resta allineato", async () => {
+        renderWithProviders(
+            <>
+                <ReportsPage />
+                <LocationProbe />
+            </>,
+            { route: "/reports?page=2" }
+        );
+        await within(table()).findByText("Cliente 1");
+
+        // Di default si ordina per data di creazione, dalla più recente.
+        expect(within(table()).getByRole("columnheader", { name: "Creato il" })).toHaveAttribute(
+            "aria-sort",
+            "descending"
+        );
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Prezzo totale" }));
+
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({ sort: "totalPrice:desc" });
+        });
+        await waitFor(() => {
+            expect(api.listReports).toHaveBeenLastCalledWith(
+                expect.objectContaining({ sortBy: "totalPrice", sortOrder: "desc", page: 1 })
+            );
+        });
+        expect(screen.getByRole("combobox", { name: "Ordina per" })).toHaveTextContent("Prezzo più alto");
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Prezzo totale" }));
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({ sort: "totalPrice:asc" });
+        });
+
+        // Tornare all'ordinamento di default toglie il parametro.
+        await userEvent.click(within(table()).getByRole("button", { name: "Creato il" }));
+        await waitFor(() => {
+            expect(currentLocation().params).toEqual({});
+        });
+    });
+
+    it("nasconde le colonne scelte dal menu, e se lo ricorda", async () => {
+        const { unmount } = renderWithProviders(<ReportsPage />, { route: "/reports" });
+        await within(table()).findByText("Cliente 1");
+
+        await userEvent.click(screen.getByRole("button", { name: "Colonne" }));
+        // Il cliente identifica la riga: c'è, ma non si toglie.
+        expect(screen.getByRole("menuitemcheckbox", { name: "Cliente" })).toHaveAttribute("aria-disabled", "true");
+        await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Password" }));
+        await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Backup dati" }));
+        await userEvent.keyboard("{Escape}");
+
+        expect(within(table()).queryByRole("columnheader", { name: "Password" })).not.toBeInTheDocument();
+        expect(within(table()).queryByRole("columnheader", { name: "Backup dati" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 2 nascoste" })).toBeInTheDocument();
+        unmount();
+
+        renderWithProviders(<ReportsPage />, { route: "/reports" });
+        await within(table()).findByText("Cliente 1");
+        expect(within(table()).queryByRole("columnheader", { name: "Password" })).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
+        await userEvent.click(screen.getByRole("menuitem", { name: "Mostra tutte" }));
+
+        expect(within(table()).getByRole("columnheader", { name: "Password" })).toBeInTheDocument();
+        expect(within(table()).getByRole("columnheader", { name: "Backup dati" })).toBeInTheDocument();
+    });
+
     it("ignora un filtro di stato sconosciuto nell'indirizzo", async () => {
         await renderPage("/reports?visibility=boh");
 
@@ -221,10 +367,9 @@ describe("ReportsPage", () => {
     it("apre la scheda e stampa dalla riga", async () => {
         await renderPage();
 
-        await userEvent.click(within(table()).getByRole("button", { name: "Apri report 2" }));
+        expect(within(table()).getByRole("link", { name: "Apri report 2" })).toHaveAttribute("href", "/reports/2");
         await userEvent.click(within(table()).getByRole("button", { name: "Stampa report 1" }));
 
-        expect(navigate).toHaveBeenCalledWith("/reports/2");
         expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/1/print");
     });
 
@@ -301,7 +446,7 @@ describe("ReportsPage", () => {
         });
     });
 
-    it("crea il report con i riferimenti risolti e propone di stamparlo", async () => {
+    it("crea il report con i riferimenti risolti e offre di aprirlo o stamparlo", async () => {
         resolveReportReferences.mockResolvedValue({
             customerId: 30,
             deviceId: 10,
@@ -309,7 +454,6 @@ describe("ReportsPage", () => {
             issueDescription: null,
         });
         api.createReport.mockResolvedValue({ id: 99 });
-        const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
         createValues = {
             customer: "Mario Rossi - 333",
             deviceType: "Notebook",
@@ -329,7 +473,7 @@ describe("ReportsPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
-            expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/99/print");
+            expect(toastSuccess).toHaveBeenCalledWith("Report #99 creato", expect.any(Object));
         });
         expect(api.createReport).toHaveBeenCalledWith({
             deviceId: 10,
@@ -341,10 +485,21 @@ describe("ReportsPage", () => {
             dataBackup: false,
             charger: true,
         });
-        expect(confirm).toHaveBeenCalledWith("Report creato. Vuoi stamparlo adesso?");
+
+        const options = toastSuccess.mock.calls[0][1] as {
+            action: { label: string; onClick: () => void };
+            cancel: { label: string; onClick: () => void };
+        };
+        expect(options.action.label).toBe("Stampa");
+        expect(options.cancel.label).toBe("Apri");
+        options.action.onClick();
+        options.cancel.onClick();
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/99/print");
+        expect(navigate).toHaveBeenCalledWith("/reports/99");
     });
 
-    it("non stampa se l'utente rifiuta", async () => {
+    /** Prima una finestra del browser bloccava la pagina con la domanda; ora si stampa solo se lo si chiede. */
+    it("non stampa da solo dopo la creazione", async () => {
         resolveReportReferences.mockResolvedValue({
             customerId: 30,
             deviceId: 10,
@@ -352,7 +507,6 @@ describe("ReportsPage", () => {
             issueDescription: null,
         });
         api.createReport.mockResolvedValue({ id: 99 });
-        vi.spyOn(window, "confirm").mockReturnValue(false);
         createValues = { notes: "", password: "", charger: false, dataBackup: false };
         await renderPage();
 

@@ -87,6 +87,7 @@ const fontSizeStorageKey = "easylab-web-font-size";
 const fontSizeAttribute = "data-font-size";
 const tableRowsPerPageStorageKey = "easylab-web-table-rows-per-page";
 const tableColumnWidthsStorageKey = "easylab-web-table-column-widths";
+const tableHiddenColumnsStorageKey = "easylab-web-table-hidden-columns";
 
 export const cornerRadiusPresets: CornerRadiusPreset[] = [
     {
@@ -572,4 +573,37 @@ export const setStoredTableColumnWidths = (tableKey: string, widths: Record<stri
     }
 
     localStorage.setItem(storageKey, JSON.stringify(widths));
+};
+
+/**
+ * Le colonne nascoste dal menu "Colonne" di una tabella, per chiave di tabella come le
+ * larghezze. Si tengono i nomi delle colonne nascoste e non di quelle visibili: una colonna
+ * aggiunta in futuro compare da sola, invece di restare nascosta a chi aveva già scelto.
+ */
+export const getStoredHiddenColumns = (tableKey: string): string[] => {
+    try {
+        const parsedValue: unknown = JSON.parse(
+            localStorage.getItem(`${tableHiddenColumnsStorageKey}:${tableKey}`) ?? "[]"
+        );
+
+        return Array.isArray(parsedValue) ? parsedValue.filter((item): item is string => typeof item === "string") : [];
+    } catch {
+        return [];
+    }
+};
+
+export const setStoredHiddenColumns = (tableKey: string, columnKeys: readonly string[]) => {
+    const storageKey = `${tableHiddenColumnsStorageKey}:${tableKey}`;
+
+    try {
+        if (columnKeys.length === 0) {
+            localStorage.removeItem(storageKey);
+            return;
+        }
+
+        localStorage.setItem(storageKey, JSON.stringify(columnKeys));
+    } catch {
+        // localStorage non disponibile (navigazione privata, quota): la scelta vale finché la
+        // pagina resta aperta, che è comunque meglio di un errore.
+    }
 };

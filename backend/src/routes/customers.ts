@@ -12,6 +12,7 @@ import { createCustomerReportsPdfBuffer } from "../services/reportPdf";
 import { createCustomerInterventionsPdfBuffer } from "../services/interventionPdf";
 import { getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
+import { exportRowLimit } from "../db/queries/pagination";
 import { buildDateRangeLabel, formatDateLabel, formatPhoneLabel, formatScheduleLabel } from "./formatting";
 import { createCrudRouter, idParamsSchema } from "./crudRouter";
 import { validate } from "./validation";
@@ -102,7 +103,7 @@ const customersRouter = createCrudRouter({
         // la stessa convenzione di tutte le altre rotte letterali di questo router.
         router.get("/export.csv", validate({ query: customerExportQuerySchema }), async (req, res) => {
             const { search } = req.query as unknown as { search?: string };
-            const customersResult = await listCustomers({ search });
+            const customersResult = await listCustomers({ search, unpaginatedLimit: exportRowLimit });
             const customers = Array.isArray(customersResult) ? customersResult : customersResult.items;
 
             const csv = toCsv(customers, [

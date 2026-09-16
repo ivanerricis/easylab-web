@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps } from "@/lib/formField";
+import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import { Button } from "@/components/ui/button";
@@ -82,20 +82,29 @@ const fieldOrder = [
     "price",
 ] as const;
 
+/** Il modulo come si presenta all'apertura. */
+const buildEmptyFormValues = (initialDate?: string) => ({
+    type: "consegna_materiale" as InterventionType,
+    status: "programmato" as InterventionStatus,
+    description: "",
+    problem: "",
+    note: "",
+    price: "",
+    customer: "",
+    collaboratorId: "",
+    // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
+    // modificabile, e `initialDate` (slot cliccato nel calendario) ha la precedenza.
+    interventionDate: initialDate ?? getTodayDateString(),
+    startTime: "",
+    endTime: "",
+});
+
 const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }: Props) => {
-    const [formValues, setFormValues] = useState({
-        type: "consegna_materiale" as InterventionType,
-        status: "programmato" as InterventionStatus,
-        description: "",
-        problem: "",
-        note: "",
-        price: "",
-        customer: "",
-        collaboratorId: "",
-        interventionDate: getTodayDateString(),
-        startTime: "",
-        endTime: "",
-    });
+    const [formValues, setFormValues] = useState(() => buildEmptyFormValues());
+    // Una copia di com'era il modulo all'apertura, non una costante: la data di partenza
+    // cambia con lo slot del calendario (e con il giorno, se la pagina resta aperta a lungo).
+    const [initialFormValues, setInitialFormValues] = useState(formValues);
+    const isDirty = hasFormChanged(formValues, initialFormValues);
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
     const [customerIdByOption, setCustomerIdByOption] = useState<Record<string, number>>({});
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
@@ -114,21 +123,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
 
         startTransition(() => {
             setErrors({});
-            setFormValues({
-                type: "consegna_materiale",
-                status: "programmato",
-                description: "",
-                problem: "",
-                note: "",
-                price: "",
-                customer: "",
-                collaboratorId: "",
-                // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
-                // modificabile, e `initialDate` (slot cliccato nel calendario) ha la precedenza.
-                interventionDate: initialDate ?? getTodayDateString(),
-                startTime: "",
-                endTime: "",
-            });
+            const emptyFormValues = buildEmptyFormValues(initialDate);
+            setFormValues(emptyFormValues);
+            setInitialFormValues(emptyFormValues);
             setCustomerIdByOption({});
         });
 
@@ -224,8 +221,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                 startTime: isOnSite ? formValues.startTime || null : null,
                 endTime: isOnSite ? formValues.endTime || null : null,
             });
+            // Niente avviso di successo qui: lo dà chi ha creato, che conosce il numero
+            // assegnato e offre di aprire o stampare (vedi `showCreatedToast`).
             onOpenChange(false);
-            toast.success("Intervento creato con successo");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare l'intervento"));
         } finally {
@@ -238,6 +236,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
             <CustomDialog
                 open={open}
                 onOpenChange={onOpenChange}
+                isDirty={isDirty}
                 title="Nuovo intervento"
                 description="Inserisci i dati dell'intervento e conferma per salvare."
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"

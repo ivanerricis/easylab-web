@@ -1,14 +1,11 @@
-import type { EntityCardSlot } from "@/components/entity-card-list";
+import type { EntityColumn } from "@/components/entity-table";
 import { formatDate } from "@/lib/utils";
 import type { CustomerDto } from "@/types/dtos";
-import type { ReactNode } from "react";
 
-export type CustomerColumn = {
+// Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
+// di questa entità.
+export type CustomerColumn = Omit<EntityColumn<CustomerDto>, "key"> & {
     key: keyof CustomerDto | "actions";
-    header: string;
-    className?: string;
-    render: (row: CustomerDto) => ReactNode;
-    cardSlot?: EntityCardSlot;
 };
 
 export const customerColumns: CustomerColumn[] = [
@@ -20,6 +17,8 @@ export const customerColumns: CustomerColumn[] = [
     {
         key: "firstName",
         header: "Nome",
+        sortKey: "name",
+        hideable: false,
         cardSlot: "title",
         render: (row) => row.firstName,
     },
@@ -53,6 +52,8 @@ export const customerColumns: CustomerColumn[] = [
     {
         key: "createdAt",
         header: "Creato il",
+        sortKey: "createdAt",
+        defaultSortDirection: "desc",
         render: (row) => formatDate(row.createdAt),
     },
     {

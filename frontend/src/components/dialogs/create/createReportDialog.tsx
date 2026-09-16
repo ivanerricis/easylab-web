@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps } from "@/lib/formField";
+import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
 import { formatCustomerOption } from "@/lib/customers";
 import { isCatchAllIssue } from "@/lib/issues";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
@@ -66,17 +66,20 @@ type FieldErrors = Partial<
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 const fieldOrder = ["client", "deviceType", "issue", "issueDescription", "charger", "dataBackup"] as const;
 
+/** Il modulo come si presenta all'apertura: da qui si riparte, e con questo si confronta. */
+const emptyFormValues = {
+    customer: "",
+    deviceType: "",
+    issue: "",
+    issueDescription: "",
+    password: "",
+    charger: "unset",
+    dataBackup: "unset",
+    notes: "",
+};
+
 const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
-    const [formValues, setFormValues] = useState({
-        customer: "",
-        deviceType: "",
-        issue: "",
-        issueDescription: "",
-        password: "",
-        charger: "unset",
-        dataBackup: "unset",
-        notes: "",
-    });
+    const [formValues, setFormValues] = useState(emptyFormValues);
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [isCreateDeviceDialogOpen, setIsCreateDeviceDialogOpen] = useState(false);
     const [isCreateIssueDialogOpen, setIsCreateIssueDialogOpen] = useState(false);
@@ -90,21 +93,13 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
     // qui il testo, l'errore sta sotto il campo e ci resta finché non si corregge.
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+    const isDirty = hasFormChanged(formValues, emptyFormValues);
 
     useEffect(() => {
         if (open) {
             startTransition(() => {
                 setFieldErrors({});
-                setFormValues({
-                    customer: "",
-                    deviceType: "",
-                    issue: "",
-                    issueDescription: "",
-                    password: "",
-                    charger: "unset",
-                    dataBackup: "unset",
-                    notes: "",
-                });
+                setFormValues(emptyFormValues);
                 setCustomerIdByOption({});
                 setDeviceIdByOption({});
                 setIssueIdByOption({});
@@ -216,8 +211,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                 charger: formValues.charger === "yes",
                 dataBackup: formValues.dataBackup === "yes",
             });
+            // Niente avviso di successo qui: lo dà chi ha creato, che conosce il numero
+            // assegnato e offre di aprire o stampare (vedi `showCreatedToast`).
             onOpenChange(false);
-            toast.success("Report creato con successo");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare i dati"));
         } finally {
@@ -230,6 +226,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
             <CustomDialog
                 open={open}
                 onOpenChange={onOpenChange}
+                isDirty={isDirty}
                 title="Nuovo report"
                 description="Inserisci i dati del report e conferma per salvare."
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
@@ -485,7 +482,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="unset">Seleziona</SelectItem>
-                                            <SelectItem value="yes">Si</SelectItem>
+                                            <SelectItem value="yes">Sì</SelectItem>
                                             <SelectItem value="no">No</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -515,7 +512,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="unset">Seleziona</SelectItem>
-                                            <SelectItem value="yes">Si</SelectItem>
+                                            <SelectItem value="yes">Sì</SelectItem>
                                             <SelectItem value="no">No</SelectItem>
                                         </SelectContent>
                                     </Select>

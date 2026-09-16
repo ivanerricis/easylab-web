@@ -8,6 +8,9 @@ import EditInterventionDialog, {
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CustomDialog from "@/components/dialogs/customDialog";
 import PageHeader from "@/components/page-header";
+import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useHiddenColumns } from "@/hooks/useHiddenColumns";
+import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
 import {
     createIntervention,
@@ -22,33 +25,38 @@ import type { InterventionDto } from "@/types/dtos";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { toInterventionCreatePayload, toInterventionUpdatePayload } from "@/lib/interventionForm";
 import { toast } from "sonner";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
 import InterventionsFilters from "./components/interventions-filters";
 import InterventionsTable from "./components/interventions-table";
 import {
     DEFAULT_INTERVENTION_SORT_OPTION,
+    interventionSortOptions,
     type InterventionSortOption,
     type InterventionStatusFilter,
     type InterventionTypeFilter,
 } from "./components/types";
 import { useInterventionsRows } from "./hooks/useInterventionsRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
+import {
+    listUrlParams,
+    readDateParam,
+    readEnumParam,
+    useListUrlState,
+    useUrlSearchText,
+} from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow } from "@/lib/utils";
+import { entityPaths } from "@/lib/entityPaths";
+import { showCreatedToast } from "@/lib/createdToast";
 import { Send } from "lucide-react";
 
-const parseStatusFilter = (value: string | null): InterventionStatusFilter => {
-    if (value === "all" || value === "programmato" || value === "in_lavorazione" || value === "completato") {
-        return value;
-    }
-
-    return "all";
-};
+const statusFilters: InterventionStatusFilter[] = ["all", "programmato", "in_lavorazione", "completato"];
+const typeFilters: InterventionTypeFilter[] = ["all", "consegna_materiale", "intervento_sede", "intervento_remoto"];
+const sortOptionValues = interventionSortOptions.map((option) => option.value);
 
 const InterventionsPage = () => {
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -58,25 +66,24 @@ const InterventionsPage = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [interventionIdToEmail, setInterventionIdToEmail] = useState<number | null>(null);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<InterventionStatusFilter>(() =>
-        parseStatusFilter(searchParams.get("status"))
+    // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
+    // "status" è il nome che usa già la dashboard nei suoi collegamenti.
+    const statusFilter = readEnumParam(searchParams, "status", statusFilters, "all");
+    const typeFilter = readEnumParam(searchParams, "type", typeFilters, "all");
+    const sortOption = readEnumParam(
+        searchParams,
+        listUrlParams.sort,
+        sortOptionValues,
+        DEFAULT_INTERVENTION_SORT_OPTION
     );
-    const [previousSearchParams, setPreviousSearchParams] = useState(searchParams);
-
-    if (previousSearchParams !== searchParams) {
-        setPreviousSearchParams(searchParams);
-        setStatusFilter(parseStatusFilter(searchParams.get("status")));
-    }
-
-    const [searchText, setSearchText] = useState("");
-    const [typeFilter, setTypeFilter] = useState<InterventionTypeFilter>("all");
-    const [sortOption, setSortOption] = useState<InterventionSortOption>(DEFAULT_INTERVENTION_SORT_OPTION);
-    const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
-    const [dateTo, setDateTo] = useState<string | undefined>(undefined);
-    const [pageSize, setPageSize] = useTableRowsPerPage("interventions");
-    const { currentPage, setCurrentPage } = useTablePagination({
-        resetDependencies: [searchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo, pageSize],
-    });
+    const dateFrom = readDateParam(searchParams, listUrlParams.dateFrom);
+    const dateTo = readDateParam(searchParams, listUrlParams.dateTo);
+    const committedSearchText = searchParams.get(listUrlParams.search) ?? "";
+    const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
+        updateParams({ [listUrlParams.search]: value })
+    );
+    const [pageSize, setStoredPageSize] = useTableRowsPerPage("interventions");
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("interventions");
     const {
         interventionRows,
         totalItems,
@@ -87,7 +94,7 @@ const InterventionsPage = () => {
         loadInterventions,
         updateInterventionRow,
     } = useInterventionsRows({
-        searchText,
+        searchText: committedSearchText,
         statusFilter,
         typeFilter,
         sortOption,
@@ -97,6 +104,19 @@ const InterventionsPage = () => {
         pageSize,
     });
 
+    const handleSortOptionChange = (value: InterventionSortOption) =>
+        updateParams({ [listUrlParams.sort]: value === DEFAULT_INTERVENTION_SORT_OPTION ? null : value });
+
+    // Dalle intestazioni arrivano solo le coppie campo/verso che le colonne dichiarano, e sono
+    // tutte fra le opzioni del menu: il cast non allarga niente.
+    const handleTableSortChange = (nextSort: TableSort) =>
+        handleSortOptionChange(formatSortOption(nextSort) as InterventionSortOption);
+
+    const setPageSize = (nextPageSize: typeof pageSize) => {
+        setStoredPageSize(nextPageSize);
+        resetPage();
+    };
+
     // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
     // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
     const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
@@ -105,9 +125,11 @@ const InterventionsPage = () => {
 
         await loadInterventions();
 
-        if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
-            handlePrintIntervention(createdIntervention.id);
-        }
+        showCreatedToast({
+            message: `Intervento #${createdIntervention.id} creato`,
+            onOpen: () => handleOpenIntervention(createdIntervention.id),
+            onPrint: () => handlePrintIntervention(createdIntervention.id),
+        });
     };
 
     const handleOpenDeleteDialog = (intervention: InterventionDto) => {
@@ -116,12 +138,11 @@ const InterventionsPage = () => {
     };
 
     const handleOpenIntervention = (id: number) => {
-        navigate(`/interventions/${id}`);
+        navigate(entityPaths.intervention(id));
     };
 
     const handleStatusFilterChange = (value: InterventionStatusFilter) => {
-        setStatusFilter(value);
-        setSearchParams(value === "all" ? {} : { status: value }, { replace: true });
+        updateParams({ status: value === "all" ? null : value });
     };
 
     const handleOpenEditDialog = (id: number) => {
@@ -264,13 +285,23 @@ const InterventionsPage = () => {
                     statusFilter={statusFilter}
                     onStatusFilterChange={handleStatusFilterChange}
                     typeFilter={typeFilter}
-                    onTypeFilterChange={setTypeFilter}
+                    onTypeFilterChange={(value: InterventionTypeFilter) =>
+                        updateParams({ type: value === "all" ? null : value })
+                    }
                     sortOption={sortOption}
-                    onSortOptionChange={setSortOption}
+                    onSortOptionChange={handleSortOptionChange}
                     dateFrom={dateFrom}
-                    onDateFromChange={setDateFrom}
+                    onDateFromChange={(value) => updateParams({ [listUrlParams.dateFrom]: value })}
                     dateTo={dateTo}
-                    onDateToChange={setDateTo}
+                    onDateToChange={(value) => updateParams({ [listUrlParams.dateTo]: value })}
+                    columnsMenu={
+                        <ColumnVisibilityMenu
+                            columns={interventionColumns}
+                            hiddenColumnKeys={hiddenColumnKeys}
+                            onColumnVisibleChange={setColumnVisible}
+                            onShowAll={showAllColumns}
+                        />
+                    }
                     onRefresh={loadInterventions}
                     isRefreshing={isLoading}
                 />
@@ -282,6 +313,9 @@ const InterventionsPage = () => {
                             isRefetching={isRefetching}
                             skeletonRowCount={pageSize}
                             columns={interventionColumns}
+                            sort={parseSortOption(sortOption)}
+                            onSortChange={handleTableSortChange}
+                            hiddenColumnKeys={hiddenColumnKeys}
                             rows={interventionRows}
                             onOpenIntervention={handleOpenIntervention}
                             onEditIntervention={handleOpenEditDialog}

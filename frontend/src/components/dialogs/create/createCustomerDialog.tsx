@@ -1,10 +1,10 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
-import { fieldProps } from "@/lib/formField";
+import { fieldProps, hasFormChanged } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api";
 import type { CustomerDto } from "@/types/dtos";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -51,21 +51,27 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
     const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const initialFormValues = useMemo(
+        () => ({
+            firstName: initialValues?.firstName ?? "",
+            lastName: initialValues?.lastName ?? "",
+            phoneNumber: initialValues?.phoneNumber ?? "",
+            phoneNumberSecondary: initialValues?.phoneNumberSecondary ?? "",
+            email: initialValues?.email ?? "",
+            city: initialValues?.city ?? "",
+        }),
+        [initialValues]
+    );
+    const isDirty = hasFormChanged(formValues, initialFormValues);
+
     useEffect(() => {
         if (open) {
             startTransition(() => {
-                setFormValues({
-                    firstName: initialValues?.firstName ?? "",
-                    lastName: initialValues?.lastName ?? "",
-                    phoneNumber: initialValues?.phoneNumber ?? "",
-                    phoneNumberSecondary: initialValues?.phoneNumberSecondary ?? "",
-                    email: initialValues?.email ?? "",
-                    city: initialValues?.city ?? "",
-                });
+                setFormValues(initialFormValues);
                 setErrors({});
             });
         }
-    }, [open, initialValues]);
+    }, [open, initialFormValues]);
 
     const handleConfirm = async () => {
         const nextErrors: FieldErrors = {};
@@ -120,6 +126,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
         <CustomDialog
             open={open}
             onOpenChange={onOpenChange}
+            isDirty={isDirty}
             title={mode === "edit" ? "Modifica cliente" : "Nuovo cliente"}
             description={
                 mode === "edit"

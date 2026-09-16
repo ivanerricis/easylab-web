@@ -1,5 +1,7 @@
 import EntityTable from "@/components/entity-table";
+import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
+import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import { interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
@@ -18,6 +20,10 @@ type InterventionsTableProps = {
     isInitialLoading?: boolean;
     isRefetching?: boolean;
     skeletonRowCount?: number;
+    /** Ordinamento dalle intestazioni e colonne nascoste: vedi `EntityTable`. */
+    sort?: TableSort;
+    onSortChange?: (sort: TableSort) => void;
+    hiddenColumnKeys?: readonly string[];
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
@@ -36,12 +42,15 @@ const InterventionsTable = ({
     isInitialLoading,
     isRefetching,
     skeletonRowCount,
+    sort,
+    onSortChange,
+    hiddenColumnKeys,
 }: InterventionsTableProps) => {
     const renderRowActions = (row: InterventionDto) => (
         <>
             <OpenEntityButton
                 size="icon-lg"
-                onClick={() => onOpenIntervention(row.id)}
+                to={entityPaths.intervention(row.id)}
                 aria-label={`Apri intervento ${row.id}`}
             />
             <TableActionButton
@@ -95,6 +104,9 @@ const InterventionsTable = ({
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}
+            sort={sort}
+            onSortChange={onSortChange}
+            hiddenColumnKeys={hiddenColumnKeys}
         />
     );
 };

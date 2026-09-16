@@ -225,3 +225,95 @@ describe("CreateIssueDialog", () => {
         expect(toastSuccess).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Esc, la X o un clic fuori non devono buttare via un modulo compilato senza chiedere: la
+ * regola sta in `CustomDialog` (`isDirty`), qui si prova su un dialogo vero.
+ */
+describe("modifiche non salvate", () => {
+    const customer = {
+        id: 7,
+        firstName: "Mario",
+        lastName: "Rossi",
+        phoneNumber: "333",
+        phoneNumberSecondary: null,
+        email: null,
+        city: null,
+        createdAt: "2026-09-01T10:00:00.000Z",
+        updatedAt: null,
+    };
+
+    it("chiude subito un modulo ancora vuoto", async () => {
+        const onOpenChange = vi.fn();
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+
+        await userEvent.keyboard("{Escape}");
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(screen.queryByText("Modifiche non salvate")).not.toBeInTheDocument();
+    });
+
+    it("con un modulo compilato chiede prima di chiudere, e si può tornare a scrivere", async () => {
+        const onOpenChange = vi.fn();
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+
+        await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
+        await userEvent.keyboard("{Escape}");
+
+        expect(await screen.findByRole("dialog", { name: "Modifiche non salvate" })).toBeInTheDocument();
+        expect(onOpenChange).not.toHaveBeenCalled();
+
+        // Il pulsante sicuro è quello con il focus: un Invio di troppo non perde niente.
+        expect(screen.getByRole("button", { name: "Continua a modificare" })).toHaveFocus();
+        await userEvent.click(screen.getByRole("button", { name: "Continua a modificare" }));
+
+        expect(onOpenChange).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/^Nome/)).toHaveValue("Mario");
+
+        await userEvent.keyboard("{Escape}");
+        await userEvent.click(await screen.findByRole("button", { name: "Chiudi senza salvare" }));
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it("chiede anche chiudendo con la X", async () => {
+        const onOpenChange = vi.fn();
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+
+        await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
+        await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+        expect(await screen.findByRole("dialog", { name: "Modifiche non salvate" })).toBeInTheDocument();
+        expect(onOpenChange).not.toHaveBeenCalled();
+    });
+
+    /** "Annulla" è già la scelta esplicita di rinunciare: una seconda domanda sarebbe di troppo. */
+    it("Annulla chiude senza chiedere", async () => {
+        const onOpenChange = vi.fn();
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+
+        await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
+        await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(screen.queryByText("Modifiche non salvate")).not.toBeInTheDocument();
+    });
+
+    /** In modifica il confronto è con i dati di partenza, non con un modulo vuoto. */
+    it("in modifica non chiede se i dati sono quelli di partenza", async () => {
+        const onOpenChange = vi.fn();
+        renderWithProviders(
+            <CreateCustomerDialog open mode="edit" initialValues={customer} onOpenChange={onOpenChange} />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Nome/)).toHaveValue("Mario");
+        });
+        // Scrivere e poi cancellare riporta il modulo com'era.
+        await userEvent.type(screen.getByLabelText(/^Nome/), "x");
+        await userEvent.type(screen.getByLabelText(/^Nome/), "{Backspace}");
+        await userEvent.keyboard("{Escape}");
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+});

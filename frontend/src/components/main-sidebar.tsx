@@ -21,7 +21,8 @@ import {
     Wrench,
     type LucideIcon,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const DOCS_URL = "https://ivanerricis.github.io/easylab-web/";
 
@@ -50,17 +51,24 @@ const isPathActive = (pathname: string, itemPath: string) => {
     return pathname.startsWith(`${itemPath}/`);
 };
 
+const menuButtonClassName =
+    "flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
+const activeMenuButtonClassName = "bg-primary! text-background! dark:text-foreground!";
+
+/**
+ * Le voci sono link (`<a>` tramite `Link`), non pulsanti che chiamano `navigate`: così si
+ * possono aprire in un'altra scheda con Ctrl+clic o con la rotella, e copiarne l'indirizzo.
+ * Un clic normale resta una navigazione interna. `aria-current="page"` dice a uno screen
+ * reader quale voce è quella aperta, che finora si capiva solo dal colore.
+ */
 const MainSidebar = () => {
-    const navigate = useNavigate();
     const { pathname } = useLocation();
     const { setOpenMobile } = useSidebar();
     const logoUrl = import.meta.env.VITE_LOGO_URL ?? "http://localhost:3000/assets/logo.jpg";
     const isSettingsActive = pathname.startsWith("/settings");
 
-    const navigateAndCloseMobile = (path: string) => {
-        navigate(path);
-        setOpenMobile(false);
-    };
+    // Su mobile la barra è un pannello sopra la pagina: scelta una voce, si chiude.
+    const closeMobile = () => setOpenMobile(false);
 
     return (
         <Sidebar collapsible="icon">
@@ -88,14 +96,20 @@ const MainSidebar = () => {
                         return (
                             <SidebarMenuItem key={item.path}>
                                 <SidebarMenuButton
+                                    asChild
                                     tooltip={item.label}
                                     isActive={active}
-                                    onClick={() => navigateAndCloseMobile(item.path)}
                                     size="lg"
-                                    className={` ${active ? "bg-primary! text-background! dark:text-foreground!" : ""} flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0`}
+                                    className={cn(menuButtonClassName, active && activeMenuButtonClassName)}
                                 >
-                                    <Icon className="size-7 shrink-0" />
-                                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                    <Link
+                                        to={item.path}
+                                        onClick={closeMobile}
+                                        aria-current={active ? "page" : undefined}
+                                    >
+                                        <Icon className="size-7 shrink-0" />
+                                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                    </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         );
@@ -106,29 +120,30 @@ const MainSidebar = () => {
             <SidebarFooter className="border-t border-sidebar-border p-2">
                 <SidebarMenu className="gap-1">
                     <SidebarMenuItem>
-                        <SidebarMenuButton
-                            tooltip="Documentazione"
-                            size="lg"
-                            onClick={() => window.open(DOCS_URL, "_blank", "noopener,noreferrer")}
-                            className="flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
-                        >
-                            <BookOpen className="size-7 shrink-0" />
-                            <span className="group-data-[collapsible=icon]:hidden">Documentazione</span>
+                        <SidebarMenuButton asChild tooltip="Documentazione" size="lg" className={menuButtonClassName}>
+                            <a href={DOCS_URL} target="_blank" rel="noopener noreferrer">
+                                <BookOpen className="size-7 shrink-0" />
+                                <span className="group-data-[collapsible=icon]:hidden">Documentazione</span>
+                            </a>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
 
                     <SidebarMenuItem>
                         <SidebarMenuButton
+                            asChild
                             tooltip="Impostazioni"
                             size="lg"
                             isActive={isSettingsActive}
-                            onClick={() => navigateAndCloseMobile("/settings")}
-                            className={`flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 ${
-                                isSettingsActive ? "bg-primary! text-background! dark:text-foreground!" : ""
-                            }`}
+                            className={cn(menuButtonClassName, isSettingsActive && activeMenuButtonClassName)}
                         >
-                            <Settings className="size-7 shrink-0" />
-                            <span className="group-data-[collapsible=icon]:hidden">Impostazioni</span>
+                            <Link
+                                to="/settings"
+                                onClick={closeMobile}
+                                aria-current={isSettingsActive ? "page" : undefined}
+                            >
+                                <Settings className="size-7 shrink-0" />
+                                <span className="group-data-[collapsible=icon]:hidden">Impostazioni</span>
+                            </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

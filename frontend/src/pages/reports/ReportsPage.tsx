@@ -4,6 +4,9 @@ import EditReportDialog, { type EditReportSubmitValues } from "@/components/dial
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
+import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useHiddenColumns } from "@/hooks/useHiddenColumns";
+import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
 import {
     createReportTechnician,
@@ -18,28 +21,36 @@ import {
 import { useState } from "react";
 import type { ReportDto } from "@/types/dtos";
 import { toast } from "sonner";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { reportColumns } from "./components/report-columns";
 import ReportsFilters from "./components/reports-filters";
 import ReportsTable from "./components/reports-table";
-import { DEFAULT_REPORT_SORT_OPTION, type ReportSortOption, type ReportVisibilityFilter } from "./components/types";
+import {
+    DEFAULT_REPORT_SORT_OPTION,
+    reportSortOptions,
+    type ReportSortOption,
+    type ReportVisibilityFilter,
+} from "./components/types";
 import { useReportsRows } from "./hooks/useReportsRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
+import {
+    listUrlParams,
+    readDateParam,
+    readEnumParam,
+    useListUrlState,
+    useUrlSearchText,
+} from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { openPrintWindow, trimOrNull } from "@/lib/utils";
+import { entityPaths } from "@/lib/entityPaths";
+import { showCreatedToast } from "@/lib/createdToast";
 import { resolveReportReferences } from "@/lib/reportForm";
 
-const parseVisibilityFilter = (value: string | null): ReportVisibilityFilter => {
-    if (value === "all" || value === "open" || value === "closed") {
-        return value;
-    }
-
-    return "open";
-};
+const visibilityFilters: ReportVisibilityFilter[] = ["all", "open", "closed"];
+const sortOptionValues = reportSortOptions.map((option) => option.value);
 
 const ReportsPage = () => {
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -47,24 +58,18 @@ const ReportsPage = () => {
     const [reportCustomerNameToEdit, setReportCustomerNameToEdit] = useState("");
     const [reportToDelete, setReportToDelete] = useState<ReportDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>(() =>
-        parseVisibilityFilter(searchParams.get("visibility"))
+    // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
+    // "visibility" è il nome che usa già la dashboard nei suoi collegamenti.
+    const visibilityFilter = readEnumParam(searchParams, "visibility", visibilityFilters, "open");
+    const sortOption = readEnumParam(searchParams, listUrlParams.sort, sortOptionValues, DEFAULT_REPORT_SORT_OPTION);
+    const dateFrom = readDateParam(searchParams, listUrlParams.dateFrom);
+    const dateTo = readDateParam(searchParams, listUrlParams.dateTo);
+    const committedSearchText = searchParams.get(listUrlParams.search) ?? "";
+    const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
+        updateParams({ [listUrlParams.search]: value })
     );
-    const [previousSearchParams, setPreviousSearchParams] = useState(searchParams);
-
-    if (previousSearchParams !== searchParams) {
-        setPreviousSearchParams(searchParams);
-        setVisibilityFilter(parseVisibilityFilter(searchParams.get("visibility")));
-    }
-
-    const [searchText, setSearchText] = useState("");
-    const [sortOption, setSortOption] = useState<ReportSortOption>(DEFAULT_REPORT_SORT_OPTION);
-    const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
-    const [dateTo, setDateTo] = useState<string | undefined>(undefined);
-    const [pageSize, setPageSize] = useTableRowsPerPage("reports");
-    const { currentPage, setCurrentPage } = useTablePagination({
-        resetDependencies: [searchText, visibilityFilter, sortOption, dateFrom, dateTo, pageSize],
-    });
+    const [pageSize, setStoredPageSize] = useTableRowsPerPage("reports");
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("reports");
     const {
         reportRows,
         totalItems,
@@ -75,7 +80,7 @@ const ReportsPage = () => {
         loadReports,
         updateReportRow,
     } = useReportsRows({
-        searchText,
+        searchText: committedSearchText,
         visibilityFilter,
         sortOption,
         dateFrom,
@@ -83,6 +88,19 @@ const ReportsPage = () => {
         currentPage,
         pageSize,
     });
+
+    const handleSortOptionChange = (value: ReportSortOption) =>
+        updateParams({ [listUrlParams.sort]: value === DEFAULT_REPORT_SORT_OPTION ? null : value });
+
+    // Dalle intestazioni arrivano solo le coppie campo/verso che le colonne dichiarano, e sono
+    // tutte fra le opzioni del menu: il cast non allarga niente.
+    const handleTableSortChange = (nextSort: TableSort) =>
+        handleSortOptionChange(formatSortOption(nextSort) as ReportSortOption);
+
+    const setPageSize = (nextPageSize: typeof pageSize) => {
+        setStoredPageSize(nextPageSize);
+        resetPage();
+    };
 
     // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
     // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
@@ -102,9 +120,11 @@ const ReportsPage = () => {
 
         await loadReports();
 
-        if (window.confirm("Report creato. Vuoi stamparlo adesso?")) {
-            handlePrintReport(createdReport.id);
-        }
+        showCreatedToast({
+            message: `Report #${createdReport.id} creato`,
+            onOpen: () => handleOpenReport(createdReport.id),
+            onPrint: () => handlePrintReport(createdReport.id),
+        });
     };
 
     const handleOpenDeleteDialog = (report: ReportDto) => {
@@ -113,12 +133,11 @@ const ReportsPage = () => {
     };
 
     const handleOpenReport = (id: number) => {
-        navigate(`/reports/${id}`);
+        navigate(entityPaths.report(id));
     };
 
     const handleVisibilityFilterChange = (value: ReportVisibilityFilter) => {
-        setVisibilityFilter(value);
-        setSearchParams(value === "open" ? {} : { visibility: value }, { replace: true });
+        updateParams({ visibility: value === "open" ? null : value });
     };
 
     const handleOpenEditDialog = (id: number) => {
@@ -256,11 +275,19 @@ const ReportsPage = () => {
                     visibilityFilter={visibilityFilter}
                     onVisibilityFilterChange={handleVisibilityFilterChange}
                     sortOption={sortOption}
-                    onSortOptionChange={setSortOption}
+                    onSortOptionChange={handleSortOptionChange}
                     dateFrom={dateFrom}
-                    onDateFromChange={setDateFrom}
+                    onDateFromChange={(value) => updateParams({ [listUrlParams.dateFrom]: value })}
                     dateTo={dateTo}
-                    onDateToChange={setDateTo}
+                    onDateToChange={(value) => updateParams({ [listUrlParams.dateTo]: value })}
+                    columnsMenu={
+                        <ColumnVisibilityMenu
+                            columns={reportColumns}
+                            hiddenColumnKeys={hiddenColumnKeys}
+                            onColumnVisibleChange={setColumnVisible}
+                            onShowAll={showAllColumns}
+                        />
+                    }
                     onRefresh={loadReports}
                     isRefreshing={isLoading}
                 />
@@ -272,6 +299,9 @@ const ReportsPage = () => {
                             isRefetching={isRefetching}
                             skeletonRowCount={pageSize}
                             columns={reportColumns}
+                            sort={parseSortOption(sortOption)}
+                            onSortChange={handleTableSortChange}
+                            hiddenColumnKeys={hiddenColumnKeys}
                             rows={reportRows}
                             onOpenReport={handleOpenReport}
                             onEditReport={handleOpenEditDialog}

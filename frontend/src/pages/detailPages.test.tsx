@@ -69,6 +69,13 @@ import InterventionPage from "./interventions/InterventionPage";
 import ReportPage from "./reports/ReportPage";
 import { renderWithProviders } from "@/test/render";
 
+/** Come arriva da axios una risposta 404: `getApiErrorStatus` guarda solo questi campi. */
+const notFoundError = () =>
+    Object.assign(new Error("Request failed with status code 404"), {
+        isAxiosError: true,
+        response: { status: 404, data: { message: "Not found" } },
+    });
+
 const timestamps = { createdAt: "2026-01-01T00:00:00.000Z", updatedAt: null };
 
 /** Il valore di una voce `DetailItem`: l'etichetta è un paragrafo, il valore quello dopo. */
@@ -147,11 +154,13 @@ describe("ReportPage", () => {
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Mario Rossi");
         expect(document.title).toBe("Report #5 - Mario Rossi · EasyLab");
         expect(detailValue("Telefono")).toBe("06 123456");
+        // Il cliente porta alla sua scheda: prima era solo testo.
+        expect(screen.getByRole("link", { name: "Mario Rossi" })).toHaveAttribute("href", "/clients/30");
         expect(detailValue("Dispositivo")).toBe("Notebook");
         expect(detailValue("Difetto catalogo")).toBe("Altro");
         expect(detailValue("Collaboratore")).toBe("Luca Bianchi");
         expect(detailValue("Problema riscontrato")).toBe("Non carica");
-        expect(detailValue("Avvisato")).toBe("Si");
+        expect(detailValue("Avvisato")).toBe("Sì");
         expect(detailValue("Alimentatore")).toBe("No");
         expect(screen.getByText("Carta")).toBeInTheDocument();
         expect(screen.getByText("Paolo")).toBeInTheDocument();
@@ -180,14 +189,27 @@ describe("ReportPage", () => {
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Cliente sconosciuto");
     });
 
-    it("torna all'elenco con un id non valido", async () => {
+    /**
+     * Un indirizzo con un id impossibile resta dov'è e dice che cosa è successo: prima
+     * riportava all'elenco con un avviso che spariva da solo.
+     */
+    it("mostra 'non trovato' con un id non valido, senza chiedere niente al server", async () => {
         renderWithProviders(<ReportPage />, { route: "/reports/abc", path: "/reports/:id" });
 
-        await waitFor(() => {
-            expect(navigate).toHaveBeenCalledWith("/reports");
-        });
-        expect(toastError).toHaveBeenCalledWith("Report non valido");
+        expect(await screen.findByRole("heading", { name: "Report non trovato" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Vai ai report" })).toHaveAttribute("href", "/reports");
+        expect(navigate).not.toHaveBeenCalled();
+        expect(toastError).not.toHaveBeenCalled();
         expect(api.getReport).not.toHaveBeenCalled();
+    });
+
+    it("mostra 'non trovato' se il server risponde 404", async () => {
+        api.getReport.mockRejectedValue(notFoundError());
+        renderWithProviders(<ReportPage />, { route: "/reports/999", path: "/reports/:id" });
+
+        expect(await screen.findByRole("heading", { name: "Report non trovato" })).toBeInTheDocument();
+        expect(navigate).not.toHaveBeenCalled();
+        expect(toastError).not.toHaveBeenCalled();
     });
 
     it("torna all'elenco se il report non si carica", async () => {
@@ -252,6 +274,7 @@ describe("InterventionPage", () => {
         await renderPage();
 
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Mario Rossi");
+        expect(screen.getByRole("link", { name: "Mario Rossi" })).toHaveAttribute("href", "/clients/30");
         expect(detailValue("Problema")).toBe("VPN non si collega");
         expect(detailValue("Note")).toBe("Chiamare dopo le 15");
         expect(detailValue("Descrizione")).toBe("-");

@@ -1,4 +1,3 @@
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import type { PaginatedResponse } from "@/lib/api/client";
 
@@ -12,6 +11,7 @@ type ListParams = {
 type UseSearchableRowsParams<TRow> = {
     /** La funzione di lista dell'entità: `listDevices`, `listIssues`, ... */
     fetchRows: (params: ListParams) => Promise<PaginatedResponse<TRow>>;
+    /** Già rallentato dal chiamante (vedi `useUrlSearchText`): qui si cerca subito. */
     searchText: string;
     currentPage: number;
     pageSize: number;
@@ -21,7 +21,7 @@ type UseSearchableRowsParams<TRow> = {
 
 /**
  * Le liste di anagrafica (dispositivi, difetti, tecnici, collaboratori) hanno tutte la
- * stessa forma: testo di ricerca con debounce, paginazione, un messaggio d'errore.
+ * stessa forma: testo di ricerca, paginazione, un messaggio d'errore.
  *
  * Prima ogni entità aveva il proprio hook, identico agli altri a meno del nome della
  * funzione di lista e dei nomi dei campi restituiti (`deviceRows`/`loadDevices` invece di
@@ -36,11 +36,9 @@ export const useSearchableRows = <TRow>({
     pageSize,
     errorMessage,
 }: UseSearchableRowsParams<TRow>) => {
-    const debouncedSearchText = useDebouncedValue(searchText);
-
     return usePaginatedRows<TRow>({
-        fetchRows: (signal) => fetchRows({ page: currentPage, pageSize, search: debouncedSearchText, signal }),
-        queryKey: [currentPage, pageSize, debouncedSearchText],
+        fetchRows: (signal) => fetchRows({ page: currentPage, pageSize, search: searchText, signal }),
+        queryKey: [currentPage, pageSize, searchText],
         errorMessage,
     });
 };

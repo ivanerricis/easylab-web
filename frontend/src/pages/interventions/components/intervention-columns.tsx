@@ -1,16 +1,13 @@
-import type { EntityCardSlot } from "@/components/entity-card-list";
+import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatDate } from "@/lib/utils";
 import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
-import type { ReactNode } from "react";
 
-export type InterventionColumn = {
+// Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
+// di questa entità.
+export type InterventionColumn = Omit<EntityColumn<InterventionDto>, "key"> & {
     key: keyof InterventionDto | "actions" | "schedule";
-    header: string;
-    className?: string;
-    render: (row: InterventionDto) => ReactNode;
-    cardSlot?: EntityCardSlot;
 };
 
 export const interventionColumns: InterventionColumn[] = [
@@ -22,6 +19,8 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "customer",
         header: "Cliente",
+        sortKey: "customer",
+        hideable: false,
         cardSlot: "title",
         render: (row) => row.customer,
     },
@@ -43,6 +42,8 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "schedule",
         header: "Data/Orario",
+        sortKey: "interventionDate",
+        defaultSortDirection: "desc",
         render: (row) => {
             if (!row.interventionDate) {
                 return "-";
@@ -67,12 +68,16 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "status",
         header: "Stato",
+        sortKey: "status",
+        defaultSortDirection: "desc",
         cardSlot: "badge",
         render: (row) => formatInterventionStatus(row.status),
     },
     {
         key: "createdAt",
         header: "Creato il",
+        sortKey: "createdAt",
+        defaultSortDirection: "desc",
         render: (row) => formatDateTime(row.createdAt),
     },
     {

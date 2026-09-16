@@ -1,4 +1,14 @@
-import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleDashed, Euro, Loader } from "lucide-react";
+import {
+    CalendarClock,
+    ChevronLeft,
+    ChevronRight,
+    CircleCheck,
+    CircleDashed,
+    Euro,
+    Loader,
+    TrendingDown,
+    TrendingUp,
+} from "lucide-react";
 import CardDashboard, {
     dashboardCardIconClassName,
     dashboardCardLabelClassName,
@@ -37,6 +47,8 @@ import {
 } from "@/lib/api";
 import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
 import { resolveReportReferences } from "@/lib/reportForm";
+import { showCreatedToast } from "@/lib/createdToast";
+import { entityPaths } from "@/lib/entityPaths";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { toInterventionCreatePayload } from "@/lib/interventionForm";
 import { toast } from "sonner";
@@ -72,6 +84,19 @@ const getMonthShortLabel = (monthKey: string) => {
         new Date(Number(yearPart), Number(monthPart) - 1, 1)
     );
 };
+
+/** L'importo sopra la barra: senza decimali, perché lo spazio è quello di una colonna su sei. */
+const barValueFormatter = new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+});
+
+const percentFormatter = new Intl.NumberFormat("it-IT", {
+    style: "percent",
+    maximumFractionDigits: 0,
+    signDisplay: "exceptZero",
+});
 
 const shiftMonthKey = (monthKey: string, deltaMonths: number) => {
     const [yearPart, monthPart] = monthKey.split("-");
@@ -130,6 +155,28 @@ const DashboardPage = () => {
         setSelectedRevenueMonth((prev) => shiftMonthKey(prev, 1));
     };
 
+    /**
+     * Il confronto con il mese prima di quello scelto. Prima il riquadro diceva solo la cifra, e
+     * per capire se il mese andava bene bisognava passare il mouse sulle barre una per una.
+     *
+     * Il mese precedente si prende dalla serie (gli ultimi sei mesi): per un mese più vecchio
+     * non c'è, e il confronto non si mostra. Con un mese precedente a zero la percentuale non
+     * ha senso, e anche lì non si mostra.
+     */
+    const revenueComparison = useMemo(() => {
+        const previousMonthKey = shiftMonthKey(selectedRevenueMonth, -1);
+        const previousPoint = monthlyRevenueSeries.find((point) => point.monthKey === previousMonthKey);
+
+        if (!previousPoint || previousPoint.value <= 0) {
+            return null;
+        }
+
+        return {
+            change: (monthlyRevenue - previousPoint.value) / previousPoint.value,
+            previousMonthLabel: getMonthLabel(previousMonthKey),
+        };
+    }, [monthlyRevenue, monthlyRevenueSeries, selectedRevenueMonth]);
+
     const maxMonthlyRevenue = useMemo(
         () => monthlyRevenueSeries.reduce((max, point) => Math.max(max, point.value), 0),
         [monthlyRevenueSeries]
@@ -172,9 +219,11 @@ const DashboardPage = () => {
 
         await loadDashboardMetrics(selectedRevenueMonth);
 
-        if (window.confirm("Report creato. Vuoi stamparlo adesso?")) {
-            openPrintWindow(getReportPrintUrl(createdReport.id));
-        }
+        showCreatedToast({
+            message: `Report #${createdReport.id} creato`,
+            onOpen: () => navigate(entityPaths.report(createdReport.id)),
+            onPrint: () => openPrintWindow(getReportPrintUrl(createdReport.id)),
+        });
     };
 
     // Come `handleCreateReport` qui sopra, niente try/catch: l'errore lo mostra il dialogo.
@@ -184,9 +233,11 @@ const DashboardPage = () => {
 
         await Promise.all([loadCalendarEvents(), loadDashboardMetrics(selectedRevenueMonth)]);
 
-        if (window.confirm("Intervento creato. Vuoi stamparlo adesso?")) {
-            openPrintWindow(getInterventionPrintUrl(createdIntervention.id));
-        }
+        showCreatedToast({
+            message: `Intervento #${createdIntervention.id} creato`,
+            onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
+            onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
+        });
     };
 
     useEffect(() => {
@@ -341,6 +392,28 @@ const DashboardPage = () => {
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">{formatEuro(monthlyRevenue)}</div>
                                     <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
+                                    {revenueComparison ? (
+                                        // Freccia e segno oltre al colore: l'andamento si legge anche
+                                        // senza distinguere il verde dal rosso.
+                                        <div
+                                            className={cn(
+                                                "mt-1 inline-flex items-center gap-1 text-sm font-medium",
+                                                revenueComparison.change >= 0
+                                                    ? "text-green-700 dark:text-green-400"
+                                                    : "text-destructive"
+                                            )}
+                                        >
+                                            {revenueComparison.change >= 0 ? (
+                                                <TrendingUp className="size-4" aria-hidden="true" />
+                                            ) : (
+                                                <TrendingDown className="size-4" aria-hidden="true" />
+                                            )}
+                                            {percentFormatter.format(revenueComparison.change)} rispetto{" "}
+                                            {/* "ad agosto", "ad aprile", ma "a luglio". */}
+                                            {revenueComparison.previousMonthLabel.startsWith("a") ? "ad" : "a"}{" "}
+                                            {revenueComparison.previousMonthLabel}
+                                        </div>
+                                    ) : null}
                                     <div className="mt-2 text-sm text-muted-foreground">
                                         Al netto tecnici esterni:{" "}
                                         <span className="font-semibold text-foreground">
@@ -366,14 +439,14 @@ const DashboardPage = () => {
                                 </Tooltip>
                             </div>
 
-                            <div className="flex h-32 items-end gap-2 border-b border-border">
+                            <div className="flex h-36 items-end gap-2 border-b border-border">
                                 {monthlyRevenueSeries.map((point) => {
                                     const isSelected = point.monthKey === selectedRevenueMonth;
                                     const shortLabel = getMonthShortLabel(point.monthKey);
+                                    // Al massimo l'80% della colonna: il resto è per l'importo
+                                    // scritto sopra, che altrimenti la barra più alta spingerebbe fuori.
                                     const heightPercent =
-                                        maxMonthlyRevenue > 0
-                                            ? Math.max((point.value / maxMonthlyRevenue) * 100, 4)
-                                            : 4;
+                                        maxMonthlyRevenue > 0 ? Math.max((point.value / maxMonthlyRevenue) * 80, 3) : 3;
 
                                     return (
                                         <button
@@ -382,8 +455,21 @@ const DashboardPage = () => {
                                             onClick={() => setSelectedRevenueMonth(point.monthKey)}
                                             title={`${shortLabel}: ${formatEuro(point.value)}`}
                                             aria-label={`${shortLabel}: ${formatEuro(point.value)}`}
-                                            className="flex h-full flex-1 cursor-pointer flex-col items-end justify-end"
+                                            aria-pressed={isSelected}
+                                            className="flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-end gap-1"
                                         >
+                                            {/* L'importo sta scritto: prima si leggeva solo nel
+                                                fumetto al passaggio del mouse, che su un telefono
+                                                non c'è. */}
+                                            <span
+                                                aria-hidden="true"
+                                                className={cn(
+                                                    "max-w-full truncate text-[10px] tabular-nums sm:text-xs",
+                                                    isSelected ? "font-semibold text-primary" : "text-muted-foreground"
+                                                )}
+                                            >
+                                                {barValueFormatter.format(point.value)}
+                                            </span>
                                             <div
                                                 className={cn(
                                                     "w-full rounded-t-[4px] transition-colors",

@@ -2,6 +2,7 @@ import EntityTable, { type EntityColumn } from "@/components/entity-table";
 import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
 import { Pencil, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 type EntityCrudTableProps<TRow extends { id: number }> = {
     tableKey: string;
@@ -15,8 +16,12 @@ type EntityCrudTableProps<TRow extends { id: number }> = {
      * pulsante fuori dal contesto della riga.
      */
     entityLabel: string;
-    /** Presente solo per le entità che hanno una scheda propria (tecnici, collaboratori). */
-    onOpen?: (id: number) => void;
+    /**
+     * L'indirizzo della scheda di una riga. Presente solo per le entità che ne hanno una
+     * (tecnici, collaboratori): un indirizzo e non una funzione da chiamare, perché "Apri" è
+     * un link (vedi `OpenEntityButton`).
+     */
+    getOpenPath?: (id: number) => string;
     /**
      * Righe che non si possono modificare né eliminare: i pulsanti spariscono invece di
      * restare lì a raccogliere un rifiuto del server. "Apri", quando c'è, resta.
@@ -46,7 +51,7 @@ const EntityCrudTable = <TRow extends { id: number }>({
     rows,
     emptyMessage,
     entityLabel,
-    onOpen,
+    getOpenPath,
     onDelete,
     onEdit,
     isRowLocked,
@@ -54,14 +59,12 @@ const EntityCrudTable = <TRow extends { id: number }>({
     isRefetching,
     skeletonRowCount,
 }: EntityCrudTableProps<TRow>) => {
+    const navigate = useNavigate();
+
     const renderRowActions = (row: TRow) => (
         <>
-            {onOpen ? (
-                <OpenEntityButton
-                    size="lg"
-                    onClick={() => onOpen(row.id)}
-                    aria-label={`Apri ${entityLabel} ${row.id}`}
-                />
+            {getOpenPath ? (
+                <OpenEntityButton size="lg" to={getOpenPath(row.id)} aria-label={`Apri ${entityLabel} ${row.id}`} />
             ) : null}
             {isRowLocked?.(row) ? null : (
                 <>
@@ -98,8 +101,8 @@ const EntityCrudTable = <TRow extends { id: number }>({
             // Il doppio click sulla riga apriva la scheda su report e interventi ma non qui,
             // perché questo componente non inoltrava `onRowOpen`: lo stesso gesto funzionava su
             // due tabelle su sette. Resta un'aggiunta per il mouse — da tastiera la scheda si
-            // apre con il pulsante "Apri", che c'è esattamente quando c'è `onOpen`.
-            onRowOpen={onOpen ? (row) => onOpen(row.id) : undefined}
+            // apre con il pulsante "Apri", che c'è esattamente quando c'è `getOpenPath`.
+            onRowOpen={getOpenPath ? (row) => void navigate(getOpenPath(row.id)) : undefined}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
             skeletonRowCount={skeletonRowCount}

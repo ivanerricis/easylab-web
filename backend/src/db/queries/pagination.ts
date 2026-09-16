@@ -1,3 +1,5 @@
+import { ApiError } from "../../services/apiError";
+
 /**
  * Tetto di sicurezza per le liste chiamate senza `page`/`pageSize`.
  *
@@ -28,17 +30,48 @@ type LimitableQuery<TRow> = {
     limit: (count: number) => PromiseLike<TRow[]>;
 };
 
-export const takeUnpaginated = async <TRow>(query: LimitableQuery<TRow>, entityName: string): Promise<TRow[]> => {
-    // Una riga in più del limite: serve solo a capire se il tetto è stato raggiunto.
-    const rows = await query.limit(unpaginatedMaxRows + 1);
+/**
+ * Cosa fare quando una lista senza paginazione supera il tetto.
+ *
+ * Per le schermate il troncamento con un warning resta la scelta giusta (vedi sopra). Per un
+ * export no: "Esporta" promette l'archivio intero, e un file che si ferma in silenzio a 5000
+ * righe è un dato sbagliato che nessuno nota — un conteggio, una contabilità, un archivio che
+ * sembra completo e non lo è. Lì il tetto è più alto e, superato, la richiesta si rifiuta.
+ */
+export type UnpaginatedLimit = { maxRows: number; onOverflow: "truncate" | "reject" };
 
-    if (rows.length > unpaginatedMaxRows) {
-        console.warn(
-            `Lista "${entityName}" richiesta senza paginazione con più di ${unpaginatedMaxRows} righe: ` +
-                `risultato troncato. Va introdotta la paginazione sul chiamante.`
-        );
-        return rows.slice(0, unpaginatedMaxRows);
+const listRowLimit: UnpaginatedLimit = { maxRows: unpaginatedMaxRows, onOverflow: "truncate" };
+
+/**
+ * Dieci volte il tetto delle liste: ben oltre i volumi del laboratorio, e ancora un file che
+ * il backend compone in memoria senza problemi (qualche decina di MB nel caso peggiore).
+ */
+export const exportRowLimit: UnpaginatedLimit = { maxRows: 50_000, onOverflow: "reject" };
+
+export class ExportTooLargeError extends ApiError {}
+
+export const takeUnpaginated = async <TRow>(
+    query: LimitableQuery<TRow>,
+    entityName: string,
+    { maxRows, onOverflow }: UnpaginatedLimit = listRowLimit
+): Promise<TRow[]> => {
+    // Una riga in più del limite: serve solo a capire se il tetto è stato raggiunto.
+    const rows = await query.limit(maxRows + 1);
+
+    if (rows.length <= maxRows) {
+        return rows;
     }
 
-    return rows;
+    if (onOverflow === "reject") {
+        throw new ExportTooLargeError(
+            `L'esportazione supera le ${maxRows.toLocaleString("it-IT")} righe: restringi i filtri (per esempio l'intervallo di date) ed esporta in più parti.`,
+            400
+        );
+    }
+
+    console.warn(
+        `Lista "${entityName}" richiesta senza paginazione con più di ${maxRows} righe: ` +
+            `risultato troncato. Va introdotta la paginazione sul chiamante.`
+    );
+    return rows.slice(0, maxRows);
 };

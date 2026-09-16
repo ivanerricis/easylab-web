@@ -1,11 +1,11 @@
 import { listInterventions } from "@/lib/api";
 import type { InterventionDto } from "@/types/dtos";
 import { useCallback } from "react";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import type { InterventionSortOption, InterventionStatusFilter, InterventionTypeFilter } from "../components/types";
 
 type UseInterventionsRowsParams = {
+    /** Già rallentato dal chiamante (vedi `useUrlSearchText`): qui si cerca subito. */
     searchText: string;
     statusFilter: InterventionStatusFilter;
     typeFilter: InterventionTypeFilter;
@@ -26,9 +26,8 @@ export const useInterventionsRows = ({
     currentPage,
     pageSize,
 }: UseInterventionsRowsParams) => {
-    const debouncedSearchText = useDebouncedValue(searchText);
     const [sortBy, sortOrder] = sortOption.split(":") as [
-        "createdAt" | "interventionDate" | "customer",
+        "createdAt" | "interventionDate" | "customer" | "status",
         "asc" | "desc",
     ];
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
@@ -37,7 +36,7 @@ export const useInterventionsRows = ({
                 listInterventions({
                     page: currentPage,
                     pageSize,
-                    search: debouncedSearchText,
+                    search: searchText,
                     status: statusFilter,
                     type: typeFilter,
                     sortBy,
@@ -46,16 +45,7 @@ export const useInterventionsRows = ({
                     dateTo,
                     signal,
                 }),
-            queryKey: [
-                currentPage,
-                pageSize,
-                debouncedSearchText,
-                statusFilter,
-                typeFilter,
-                sortOption,
-                dateFrom,
-                dateTo,
-            ],
+            queryKey: [currentPage, pageSize, searchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo],
             errorMessage: "Impossibile caricare gli interventi",
             initialLoading: false,
         });

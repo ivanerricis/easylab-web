@@ -97,11 +97,13 @@ describe("rotte con un utente entrato", () => {
         expect(window.location.pathname).toBe("/dashboard");
     });
 
-    it("un indirizzo sconosciuto porta alla dashboard", async () => {
+    /** Prima riportava in silenzio alla dashboard, e un link sbagliato sembrava funzionare. */
+    it("un indirizzo sconosciuto mostra la pagina non trovata, lasciando l'indirizzo", async () => {
         renderAt("/pagina-che-non-esiste");
 
-        expect(await screen.findByText("Pagina: dashboard")).toBeInTheDocument();
-        expect(window.location.pathname).toBe("/dashboard");
+        expect(await screen.findByRole("heading", { name: "Pagina non trovata" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Vai alla dashboard" })).toHaveAttribute("href", "/dashboard");
+        expect(window.location.pathname).toBe("/pagina-che-non-esiste");
     });
 
     it("/error mostra la pagina d'errore dentro il layout", async () => {

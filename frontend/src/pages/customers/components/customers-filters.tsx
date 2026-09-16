@@ -1,6 +1,7 @@
 import FilterSelect from "@/components/filters/filter-select";
 import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
+import type { ReactNode } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { customerSortOptions, type CustomerSortOption } from "./types";
 
@@ -11,6 +12,8 @@ type CustomersFiltersProps = {
     onSortOptionChange: (value: CustomerSortOption) => void;
     onRefresh: () => void | Promise<unknown>;
     isRefreshing?: boolean;
+    /** Il menu "Colonne", in fondo alla riga dei filtri. */
+    columnsMenu?: ReactNode;
 };
 
 const CustomersFilters = ({
@@ -20,6 +23,7 @@ const CustomersFilters = ({
     onSortOptionChange,
     onRefresh,
     isRefreshing,
+    columnsMenu,
 }: CustomersFiltersProps) => {
     return (
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -33,6 +37,8 @@ const CustomersFilters = ({
                 label="Ordina per"
                 icon={ArrowUpDown}
             />
+
+            {columnsMenu}
         </div>
     );
 };

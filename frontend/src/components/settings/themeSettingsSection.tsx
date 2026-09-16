@@ -201,7 +201,7 @@ const ThemeSettingsSection = () => {
                 title="Colore principale"
                 description="Palette usata per pulsanti, sidebar e accenti dell'applicazione."
             >
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
                     {themeAccentPresets.map((preset) => (
                         <Button
                             key={preset.key}

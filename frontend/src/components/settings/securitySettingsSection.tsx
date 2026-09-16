@@ -4,6 +4,7 @@ import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsCard, SettingsEmptyBox, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
 import SessionsList from "@/components/settings/sessionsList";
+import CustomDialog from "@/components/dialogs/customDialog";
 import RecoveryCodesDialog from "@/components/dialogs/settings/recoveryCodesDialog";
 import TwoFactorConfirmDialog from "@/components/dialogs/settings/twoFactorConfirmDialog";
 import TwoFactorSetupDialog from "@/components/dialogs/settings/twoFactorSetupDialog";
@@ -42,6 +43,7 @@ const SecuritySettingsSection = () => {
     const [sessionsLoadedAt, setSessionsLoadedAt] = useState(0);
     const [isLoadingSessions, setIsLoadingSessions] = useState(false);
     const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+    const [sessionToRevoke, setSessionToRevoke] = useState<SessionDto | null>(null);
 
     const loadSessions = useCallback(async () => {
         setIsLoadingSessions(true);
@@ -77,6 +79,7 @@ const SecuritySettingsSection = () => {
             toast.error(getApiErrorMessage(error, "Impossibile disconnettere la sessione"));
         } finally {
             setRevokingSessionId(null);
+            setSessionToRevoke(null);
         }
     };
 
@@ -253,9 +256,34 @@ const SecuritySettingsSection = () => {
                     isLoading={isLoadingSessions}
                     loadedAt={sessionsLoadedAt}
                     revokingId={revokingSessionId}
-                    onRevoke={(session) => void handleRevokeSession(session)}
+                    onRevoke={(session) => setSessionToRevoke(session)}
                 />
             </SettingsCard>
+
+            <CustomDialog
+                open={sessionToRevoke !== null}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                        setSessionToRevoke(null);
+                    }
+                }}
+                title="Disconnetti sessione"
+                description={
+                    sessionToRevoke
+                        ? `Disconnettere "${sessionToRevoke.device ?? "questo dispositivo"}"? Dovrai accedere di nuovo da lì.`
+                        : undefined
+                }
+                destructive
+                confirmLabel={revokingSessionId ? "Disconnessione..." : "Disconnetti"}
+                confirmDisabled={revokingSessionId !== null}
+                cancelDisabled={revokingSessionId !== null}
+                onCancel={() => setSessionToRevoke(null)}
+                onConfirm={() => {
+                    if (sessionToRevoke) {
+                        void handleRevokeSession(sessionToRevoke);
+                    }
+                }}
+            />
 
             {user?.isAdmin ? (
                 <SettingsCard

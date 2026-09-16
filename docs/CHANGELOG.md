@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Conferma prima di disconnettere una sessione o ripristinare il logo
+
+**Il problema.** "Disconnetti" nella lista sessioni (sia l'admin su un altro utente, sia
+"Le tue sessioni" su se stessi) chiamava subito `revokeUserSession`/`revokeOwnSession` al click:
+un errore di mira su un elenco denso disconnetteva una sessione — con logout immediato per
+l'utente colpito — senza possibilità di annullare. Stesso schema per "Ripristina logo
+predefinito" in Impostazioni > Azienda, che scartava il logo caricato con un click, irreversibile
+se non si ha più il file originale. Ogni altra azione distruttiva del pannello impostazioni
+(elimina utente, elimina cliente/report/intervento, disabilita utente, disattiva 2FA) passa già
+da un dialog di conferma: questi tre erano rimasti fuori schema.
+
+**Cosa.** Aggiunto un `CustomDialog` di conferma (`destructive`) prima della chiamata effettiva,
+in `userSessionsDialog.tsx`, `securitySettingsSection.tsx` e `companySettingsPanel.tsx`; la
+richiesta parte solo al click su "Conferma" nel secondo dialog, non più al primo click sul
+pulsante dell'elenco.
+
+---
+
 ## 2026-09-16 — "Pulisci date" azzerava solo la data di fine, cifre tagliate su mobile
 
 **Il problema (1).** In Report e Interventi, "Pulisci date" chiamava `onDateFromChange(undefined)`

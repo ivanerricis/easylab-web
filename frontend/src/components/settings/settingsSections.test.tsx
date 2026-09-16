@@ -219,6 +219,9 @@ describe("UsersSettingsSection", () => {
         expect(disconnectButtons[0]).toBeDisabled();
         await userEvent.click(disconnectButtons[1]);
 
+        const confirmDialog = await screen.findByRole("dialog", { name: "Disconnetti sessione" });
+        await userEvent.click(within(confirmDialog).getByRole("button", { name: "Disconnetti" }));
+
         await waitFor(() => {
             expect(api.revokeUserSession).toHaveBeenCalledWith(2, "hash-altro");
         });

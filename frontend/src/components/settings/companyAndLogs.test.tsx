@@ -164,6 +164,9 @@ describe("CompanySettingsPanel", () => {
 
         await userEvent.click(screen.getByRole("button", { name: "Ripristina logo predefinito" }));
 
+        const confirmDialog = await screen.findByRole("dialog", { name: "Ripristina logo predefinito" });
+        await userEvent.click(within(confirmDialog).getByRole("button", { name: "Ripristina" }));
+
         await waitFor(() => {
             expect(screen.getByText("Logo predefinito attivo")).toBeInTheDocument();
         });

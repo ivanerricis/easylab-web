@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import CustomDialog from "@/components/dialogs/customDialog";
 import {
     SettingsActions,
     SettingsCard,
@@ -59,6 +60,7 @@ const CompanySettingsPanel = () => {
     const [isLoadingLogo, setIsLoadingLogo] = useState(false);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [isResettingLogo, setIsResettingLogo] = useState(false);
+    const [isLogoResetConfirmOpen, setIsLogoResetConfirmOpen] = useState(false);
     const [hasCustomLogo, setHasCustomLogo] = useState(false);
     const [logoUpdatedAt, setLogoUpdatedAt] = useState<string | null>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
@@ -176,6 +178,7 @@ const CompanySettingsPanel = () => {
             toast.error(getApiErrorMessage(error, "Impossibile ripristinare il logo predefinito"));
         } finally {
             setIsResettingLogo(false);
+            setIsLogoResetConfirmOpen(false);
         }
     };
 
@@ -305,10 +308,27 @@ const CompanySettingsPanel = () => {
                                     type="button"
                                     variant="outline"
                                     disabled={!hasCustomLogo || isResettingLogo || isUploadingLogo}
-                                    onClick={() => void handleLogoReset()}
+                                    onClick={() => setIsLogoResetConfirmOpen(true)}
                                 >
                                     {isResettingLogo ? "Ripristino..." : "Ripristina logo predefinito"}
                                 </Button>
+
+                                <CustomDialog
+                                    open={isLogoResetConfirmOpen}
+                                    onOpenChange={(nextOpen) => {
+                                        if (!isResettingLogo) {
+                                            setIsLogoResetConfirmOpen(nextOpen);
+                                        }
+                                    }}
+                                    title="Ripristina logo predefinito"
+                                    description="Il logo personalizzato attuale verrà rimosso e sostituito da quello predefinito. Se non hai più il file originale, dovrai crearlo di nuovo per ricaricarlo."
+                                    destructive
+                                    confirmLabel={isResettingLogo ? "Ripristino..." : "Ripristina"}
+                                    confirmDisabled={isResettingLogo}
+                                    cancelDisabled={isResettingLogo}
+                                    onCancel={() => setIsLogoResetConfirmOpen(false)}
+                                    onConfirm={() => void handleLogoReset()}
+                                />
                             </SettingsActions>
                         </SettingsGroup>
 

@@ -23,6 +23,7 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
     const [loadedAt, setLoadedAt] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [revokingId, setRevokingId] = useState<string | null>(null);
+    const [sessionToRevoke, setSessionToRevoke] = useState<SessionDto | null>(null);
 
     const loadSessions = useCallback(async () => {
         if (!user) {
@@ -67,30 +68,58 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
             toast.error(getApiErrorMessage(error, "Impossibile disconnettere la sessione"));
         } finally {
             setRevokingId(null);
+            setSessionToRevoke(null);
         }
     };
 
     return (
-        <CustomDialog
-            open={open}
-            onOpenChange={onOpenChange}
-            title="Sessioni attive"
-            description={user ? `Accessi aperti per "${user.username}".` : undefined}
-            showConfirmButton={false}
-            cancelLabel="Chiudi"
-            onCancel={() => onOpenChange(false)}
-            content={
-                <div className="py-2">
-                    <SessionsList
-                        sessions={sessions}
-                        isLoading={isLoading}
-                        loadedAt={loadedAt}
-                        revokingId={revokingId}
-                        onRevoke={(session) => void handleRevoke(session)}
-                    />
-                </div>
-            }
-        />
+        <>
+            <CustomDialog
+                open={open}
+                onOpenChange={onOpenChange}
+                title="Sessioni attive"
+                description={user ? `Accessi aperti per "${user.username}".` : undefined}
+                showConfirmButton={false}
+                cancelLabel="Chiudi"
+                onCancel={() => onOpenChange(false)}
+                content={
+                    <div className="py-2">
+                        <SessionsList
+                            sessions={sessions}
+                            isLoading={isLoading}
+                            loadedAt={loadedAt}
+                            revokingId={revokingId}
+                            onRevoke={(session) => setSessionToRevoke(session)}
+                        />
+                    </div>
+                }
+            />
+
+            <CustomDialog
+                open={sessionToRevoke !== null}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                        setSessionToRevoke(null);
+                    }
+                }}
+                title="Disconnetti sessione"
+                description={
+                    sessionToRevoke
+                        ? `Disconnettere "${sessionToRevoke.device ?? "questo dispositivo"}"? L'utente dovrà accedere di nuovo.`
+                        : undefined
+                }
+                destructive
+                confirmLabel={revokingId ? "Disconnessione..." : "Disconnetti"}
+                confirmDisabled={revokingId !== null}
+                cancelDisabled={revokingId !== null}
+                onCancel={() => setSessionToRevoke(null)}
+                onConfirm={() => {
+                    if (sessionToRevoke) {
+                        void handleRevoke(sessionToRevoke);
+                    }
+                }}
+            />
+        </>
     );
 };
 

@@ -26,7 +26,13 @@ type DateRangeFilterProps = {
  * avevano due copie identiche carattere per carattere, e quella regola è comportamento,
  * non impaginazione — due copie di una regola sono due occasioni perché una cambi da sola.
  */
-const DateRangeFilter = ({ dateFrom, onDateFromChange, dateTo, onDateToChange, onClearDates }: DateRangeFilterProps) => {
+const DateRangeFilter = ({
+    dateFrom,
+    onDateFromChange,
+    dateTo,
+    onDateToChange,
+    onClearDates,
+}: DateRangeFilterProps) => {
     return (
         <>
             <div className="flex flex-wrap items-center gap-2">

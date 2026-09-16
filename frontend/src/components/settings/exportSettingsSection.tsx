@@ -84,11 +84,13 @@ const ExportDateRange = ({
     dateTo,
     onDateFromChange,
     onDateToChange,
+    onClearDates,
 }: {
     dateFrom: string | undefined;
     dateTo: string | undefined;
     onDateFromChange: (value: string | undefined) => void;
     onDateToChange: (value: string | undefined) => void;
+    onClearDates: () => void;
 }) => (
     <div className="grid gap-2">
         <Label>Periodo</Label>
@@ -98,6 +100,7 @@ const ExportDateRange = ({
                 onDateFromChange={onDateFromChange}
                 dateTo={dateTo}
                 onDateToChange={onDateToChange}
+                onClearDates={onClearDates}
             />
         </div>
     </div>
@@ -178,6 +181,10 @@ const ExportSettingsSection = () => {
                         dateTo={reportDateTo}
                         onDateFromChange={setReportDateFrom}
                         onDateToChange={setReportDateTo}
+                        onClearDates={() => {
+                            setReportDateFrom(undefined);
+                            setReportDateTo(undefined);
+                        }}
                     />
                 </ExportFilters>
 
@@ -226,6 +233,10 @@ const ExportSettingsSection = () => {
                         dateTo={interventionDateTo}
                         onDateFromChange={setInterventionDateFrom}
                         onDateToChange={setInterventionDateTo}
+                        onClearDates={() => {
+                            setInterventionDateFrom(undefined);
+                            setInterventionDateTo(undefined);
+                        }}
                     />
                 </ExportFilters>
 

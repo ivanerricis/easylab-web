@@ -11,6 +11,29 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Fasi dell'aggiornamento visibili invece del solo spinner
+
+**Il problema.** `scripts/update-server.sh` attraversa già dei passaggi distinti (verifica
+della firma del commit, `git reset --hard`, `docker compose up --build`, pulizia immagini), ma
+`status.json` veniva scritto solo due volte: `"running"` all'inizio, `"success"`/`"failed"` alla
+fine. Il pannello Aggiornamenti fa polling ogni 3 secondi per fino a 6 minuti, ma per tutta
+quell'attesa mostrava solo uno spinner con "Aggiornamento in corso...", senza dire se si era
+fermo al fetch o a metà della ricostruzione dei container. Una progress bar a percentuale non
+avrebbe avuto senso: il tempo di `docker compose build` varia troppo (secondi con la cache,
+minuti se cambia una dipendenza) per essere stimato in anticipo.
+
+**Cosa.** Lo script scrive ora la fase corrente (`verify`/`code`/`build`/`cleanup`, tipo
+`UpdatePhase` in `updateManager.ts`) ad ogni passaggio, non solo all'inizio e alla fine; in caso
+di fallimento la fase resta quella raggiunta, non viene azzerata. Il campo `phase` attraversa
+`UpdateStatus` (backend) e `UpdateStatusDto` (frontend) fino a `updateSettingsPanel.tsx`, che
+aggiorna la schermata di blocco a ogni cambio di fase durante il polling. `BusyGuardState` (il
+context dietro la schermata di blocco a schermo intero, condiviso anche col ripristino del
+backup) guadagna un campo opzionale `steps`/`activeStepKey`: chi non lo passa vede la stessa
+schermata di sempre, chi lo passa vede l'elenco dei passaggi con quello attivo evidenziato e i
+precedenti spuntati.
+
+---
+
 ## 2026-09-16 — Conferma prima di disconnettere una sessione o ripristinare il logo
 
 **Il problema.** "Disconnetti" nella lista sessioni (sia l'admin su un altro utente, sia

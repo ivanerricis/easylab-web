@@ -19,8 +19,16 @@ const checkTriggerPath = path.join(signalDir, "check.trigger");
 
 type UpdateStatusState = "unknown" | "idle" | "running" | "success" | "failed";
 
+// Le fasi che scripts/update-server.sh attraversa mentre `state` è "running": scritte lì una
+// per volta, servono solo a dire all'utente a che punto siamo durante i minuti di attesa, non
+// sono usate per nessuna logica qui. Tenute in sync a mano con quell'elenco di `write_status`.
+export type UpdatePhase = "verify" | "code" | "build" | "cleanup";
+
+const validPhases: UpdatePhase[] = ["verify", "code", "build", "cleanup"];
+
 export type UpdateStatus = {
     state: UpdateStatusState;
+    phase: UpdatePhase | null;
     currentCommit: string | null;
     remoteCommit: string | null;
     updateAvailable: boolean;
@@ -35,6 +43,7 @@ export class UpdateManagerError extends ApiError {}
 
 const defaultStatus: UpdateStatus = {
     state: "unknown",
+    phase: null,
     currentCommit: null,
     remoteCommit: null,
     updateAvailable: false,
@@ -52,6 +61,7 @@ const validStates: UpdateStatusState[] = ["unknown", "idle", "running", "success
 // or malformed rather than throwing.
 const sanitizeStatus = (input: Partial<UpdateStatus> | null | undefined): UpdateStatus => ({
     state: validStates.includes(input?.state as UpdateStatusState) ? (input!.state as UpdateStatusState) : "unknown",
+    phase: validPhases.includes(input?.phase as UpdatePhase) ? (input!.phase as UpdatePhase) : null,
     currentCommit: typeof input?.currentCommit === "string" ? input.currentCommit : null,
     remoteCommit: typeof input?.remoteCommit === "string" ? input.remoteCommit : null,
     updateAvailable: Boolean(input?.updateAvailable),

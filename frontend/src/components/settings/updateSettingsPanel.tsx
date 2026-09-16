@@ -28,6 +28,15 @@ const POLL_INTERVAL_MS = 3000;
 const CHECK_MAX_ATTEMPTS = 20; // ~1 minute
 const UPDATE_MAX_ATTEMPTS = 120; // ~6 minutes
 
+// Stesso ordine delle fasi scritte da scripts/update-server.sh: vedi UpdatePhase in
+// backend/src/services/updateManager.ts.
+const updatePhaseSteps = [
+    { key: "verify", label: "Verifica della firma del commit" },
+    { key: "code", label: "Aggiornamento del codice" },
+    { key: "build", label: "Ricostruzione dei container" },
+    { key: "cleanup", label: "Pulizia delle immagini vecchie" },
+];
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const UpdateSettingsPanel = () => {
@@ -150,6 +159,8 @@ const UpdateSettingsPanel = () => {
             title: "Aggiornamento in corso...",
             description:
                 "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
+            steps: updatePhaseSteps,
+            activeStepKey: "verify",
         });
 
         try {
@@ -176,6 +187,19 @@ const UpdateSettingsPanel = () => {
                         await sleep(1500);
                         window.location.reload();
                         return;
+                    }
+
+                    // Il container backend viene ricreato durante la fase "build": qui sotto
+                    // non arriva più nulla per quella finestra, ma la fase resta quella scritta
+                    // prima del riavvio finché il polling successivo non ne legge una nuova.
+                    if (result.state === "running" && result.phase) {
+                        setBusy({
+                            title: "Aggiornamento in corso...",
+                            description:
+                                "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
+                            steps: updatePhaseSteps,
+                            activeStepKey: result.phase,
+                        });
                     }
                 } catch {
                     // atteso: i container vengono ricreati durante l'aggiornamento

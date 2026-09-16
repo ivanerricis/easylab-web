@@ -32,6 +32,10 @@ write_status() {
     local state="$1"
     local last_status="$2"
     local error_msg="$3"
+    # Fase corrente mentre state="running" (vedi UpdatePhase in updateManager.ts). Omesso (o
+    # vuoto) fuori dai passaggi intermedi: la riga sotto tiene quella già scritta, così il
+    # fallimento finale non la cancella e il frontend può ancora dire dove si è fermato.
+    local phase="${4:-}"
     local now current_commit log_tail
 
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -40,6 +44,7 @@ write_status() {
 
     update_status \
         --arg state "$state" \
+        --arg phase "$phase" \
         --arg currentCommit "$current_commit" \
         --arg now "$now" \
         --arg lastUpdateStatus "$last_status" \
@@ -47,6 +52,7 @@ write_status() {
         --arg log "$log_tail" \
         '. + {
             state: $state,
+            phase: (if $phase == "" then (.phase // null) else $phase end),
             currentCommit: $currentCommit,
             lastUpdateAt: $now,
             lastUpdateStatus: (if $lastUpdateStatus == "" then (.lastUpdateStatus // null) else $lastUpdateStatus end),
@@ -68,7 +74,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-write_status "running" "" ""
+write_status "running" "" "" "verify"
 
 set -euo pipefail
 
@@ -98,10 +104,25 @@ set -euo pipefail
     else
         echo "=== ops/allowed_signers not installed yet: signature check skipped this once ==="
     fi
+} >>"$LOG_FILE" 2>&1
+
+write_status "running" "" "" "code"
+
+{
     echo "=== git reset --hard origin/main ==="
     git reset --hard origin/main
+} >>"$LOG_FILE" 2>&1
+
+write_status "running" "" "" "build"
+
+{
     echo "=== docker compose up --build -d --remove-orphans ==="
     docker compose up --build -d --remove-orphans
+} >>"$LOG_FILE" 2>&1
+
+write_status "running" "" "" "cleanup"
+
+{
     echo "=== docker image prune -f ==="
     docker image prune -f
     echo "=== docker builder prune -f --filter until=24h ==="

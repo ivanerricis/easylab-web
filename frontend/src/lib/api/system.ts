@@ -2,6 +2,7 @@ import { api } from "./client";
 
 export type UpdateStatusDto = {
     state: "unknown" | "idle" | "running" | "success" | "failed";
+    phase: "verify" | "code" | "build" | "cleanup" | null;
     currentCommit: string | null;
     remoteCommit: string | null;
     updateAvailable: boolean;

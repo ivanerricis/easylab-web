@@ -30,6 +30,7 @@ import {
 
 const storedStatus = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
     state: "idle",
+    phase: null,
     currentCommit: "abc123",
     remoteCommit: "abc123",
     updateAvailable: false,
@@ -103,6 +104,22 @@ describe("getUpdateStatus", () => {
         const status = await getUpdateStatus();
 
         expect(status.lastUpdateStatus).toBe("failed");
+    });
+
+    it("scarta una phase non tra i valori ammessi", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedStatus({ phase: "boh" as never })));
+
+        const status = await getUpdateStatus();
+
+        expect(status.phase).toBeNull();
+    });
+
+    it("preserva una phase valida mentre l'aggiornamento è in corso", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedStatus({ state: "running", phase: "build" })));
+
+        const status = await getUpdateStatus();
+
+        expect(status.phase).toBe("build");
     });
 
     it("un JSON illeggibile non fa fallire la chiamata: torna lo stato di default", async () => {

@@ -1,6 +1,44 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
+import { Circle, CircleCheck, Loader2 } from "lucide-react";
 import { BusyGuardContext, type BusyGuardState } from "@/components/busy-guard-context";
+import { cn } from "@/lib/utils";
+
+const BusySteps = ({ steps, activeStepKey }: { steps: BusyGuardState["steps"]; activeStepKey?: string | null }) => {
+    if (!steps || steps.length === 0) {
+        return null;
+    }
+
+    const activeIndex = steps.findIndex((step) => step.key === activeStepKey);
+
+    return (
+        <ol className="grid w-full max-w-xs gap-1.5 text-left">
+            {steps.map((step, index) => {
+                const isDone = activeIndex >= 0 && index < activeIndex;
+                const isActive = index === activeIndex;
+
+                return (
+                    <li
+                        key={step.key}
+                        aria-current={isActive ? "step" : undefined}
+                        className={cn(
+                            "flex items-center gap-2 text-sm",
+                            isActive ? "font-medium text-foreground" : "text-muted-foreground"
+                        )}
+                    >
+                        {isDone ? (
+                            <CircleCheck className="size-4 shrink-0 text-primary" />
+                        ) : isActive ? (
+                            <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                        ) : (
+                            <Circle className="size-4 shrink-0" />
+                        )}
+                        {step.label}
+                    </li>
+                );
+            })}
+        </ol>
+    );
+};
 
 export const BusyGuardProvider = ({ children }: { children: ReactNode }) => {
     const [busy, setBusy] = useState<BusyGuardState | null>(null);
@@ -33,6 +71,7 @@ export const BusyGuardProvider = ({ children }: { children: ReactNode }) => {
                     <Loader2 className="size-10 animate-spin text-primary" />
                     <p className="text-lg font-semibold">{busy.title}</p>
                     <p className="max-w-sm text-center text-sm text-muted-foreground">{busy.description}</p>
+                    <BusySteps steps={busy.steps} activeStepKey={busy.activeStepKey} />
                 </div>
             ) : null}
         </BusyGuardContext.Provider>

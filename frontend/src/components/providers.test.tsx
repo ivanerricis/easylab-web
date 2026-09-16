@@ -69,6 +69,49 @@ describe("BusyGuardProvider", () => {
             "useBusyGuard deve essere usato dentro BusyGuardProvider"
         );
     });
+
+    /** Senza `steps` il comportamento resta quello di sempre: nessun elenco, solo spinner. */
+    it("senza passi mostra solo il messaggio, come prima", async () => {
+        render(
+            <BusyGuardProvider>
+                <BusyButton />
+            </BusyGuardProvider>
+        );
+
+        await userEvent.click(screen.getByRole("button", { name: "Blocca" }));
+
+        expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+
+    it("con i passi evidenzia quello attivo e spunta quelli già fatti", () => {
+        let setBusy: ReturnType<typeof useBusyGuard>["setBusy"] = () => {};
+        const Capture = () => {
+            setBusy = useBusyGuard().setBusy;
+            return null;
+        };
+        render(
+            <BusyGuardProvider>
+                <Capture />
+            </BusyGuardProvider>
+        );
+
+        act(() =>
+            setBusy({
+                title: "Aggiornamento",
+                description: "",
+                steps: [
+                    { key: "a", label: "Passo A" },
+                    { key: "b", label: "Passo B" },
+                    { key: "c", label: "Passo C" },
+                ],
+                activeStepKey: "b",
+            })
+        );
+
+        expect(screen.getByText("Passo B").closest("li")).toHaveAttribute("aria-current", "step");
+        expect(screen.getByText("Passo A").closest("li")).not.toHaveAttribute("aria-current");
+        expect(screen.getByText("Passo C").closest("li")).not.toHaveAttribute("aria-current");
+    });
 });
 
 describe("ThemeProvider", () => {

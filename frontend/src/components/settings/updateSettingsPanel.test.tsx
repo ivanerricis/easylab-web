@@ -33,6 +33,7 @@ import { renderWithProviders } from "@/test/render";
 
 const status = {
     state: "idle",
+    phase: null,
     currentCommit: "abc1234",
     remoteCommit: "def5678",
     updateAvailable: true,
@@ -157,6 +158,39 @@ describe("UpdateSettingsPanel", () => {
         await nextPoll();
         expect(toast.success).toHaveBeenCalledWith("Aggiornamento completato. Ricarico la pagina...");
 
+        await nextPoll(1500);
+        expect(reload).toHaveBeenCalled();
+    });
+
+    /**
+     * scripts/update-server.sh scrive la fase corrente in status.json mentre l'aggiornamento
+     * gira: qui verifichiamo che il pannello segua quella fase invece di mostrare solo uno
+     * spinner muto per i minuti in cui l'utente aspetta.
+     */
+    it("segue le fasi dell'aggiornamento durante l'attesa", async () => {
+        api.runUpdateNow.mockResolvedValue(status);
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Aggiorna adesso" }));
+        await click(within(screen.getByRole("dialog")).getByRole("button", { name: "Aggiorna adesso" }));
+
+        const overlay = screen.getByRole("alert");
+        expect(within(overlay).getByText("Verifica della firma del commit").closest("li")).toHaveAttribute(
+            "aria-current",
+            "step"
+        );
+
+        api.getUpdateStatus.mockResolvedValue({ ...status, state: "running", phase: "build" });
+        await nextPoll();
+
+        expect(within(overlay).getByText("Ricostruzione dei container").closest("li")).toHaveAttribute(
+            "aria-current",
+            "step"
+        );
+        expect(within(overlay).getByText("Aggiornamento del codice").closest("li")).not.toHaveAttribute("aria-current");
+
+        api.getUpdateStatus.mockResolvedValue({ ...status, state: "success", currentCommit: "def5678" });
+        await nextPoll();
         await nextPoll(1500);
         expect(reload).toHaveBeenCalled();
     });

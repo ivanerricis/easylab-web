@@ -11,6 +11,26 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Aggiornamenti delle dipendenze automatizzati (Dependabot)
+
+**Il problema.** `npm audit` è pulito oggi su frontend e backend, ma è una foto dello stato
+attuale: senza un controllo periodico, una CVE futura su una dipendenza già installata resta
+silenziosa finché qualcuno non pensa a rilanciare l'audit a mano. Con l'app ora esposta su
+dominio pubblico (voce sotto), questo buco pesa di più che in LAN.
+
+**Cosa.** `.github/dependabot.yml`: controllo settimanale delle dipendenze npm di `frontend/` e
+`backend/` (una PR per cartella, dipendenze raggruppate per evitare una PR a pacchetto) più delle
+versioni usate nei workflow di `.github/workflows/`. Gli avvisi di sicurezza restano fuori
+programma: se GitHub pubblica una CVE su una libreria in uso, la PR con la versione corretta
+arriva subito, non alla prossima finestra settimanale. Ogni PR passa dalla CI esistente
+(lint/typecheck/test/build immagini) come qualunque altra; il merge resta manuale.
+
+**Il perché.** Costo quasi nullo (un file YAML, nessun servizio esterno), copre esattamente il
+buco individuato: oggi nessuno viene avvisato di una vulnerabilità futura in una dipendenza già
+installata.
+
+---
+
 ## 2026-09-16 — Esposizione su dominio pubblico completata
 
 **Cosa.** Tolta dal BACKLOG la voce "Esposizione su dominio pubblico". La parte applicativa era

@@ -50,6 +50,5 @@ nav:
   - Deploy e configurazione server: DEPLOY.md
   - Backup, restore e migrazione: BACKUP.md
   - Sicurezza account e accesso: OPERATIONS.md
-  - "Piano 2FA (storico)": 2FA-PLAN.md
   - Changelog: CHANGELOG.md
   - Backlog: BACKLOG.md

@@ -11,6 +11,17 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-16 — Rimosso il piano della 2FA, a lavoro concluso
+
+`docs/2FA-PLAN.md` era il documento di progettazione della verifica in due passaggi: tutte
+le fasi (1-4 l'8 settembre, la 5 il 14) sono implementate e collaudate, e le voci di questo
+changelog raccontano già cosa è stato fatto davvero, comprese le differenze rispetto al piano
+(migration `0023` invece di `0021`, 410 invece di 401 sul challenge morto, `--reset-2fa` invece
+di un azzeramento automatico). Tenerlo in giro serviva solo a ricostruire un ragionamento che
+qui è già scritto: rimosso, insieme al link nella navigazione del sito (`mkdocs.yml`).
+
+---
+
 ## 2026-09-16 — Documentazione pubblicata come sito con MkDocs Material
 
 I file in `docs/` erano Markdown letto solo su GitHub: niente ricerca, niente indice per
@@ -954,7 +965,7 @@ più una riga aggiunta a `_journal.json`.
 
 ## 2026-09-14 — Verifica in due passaggi obbligatoria per l'admin
 
-**Cosa.** Fase 5 del [piano della 2FA](2FA-PLAN.md). Un admin senza 2FA attiva non entra più
+**Cosa.** Fase 5 del piano della 2FA. Un admin senza 2FA attiva non entra più
 nell'app: dopo l'eventuale cambio della password generata, `RequireAuth` mostra
 `ForceTwoFactorSetupPage` (password → QR → codice → codici di recupero) al posto di qualunque
 pagina, e il backend risponde 403 `{ twoFactorSetupRequired: true }` a ogni rotta fuori da
@@ -3056,8 +3067,8 @@ rubare con un phishing. Il limitatore per IP
 ([loginRateLimit.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/loginRateLimit.ts)) ferma il tentativo a forza
 bruta, non la password già nota. Aggrava il quadro il fatto che l'admin può lanciare
 l'aggiornamento, che **esegue codice sull'host**, e leggere o ripristinare i backup: un account
-admin compromesso non è una fuga di dati, è la macchina. Il piano stava in
-[docs/2FA-PLAN.md](2FA-PLAN.md) da mesi; qui vengono realizzate le fasi 1-4, cioè tutto tranne
+admin compromesso non è una fuga di dati, è la macchina. Il piano stava in `docs/2FA-PLAN.md`
+da mesi (rimosso il 16 settembre 2026, a lavoro concluso); qui vengono realizzate le fasi 1-4, cioè tutto tranne
 l'obbligo per l'admin, che è meglio imporre a flusso collaudato.
 
 **TOTP scritto a mano invece che con una libreria.** RFC 6238 è un HMAC-SHA1 su un contatore a

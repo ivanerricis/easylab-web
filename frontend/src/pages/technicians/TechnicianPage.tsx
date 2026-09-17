@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
+import CreateTechnicianDialog, {
+    type TechnicianSubmitValues,
+} from "@/components/dialogs/create/createTechnicianDialog";
+import { toTechnicianPayload } from "@/lib/people";
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +23,7 @@ import {
     deleteReportTechnician,
     updateReport,
     updateReportTechnician,
+    updateTechnician,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil } from "lucide-react";
@@ -59,6 +64,7 @@ const TechnicianPage = () => {
     useDocumentTitle(technicianName);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isEditTechnicianDialogOpen, setIsEditTechnicianDialogOpen] = useState(false);
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
 
     const hasValidTechnicianId = useMemo(() => Number.isInteger(technicianId) && technicianId > 0, [technicianId]);
@@ -137,6 +143,12 @@ const TechnicianPage = () => {
         }
     }, [technicianId]);
 
+    // Come nella scheda del cliente: il nome e il riquadro si aggiornano con il tecnico che
+    // il server restituisce.
+    const handleEditTechnician = async (values: TechnicianSubmitValues) => {
+        setTechnician(await updateTechnician(technicianId, toTechnicianPayload(values)));
+    };
+
     const handleRefresh = useCallback(async () => {
         await Promise.all([loadTechnician(), reloadReports()]);
     }, [loadTechnician, reloadReports]);
@@ -184,13 +196,40 @@ const TechnicianPage = () => {
                     <TooltipContent>Torna indietro</TooltipContent>
                 </Tooltip>
                 <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{technicianName}</h1>
-                <RefreshButton
-                    onRefresh={handleRefresh}
-                    isRefreshing={areReportsLoading}
-                    label="Aggiorna i dati del tecnico"
-                    className="ml-auto"
-                />
+
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <RefreshButton
+                        onRefresh={handleRefresh}
+                        isRefreshing={areReportsLoading}
+                        label="Aggiorna i dati del tecnico"
+                    />
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={() => setIsEditTechnicianDialogOpen(true)}
+                                aria-label="Modifica tecnico"
+                            >
+                                <Pencil className="size-5" />
+                                <span className="hidden text-lg lg:inline">Modifica</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Modifica tecnico</TooltipContent>
+                    </Tooltip>
+                </div>
             </div>
+
+            {isEditTechnicianDialogOpen && technician ? (
+                <CreateTechnicianDialog
+                    open={isEditTechnicianDialogOpen}
+                    onOpenChange={setIsEditTechnicianDialogOpen}
+                    mode="edit"
+                    initialValues={technician}
+                    onSubmit={handleEditTechnician}
+                />
+            ) : null}
 
             {technician ? (
                 <Card className="gap-1">
@@ -205,13 +244,18 @@ const TechnicianPage = () => {
             ) : null}
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 className="text-lg font-semibold">Report affidati</h2>
+                {/* Titolo e filtro sulla stessa riga anche su mobile, come tab e filtro nelle
+                    schede di cliente e collaboratore. */}
+                <div className="flex items-center justify-between gap-2">
+                    <h2 className="shrink-0 text-lg font-semibold">Report affidati</h2>
                     <Select
                         value={visibilityFilter}
                         onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
                     >
-                        <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
+                        <SelectTrigger
+                            className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                            aria-label="Filtra i report per stato"
+                        >
                             <SelectValue placeholder="Filtra per stato" />
                         </SelectTrigger>
                         <SelectContent position="popper">

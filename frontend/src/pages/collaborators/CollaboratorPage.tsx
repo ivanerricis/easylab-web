@@ -1,4 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import DetailItem from "@/components/detail-item";
 import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import OpenEntityButton from "@/components/open-entity-button";
@@ -7,15 +8,31 @@ import { useGoBack } from "@/hooks/useGoBack";
 import { entityPaths } from "@/lib/entityPaths";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import CreateCollaboratorDialog, {
+    type CollaboratorSubmitValues,
+} from "@/components/dialogs/create/createCollaboratorDialog";
+import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
+import { toCollaboratorPayload } from "@/lib/people";
+import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getApiErrorMessage, getApiErrorStatus, getCollaborator, listInterventions, listReports } from "@/lib/api";
+import {
+    getApiErrorMessage,
+    getApiErrorStatus,
+    getCollaborator,
+    getCollaboratorInterventionsPrintUrl,
+    getCollaboratorReportsPrintUrl,
+    listInterventions,
+    listReports,
+    updateCollaborator,
+} from "@/lib/api";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
-import type { InterventionDto, ReportDto } from "@/types/dtos";
+import { ArrowLeft, Pencil, Printer } from "lucide-react";
+import type { CollaboratorDto, InterventionDto, ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import type { InterventionStatusFilter } from "../interventions/components/types";
 import { useNavigate, useParams } from "react-router-dom";
@@ -50,14 +67,26 @@ import { collaboratorInterventionColumns, collaboratorReportColumns } from "./co
  * righe a schermo non cresce mai, ma la pagina sì: filtro, tabella e impaginazione di
  * entrambe le liste insieme rendevano la scheda lunga da scorrere anche per un collaboratore
  * con pochi report. Il tab dei report è quello di default perché è la vista più cercata.
+ *
+ * In alto, come nella scheda del cliente, i dati del collaboratore e i pulsanti per modificarli
+ * e per stampare il resoconto del tab aperto: prima la scheda mostrava solo il nome, e per
+ * leggere il telefono o correggerlo bisognava tornare all'elenco.
  */
+type CollaboratorTab = "reports" | "interventions";
+
 const CollaboratorPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const collaboratorId = Number(id);
     const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(true);
-    const [collaboratorName, setCollaboratorName] = useState("Collaboratore");
+    const [collaborator, setCollaborator] = useState<CollaboratorDto | null>(null);
+    const collaboratorName = collaborator
+        ? `${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim()
+        : "Collaboratore";
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     useDocumentTitle(collaboratorName);
+    const [activeTab, setActiveTab] = useState<CollaboratorTab>("reports");
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("all");
     const [interventionStatusFilter, setInterventionStatusFilter] = useState<InterventionStatusFilter>("all");
 
@@ -134,38 +163,56 @@ const CollaboratorPage = () => {
         initialLoading: false,
     });
 
+    const loadCollaborator = useCallback(async () => {
+        try {
+            // Per id, come la scheda del tecnico: prima si scaricava l'elenco intero dei
+            // collaboratori per usarne uno.
+            setCollaborator(await getCollaborator(collaboratorId));
+        } catch (error) {
+            if (getApiErrorStatus(error) === 404) {
+                setIsNotFound(true);
+                return;
+            }
+
+            toast.error(getApiErrorMessage(error, "Impossibile caricare il collaboratore"));
+        }
+    }, [collaboratorId]);
+
     const handleRefresh = useCallback(async () => {
-        await Promise.all([reloadReports(), reloadInterventions()]);
-    }, [reloadInterventions, reloadReports]);
+        await Promise.all([loadCollaborator(), reloadReports(), reloadInterventions()]);
+    }, [loadCollaborator, reloadInterventions, reloadReports]);
+
+    const handleEditCollaborator = async (values: CollaboratorSubmitValues) => {
+        setCollaborator(await updateCollaborator(collaboratorId, toCollaboratorPayload(values)));
+    };
+
+    // La stampa segue il tab, come nella scheda del cliente.
+    const printTitle = activeTab === "interventions" ? "Stampa resoconto interventi" : "Stampa resoconto report";
+
+    const handleConfirmPrint = (range: { dateFrom?: string; dateTo?: string }) => {
+        openPrintWindow(
+            activeTab === "interventions"
+                ? getCollaboratorInterventionsPrintUrl(collaboratorId, range)
+                : getCollaboratorReportsPrintUrl(collaboratorId, range)
+        );
+    };
 
     useEffect(() => {
         if (!hasValidCollaboratorId) {
             return;
         }
 
-        // Il nome è l'unica cosa che deve esserci prima di disegnare la pagina: è
-        // l'intestazione e il titolo della scheda del browser. Le due liste si caricano da
-        // sole e mostrano intanto lo scheletro delle righe, come tutti gli altri elenchi.
+        // I dati del collaboratore sono l'intestazione e il riquadro in alto: è l'unica cosa
+        // che si aspetta prima di disegnare la pagina. Le due liste si caricano da sole.
         void (async () => {
             setIsCollaboratorLoading(true);
-
             try {
-                // Per id, come la scheda del tecnico: prima si scaricava l'elenco intero dei
-                // collaboratori per usarne uno.
-                const collaborator = await getCollaborator(collaboratorId);
-                setCollaboratorName(`${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim());
-            } catch (error) {
-                if (getApiErrorStatus(error) === 404) {
-                    setIsNotFound(true);
-                    return;
-                }
-
-                toast.error(getApiErrorMessage(error, "Impossibile caricare il collaboratore"));
+                await loadCollaborator();
             } finally {
                 setIsCollaboratorLoading(false);
             }
         })();
-    }, [collaboratorId, hasValidCollaboratorId]);
+    }, [hasValidCollaboratorId, loadCollaborator]);
 
     if (!hasValidCollaboratorId || isNotFound) {
         return (
@@ -183,7 +230,24 @@ const CollaboratorPage = () => {
     }
 
     return (
-        <div className="flex h-full min-h-0 w-full flex-col gap-6">
+        <div className="flex h-full min-h-0 w-full flex-col gap-4">
+            <PrintRangeDialog
+                open={isPrintDialogOpen}
+                onOpenChange={setIsPrintDialogOpen}
+                title={printTitle}
+                onConfirm={handleConfirmPrint}
+            />
+
+            {isEditDialogOpen && collaborator ? (
+                <CreateCollaboratorDialog
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                    mode="edit"
+                    initialValues={collaborator}
+                    onSubmit={handleEditCollaborator}
+                />
+            ) : null}
+
             <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -193,28 +257,100 @@ const CollaboratorPage = () => {
                     </TooltipTrigger>
                     <TooltipContent>Torna indietro</TooltipContent>
                 </Tooltip>
-                <h1 className="text-2xl font-bold">{collaboratorName}</h1>
-                <RefreshButton
-                    onRefresh={handleRefresh}
-                    isRefreshing={areReportsLoading || areInterventionsLoading}
-                    label="Aggiorna i dati del collaboratore"
-                    className="ml-auto"
-                />
+                <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{collaboratorName}</h1>
+
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <RefreshButton
+                        onRefresh={handleRefresh}
+                        isRefreshing={areReportsLoading || areInterventionsLoading}
+                        label="Aggiorna i dati del collaboratore"
+                    />
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={() => setIsEditDialogOpen(true)}
+                                aria-label="Modifica collaboratore"
+                            >
+                                <Pencil className="size-5" />
+                                <span className="hidden text-lg lg:inline">Modifica</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Modifica collaboratore</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
+                                <Printer className="size-5" />
+                                <span className="hidden text-lg lg:inline">Stampa</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{printTitle}</TooltipContent>
+                    </Tooltip>
+                </div>
             </div>
 
-            <Tabs defaultValue="reports" className="min-h-0 flex-1">
-                <TabsList>
-                    <TabsTrigger value="reports">Report</TabsTrigger>
-                    <TabsTrigger value="interventions">Interventi</TabsTrigger>
-                </TabsList>
+            {collaborator ? (
+                <Card className="gap-1">
+                    <CardHeader>
+                        <CardTitle className="text-primary">Dati del collaboratore</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                        <DetailItem label="Telefono" value={collaborator.phoneNumber ?? "-"} />
+                        <DetailItem label="Collaboratore dal" value={formatDateTime(collaborator.createdAt)} />
+                    </CardContent>
+                </Card>
+            ) : null}
 
-                <TabsContent value="reports" aria-label="Report del collaboratore" className="min-h-0 flex-1">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as CollaboratorTab)}
+                className="min-h-0 flex-1"
+            >
+                {/* Tab e filtro sulla stessa riga, anche su mobile: su due righe il filtro
+                    sembrava un controllo a sé, staccato dalla lista che filtra, e toglieva una
+                    riga alla tabella. Il filtro è uno solo e mostra le voci del tab aperto. */}
+                <div className="flex items-center justify-between gap-2">
+                    <TabsList>
+                        <TabsTrigger value="reports" className="px-2 sm:px-3">
+                            Report
+                        </TabsTrigger>
+                        <TabsTrigger value="interventions" className="px-2 sm:px-3">
+                            Interventi
+                        </TabsTrigger>
+                    </TabsList>
+                    {activeTab === "interventions" ? (
+                        <Select
+                            value={interventionStatusFilter}
+                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
+                        >
+                            <SelectTrigger
+                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                                aria-label="Filtra gli interventi per stato"
+                            >
+                                <SelectValue placeholder="Filtra per stato" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                                <SelectItem value="all">Tutti gli interventi</SelectItem>
+                                {interventionStatusOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
                         <Select
                             value={visibilityFilter}
                             onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
                         >
-                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
+                            <SelectTrigger
+                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                                aria-label="Filtra i report per stato"
+                            >
                                 <SelectValue placeholder="Filtra per stato" />
                             </SelectTrigger>
                             <SelectContent position="popper">
@@ -223,8 +359,10 @@ const CollaboratorPage = () => {
                                 <SelectItem value="closed">Report chiusi</SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
+                    )}
+                </div>
 
+                <TabsContent value="reports" aria-label="Report del collaboratore" className="min-h-0 flex-1">
                     {/* Come nelle altre pagine a elenco: quest'area scorre da sola (in
                         entrambe le direzioni — il contenitore principale del layout ha
                         overflow-x nascosto, e allargando le colonne la tabella può diventare
@@ -263,25 +401,6 @@ const CollaboratorPage = () => {
                 </TabsContent>
 
                 <TabsContent value="interventions" aria-label="Interventi del collaboratore" className="min-h-0 flex-1">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                        <Select
-                            value={interventionStatusFilter}
-                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
-                        >
-                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra gli interventi per stato">
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti gli interventi</SelectItem>
-                                {interventionStatusOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
                     {/* Stesso motivo della tabella dei report. */}
                     <div className="min-h-0 flex-1 overflow-auto">
                         <EntityTable

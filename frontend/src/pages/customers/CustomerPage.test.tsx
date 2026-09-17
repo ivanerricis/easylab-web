@@ -13,6 +13,12 @@ const api = vi.hoisted(() => ({
     getCustomer: vi.fn(),
     listReports: vi.fn(),
     listInterventions: vi.fn(),
+    updateCustomer: vi.fn(),
+    deleteCustomer: vi.fn(),
+    listDevices: vi.fn(),
+    listIssues: vi.fn(),
+    listCollaborators: vi.fn(),
+    listCustomers: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -22,6 +28,12 @@ vi.mock("@/lib/api", async () => {
         getCustomer: (...args: unknown[]) => api.getCustomer(...args),
         listReports: (...args: unknown[]) => api.listReports(...args),
         listInterventions: (...args: unknown[]) => api.listInterventions(...args),
+        updateCustomer: (...args: unknown[]) => api.updateCustomer(...args),
+        deleteCustomer: (...args: unknown[]) => api.deleteCustomer(...args),
+        listDevices: (...args: unknown[]) => api.listDevices(...args),
+        listIssues: (...args: unknown[]) => api.listIssues(...args),
+        listCollaborators: (...args: unknown[]) => api.listCollaborators(...args),
+        listCustomers: (...args: unknown[]) => api.listCustomers(...args),
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
         getCustomerInterventionsPrintUrl: (id: number) => `interventions:${id}`,
     };
@@ -51,6 +63,10 @@ const renderPage = async (route: string, path: string) => {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    api.listDevices.mockResolvedValue([]);
+    api.listIssues.mockResolvedValue([]);
+    api.listCollaborators.mockResolvedValue([]);
+    api.listCustomers.mockResolvedValue(page([]));
     api.getCustomer.mockResolvedValue({
         id: 3,
         firstName: "Mario",
@@ -128,6 +144,65 @@ describe("CustomerPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Stampa tutto" }));
 
         expect(openPrintWindow).toHaveBeenCalledWith("reports:3");
+    });
+
+    it("modifica i dati del cliente dalla scheda", async () => {
+        api.updateCustomer.mockImplementation(async (id: number, payload: object) => ({
+            ...(await api.getCustomer.mock.results[0].value),
+            ...payload,
+            id,
+        }));
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("button", { name: "Modifica cliente" }));
+        const dialog = await screen.findByRole("dialog");
+        const city = within(dialog).getByLabelText(/Località/);
+        await userEvent.type(city, "  Roma ");
+        await userEvent.click(within(dialog).getByRole("button", { name: /Salva/ }));
+
+        await waitFor(() => {
+            expect(api.updateCustomer).toHaveBeenCalledWith(
+                3,
+                expect.objectContaining({ city: "Roma", lastName: "Rossi" })
+            );
+        });
+        expect(await screen.findByText("Roma")).toBeInTheDocument();
+    });
+
+    /** Il cliente della scheda è già scritto e già risolto: il modulo non risulta modificato. */
+    it.each([
+        ["Nuovo report", "Nuovo report"],
+        ["Nuovo intervento", "Nuovo intervento"],
+    ])('"%s" apre il dialogo con il cliente già compilato', async (item, dialogTitle) => {
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report o intervento" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: item }));
+
+        const dialog = await screen.findByRole("dialog", { name: dialogTitle });
+        expect(within(dialog).getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+
+        // Chiudere senza toccare nulla non chiede conferma: il cliente precompilato non è una modifica.
+        await userEvent.keyboard("{Escape}");
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        });
+    });
+
+    it("elimina il cliente e torna all'elenco", async () => {
+        api.deleteCustomer.mockResolvedValue({});
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina cliente" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent("Mario Rossi");
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith("/clients", { replace: true });
+        });
+        expect(api.deleteCustomer).toHaveBeenCalledWith(3);
     });
 
     it("filtra i report per stato sul server", async () => {

@@ -64,13 +64,18 @@ export type CustomerReportSummaryItem = {
     alerted: boolean;
     paymentMethod: "non_paid" | "cash" | "card";
     totalPrice: number;
+    /** Solo nel riepilogo del collaboratore, dove i report sono di clienti diversi. */
+    customerName?: string;
 };
 
 export type CustomerReportsPrintData = {
     customerId: number;
     customerName: string;
     customerPhone: string;
-    customerEmail: string;
+    customerEmail?: string;
+    subjectLabel?: string;
+    /** Aggiunge la colonna "Cliente": il riepilogo del collaboratore elenca clienti diversi. */
+    showCustomerColumn?: boolean;
     labName: string;
     labEmail: string;
     labAddress: string;
@@ -233,12 +238,16 @@ type ReportsTableCell = {
     fillColor?: string;
 };
 
-const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[]) => {
+const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[], showCustomerColumn = false) => {
+    const columnCount = showCustomerColumn ? 8 : 7;
+    // Una cella vuota per ogni colonna coperta da un `colSpan`, come vuole pdfmake.
+    const spanFillers = (count: number) => new Array<ReportsTableCell>(count).fill({});
     const body: ReportsTableCell[][] = [
-        sectionBarRow("RESOCONTO REPORT", 7),
+        sectionBarRow("RESOCONTO REPORT", columnCount),
         [
             { text: "#", style: "summaryHeader" },
             { text: "Data", style: "summaryHeader" },
+            ...(showCustomerColumn ? [{ text: "Cliente", style: "summaryHeader" }] : []),
             { text: "Dispositivo", style: "summaryHeader" },
             { text: "Problema", style: "summaryHeader" },
             { text: "Stato", style: "summaryHeader" },
@@ -249,19 +258,21 @@ const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[]) => {
 
     if (reports.length === 0) {
         body.push([
-            { text: "Nessun report disponibile", colSpan: 7, alignment: "center", italics: true, margin: [0, 8, 0, 8] },
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
+            {
+                text: "Nessun report disponibile",
+                colSpan: columnCount,
+                alignment: "center",
+                italics: true,
+                margin: [0, 8, 0, 8],
+            },
+            ...spanFillers(columnCount - 1),
         ]);
     } else {
         for (const report of reports) {
             body.push([
                 { text: String(report.id), alignment: "center", bold: true },
                 { text: report.createdAtLabel, alignment: "center" },
+                ...(showCustomerColumn ? [{ text: report.customerName ?? "-" }] : []),
                 { text: report.deviceName, bold: true },
                 { text: report.issueDescription, fontSize: 8.5 },
                 { text: report.closed ? "Chiuso" : "Aperto", alignment: "center" },
@@ -272,12 +283,14 @@ const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[]) => {
 
         const totalAmount = reports.reduce((sum, report) => sum + report.totalPrice, 0);
         body.push([
-            { text: "Totale complessivo", colSpan: 6, alignment: "right", bold: true, fillColor: "#F4F8FD" },
-            {},
-            {},
-            {},
-            {},
-            {},
+            {
+                text: "Totale complessivo",
+                colSpan: columnCount - 1,
+                alignment: "right",
+                bold: true,
+                fillColor: "#F4F8FD",
+            },
+            ...spanFillers(columnCount - 2),
             { text: formatEuro(totalAmount), alignment: "right", bold: true, fillColor: "#F4F8FD" },
         ]);
     }
@@ -286,7 +299,10 @@ const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[]) => {
         table: {
             // Barra di sezione + intestazione colonne: entrambe si ripetono a ogni pagina.
             headerRows: 2,
-            widths: [28, 56, 92, "*", 56, 68, 68],
+            // "#" tiene un id a cinque cifre su una riga. Con la colonna "Cliente" le colonne
+            // fisse cedono spazio: il problema resta l'unica elastica, e se le fisse lasciano meno
+            // della sua parola più lunga pdfmake la allarga oltre il margine destro.
+            widths: showCustomerColumn ? [34, 56, 76, 72, "*", 42, 54, 56] : [34, 56, 92, "*", 56, 68, 68],
             body,
         },
         layout: tableLayout,
@@ -625,7 +641,7 @@ export const createCustomerReportsPdfBuffer = async (customer: CustomerReportsPr
         content: [
             buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.reportCount} report`),
             buildCustomerSummaryInfoSection(customer),
-            buildCustomerReportsTable(customer.reports),
+            buildCustomerReportsTable(customer.reports, customer.showCustomerColumn),
         ],
         styles: pdfStyles,
     };

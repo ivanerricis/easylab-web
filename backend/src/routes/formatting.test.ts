@@ -22,10 +22,28 @@ describe("formatDateLabel", () => {
 
 describe("formatDayLabel", () => {
     it("formatta una data solo-giorno senza slittare al giorno precedente", () => {
-        // Se l'ora non venisse fissata a mezzanotte locale, "2026-01-01" interpretata come UTC
-        // diventerebbe 31 dicembre in un fuso orario più indietro di UTC.
         expect(formatDayLabel("2026-01-01")).toBe("1 gen 2026");
     });
+
+    // `companyManager` cambia `process.env.TZ` a server avviato, dopo che questo modulo ha già
+    // creato il suo formattatore: il giorno deve restare quello in qualunque fuso.
+    it.each(["Europe/Rome", "America/New_York", "Pacific/Kiritimati"])(
+        "non cambia giorno se il fuso del processo diventa %s dopo l'import",
+        (timeZone) => {
+            const previous = process.env.TZ;
+            process.env.TZ = timeZone;
+            try {
+                expect(formatDayLabel("2030-01-01")).toBe("1 gen 2030");
+                expect(formatDayLabel("2026-12-31")).toBe("31 dic 2026");
+            } finally {
+                if (previous === undefined) {
+                    delete process.env.TZ;
+                } else {
+                    process.env.TZ = previous;
+                }
+            }
+        }
+    );
 });
 
 describe("buildDateRangeLabel", () => {

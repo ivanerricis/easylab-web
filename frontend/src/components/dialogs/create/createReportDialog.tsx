@@ -18,7 +18,7 @@ import {
     listDevices,
     listIssues,
 } from "@/lib/api";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import InputWithAdd from "@/components/inputWithAdd";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Save } from "lucide-react";
 import type { ChangeEvent } from "react";
+import type { CustomerDto } from "@/types/dtos";
 
 /**
  * I valori che questo dialogo consegna a chi lo apre.
@@ -57,6 +58,12 @@ type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit?: (values: CreateReportSubmitValues) => Promise<void> | void;
+    /**
+     * Il cliente da cui si parte, quando il dialogo si apre dalla sua scheda: la casella è già
+     * compilata e il cliente già risolto, e resta modificabile. Il modulo non conta come
+     * modificato finché non lo si cambia.
+     */
+    initialCustomer?: CustomerDto | null;
 };
 
 type FieldErrors = Partial<
@@ -78,7 +85,7 @@ const emptyFormValues = {
     notes: "",
 };
 
-const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
+const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = null }: Props) => {
     const [formValues, setFormValues] = useState(emptyFormValues);
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [isCreateDeviceDialogOpen, setIsCreateDeviceDialogOpen] = useState(false);
@@ -93,14 +100,27 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
     // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
     // qui il testo, l'errore sta sotto il campo e ci resta finché non si corregge.
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-    const isDirty = hasFormChanged(formValues, emptyFormValues);
+    const initialCustomerId = initialCustomer?.id ?? null;
+    const initialCustomerOption = initialCustomer
+        ? formatCustomerOption(
+              initialCustomer.firstName,
+              initialCustomer.lastName,
+              initialCustomer.phoneNumber,
+              initialCustomer.phoneNumberSecondary
+          )
+        : "";
+    const initialFormValues = useMemo(
+        () => ({ ...emptyFormValues, customer: initialCustomerOption }),
+        [initialCustomerOption]
+    );
+    const isDirty = hasFormChanged(formValues, initialFormValues);
 
     useEffect(() => {
         if (open) {
             startTransition(() => {
                 setFieldErrors({});
-                setFormValues(emptyFormValues);
-                setCustomerIdByOption({});
+                setFormValues(initialFormValues);
+                setCustomerIdByOption(initialCustomerId == null ? {} : { [initialCustomerOption]: initialCustomerId });
                 setDeviceIdByOption({});
                 setIssueIdByOption({});
             });
@@ -120,7 +140,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit }: Props) => {
 
             void loadOptions();
         }
-    }, [open]);
+    }, [open, initialFormValues, initialCustomerId, initialCustomerOption]);
 
     const searchCustomers = useCallback(async (query: string) => {
         const customers = await listCustomers({ pageSize: 8, search: query || undefined });

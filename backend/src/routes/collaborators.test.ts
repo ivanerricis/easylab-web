@@ -11,12 +11,39 @@ vi.mock("../db/queries/collaborator", () => ({
     deleteCollaboratorById: vi.fn(),
 }));
 
+// La stampa dei resoconti: query, PDF e config mockati come in customers.test.ts.
+vi.mock("../db/queries/report", () => ({
+    listReports: vi.fn(),
+}));
+
+vi.mock("../db/queries/intervention", () => ({
+    listInterventions: vi.fn(),
+}));
+
+vi.mock("../services/reportPdf", () => ({
+    createCustomerReportsPdfBuffer: vi.fn(),
+}));
+
+vi.mock("../services/interventionPdf", () => ({
+    createCustomerInterventionsPdfBuffer: vi.fn(),
+}));
+
+vi.mock("../config/lab", () => ({
+    getLabConfig: vi.fn(),
+    getAppTimeZone: vi.fn(async () => "Europe/Rome"),
+}));
+
 import {
     createCollaborator,
     deleteCollaboratorById,
     getCollaboratorById,
     updateCollaboratorById,
 } from "../db/queries/collaborator";
+import { listReports } from "../db/queries/report";
+import { listInterventions } from "../db/queries/intervention";
+import { createCustomerReportsPdfBuffer } from "../services/reportPdf";
+import { createCustomerInterventionsPdfBuffer } from "../services/interventionPdf";
+import { getLabConfig } from "../config/lab";
 import collaboratorsRouter from "./collaborators";
 import { errorHandler } from "../middleware/errorHandler";
 
@@ -100,5 +127,120 @@ describe("collaborators router", () => {
         const response = await request(buildApp()).delete("/api/collaborators/999");
 
         expect(response.status).toBe(404);
+    });
+
+    describe("stampa PDF del collaboratore", () => {
+        beforeEach(() => {
+            vi.mocked(getLabConfig).mockResolvedValue({
+                labName: "Laboratorio",
+                labEmail: "info@lab.it",
+                labAddress: "Via Roma 1",
+                labPhone: "0212345678",
+                timeZone: "Europe/Rome",
+            } as never);
+        });
+
+        it("risponde 404 quando il collaboratore non esiste", async () => {
+            vi.mocked(getCollaboratorById).mockResolvedValue([] as never);
+
+            const reports = await request(buildApp()).get("/api/collaborators/999/reports/print");
+            const interventions = await request(buildApp()).get("/api/collaborators/999/interventions/print");
+
+            expect(reports.status).toBe(404);
+            expect(interventions.status).toBe(404);
+            expect(listReports).not.toHaveBeenCalled();
+            expect(listInterventions).not.toHaveBeenCalled();
+        });
+
+        it("rifiuta un intervallo di date mal formattato", async () => {
+            const response = await request(buildApp()).get("/api/collaborators/1/reports/print?dateTo=31-01-2026");
+
+            expect(response.status).toBe(400);
+            expect(getCollaboratorById).not.toHaveBeenCalled();
+        });
+
+        it("stampa i report del collaboratore, con il cliente di ogni riga e senza email", async () => {
+            vi.mocked(getCollaboratorById).mockResolvedValue([{ ...collaborator, phoneNumber: "3331234567" }] as never);
+            vi.mocked(listReports).mockResolvedValue({
+                items: [
+                    {
+                        id: 42,
+                        createdAt: new Date("2026-01-15"),
+                        customer: "Anna Bianchi",
+                        device: "iPhone 12",
+                        issue: "Schermo rotto",
+                        closed: false,
+                        alerted: false,
+                        paymentMethod: "card",
+                        totalPrice: 5000,
+                    },
+                ],
+                totalItems: 1,
+            } as never);
+            vi.mocked(createCustomerReportsPdfBuffer).mockResolvedValue(Buffer.from("pdf") as never);
+
+            const response = await request(buildApp()).get(
+                "/api/collaborators/1/reports/print?dateFrom=2026-01-01&dateTo=2026-01-31"
+            );
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-type"]).toContain("application/pdf");
+            expect(response.headers["content-disposition"]).toContain("collaborator-1-reports.pdf");
+            expect(listReports).toHaveBeenCalledWith({
+                collaboratorId: 1,
+                dateFrom: "2026-01-01",
+                dateTo: "2026-01-31",
+                timeZone: "Europe/Rome",
+            });
+            const [data] = vi.mocked(createCustomerReportsPdfBuffer).mock.calls[0];
+            expect(data).toMatchObject({
+                customerId: 1,
+                customerName: "Mario Rossi",
+                subjectLabel: "Collaboratore",
+                showCustomerColumn: true,
+                reportCount: 1,
+                reports: [{ id: 42, customerName: "Anna Bianchi", deviceName: "iPhone 12", totalPrice: 5000 }],
+            });
+            expect(data).not.toHaveProperty("customerEmail");
+        });
+
+        it("stampa gli interventi del collaboratore con il cliente di ogni riga", async () => {
+            vi.mocked(getCollaboratorById).mockResolvedValue([collaborator] as never);
+            vi.mocked(listInterventions).mockResolvedValue([
+                {
+                    id: 7,
+                    createdAt: new Date("2026-02-01"),
+                    customer: "Anna Bianchi",
+                    type: "intervento_remoto",
+                    status: "programmato",
+                    description: null,
+                    interventionDate: null,
+                    startTime: null,
+                    endTime: null,
+                },
+            ] as never);
+            vi.mocked(createCustomerInterventionsPdfBuffer).mockResolvedValue(Buffer.from("pdf") as never);
+
+            const response = await request(buildApp()).get("/api/collaborators/1/interventions/print");
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-disposition"]).toContain("collaborator-1-interventions.pdf");
+            expect(listInterventions).toHaveBeenCalledWith({
+                collaboratorId: 1,
+                dateFrom: undefined,
+                dateTo: undefined,
+                timeZone: "Europe/Rome",
+            });
+            expect(createCustomerInterventionsPdfBuffer).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    subjectLabel: "Collaboratore",
+                    showCustomerColumn: true,
+                    interventionCount: 1,
+                    interventions: [
+                        expect.objectContaining({ id: 7, customerName: "Anna Bianchi", type: "intervento_remoto" }),
+                    ],
+                })
+            );
+        });
     });
 });

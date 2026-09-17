@@ -5,6 +5,7 @@ import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import RefreshButton from "@/components/refresh-button";
+import DetailDeleteButton from "@/components/detail-delete-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
     type ReportEntityDto,
     updateReport,
     updateReportTechnician,
+    deleteReport,
 } from "@/lib/api";
 import { formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
 import { ArrowLeft, Pencil, Printer } from "lucide-react";
@@ -264,6 +266,16 @@ const ReportPage = () => {
                                 </TooltipTrigger>
                                 <TooltipContent>Stampa report</TooltipContent>
                             </Tooltip>
+
+                            <DetailDeleteButton
+                                label="Elimina report"
+                                title="Elimina report"
+                                description={`Sei sicuro di voler eliminare il report ID ${details.report.id}?`}
+                                onDelete={() => deleteReport(details.report.id)}
+                                successMessage="Report eliminato con successo"
+                                errorMessage="Impossibile eliminare il report"
+                                redirectTo="/reports"
+                            />
                         </div>
                     </div>
                 </div>

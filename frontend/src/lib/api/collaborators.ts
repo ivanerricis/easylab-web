@@ -62,3 +62,16 @@ export const updateCollaborator = async (id: number, payload: CollaboratorUpdate
 
 export const deleteCollaborator = async (id: number) =>
     mapEntityTimestamps((await api.delete<EntityWithRawTimestamps<CollaboratorDto>>(`/collaborators/${id}`)).data);
+
+/** Stessa forma del resoconto del cliente: un periodo facoltativo sulla data di creazione. */
+export const getCollaboratorReportsPrintUrl = (id: number, params?: { dateFrom?: string; dateTo?: string }) =>
+    api.getUri({
+        url: `/collaborators/${id}/reports/print`,
+        params: { dateFrom: params?.dateFrom, dateTo: params?.dateTo },
+    });
+
+export const getCollaboratorInterventionsPrintUrl = (id: number, params?: { dateFrom?: string; dateTo?: string }) =>
+    api.getUri({
+        url: `/collaborators/${id}/interventions/print`,
+        params: { dateFrom: params?.dateFrom, dateTo: params?.dateTo },
+    });

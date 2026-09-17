@@ -106,6 +106,7 @@ const printRow = {
     description: "Sostituito alimentatore",
     problem: "Non si accende",
     note: "Cliente da richiamare",
+    toInvoice: true,
     status: "completato",
     interventionDate: "2026-01-10",
     startTime: "09:00:00",
@@ -320,6 +321,7 @@ describe("interventions router", () => {
                     problem: "Non si accende",
                     description: "Sostituito alimentatore",
                     note: "Cliente da richiamare",
+                    toInvoice: true,
                     ...labHeader,
                 })
             );

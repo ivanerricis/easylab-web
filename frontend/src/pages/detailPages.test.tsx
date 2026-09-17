@@ -24,6 +24,9 @@ const api = vi.hoisted(() => ({
     createReportTechnician: vi.fn(),
     updateReportTechnician: vi.fn(),
     deleteReportTechnician: vi.fn(),
+    deleteReport: vi.fn(),
+    deleteIntervention: vi.fn(),
+    sendInterventionEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -50,8 +53,20 @@ vi.mock("@/lib/utils", async () => {
 });
 
 const toastError = vi.fn();
+const toastSuccess = vi.fn();
 
-vi.mock("sonner", () => ({ toast: { error: (...args: unknown[]) => toastError(...args), success: vi.fn() } }));
+vi.mock("sonner", () => ({
+    toast: {
+        error: (...args: unknown[]) => toastError(...args),
+        success: (...args: unknown[]) => toastSuccess(...args),
+    },
+}));
+
+const confirmDelete = async () => {
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+};
 
 let editValues: unknown;
 
@@ -243,6 +258,34 @@ describe("ReportPage", () => {
             expect(api.getReport).toHaveBeenCalledTimes(2);
         });
     });
+
+    it("elimina il report dopo la conferma e torna all'elenco, senza lasciare la scheda nella cronologia", async () => {
+        api.deleteReport.mockResolvedValue({});
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina report" }));
+        await confirmDelete();
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith("/reports", { replace: true });
+        });
+        expect(api.deleteReport).toHaveBeenCalledWith(5);
+        expect(toastSuccess).toHaveBeenCalledWith("Report eliminato con successo");
+    });
+
+    it("se l'eliminazione fallisce resta sulla scheda e lo dice", async () => {
+        api.deleteReport.mockRejectedValue(new Error("boom"));
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina report" }));
+        await confirmDelete();
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalled();
+        });
+        expect(navigate).not.toHaveBeenCalled();
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
 });
 
 describe("InterventionPage", () => {
@@ -333,5 +376,35 @@ describe("InterventionPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Stampa intervento" }));
 
         expect(openPrintWindow).toHaveBeenCalledWith("/api/interventions/9/print");
+    });
+
+    it("invia l'email dalla scheda dopo la conferma e mostra l'esito del server", async () => {
+        api.sendInterventionEmail.mockResolvedValue({ message: "Email inviata a mario@example.com" });
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Invia email intervento" }));
+        const dialog = await screen.findByRole("dialog");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Invia" }));
+
+        await waitFor(() => {
+            expect(toastSuccess).toHaveBeenCalledWith("Email inviata a mario@example.com");
+        });
+        expect(api.sendInterventionEmail).toHaveBeenCalledWith(9);
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        });
+    });
+
+    it("elimina l'intervento e torna all'elenco", async () => {
+        api.deleteIntervention.mockResolvedValue({});
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina intervento" }));
+        await confirmDelete();
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith("/interventions", { replace: true });
+        });
+        expect(api.deleteIntervention).toHaveBeenCalledWith(9);
     });
 });

@@ -1,4 +1,6 @@
-const dateLabelFormatter = new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" });
+// Fuso fisso: `formatDayLabel` ci passa la mezzanotte UTC del giorno. Senza, il formattatore
+// prende il fuso del processo al momento in cui nasce, cioè all'import.
+const dateLabelFormatter = new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeZone: "UTC" });
 const dateLabelFormattersByTimeZone = new Map<string, Intl.DateTimeFormat>();
 
 /**
@@ -17,9 +19,17 @@ export const formatDateLabel = (value: Date, timeZone: string) => {
     return formatter.format(value);
 };
 
-// Le date "solo giorno" arrivano come stringhe YYYY-MM-DD: l'ora esplicita evita che
-// vengano interpretate come UTC e slittino al giorno precedente.
-export const formatDayLabel = (value: string) => dateLabelFormatter.format(new Date(`${value}T00:00:00`));
+/**
+ * Le date "solo giorno" arrivano come stringhe YYYY-MM-DD e non hanno fuso: si leggono e si
+ * scrivono entrambe in UTC, così il giorno resta quello.
+ *
+ * Prima si leggevano nel fuso del processo (`T00:00:00` senza `Z`) e si scrivevano con un
+ * formattatore creato all'import. Ma `companyManager` imposta `process.env.TZ` dopo l'avvio:
+ * il formattatore restava in UTC, la lettura passava a Europe/Rome, e la mezzanotte di Roma
+ * è ancora il giorno prima in UTC. Nei PDF "dal 1 gen 2030" diventava "Dal 31 dic 2029", e la
+ * data dell'intervento nella ricevuta slittava indietro di un giorno.
+ */
+export const formatDayLabel = (value: string) => dateLabelFormatter.format(new Date(`${value}T00:00:00Z`));
 
 // Un intervallo vuoto non produce etichetta: chi chiama la omette dal PDF.
 export const buildDateRangeLabel = (dateFrom?: string, dateTo?: string) => {

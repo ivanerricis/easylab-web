@@ -56,6 +56,7 @@ const buildIntervention = (overrides: Partial<InterventionPrintData> = {}): Inte
     problem: "Il PC non si accende",
     note: null,
     price: null,
+    toInvoice: false,
     interventionDateLabel: "10/09/2026",
     startTime: "09:00",
     endTime: "11:30",
@@ -187,6 +188,34 @@ describe("createInterventionPdfBuffer", () => {
         expect(conPrezzo).toContain("45,00");
         expect(senzaPrezzo).not.toContain("Prezzo");
     });
+
+    it('mostra "Da fatturare" solo quando è segnato, accanto al prezzo se c\'è', async () => {
+        const activityRows = async (overrides: Partial<InterventionPrintData>) => {
+            const doc = await captureInterventionDoc(buildIntervention(overrides));
+            const section = (doc.content as { table: { body: { text?: string }[][] } }[])[2];
+            return section.table.body;
+        };
+        const labelRow = (rows: { text?: string }[][], label: string) =>
+            rows.find((row) => row.some((cell) => cell.text === label));
+
+        const nonSegnato = await activityRows({ toInvoice: false, price: 45 });
+        const soloFattura = await activityRows({ toInvoice: true, price: null });
+        const conPrezzo = await activityRows({ toInvoice: true, price: 45 });
+
+        expect(labelRow(nonSegnato, "Da fatturare")).toBeUndefined();
+        expect(labelRow(soloFattura, "Da fatturare")?.map((cell) => cell.text)).toEqual([
+            "Da fatturare",
+            "Sì",
+            undefined,
+            undefined,
+        ]);
+        expect(labelRow(conPrezzo, "Da fatturare")?.map((cell) => cell.text)).toEqual([
+            "Prezzo",
+            expect.stringContaining("45,00"),
+            "Da fatturare",
+            "Sì",
+        ]);
+    });
 });
 
 describe("createCustomerInterventionsPdfBuffer", () => {
@@ -232,5 +261,26 @@ describe("createCustomerInterventionsPdfBuffer", () => {
         expect(serialized).toContain("In lavorazione");
         expect(serialized).toContain("Consegnati due monitor");
         expect(serialized).not.toContain("Nessun intervento disponibile");
+    });
+
+    it("nella variante collaboratore aggiunge la colonna del cliente e toglie l'email", async () => {
+        const doc = await captureCustomerInterventionsDoc(
+            buildCustomerInterventions({
+                customerEmail: undefined,
+                subjectLabel: "Collaboratore",
+                showCustomerColumn: true,
+                interventions: [buildInterventionSummary({ customerName: "Anna Verdi" })],
+            })
+        );
+        const serialized = JSON.stringify(doc);
+        const table = (doc.content as { table?: { widths: unknown[]; body: unknown[][] } }[])[2].table!;
+
+        expect(serialized).toContain("Collaboratore #5");
+        expect(serialized).toContain("Anna Verdi");
+        expect(serialized).not.toContain("Email");
+        expect(table.widths).toHaveLength(7);
+        for (const row of table.body) {
+            expect(row).toHaveLength(7);
+        }
     });
 });

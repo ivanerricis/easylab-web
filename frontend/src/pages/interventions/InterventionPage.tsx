@@ -5,6 +5,8 @@ import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import RefreshButton from "@/components/refresh-button";
+import DetailDeleteButton from "@/components/detail-delete-button";
+import CustomDialog from "@/components/dialogs/customDialog";
 import EditInterventionDialog, {
     type EditInterventionSubmitValues,
 } from "@/components/dialogs/edit/editInterventionDialog";
@@ -18,6 +20,8 @@ import {
     getInterventionPrintUrl,
     type InterventionEntityDto,
     updateIntervention,
+    deleteIntervention,
+    sendInterventionEmail,
 } from "@/lib/api";
 import { formatDate, formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
 import { toInterventionUpdatePayload } from "@/lib/interventionForm";
@@ -29,7 +33,7 @@ import {
     formatToInvoiceStatus,
     isOnSiteInterventionType,
 } from "@/lib/interventions";
-import { ArrowLeft, Pencil, Printer } from "lucide-react";
+import { ArrowLeft, Pencil, Printer, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -61,6 +65,8 @@ const InterventionPage = () => {
     const [details, setDetails] = useState<InterventionPageDetails | null>(null);
     useDocumentTitle(details ? `Intervento #${details.intervention.id} - ${details.customerName}` : "Intervento");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
 
     const hasValidInterventionId = useMemo(
         () => Number.isInteger(interventionId) && interventionId > 0,
@@ -78,6 +84,25 @@ const InterventionPage = () => {
         }
 
         openPrintWindow(getInterventionPrintUrl(details.intervention.id));
+    };
+
+    // Come nell'elenco interventi, da cui prima era l'unica strada: conferma, invio, e l'esito
+    // del server (a chi è andata, o perché no) in un avviso.
+    const handleConfirmSendEmail = async () => {
+        if (!details || isSendingEmail) {
+            return;
+        }
+
+        try {
+            setIsSendingEmail(true);
+            const result = await sendInterventionEmail(details.intervention.id);
+            toast.success(result.message);
+            setIsEmailDialogOpen(false);
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile inviare l'email"));
+        } finally {
+            setIsSendingEmail(false);
+        }
     };
 
     const loadDetails = useCallback(async () => {
@@ -218,6 +243,31 @@ const InterventionPage = () => {
                                 </TooltipTrigger>
                                 <TooltipContent>Stampa intervento</TooltipContent>
                             </Tooltip>
+
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="lg"
+                                        onClick={() => setIsEmailDialogOpen(true)}
+                                        aria-label="Invia email intervento"
+                                    >
+                                        <Send className="size-5" />
+                                        <span className="hidden text-lg lg:inline">Email</span>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Invia email intervento</TooltipContent>
+                            </Tooltip>
+
+                            <DetailDeleteButton
+                                label="Elimina intervento"
+                                title="Elimina intervento"
+                                description={`Sei sicuro di voler eliminare l'intervento ID ${details.intervention.id}?`}
+                                onDelete={() => deleteIntervention(details.intervention.id)}
+                                successMessage="Intervento eliminato con successo"
+                                errorMessage="Impossibile eliminare l'intervento"
+                                redirectTo="/interventions"
+                            />
                         </div>
                     </div>
                 </div>
@@ -322,6 +372,19 @@ const InterventionPage = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            <CustomDialog
+                open={isEmailDialogOpen}
+                onOpenChange={setIsEmailDialogOpen}
+                title="Invia email intervento"
+                description={`Sei sicuro di voler inviare l'email per l'intervento ID ${details.intervention.id}?`}
+                confirmLabel="Invia"
+                confirmIcon={Send}
+                cancelLabel="Annulla"
+                confirmDisabled={isSendingEmail}
+                onCancel={() => setIsEmailDialogOpen(false)}
+                onConfirm={handleConfirmSendEmail}
+            />
 
             <EditInterventionDialog
                 open={isEditDialogOpen}

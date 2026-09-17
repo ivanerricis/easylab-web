@@ -20,6 +20,8 @@ const api = vi.hoisted(() => ({
     createReportTechnician: vi.fn(),
     updateReportTechnician: vi.fn(),
     deleteReportTechnician: vi.fn(),
+    updateCollaborator: vi.fn(),
+    updateTechnician: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -30,7 +32,21 @@ vi.mock("@/lib/api", async () => {
             (...args: unknown[]) => (api[name as keyof typeof api] as (...a: unknown[]) => unknown)(...args),
         ])
     );
-    return { ...errors, ...forwarded, createCollaborator: vi.fn(), createTechnician: vi.fn() };
+    return {
+        ...errors,
+        ...forwarded,
+        createCollaborator: vi.fn(),
+        createTechnician: vi.fn(),
+        getCollaboratorReportsPrintUrl: (id: number) => `reports:${id}`,
+        getCollaboratorInterventionsPrintUrl: (id: number) => `interventions:${id}`,
+    };
+});
+
+const openPrintWindow = vi.fn();
+
+vi.mock("@/lib/utils", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/utils")>("@/lib/utils");
+    return { ...actual, openPrintWindow: (...args: unknown[]) => openPrintWindow(...args) };
 });
 
 const toastError = vi.fn();
@@ -128,6 +144,53 @@ describe("CollaboratorPage", () => {
         ).toBeInTheDocument();
     });
 
+    it("mostra i dati del collaboratore e li modifica dalla scheda", async () => {
+        api.updateCollaborator.mockResolvedValue({
+            id: 40,
+            firstName: "Luca",
+            lastName: "Verdi",
+            phoneNumber: "333 111",
+            ...timestamps,
+        });
+        await renderPage();
+
+        expect(screen.getByText("Dati del collaboratore")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Modifica collaboratore" }));
+        const dialog = await screen.findByRole("dialog");
+        const lastName = within(dialog).getByLabelText("Cognome");
+        await userEvent.clear(lastName);
+        await userEvent.type(lastName, "Verdi");
+        await userEvent.type(within(dialog).getByLabelText("Telefono"), " 333 111 ");
+        await userEvent.click(within(dialog).getByRole("button", { name: /Salva/ }));
+
+        await waitFor(() => {
+            expect(api.updateCollaborator).toHaveBeenCalledWith(40, {
+                firstName: "Luca",
+                lastName: "Verdi",
+                phoneNumber: "333 111",
+            });
+        });
+        // Intestazione e riquadro prendono il collaboratore restituito dal server.
+        expect(await screen.findByRole("heading", { level: 1, name: "Luca Verdi" })).toBeInTheDocument();
+        expect(screen.getByText("333 111")).toBeInTheDocument();
+    });
+
+    it("la stampa segue il tab aperto", async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Stampa resoconto report" }));
+        await userEvent.click(screen.getByRole("button", { name: "Stampa" }));
+        await userEvent.click(screen.getByRole("button", { name: "Stampa tutto" }));
+        expect(openPrintWindow).toHaveBeenLastCalledWith("reports:40");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Interventi" }));
+        await userEvent.click(screen.getByRole("button", { name: "Stampa resoconto interventi" }));
+        await userEvent.click(screen.getByRole("button", { name: "Stampa" }));
+        await userEvent.click(screen.getByRole("button", { name: "Stampa tutto" }));
+        expect(openPrintWindow).toHaveBeenLastCalledWith("interventions:40");
+    });
+
     it("mostra 'non trovato' con un id non valido", async () => {
         renderWithProviders(<CollaboratorPage />, { route: "/collaborators/x", path: "/collaborators/:id" });
 
@@ -151,6 +214,33 @@ describe("TechnicianPage", () => {
         expect(screen.getByText("IT123")).toBeInTheDocument();
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ technicianId: 50, visibility: "open" }));
         expect(await within(screen.getByRole("table")).findByText("Mario Rossi")).toBeInTheDocument();
+    });
+
+    it("modifica i dati del tecnico dalla scheda", async () => {
+        api.updateTechnician.mockResolvedValue({
+            id: 50,
+            firstName: "Paolo",
+            lastName: "Neri",
+            phoneNumber: "320",
+            vatNumber: "IT999",
+            ...timestamps,
+        });
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Modifica tecnico" }));
+        const dialog = await screen.findByRole("dialog");
+        const vatNumber = within(dialog).getByLabelText("Partita IVA");
+        await userEvent.clear(vatNumber);
+        await userEvent.type(vatNumber, "IT999");
+        await userEvent.click(within(dialog).getByRole("button", { name: /Salva/ }));
+
+        await waitFor(() => {
+            expect(api.updateTechnician).toHaveBeenCalledWith(
+                50,
+                expect.objectContaining({ firstName: "Paolo", vatNumber: "IT999" })
+            );
+        });
+        expect(await screen.findByText("IT999")).toBeInTheDocument();
     });
 
     it("modifica un report dalla scheda e ricarica l'elenco", async () => {

@@ -7,6 +7,21 @@ export const idParamsSchema = z.object({
     id: z.coerce.number().int().positive(),
 });
 
+/**
+ * Il periodo dei resoconti PDF (cliente, collaboratore): due date facoltative `AAAA-MM-GG`.
+ * Sta qui, accanto a `idParamsSchema`, perché lo usano router diversi con la stessa forma.
+ */
+export const printRangeQuerySchema = z.object({
+    dateFrom: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+    dateTo: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+});
+
 export const listQuerySchema = z.object({
     page: z.coerce.number().int().min(1).optional(),
     pageSize: z.coerce.number().int().min(1).max(maxPageSize).optional(),

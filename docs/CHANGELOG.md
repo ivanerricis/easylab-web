@@ -11,6 +11,154 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Date "solo giorno" dei PDF un giorno indietro
+
+**Il problema.** Nei PDF la data dell'intervento e l'intervallo dei resoconti uscivano un giorno
+prima: chiedendo il resoconto "dal 2030-01-01" l'intestazione diceva "Dal 31 dic 2029", e un
+intervento dell'11 settembre risultava del 10. `formatDayLabel` leggeva la stringa `AAAA-MM-GG`
+nel fuso del processo (`T00:00:00` senza `Z`) e la scriveva con un formattatore creato
+all'import. Ma `companyManager` imposta `process.env.TZ` dopo l'avvio. Il formattatore restava
+così in UTC mentre la lettura passava a Europe/Rome, e la mezzanotte di Roma in UTC è ancora il
+giorno prima. In un `node` appena avviato il risultato era giusto, per questo il test esistente
+passava.
+
+**Cosa.** Lettura e scrittura in UTC, fissato in entrambe: una data senza fuso resta quel giorno
+qualunque sia il fuso del processo. Il nuovo test cambia `process.env.TZ` *dopo* l'import, in
+tre fusi (Roma, New York, Kiritimati a +14). Senza la correzione fallisce in 6 casi su 6.
+
+**Da verificare in produzione.** Il bug riguarda anche il server: dopo l'aggiornamento la data
+della ricevuta di un intervento torna quella giusta. Le ricevute già stampate restano sbagliate
+di un giorno.
+
+**File.** `backend/src/routes/formatting.ts`, `formatting.test.ts`.
+
+---
+
+## 2026-09-17 — "Da fatturare" nella ricevuta dell'intervento
+
+**Il problema.** L'intervento ha il campo "Da fatturare", visibile nella scheda e nell'export CSV,
+ma la ricevuta PDF non lo riportava.
+
+**Cosa.** Nella sezione "REPORT ATTIVITÀ" compare la riga "Da fatturare: Sì", solo quando il
+campo è segnato: un "No" su ogni foglio sarebbe rumore. Divide la riga con il prezzo quando
+c'è anche quello, altrimenti la occupa tutta, come il prezzo da solo. La stessa ricevuta è
+quella allegata all'email.
+
+**File.** `backend/src/services/interventionPdf.ts` (`buildPriceRows`),
+`backend/src/routes/interventions.ts` (la query di stampa legge `toInvoice`) e i test.
+
+---
+
+## 2026-09-17 — Resoconto PDF del collaboratore e colonna "#" dei resoconti
+
+**Cosa.** Due nuove rotte, `GET /api/collaborators/:id/reports/print` e
+`/:id/interventions/print`, con lo stesso periodo facoltativo di quelle del cliente. Non c'è un
+generatore nuovo: il riepilogo del cliente accetta ora `subjectLabel` ("Collaboratore" al
+posto di "Cliente" nel riquadro e nella barra di sezione) e `showCustomerColumn`. Quest'ultimo
+aggiunge la colonna "Cliente", perché le voci di un collaboratore sono di clienti diversi.
+L'email, che il collaboratore non ha, se manca toglie la sua riga. Lo schema del periodo
+(`printRangeQuerySchema`) passa da `customers.ts` a `crudRouter.ts`, accanto a `idParamsSchema`,
+perché ora lo usano due router.
+
+*Larghezze.* Con un'ottava colonna le colonne fisse del resoconto report lasciavano al
+"Problema" meno della sua parola più lunga, e pdfmake allargava la tabella oltre il margine
+destro. Verificato impaginando il PDF vero: ora le colonne fisse cedono spazio. Nella stessa
+verifica è emerso che la colonna "#" (28pt nei report, 22 negli interventi) mandava a capo gli
+id già da cinque e da quattro cifre ("1814 / 2"). Passa a 34pt in tutte e quattro le tabelle.
+Controllati sul PDF reale i resoconti di cliente e collaboratore, report e interventi, anche con
+elenco vuoto.
+
+**File.** `backend/src/routes/collaborators.ts`, `crudRouter.ts`, `customers.ts`,
+`backend/src/services/pdf/shared.ts`, `reportPdf.ts`, `interventionPdf.ts` e i test;
+`frontend/src/lib/api/collaborators.ts`.
+
+---
+
+## 2026-09-17 — Azioni mancanti nelle schede
+
+**Il problema.** Alcune azioni esistevano solo negli elenchi, e dalla scheda bisognava tornare
+indietro e ritrovare la riga:
+- la scheda del collaboratore mostrava solo il nome: niente telefono, "Modifica" o stampa;
+- quella del tecnico non aveva "Modifica";
+- quella dell'intervento non aveva "Invia email";
+- report, intervento e cliente non si potevano eliminare dalla scheda;
+- un report o un intervento nuovo per il cliente aperto richiedeva di aprire il dialogo altrove
+  e cercare di nuovo il cliente.
+
+**Cosa.**
+- *Collaboratore:* riquadro "Dati del collaboratore" (telefono, data di inserimento),
+  "Modifica" e "Stampa". La stampa segue il tab aperto, come nella scheda del cliente, e usa
+  le rotte nuove.
+- *Tecnico:* "Modifica". Come per il cliente, il nome e il riquadro si aggiornano con la
+  persona restituita dal server.
+- *Intervento:* "Email", con la stessa conferma dell'elenco.
+- *Report, intervento, cliente:* "Elimina" (`DetailDeleteButton`), con la stessa conferma degli
+  elenchi (digitare ELIMINA). Dopo l'eliminazione torna all'elenco sostituendo la voce della
+  cronologia, così "indietro" non riapre una scheda che non esiste più. Se fallisce resta sulla
+  scheda con l'errore.
+- *Cliente:* menu "Nuovo" con "Nuovo report" e "Nuovo intervento". I due dialoghi accettano
+  `initialCustomer`: la casella è già compilata, il cliente già risolto per id, e il modulo non
+  conta come modificato finché non lo si cambia (chiudere non chiede conferma). Un menu e non
+  due pulsanti perché sono azioni sorelle, e con sei azioni l'intestazione non starebbe su un
+  telefono. Per lo stesso motivo l'intestazione del cliente ha `flex-wrap`: quando nome e
+  pulsanti non stanno insieme, i pulsanti vanno sulla riga sotto, allineati a destra. Il menu è largo quanto le voci
+  (`w-auto`): di suo prende la larghezza del trigger, che su mobile è un'icona, e le voci
+  risultavano tagliate.
+
+Le funzioni che preparano il corpo della richiesta per collaboratore e tecnico passano da
+`CollaboratorsPage`/`TechniciansPage` a `lib/people.ts`, come `toCustomerPayload`: elenco e
+scheda devono mandare lo stesso corpo.
+
+Verificato a 1280, 390 e 360px: intestazioni, menu, dialoghi precompilati, conferme di
+eliminazione ed email (senza confermarle), nessuno scorrimento orizzontale.
+
+**File.** `frontend/src/components/detail-delete-button.tsx` (nuovo), `frontend/src/lib/people.ts`
+(nuovo), `createReportDialog.tsx`, `createInterventionDialog.tsx`, le pagine `CustomerPage`,
+`CollaboratorPage`, `CollaboratorsPage`, `TechnicianPage`, `TechniciansPage`, `ReportPage`,
+`InterventionPage` e i test.
+
+---
+
+## 2026-09-17 — Tab e filtro sulla stessa riga nelle schede cliente, collaboratore e tecnico
+
+**Il problema.** Nelle schede di cliente e collaboratore i tab "Report / Interventi" stavano su una
+riga e il filtro per stato su quella sotto, allineato a destra: sembrava un controllo a sé, lontano
+dai tab di cui filtra la lista, e la tabella perdeva una riga di spazio. Nella scheda del tecnico
+titolo e filtro erano già affiancati da `sm` in su, ma su mobile andavano a capo.
+
+**Cosa.** Il filtro esce dai due `TabsContent` e si affianca ai tab, a tutte le larghezze. Il
+filtro è uno solo e mostra le voci del tab aperto: ogni tab conserva il proprio stato del filtro.
+Per saperlo, il `Tabs` del collaboratore passa da `defaultValue` a controllato. Nella scheda del
+tecnico lo stesso trattamento vale per titolo e filtro. Sotto `sm` il filtro occupa lo spazio che
+resta, con testo a 16px (la soglia sotto cui iOS ingrandisce la pagina al tocco), e i due tab
+hanno `px-2` invece di `px-3`. Misurato a 1280, 700, 390 e 360px: stessa riga, nessuno scorrimento
+orizzontale, nessuna voce troncata. A 360px "Tutti gli interventi" entra al pixel: senza gli 8px
+dei tab veniva troncato.
+
+**File.** `frontend/src/pages/customers/CustomerPage.tsx`,
+`frontend/src/pages/collaborators/CollaboratorPage.tsx`,
+`frontend/src/pages/technicians/TechnicianPage.tsx`.
+
+---
+
+## 2026-09-17 — Pulsante "Modifica" nella scheda del cliente
+
+**Il problema.** Le schede di report e intervento hanno un pulsante "Modifica" nell'intestazione,
+quella del cliente no: per correggere un telefono o un'email dalla scheda bisognava tornare
+all'elenco clienti, ritrovare il cliente e aprire lì il dialogo.
+
+**Cosa.** Nell'intestazione della scheda, fra "Aggiorna" e "Stampa", c'è ora "Modifica", con la
+stessa forma degli altri (contorno, solo icona sotto `lg`). Apre lo stesso dialogo dell'elenco in
+modalità modifica. Il salvataggio usa il cliente restituito da `PUT /customers/:id`, quindi
+intestazione e riquadro "Dati del cliente" si aggiornano senza un'altra richiesta.
+`toCustomerPayload`, che stava dentro `CustomersPage`, passa in `lib/customers.ts`: le due pagine
+devono mandare lo stesso corpo, e una sola definizione lo garantisce.
+
+**File.** `frontend/src/pages/customers/CustomerPage.tsx`, `CustomersPage.tsx`,
+`CustomerPage.test.tsx`, `frontend/src/lib/customers.ts`.
+
+---
+
 ## 2026-09-17 — Padding sbilanciato nella conferma "Modifiche non salvate"
 
 **Il problema.** Su desktop il dialogo aveva 25px di margine a sinistra e 4 a destra. I due

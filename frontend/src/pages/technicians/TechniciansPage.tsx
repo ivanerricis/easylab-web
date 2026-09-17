@@ -3,17 +3,10 @@ import CreateTechnicianDialog, {
 } from "@/components/dialogs/create/createTechnicianDialog";
 import SimpleEntityPage from "@/components/simple-entity-page";
 import { createTechnician, deleteTechnician, listTechnicians, updateTechnician } from "@/lib/api";
-import { trimOrNull } from "@/lib/utils";
+import { toTechnicianPayload } from "@/lib/people";
 import type { TechnicianDto } from "@/types/dtos";
 import { entityPaths } from "@/lib/entityPaths";
 import { technicianColumns } from "./components/technician-columns";
-
-const toPayload = (values: TechnicianSubmitValues) => ({
-    firstName: values.firstName.trim(),
-    lastName: trimOrNull(values.lastName),
-    phoneNumber: trimOrNull(values.phoneNumber),
-    vatNumber: trimOrNull(values.vatNumber),
-});
 
 const TechniciansPage = () => {
     return (
@@ -29,8 +22,8 @@ const TechniciansPage = () => {
             listRows={listTechnicians}
             loadErrorMessage="Impossibile caricare i tecnici"
             Dialog={CreateTechnicianDialog}
-            onCreate={(values) => createTechnician(toPayload(values))}
-            onEdit={(row, values) => updateTechnician(row.id, toPayload(values))}
+            onCreate={(values) => createTechnician(toTechnicianPayload(values))}
+            onEdit={(row, values) => updateTechnician(row.id, toTechnicianPayload(values))}
             onDelete={(row) => deleteTechnician(row.id)}
             notFoundMessage="Tecnico non trovato"
             deleteTitle="Elimina tecnico"

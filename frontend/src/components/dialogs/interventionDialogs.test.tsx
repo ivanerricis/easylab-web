@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,7 +78,7 @@ afterEach(() => {
 });
 
 describe("CreateInterventionDialog", () => {
-    const renderDialog = async (props: { initialDate?: string } = {}) => {
+    const renderDialog = async (props: Partial<ComponentProps<typeof CreateInterventionDialog>> = {}) => {
         const onSubmit = vi.fn();
         renderWithProviders(<CreateInterventionDialog open onOpenChange={() => {}} onSubmit={onSubmit} {...props} />);
         await waitFor(() => {
@@ -150,6 +151,33 @@ describe("CreateInterventionDialog", () => {
         });
         // L'avviso di creazione lo dà la pagina, con il numero e le azioni (`showCreatedToast`).
         expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    /** Dalla scheda del cliente: la casella è già compilata e il cliente già risolto per id. */
+    it("parte dal cliente passato, senza doverlo cercare", async () => {
+        const onSubmit = await renderDialog({
+            initialCustomer: {
+                id: 77,
+                firstName: "Anna",
+                lastName: "Verdi",
+                phoneNumber: null,
+                phoneNumberSecondary: "081",
+                email: null,
+                city: null,
+                createdAt: "2026-01-01T00:00:00.000Z",
+                updatedAt: null,
+            },
+        });
+
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Anna Verdi - 081");
+        await chooseOption(/^Collaboratore/, "Luca Bianchi");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({ customer: "Anna Verdi - 081", customerId: 77 })
+            );
+        });
     });
 
     it("il prezzo è facoltativo ma, se indicato, viaggia come numero", async () => {

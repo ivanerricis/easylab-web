@@ -1,4 +1,19 @@
+import type { CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
+import { trimOrNull } from "@/lib/utils";
 import type { CustomerDto } from "@/types/dtos";
+
+/**
+ * Dai valori del dialogo al corpo della richiesta: i campi facoltativi vuoti diventano `null`.
+ * Lo usano l'elenco clienti e la scheda del cliente, che modificano lo stesso cliente.
+ */
+export const toCustomerPayload = (values: CustomerSubmitValues) => ({
+    firstName: values.firstName.trim(),
+    lastName: trimOrNull(values.lastName),
+    phoneNumber: trimOrNull(values.phoneNumber),
+    phoneNumberSecondary: trimOrNull(values.phoneNumberSecondary),
+    email: trimOrNull(values.email),
+    city: trimOrNull(values.city),
+});
 
 /**
  * Come il cliente viene scritto nella casella del dialogo: "Nome Cognome - telefono".

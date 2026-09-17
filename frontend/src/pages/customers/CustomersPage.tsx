@@ -28,21 +28,13 @@ import { customerSortOptions, DEFAULT_CUSTOMER_SORT_OPTION, type CustomerSortOpt
 import { useCustomersRows } from "./hooks/useCustomersRows";
 import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
-import { openPrintWindow, trimOrNull } from "@/lib/utils";
+import { openPrintWindow } from "@/lib/utils";
+import { toCustomerPayload } from "@/lib/customers";
 import { entityPaths } from "@/lib/entityPaths";
 
 const sortOptionValues = customerSortOptions.map((option) => option.value);
 
 type CustomerPrintKind = "reports" | "interventions";
-
-const toCustomerPayload = (values: CustomerSubmitValues) => ({
-    firstName: values.firstName.trim(),
-    lastName: trimOrNull(values.lastName),
-    phoneNumber: trimOrNull(values.phoneNumber),
-    phoneNumberSecondary: trimOrNull(values.phoneNumberSecondary),
-    email: trimOrNull(values.email),
-    city: trimOrNull(values.city),
-});
 
 const CustomersPage = () => {
     const navigate = useNavigate();

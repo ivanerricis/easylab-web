@@ -168,6 +168,49 @@ describe("CreateReportDialog", () => {
         expect(toastSuccess).not.toHaveBeenCalled();
     });
 
+    /** Dalla scheda del cliente: la casella è già compilata e il cliente già risolto per id. */
+    it("parte dal cliente passato, e il modulo non risulta modificato finché non lo si tocca", async () => {
+        const onSubmit = vi.fn();
+        const onOpenChange = vi.fn();
+        renderWithProviders(
+            <CreateReportDialog
+                open
+                onOpenChange={onOpenChange}
+                onSubmit={onSubmit}
+                initialCustomer={{
+                    id: 77,
+                    firstName: "Anna",
+                    lastName: null,
+                    phoneNumber: "081",
+                    phoneNumberSecondary: null,
+                    email: null,
+                    city: null,
+                    createdAt: "2026-01-01T00:00:00.000Z",
+                    updatedAt: null,
+                }}
+            />
+        );
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Anna - 081");
+        // Nessuna modifica: chiudere non chiede conferma.
+        await userEvent.keyboard("{Escape}");
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+
+        await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+        await chooseOption(/^Alimentatore presente/, "No");
+        await chooseOption(/^Backup dati/, "No");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        expect(onSubmit.mock.calls[0][0]).toMatchObject({ customer: "Anna - 081", customerId: 77 });
+    });
+
     /**
      * Con "Altro" l'etichetta del catalogo non dice niente al cliente: sulla ricevuta va il
      * problema scritto qui, che quindi diventa obbligatorio.

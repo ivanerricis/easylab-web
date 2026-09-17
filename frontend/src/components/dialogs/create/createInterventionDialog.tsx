@@ -26,7 +26,7 @@ import {
     isScheduledInterventionStatus,
     getTodayDateString,
 } from "@/lib/interventions";
-import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import type { CollaboratorDto, CustomerDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
 import { startTransition, useCallback, useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
@@ -72,6 +72,12 @@ type Props = {
     onOpenChange: (open: boolean) => void;
     onSubmit?: (values: CreateInterventionSubmitValues) => Promise<void> | void;
     initialDate?: string;
+    /**
+     * Il cliente da cui si parte, quando il dialogo si apre dalla sua scheda: la casella è già
+     * compilata e il cliente già risolto, e resta modificabile. Il modulo non conta come
+     * modificato finché non lo si cambia.
+     */
+    initialCustomer?: CustomerDto | null;
 };
 
 type FieldErrors = Partial<Record<"customer" | "collaboratorId" | "price" | InterventionField, string>>;
@@ -89,7 +95,7 @@ const fieldOrder = [
 ] as const;
 
 /** Il modulo come si presenta all'apertura. */
-const buildEmptyFormValues = (initialDate?: string) => ({
+const buildEmptyFormValues = (initialDate?: string, initialCustomerOption = "") => ({
     type: "consegna_materiale" as InterventionType,
     status: "programmato" as InterventionStatus,
     description: "",
@@ -98,7 +104,7 @@ const buildEmptyFormValues = (initialDate?: string) => ({
     price: "",
     paid: false,
     toInvoice: false,
-    customer: "",
+    customer: initialCustomerOption,
     collaboratorId: "",
     // Nella quasi totalità dei casi l'intervento è di oggi; resta comunque
     // modificabile, e `initialDate` (slot cliccato nel calendario) ha la precedenza.
@@ -107,7 +113,7 @@ const buildEmptyFormValues = (initialDate?: string) => ({
     endTime: "",
 });
 
-const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }: Props) => {
+const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, initialCustomer = null }: Props) => {
     const [formValues, setFormValues] = useState(() => buildEmptyFormValues());
     // Una copia di com'era il modulo all'apertura, non una costante: la data di partenza
     // cambia con lo slot del calendario (e con il giorno, se la pagina resta aperta a lungo).
@@ -118,6 +124,16 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const initialCustomerId = initialCustomer?.id ?? null;
+    const initialCustomerOption = initialCustomer
+        ? formatCustomerOption(
+              initialCustomer.firstName,
+              initialCustomer.lastName,
+              initialCustomer.phoneNumber,
+              initialCustomer.phoneNumberSecondary
+          )
+        : "";
 
     const isOnSite = isOnSiteInterventionType(formValues.type);
     // Un intervento ancora da svolgere non ha orari né lavoro da descrivere: i campi
@@ -131,10 +147,10 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
 
         startTransition(() => {
             setErrors({});
-            const emptyFormValues = buildEmptyFormValues(initialDate);
+            const emptyFormValues = buildEmptyFormValues(initialDate, initialCustomerOption);
             setFormValues(emptyFormValues);
             setInitialFormValues(emptyFormValues);
-            setCustomerIdByOption({});
+            setCustomerIdByOption(initialCustomerId == null ? {} : { [initialCustomerOption]: initialCustomerId });
         });
 
         const loadCollaborators = async () => {
@@ -147,7 +163,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
         };
 
         void loadCollaborators();
-    }, [open, initialDate]);
+    }, [open, initialDate, initialCustomerId, initialCustomerOption]);
 
     const searchCustomers = useCallback(async (query: string) => {
         const customers = await listCustomers({ pageSize: 8, search: query || undefined });

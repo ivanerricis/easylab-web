@@ -157,12 +157,18 @@ export const loadLogoDataUrl = async () => {
     return `data:${logo.contentType};base64,${logo.content.toString("base64")}`;
 };
 
-/** I campi che i riepiloghi per cliente hanno in comune, qualunque cosa elenchino. */
+/**
+ * I campi che i riepiloghi hanno in comune, qualunque cosa elenchino. Nati per il cliente,
+ * servono anche al collaboratore: `subjectLabel` dice di chi è il riepilogo, e l'email, che il
+ * collaboratore non ha, se manca toglie la sua riga.
+ */
 export type CustomerSummaryHeaderData = {
     customerId: number;
     customerName: string;
     customerPhone: string;
-    customerEmail: string;
+    customerEmail?: string;
+    /** "Cliente" se manca. */
+    subjectLabel?: string;
     labName: string;
     labEmail: string;
     labAddress: string;
@@ -177,7 +183,11 @@ const buildCustomerSummaryMetaBlock = (customer: CustomerSummaryHeaderData, coun
             [
                 {
                     stack: [
-                        { text: `Cliente #${customer.customerId}`, style: "metaTitle", alignment: "right" },
+                        {
+                            text: `${customer.subjectLabel ?? "Cliente"} #${customer.customerId}`,
+                            style: "metaTitle",
+                            alignment: "right",
+                        },
                         ...(customer.rangeLabel
                             ? [{ text: customer.rangeLabel, style: "metaDate", alignment: "right" as const }]
                             : []),
@@ -238,23 +248,31 @@ export const buildCustomerSummaryHeader = (
     margin: [0, 0, 0, 8],
 });
 
-export const buildCustomerSummaryInfoSection = (customer: CustomerSummaryHeaderData) => ({
-    table: {
-        widths: [90, "*", 90, "*"],
-        body: [
-            sectionBarRow("CLIENTE", 4),
-            dualFieldRow("Cliente", customer.customerName, "Telefono", customer.customerPhone),
-            // L'email prende tutta la riga: e' un token che non va a capo e in mezza
-            // colonna costringerebbe la tabella a sforare il margine destro.
-            // Il conteggio delle voci e' gia' nel riquadro in alto.
-            [
-                { text: "Email", style: "label" },
-                { text: customer.customerEmail || "-", style: "value", colSpan: 3 },
-                {},
-                {},
+export const buildCustomerSummaryInfoSection = (customer: CustomerSummaryHeaderData) => {
+    const subjectLabel = customer.subjectLabel ?? "Cliente";
+
+    return {
+        table: {
+            widths: [90, "*", 90, "*"],
+            body: [
+                sectionBarRow(subjectLabel.toUpperCase(), 4),
+                dualFieldRow(subjectLabel, customer.customerName, "Telefono", customer.customerPhone),
+                // L'email prende tutta la riga: e' un token che non va a capo e in mezza
+                // colonna costringerebbe la tabella a sforare il margine destro.
+                // Il conteggio delle voci e' gia' nel riquadro in alto.
+                ...(customer.customerEmail === undefined
+                    ? []
+                    : [
+                          [
+                              { text: "Email", style: "label" },
+                              { text: customer.customerEmail || "-", style: "value", colSpan: 3 },
+                              {},
+                              {},
+                          ],
+                      ]),
             ],
-        ],
-    },
-    layout: tableLayout,
-    margin: [0, 0, 0, 8],
-});
+        },
+        layout: tableLayout,
+        margin: [0, 0, 0, 8],
+    };
+};

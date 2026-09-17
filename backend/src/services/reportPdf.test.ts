@@ -292,4 +292,36 @@ describe("createCustomerReportsPdfBuffer", () => {
         expect(serialized).toContain("Totale complessivo");
         expect(serialized).toContain(formatEuroLikeTheService(50));
     });
+
+    /** Il riepilogo del collaboratore riusa questo: etichette sue, colonna "Cliente", niente email. */
+    it("nella variante collaboratore cambia le etichette, aggiunge il cliente e toglie l'email", async () => {
+        const doc = await captureCustomerReportsDoc(
+            buildCustomerReports({
+                customerEmail: undefined,
+                subjectLabel: "Collaboratore",
+                showCustomerColumn: true,
+                reports: [buildReportSummary({ customerName: "Anna Verdi", totalPrice: 30 })],
+            })
+        );
+        const serialized = JSON.stringify(doc);
+        const table = (doc.content as { table?: { widths: unknown[]; body: unknown[][] } }[])[2].table!;
+
+        expect(serialized).toContain("Collaboratore #5");
+        expect(serialized).toContain("COLLABORATORE");
+        expect(serialized).toContain("Anna Verdi");
+        expect(serialized).not.toContain("Email");
+        // pdfmake vuole ogni riga lunga quanto le colonne, celle coperte dal colSpan comprese.
+        expect(table.widths).toHaveLength(8);
+        for (const row of table.body) {
+            expect(row).toHaveLength(8);
+        }
+    });
+
+    it("nella variante collaboratore anche l'elenco vuoto copre tutte le colonne", async () => {
+        const doc = await captureCustomerReportsDoc(buildCustomerReports({ showCustomerColumn: true, reports: [] }));
+        const table = (doc.content as { table?: { body: { colSpan?: number }[][] } }[])[2].table!;
+
+        expect(table.body.at(-1)).toHaveLength(8);
+        expect(table.body.at(-1)![0].colSpan).toBe(8);
+    });
 });

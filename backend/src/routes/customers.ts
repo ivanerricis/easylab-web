@@ -14,22 +14,11 @@ import { getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
 import { buildDateRangeLabel, formatDateLabel, formatPhoneLabel, formatScheduleLabel } from "./formatting";
-import { createCrudRouter, idParamsSchema } from "./crudRouter";
+import { createCrudRouter, idParamsSchema, printRangeQuerySchema } from "./crudRouter";
 import { validate } from "./validation";
 
 const customerExportQuerySchema = z.object({
     search: z.string().trim().max(255).optional(),
-});
-
-const printRangeQuerySchema = z.object({
-    dateFrom: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional(),
-    dateTo: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional(),
 });
 
 const customerBodySchemaBase = z.object({

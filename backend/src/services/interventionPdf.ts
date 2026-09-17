@@ -35,6 +35,8 @@ export type InterventionPrintData = {
     note: string | null;
     /** Facoltativo: quando manca non compare in stampa, invece di mostrare 0 €. */
     price: number | null;
+    /** Segnato "da fatturare": in stampa compare solo quando è vero. */
+    toInvoice: boolean;
     interventionDateLabel: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -48,13 +50,18 @@ export type CustomerInterventionSummaryItem = {
     status: InterventionStatus;
     description: string | null;
     scheduleLabel: string | null;
+    /** Solo nel riepilogo del collaboratore, dove gli interventi sono di clienti diversi. */
+    customerName?: string;
 };
 
 export type CustomerInterventionsPrintData = {
     customerId: number;
     customerName: string;
     customerPhone: string;
-    customerEmail: string;
+    customerEmail?: string;
+    subjectLabel?: string;
+    /** Aggiunge la colonna "Cliente": il riepilogo del collaboratore elenca clienti diversi. */
+    showCustomerColumn?: boolean;
     labName: string;
     labEmail: string;
     labAddress: string;
@@ -135,6 +142,35 @@ const buildCustomerSection = (intervention: InterventionPrintData) => ({
     margin: [0, 0, 0, 8],
 });
 
+/**
+ * Prezzo e "Da fatturare" condividono una riga. Il prezzo è facoltativo per ogni tipo di
+ * intervento e compare solo quando è stato indicato, invece di mostrare uno 0 € che nessuno ha
+ * mai chiesto. "Da fatturare" compare solo quando è segnato: un "No" su ogni foglio sarebbe
+ * rumore. Se c'è uno solo dei due, prende tutta la riga.
+ */
+const buildPriceRows = (intervention: InterventionPrintData) => {
+    const fields: [string, string][] = [];
+
+    if (intervention.price != null) {
+        fields.push(["Prezzo", formatEuro(intervention.price)]);
+    }
+
+    if (intervention.toInvoice) {
+        fields.push(["Da fatturare", "Sì"]);
+    }
+
+    if (fields.length === 2) {
+        return [dualFieldRow(fields[0][0], fields[0][1], fields[1][0], fields[1][1])];
+    }
+
+    return fields.map(([label, value]) => [
+        { text: label, style: "label" },
+        { text: value, style: "value", colSpan: 3 },
+        {},
+        {},
+    ]);
+};
+
 const buildActivitySection = (intervention: InterventionPrintData) => ({
     table: {
         widths: [90, "*", 90, "*"],
@@ -152,18 +188,7 @@ const buildActivitySection = (intervention: InterventionPrintData) => ({
                 "Stato",
                 formatInterventionStatus(intervention.status)
             ),
-            // Il prezzo è facoltativo per ogni tipo di intervento: la riga compare solo quando
-            // è stato indicato, invece di mostrare uno 0 € che nessuno ha mai chiesto.
-            ...(intervention.price != null
-                ? [
-                      [
-                          { text: "Prezzo", style: "label" },
-                          { text: formatEuro(intervention.price), style: "value", colSpan: 3 },
-                          {},
-                          {},
-                      ],
-                  ]
-                : []),
+            ...buildPriceRows(intervention),
             // Il problema riscontrato esiste solo per gli interventi in sede o da remoto.
             ...(intervention.problem
                 ? [
@@ -289,12 +314,17 @@ type SummaryTableCell = {
     fillColor?: string;
 };
 
-const buildCustomerInterventionsTable = (interventions: CustomerInterventionSummaryItem[]) => {
+const buildCustomerInterventionsTable = (
+    interventions: CustomerInterventionSummaryItem[],
+    showCustomerColumn = false
+) => {
+    const columnCount = showCustomerColumn ? 7 : 6;
     const body: SummaryTableCell[][] = [
-        sectionBarRow("RESOCONTO INTERVENTI", 6),
+        sectionBarRow("RESOCONTO INTERVENTI", columnCount),
         [
             { text: "#", style: "summaryHeader" },
             { text: "Creato il", style: "summaryHeader" },
+            ...(showCustomerColumn ? [{ text: "Cliente", style: "summaryHeader" }] : []),
             { text: "Tipo", style: "summaryHeader" },
             { text: "Descrizione", style: "summaryHeader" },
             { text: "Data/Orario", style: "summaryHeader" },
@@ -306,22 +336,20 @@ const buildCustomerInterventionsTable = (interventions: CustomerInterventionSumm
         body.push([
             {
                 text: "Nessun intervento disponibile",
-                colSpan: 6,
+                colSpan: columnCount,
                 alignment: "center",
                 italics: true,
                 margin: [0, 8, 0, 8],
             },
-            {},
-            {},
-            {},
-            {},
-            {},
+            // Una cella vuota per ogni colonna coperta dal `colSpan`, come vuole pdfmake.
+            ...new Array<SummaryTableCell>(columnCount - 1).fill({}),
         ]);
     } else {
         for (const intervention of interventions) {
             body.push([
                 { text: String(intervention.id), alignment: "center", bold: true },
                 { text: intervention.createdAtLabel, alignment: "center" },
+                ...(showCustomerColumn ? [{ text: intervention.customerName ?? "-" }] : []),
                 { text: formatInterventionType(intervention.type), bold: true },
                 { text: intervention.description ?? "-", fontSize: 8.5 },
                 { text: intervention.scheduleLabel ?? "-", alignment: "center" },
@@ -334,7 +362,8 @@ const buildCustomerInterventionsTable = (interventions: CustomerInterventionSumm
         table: {
             // Barra di sezione + intestazione colonne: entrambe si ripetono a ogni pagina.
             headerRows: 2,
-            widths: [22, 56, 76, "*", 100, 62],
+            // "#" tiene un id a cinque cifre su una riga: a 22 andava a capo già dalla quarta.
+            widths: showCustomerColumn ? [34, 56, 80, 70, "*", 90, 62] : [34, 56, 76, "*", 100, 62],
             body,
         },
         layout: tableLayout,
@@ -385,7 +414,7 @@ export const createCustomerInterventionsPdfBuffer = async (customer: CustomerInt
         content: [
             buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.interventionCount} interventi`),
             buildCustomerSummaryInfoSection(customer),
-            buildCustomerInterventionsTable(customer.interventions),
+            buildCustomerInterventionsTable(customer.interventions, customer.showCustomerColumn),
         ],
         styles: pdfStyles,
     };

@@ -3,16 +3,10 @@ import CreateCollaboratorDialog, {
 } from "@/components/dialogs/create/createCollaboratorDialog";
 import SimpleEntityPage from "@/components/simple-entity-page";
 import { createCollaborator, deleteCollaborator, listCollaborators, updateCollaborator } from "@/lib/api";
-import { trimOrNull } from "@/lib/utils";
+import { toCollaboratorPayload } from "@/lib/people";
 import type { CollaboratorDto } from "@/types/dtos";
 import { entityPaths } from "@/lib/entityPaths";
 import { collaboratorColumns } from "./components/collaborator-columns";
-
-const toPayload = (values: CollaboratorSubmitValues) => ({
-    firstName: values.firstName.trim(),
-    lastName: trimOrNull(values.lastName),
-    phoneNumber: trimOrNull(values.phoneNumber),
-});
 
 const CollaboratorsPage = () => {
     return (
@@ -28,8 +22,8 @@ const CollaboratorsPage = () => {
             listRows={listCollaborators}
             loadErrorMessage="Impossibile caricare i collaboratori"
             Dialog={CreateCollaboratorDialog}
-            onCreate={(values) => createCollaborator(toPayload(values))}
-            onEdit={(row, values) => updateCollaborator(row.id, toPayload(values))}
+            onCreate={(values) => createCollaborator(toCollaboratorPayload(values))}
+            onEdit={(row, values) => updateCollaborator(row.id, toCollaboratorPayload(values))}
             onDelete={(row) => deleteCollaborator(row.id)}
             notFoundMessage="Collaboratore non trovato"
             deleteTitle="Elimina collaboratore"

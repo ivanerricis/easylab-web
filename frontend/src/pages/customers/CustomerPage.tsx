@@ -8,6 +8,23 @@ import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { entityPaths } from "@/lib/entityPaths";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
+import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
+import CreateInterventionDialog, {
+    type CreateInterventionSubmitValues,
+} from "@/components/dialogs/create/createInterventionDialog";
+import DetailDeleteButton from "@/components/detail-delete-button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { showCreatedToast } from "@/lib/createdToast";
+import { resolveReportReferences } from "@/lib/reportForm";
+import { toInterventionCreatePayload } from "@/lib/interventionForm";
+import { resolveCustomerId } from "@/lib/customerLookup";
+import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
+import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,18 +32,24 @@ import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+    createIntervention,
+    createReport,
+    deleteCustomer,
     getApiErrorMessage,
     getApiErrorStatus,
     getCustomer,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
+    getInterventionPrintUrl,
+    getReportPrintUrl,
     listInterventions,
     listReports,
+    updateCustomer,
 } from "@/lib/api";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
-import { formatDateTime, openPrintWindow } from "@/lib/utils";
+import { formatDateTime, openPrintWindow, trimOrNull } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
 import type { CustomerDto, InterventionDto, ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import type { InterventionStatusFilter } from "../interventions/components/types";
@@ -74,6 +97,9 @@ const CustomerPage = () => {
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("all");
     const [interventionStatusFilter, setInterventionStatusFilter] = useState<InterventionStatusFilter>("all");
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
+    const [isCreateInterventionDialogOpen, setIsCreateInterventionDialogOpen] = useState(false);
 
     const hasValidCustomerId = useMemo(() => Number.isInteger(customerId) && customerId > 0, [customerId]);
 
@@ -175,6 +201,60 @@ const CustomerPage = () => {
         }
     }, [customerId]);
 
+    // Prima i dati si potevano cambiare solo dall'elenco clienti: dalla scheda bisognava
+    // tornare indietro, ritrovare il cliente e aprire lì il dialogo. Il nome nell'intestazione
+    // e il riquadro si aggiornano con il cliente che il server restituisce.
+    const handleEditCustomer = async (values: CustomerSubmitValues) => {
+        setCustomer(await updateCustomer(customerId, toCustomerPayload(values)));
+    };
+
+    // Report e intervento nuovi partono da questo cliente (vedi `initialCustomer` nei due
+    // dialoghi): prima bisognava aprire il dialogo altrove e ricercarlo. Il resto è come
+    // nell'elenco: niente try/catch, l'errore lo mostra il dialogo; dopo si ricarica la lista
+    // e l'avviso offre di aprire o stampare.
+    const handleCreateReport = async (values: CreateReportSubmitValues) => {
+        const {
+            customerId: reportCustomerId,
+            deviceId,
+            issueId,
+            issueDescription,
+        } = await resolveReportReferences(values);
+
+        const createdReport = await createReport({
+            deviceId,
+            issueId,
+            customerId: reportCustomerId,
+            note: trimOrNull(values.notes),
+            password: trimOrNull(values.password),
+            issueDescription,
+            dataBackup: values.dataBackup,
+            charger: values.charger,
+        });
+
+        await reloadReports();
+
+        showCreatedToast({
+            message: `Report #${createdReport.id} creato`,
+            onOpen: () => navigate(entityPaths.report(createdReport.id)),
+            onPrint: () => openPrintWindow(getReportPrintUrl(createdReport.id)),
+        });
+    };
+
+    const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
+        const interventionCustomerId = await resolveCustomerId(values.customerId, values.customer);
+        const createdIntervention = await createIntervention(
+            toInterventionCreatePayload(values, interventionCustomerId)
+        );
+
+        await reloadInterventions();
+
+        showCreatedToast({
+            message: `Intervento #${createdIntervention.id} creato`,
+            onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
+            onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
+        });
+    };
+
     const handleRefresh = useCallback(async () => {
         await Promise.all([loadCustomer(), reloadReports(), reloadInterventions()]);
     }, [loadCustomer, reloadInterventions, reloadReports]);
@@ -223,7 +303,33 @@ const CustomerPage = () => {
                 onConfirm={handleConfirmPrint}
             />
 
-            <div className="flex items-center gap-2">
+            <CreateReportDialog
+                open={isCreateReportDialogOpen}
+                onOpenChange={setIsCreateReportDialogOpen}
+                onSubmit={handleCreateReport}
+                initialCustomer={customer}
+            />
+
+            <CreateInterventionDialog
+                open={isCreateInterventionDialogOpen}
+                onOpenChange={setIsCreateInterventionDialogOpen}
+                onSubmit={handleCreateIntervention}
+                initialCustomer={customer}
+            />
+
+            {isEditDialogOpen && customer ? (
+                <CreateCustomerDialog
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                    mode="edit"
+                    initialValues={customer}
+                    onSubmit={handleEditCustomer}
+                />
+            ) : null}
+
+            {/* Con sei azioni i pulsanti non stanno accanto al nome su un telefono: `flex-wrap`
+                li manda sotto, allineati a destra, solo quando serve. */}
+            <div className="flex flex-wrap items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
@@ -241,6 +347,44 @@ const CustomerPage = () => {
                         label="Aggiorna i dati del cliente"
                     />
 
+                    {/* Un menu solo per le due creazioni: sono azioni sorelle, e due pulsanti in
+                        più non starebbero nell'intestazione su un telefono. */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="lg" aria-label="Nuovo report o intervento">
+                                <Plus className="size-5" />
+                                <span className="hidden text-lg lg:inline">Nuovo</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        {/* Largo quanto le voci, non quanto il pulsante: da solo prende la larghezza
+                            del trigger, che su mobile è un'icona. */}
+                        <DropdownMenuContent align="end" className="w-auto">
+                            <DropdownMenuItem onSelect={() => setIsCreateReportDialogOpen(true)}>
+                                <ClipboardList />
+                                Nuovo report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setIsCreateInterventionDialogOpen(true)}>
+                                <HardHat />
+                                Nuovo intervento
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={() => setIsEditDialogOpen(true)}
+                                aria-label="Modifica cliente"
+                            >
+                                <Pencil className="size-5" />
+                                <span className="hidden text-lg lg:inline">Modifica</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Modifica cliente</TooltipContent>
+                    </Tooltip>
+
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
@@ -250,6 +394,16 @@ const CustomerPage = () => {
                         </TooltipTrigger>
                         <TooltipContent>{printTitle}</TooltipContent>
                     </Tooltip>
+
+                    <DetailDeleteButton
+                        label="Elimina cliente"
+                        title="Elimina cliente"
+                        description={`Sei sicuro di voler eliminare il cliente ${customerName}?`}
+                        onDelete={() => deleteCustomer(customerId)}
+                        successMessage="Cliente eliminato con successo"
+                        errorMessage="Impossibile eliminare il cliente"
+                        redirectTo="/clients"
+                    />
                 </div>
             </div>
 
@@ -272,18 +426,47 @@ const CustomerPage = () => {
             ) : null}
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="min-h-0 flex-1">
-                <TabsList>
-                    <TabsTrigger value="reports">Report</TabsTrigger>
-                    <TabsTrigger value="interventions">Interventi</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="reports" aria-label="Report del cliente" className="min-h-0 flex-1">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                {/* Tab e filtro sulla stessa riga, anche su mobile: su due righe il filtro
+                    sembrava un controllo a sé, staccato dalla lista che filtra, e toglieva una
+                    riga alla tabella. Il filtro è uno solo e mostra le voci del tab aperto. */}
+                <div className="flex items-center justify-between gap-2">
+                    <TabsList>
+                        <TabsTrigger value="reports" className="px-2 sm:px-3">
+                            Report
+                        </TabsTrigger>
+                        <TabsTrigger value="interventions" className="px-2 sm:px-3">
+                            Interventi
+                        </TabsTrigger>
+                    </TabsList>
+                    {activeTab === "interventions" ? (
+                        <Select
+                            value={interventionStatusFilter}
+                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
+                        >
+                            <SelectTrigger
+                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                                aria-label="Filtra gli interventi per stato"
+                            >
+                                <SelectValue placeholder="Filtra per stato" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                                <SelectItem value="all">Tutti gli interventi</SelectItem>
+                                {interventionStatusOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
                         <Select
                             value={visibilityFilter}
                             onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
                         >
-                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra i report per stato">
+                            <SelectTrigger
+                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                                aria-label="Filtra i report per stato"
+                            >
                                 <SelectValue placeholder="Filtra per stato" />
                             </SelectTrigger>
                             <SelectContent position="popper">
@@ -292,8 +475,10 @@ const CustomerPage = () => {
                                 <SelectItem value="closed">Report chiusi</SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
+                    )}
+                </div>
 
+                <TabsContent value="reports" aria-label="Report del cliente" className="min-h-0 flex-1">
                     {/* Come nelle altre liste: l'area della tabella scorre da sola e
                         l'impaginazione resta ferma in fondo. */}
                     <div className="min-h-0 flex-1 overflow-auto">
@@ -329,25 +514,6 @@ const CustomerPage = () => {
                 </TabsContent>
 
                 <TabsContent value="interventions" aria-label="Interventi del cliente" className="min-h-0 flex-1">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                        <Select
-                            value={interventionStatusFilter}
-                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
-                        >
-                            <SelectTrigger className="w-full sm:w-56" aria-label="Filtra gli interventi per stato">
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti gli interventi</SelectItem>
-                                {interventionStatusOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
                     <div className="min-h-0 flex-1 overflow-auto">
                         <EntityTable
                             tableKey="customer-interventions"

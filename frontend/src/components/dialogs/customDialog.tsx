@@ -180,7 +180,13 @@ const CustomDialog = ({
                 {/* Annidato nel dialogo del modulo, non accanto: Radix gestisce così lo
                     strato sopra lo strato, e Esc chiude solo questa domanda. */}
                 <Dialog open={isDiscardConfirmOpen} onOpenChange={setIsDiscardConfirmOpen}>
-                    <DialogContent className="border! border-destructive! sm:max-w-md" showCloseButton={false}>
+                    {/* `sm:max-w-lg`, non `md`: i due pulsanti affiancati vogliono 419px, più dei
+                        398px che restano dentro un `max-w-md` tolti bordo e padding. Essendo
+                        `shrink-0` e `whitespace-nowrap` non si stringevano — allargavano invece la
+                        colonna della griglia (le celle nascono `min-width: auto`), e header e
+                        footer sbordavano nel padding destro: 25px di margine a sinistra, 4 a
+                        destra. */}
+                    <DialogContent className="border! border-destructive! sm:max-w-lg" showCloseButton={false}>
                         <DialogHeader>
                             <DialogTitle className="text-lg">Modifiche non salvate</DialogTitle>
                             <DialogDescription>

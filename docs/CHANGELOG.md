@@ -11,6 +11,27 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Padding sbilanciato nella conferma "Modifiche non salvate"
+
+**Il problema.** Su desktop il dialogo aveva 25px di margine a sinistra e 4 a destra. I due
+pulsanti affiancati ("Continua a modificare", "Chiudi senza salvare") occupano 419px, ma un
+`sm:max-w-md` (448px) lascia 398px una volta tolti bordo e padding. I pulsanti sono `shrink-0` e
+`whitespace-nowrap`, quindi non si stringono. Al loro posto si allargava la colonna della griglia
+di `DialogContent`, perché le celle di una griglia nascono con `min-width: auto`: header e footer
+misuravano 419px e sbordavano nel padding destro. Non c'era barra di scorrimento
+(`scrollWidth === clientWidth`), per questo sembrava solo "strano" invece che rotto.
+
+**Cosa.** Il dialogo passa a `sm:max-w-lg` (512px, 462px utili). Larghezza e testo sono entrambi
+in `rem`, quindi il margine resta anche con un carattere del browser più grande. Misurato a
+1280, 700 e 390px: 25px di margine per lato in tutti e tre i casi. Sotto `sm` non cambia nulla,
+perché lì i pulsanti sono in colonna e già a larghezza piena.
+
+*Gli altri dialoghi:* ogni coppia di etichette dei footer `CustomDialog` è stata misurata come
+pulsante reale (stesse classi, icona compresa). La più larga, "Annulla" + "Ripristino in
+corso...", arriva a 314px su 398: nessun altro dialogo ha lo stesso problema.
+
+---
+
 ## 2026-09-17 — La chiave di cifratura dei backup si esportava senza richiedere di nuovo la password
 
 **Il problema.** `GET /api/settings/backup/key` restituiva la chiave a qualsiasi sessione

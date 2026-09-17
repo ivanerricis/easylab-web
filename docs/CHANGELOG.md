@@ -46,6 +46,13 @@ non cambiano, come per `paid`.
 stesso tempo pagato e da fatturare, o non pagato e non da fatturare. Schiacciare le due cose in
 un solo campo avrebbe reso impossibile metà delle combinazioni reali.
 
+**Il layout dei due dialoghi.** Le sezioni "Intervento" sono griglie a due colonne, e mezza
+colonna (sotto i 200px per scheda) non basta a una scheda radio: "Non da fatturare" andava a
+capo e la riga restava sfalsata rispetto al pagamento accanto. I due selettori occupano ora
+tutta la sezione (`lg:col-span-2`, come già facevano problema e descrizione), e con loro la
+coppia ora inizio / ora fine, che stretta in mezza colonna spezzava le etichette in "Ora /
+inizio" e non si allineava con i campi sopra.
+
 **Contorno.** Il terzo selettore a schede radio avrebbe portato a tre copie dello stesso
 markup (`payment-method-selector`, `paid-status-selector` e il nuovo). La resa a schermo vive
 ora in `option-selector.tsx`, generico sul tipo del valore, e i tre selettori sono involucri

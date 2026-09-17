@@ -426,7 +426,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     <FieldError id="price" error={errors.price} />
                                 </div>
 
-                                <div className="grid gap-1">
+                                {/*
+                                 * Larghi quanto tutta la sezione: dentro mezza colonna le due schede radio
+                                 * si stringono sotto i 200px e "Non da fatturare" andava a capo, lasciando
+                                 * la riga sfalsata rispetto al pagamento qui accanto.
+                                 */}
+                                <div className="grid gap-1 lg:col-span-2">
                                     <Label className="text-lg">Pagamento</Label>
                                     <PaidStatusSelector
                                         value={formValues.paid}
@@ -434,7 +439,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                     />
                                 </div>
 
-                                <div className="grid gap-1">
+                                <div className="grid gap-1 lg:col-span-2">
                                     <Label className="text-lg">Fatturazione</Label>
                                     <ToInvoiceSelector
                                         value={formValues.toInvoice}
@@ -443,7 +448,10 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate }:
                                 </div>
 
                                 {isOnSite ? (
-                                    <div className="grid grid-cols-2 items-start gap-4">
+                                    // Anche gli orari occupano tutta la sezione, come le altre coppie: stretti
+                                    // in mezza colonna le etichette andavano a capo ("Ora / inizio") e i campi
+                                    // non erano allineati con quelli sopra.
+                                    <div className="grid grid-cols-2 items-start gap-4 lg:col-span-2">
                                         <div className="grid gap-1">
                                             <Label htmlFor="startTime" className="text-lg">
                                                 Ora inizio

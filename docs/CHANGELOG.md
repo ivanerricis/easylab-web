@@ -27,6 +27,33 @@ chiamate quasi identiche a `setBusy` (fase iniziale, cambio fase, fine) sono rac
 
 ---
 
+## 2026-09-17 — Campo "Da fatturare" sugli interventi
+
+**Il problema.** Sapere se un intervento è stato pagato non dice se va emessa fattura: sono
+due cose distinte (c'è lavoro saldato in contanti che non si fattura, e fatture emesse e non
+ancora incassate). Finora quell'informazione stava solo nella testa di chi ha fatto il lavoro,
+o al massimo nelle note in mezzo ad altro testo.
+
+**Cosa.** Colonna `to_invoice` (booleana, `NOT NULL DEFAULT false`) sulla tabella
+`intervention` (`0030_add_intervention_to_invoice.sql`). Il default è "no" perché la fattura è
+l'eccezione: la gran parte degli interventi non si fattura, e le righe già esistenti devono
+restare com'erano. In creazione e modifica compare un selettore "Fatturazione" a due voci
+(Non da fatturare / Da fatturare) accanto a quello del pagamento; la scheda dell'intervento
+mostra "Da fatturare: Sì/No" e l'esportazione CSV guadagna la colonna omonima. Elenco e stampa
+non cambiano, come per `paid`.
+
+*Perché un campo a parte e non un terzo stato del pagamento:* un intervento può essere allo
+stesso tempo pagato e da fatturare, o non pagato e non da fatturare. Schiacciare le due cose in
+un solo campo avrebbe reso impossibile metà delle combinazioni reali.
+
+**Contorno.** Il terzo selettore a schede radio avrebbe portato a tre copie dello stesso
+markup (`payment-method-selector`, `paid-status-selector` e il nuovo). La resa a schermo vive
+ora in `option-selector.tsx`, generico sul tipo del valore, e i tre selettori sono involucri
+che portano solo le proprie voci. Le classi delle colonne (`md:grid-cols-2`, `md:grid-cols-3`)
+restano scritte per intero in una mappa: composte a runtime Tailwind non le genererebbe.
+
+---
+
 ## 2026-09-16 — Pagamento pagato/non pagato anche sugli interventi
 
 **Il problema.** I report distinguono da tempo se un lavoro è stato pagato, con tanto e carta

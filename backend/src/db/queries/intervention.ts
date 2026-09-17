@@ -146,6 +146,7 @@ export const listInterventions = async ({
             // per non gonfiare ogni pagina dell'elenco con testo che nessuno legge lì.
             price: interventionTable.price,
             paid: interventionTable.paid,
+            toInvoice: interventionTable.toInvoice,
             status: interventionTable.status,
             interventionDate: interventionTable.interventionDate,
             startTime: interventionTable.startTime,

@@ -211,6 +211,13 @@
       "when": 1776370006000,
       "tag": "0029_add_intervention_paid",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776370007000,
+      "tag": "0030_add_intervention_to_invoice",
+      "breakpoints": true
     }
   ]
 }

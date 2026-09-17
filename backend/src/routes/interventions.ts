@@ -79,6 +79,8 @@ const interventionBodySchema = z
         price: z.coerce.number().int().min(0).nullable().optional(),
         // A differenza dei report: solo pagato/non pagato, senza distinguere il mezzo.
         paid: z.boolean().optional(),
+        // Indipendente dal pagamento: dice se va emessa fattura, non se è stato incassato.
+        toInvoice: z.boolean().optional(),
         status: z.enum(interventionStatuses).optional(),
         customerId: z.coerce.number().int().positive(),
         collaboratorId: z.coerce.number().int().positive(),
@@ -266,6 +268,7 @@ interventionsRouter.get("/export.csv", validate({ query: interventionExportQuery
         { header: "Descrizione", value: (intervention) => intervention.description },
         { header: "Prezzo", value: (intervention) => intervention.price },
         { header: "Pagato", value: (intervention) => intervention.paid },
+        { header: "Da fatturare", value: (intervention) => intervention.toInvoice },
         { header: "Creato il", value: (intervention) => intervention.createdAt },
     ]);
 
@@ -452,6 +455,7 @@ interventionsRouter.post("/", validate({ body: interventionCreateBodySchema }), 
         note: req.body.note || null,
         price: req.body.price ?? null,
         paid: req.body.paid ?? false,
+        toInvoice: req.body.toInvoice ?? false,
         status: req.body.status ?? "programmato",
         customerId: req.body.customerId,
         collaboratorId: req.body.collaboratorId,

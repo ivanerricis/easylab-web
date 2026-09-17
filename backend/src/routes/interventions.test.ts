@@ -129,6 +129,7 @@ const storedIntervention = {
     problem: null,
     note: null,
     paid: false,
+    toInvoice: false,
     status: "programmato",
     interventionDate: "2026-01-10",
     startTime: null,
@@ -216,6 +217,7 @@ describe("interventions router", () => {
             description: "Sostituito alimentatore",
             price: 120,
             paid: true,
+            toInvoice: true,
             createdAt: new Date("2026-01-10T10:00:00Z"),
         };
 
@@ -240,6 +242,7 @@ describe("interventions router", () => {
             expect(response.text).toContain("Completato");
             expect(response.text).toContain("Sostituito alimentatore");
             expect(response.text).toContain("Pagato");
+            expect(response.text).toContain("Da fatturare");
         });
 
         /** Senza filtri l'export scarica tutto: `status` e `type` tornano a "all". */
@@ -548,6 +551,25 @@ describe("interventions router", () => {
 
             expect(response.status).toBe(201);
             expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ paid: true }));
+        });
+
+        it("senza indicarlo l'intervento non è da fatturare", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            await request(buildApp()).post("/api/interventions").send(minimalBody);
+
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ toInvoice: false }));
+        });
+
+        it("crea un intervento da fatturare", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...minimalBody, toInvoice: true });
+
+            expect(response.status).toBe(201);
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ toInvoice: true }));
         });
 
         it("rifiuta un prezzo negativo", async () => {

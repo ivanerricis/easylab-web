@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import DatePickerField from "@/components/date-picker-field";
 import PaidStatusSelector from "@/components/paid-status-selector";
+import ToInvoiceSelector from "@/components/to-invoice-selector";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
     getInterventionValidationError,
@@ -51,6 +52,8 @@ export type EditInterventionSubmitValues = {
     price: number | null;
     /** A differenza dei report: solo pagato/non pagato, senza distinguere contanti/carta. */
     paid: boolean;
+    /** Indipendente dal pagamento: dice se va emessa fattura. Di default no. */
+    toInvoice: boolean;
     collaboratorId: number;
     interventionDate: string | null;
     startTime: string | null;
@@ -99,6 +102,7 @@ const EditInterventionDialog = ({
         note: "",
         price: "",
         paid: false,
+        toInvoice: false,
         collaboratorId: "",
         interventionDate: "",
         startTime: "",
@@ -143,6 +147,7 @@ const EditInterventionDialog = ({
                     note: intervention.note ?? "",
                     price: intervention.price != null ? String(intervention.price) : "",
                     paid: intervention.paid,
+                    toInvoice: intervention.toInvoice,
                     collaboratorId: String(intervention.collaboratorId),
                     interventionDate: intervention.interventionDate ?? "",
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
@@ -211,6 +216,7 @@ const EditInterventionDialog = ({
                 note: formValues.note.trim() || null,
                 price,
                 paid: formValues.paid,
+                toInvoice: formValues.toInvoice,
                 collaboratorId,
                 interventionDate: formValues.interventionDate,
                 startTime: isOnSite ? formValues.startTime || null : null,
@@ -402,6 +408,16 @@ const EditInterventionDialog = ({
                                         <PaidStatusSelector
                                             value={formValues.paid}
                                             onValueChange={(paid) => setFormValues((prev) => ({ ...prev, paid }))}
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-1">
+                                        <Label className="text-lg">Fatturazione</Label>
+                                        <ToInvoiceSelector
+                                            value={formValues.toInvoice}
+                                            onValueChange={(toInvoice) =>
+                                                setFormValues((prev) => ({ ...prev, toInvoice }))
+                                            }
                                         />
                                     </div>
 

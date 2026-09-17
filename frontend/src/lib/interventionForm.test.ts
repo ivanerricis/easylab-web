@@ -9,6 +9,7 @@ const shared = {
     note: "Richiamare lunedì",
     price: 80,
     paid: true,
+    toInvoice: false,
     collaboratorId: 40,
     interventionDate: "2026-09-10",
     startTime: "09:00",

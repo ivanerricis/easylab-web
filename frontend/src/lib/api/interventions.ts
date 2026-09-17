@@ -14,6 +14,8 @@ export type InterventionEntityDto = {
     price: number | null;
     /** A differenza dei report: solo pagato/non pagato, senza distinguere contanti/carta. */
     paid: boolean;
+    /** Indipendente da `paid`: dice se va emessa fattura, non se è stato incassato. */
+    toInvoice: boolean;
     status: InterventionStatus;
     interventionDate: string | null;
     startTime: string | null;
@@ -31,6 +33,7 @@ export type InterventionCreateInput = {
     note?: string | null;
     price?: number | null;
     paid?: boolean;
+    toInvoice?: boolean;
     status?: InterventionStatus;
     customerId: number;
     collaboratorId: number;

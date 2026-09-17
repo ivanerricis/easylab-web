@@ -278,6 +278,11 @@ export const interventionTable = pgTable(
          * l'intervento è stato pagato o no.
          */
         paid: boolean("paid").notNull().default(false),
+        /**
+         * Indipendente da `paid`: dice se per questo intervento va emessa fattura, non se è
+         * stato incassato. La gran parte del lavoro non si fattura, quindi il default è `false`.
+         */
+        toInvoice: boolean("to_invoice").notNull().default(false),
         status: varchar("status", { length: 20 }).notNull().default("programmato"),
         interventionDate: date("intervention_date"),
         startTime: time("start_time"),

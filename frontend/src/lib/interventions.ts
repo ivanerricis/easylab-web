@@ -133,6 +133,8 @@ export const formatInterventionTime = (value: string | null) => (value ? value.s
 
 export const formatPaidStatus = (value: boolean) => (value ? "Pagato" : "Non pagato");
 
+export const formatToInvoiceStatus = (value: boolean) => (value ? "Sì" : "No");
+
 export const getTodayDateString = () => {
     const now = new Date();
     const year = now.getFullYear();

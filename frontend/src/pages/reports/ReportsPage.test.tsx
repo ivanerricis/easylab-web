@@ -330,21 +330,21 @@ describe("ReportsPage", () => {
             "descending"
         );
 
-        await userEvent.click(within(table()).getByRole("button", { name: "Prezzo totale" }));
+        await userEvent.click(within(table()).getByRole("button", { name: "Cliente" }));
 
         await waitFor(() => {
-            expect(currentLocation().params).toEqual({ sort: "totalPrice:desc" });
+            expect(currentLocation().params).toEqual({ sort: "customer:asc" });
         });
         await waitFor(() => {
             expect(api.listReports).toHaveBeenLastCalledWith(
-                expect.objectContaining({ sortBy: "totalPrice", sortOrder: "desc", page: 1 })
+                expect.objectContaining({ sortBy: "customer", sortOrder: "asc", page: 1 })
             );
         });
-        expect(screen.getByRole("combobox", { name: "Ordina per" })).toHaveTextContent("Prezzo più alto");
+        expect(screen.getByRole("combobox", { name: "Ordina per" })).toHaveTextContent("Cliente (A-Z)");
 
-        await userEvent.click(within(table()).getByRole("button", { name: "Prezzo totale" }));
+        await userEvent.click(within(table()).getByRole("button", { name: "Cliente" }));
         await waitFor(() => {
-            expect(currentLocation().params).toEqual({ sort: "totalPrice:asc" });
+            expect(currentLocation().params).toEqual({ sort: "customer:desc" });
         });
 
         // Tornare all'ordinamento di default toglie il parametro.

@@ -68,8 +68,6 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "totalPrice",
         header: "Prezzo totale",
-        sortKey: "totalPrice",
-        defaultSortDirection: "desc",
         render: (row) => formatEuro(row.totalPrice),
     },
     {

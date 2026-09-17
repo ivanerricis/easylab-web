@@ -56,7 +56,21 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   database non può usare gli indici trigram e la scansione cresce con l'archivio. Soluzione
   provata come prototipo: una ricerca per tabella, ognuna sul suo indice, unite con `UNION` degli
   id. Misure del 2026-09-07 sul database di sviluppo: 319 → 35 ms a 20.000 report, 2893 → 558 ms
-  a 100.000; una ricerca senza risultati da 359 a 3,5 ms.
+  a 100.000; una ricerca senza risultati da 359 a 3,5 ms. Riconfermato il 2026-09-17 sullo stesso
+  database (309-475 ms per una ricerca con risultati, 381-430 ms per una senza): la ricerca
+  globale (Ctrl+K, 2026-09-16) chiama la stessa `listReports`/`listInterventions` a ogni
+  tastiera digitata (da due lettere in su) da qualunque pagina, non solo dalle liste — lo stesso
+  costo, prima confinato alle pagine Report/Interventi, ora gira ovunque nell'app. Non cambia la
+  soluzione, ma alza la priorità.
+- Ordinare i report per "Cliente" costa circa 100 ms a pagina (20.000 report), contro i 15-25 ms
+  della paginazione semplice o dell'ordine per data. La causa è la stessa famiglia del punto
+  sopra: l'espressione di ordinamento (`concat_ws` su nome e cognome del cliente) nasce dal join
+  col cliente e non ha un indice, quindi Postgres deve materializzare e ordinare tutte le righe
+  che passano i filtri prima di applicare `LIMIT`/`OFFSET` — il costo cresce con l'archivio, non
+  con la pagina. Misurato il 2026-09-17 (`backend/src/db/queries/report.ts`, `customerSortExpr`).
+  Nessuna soluzione ancora valutata. **L'ordinamento per "Totale" aveva lo stesso costo ed è
+  stato tolto lo stesso giorno** (CHANGELOG), non risolto: la colonna resta in tabella, solo non
+  più cliccabile per ordinare.
 - I dialoghi di creazione (report, intervento) caricano `listDevices()` e `listIssues()` interi
   all'apertura. Oggi sono cataloghi piccoli (pochi KB); il tetto delle 5000 righe li
   troncherebbe senza avviso se crescessero. Il cliente invece è già cercato sul server

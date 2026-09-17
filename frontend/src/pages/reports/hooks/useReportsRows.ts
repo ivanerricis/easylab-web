@@ -24,7 +24,7 @@ export const useReportsRows = ({
     currentPage,
     pageSize,
 }: UseReportsRowsParams) => {
-    const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer" | "totalPrice", "asc" | "desc"];
+    const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer", "asc" | "desc"];
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
         usePaginatedRows<ReportDto>({
             fetchRows: (signal) =>

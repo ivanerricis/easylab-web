@@ -11,6 +11,32 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Tolto l'ordinamento dei report per "Totale"
+
+**Il problema.** Un giro di misure sul database di sviluppo (20.000 report) durante un
+controllo prestazioni ha trovato che ordinare la lista report per "Cliente" o per "Totale"
+costa circa 100 ms a pagina, contro 15-25 ms per la paginazione semplice o l'ordine per data:
+l'espressione di ordinamento nasce da un join (nome del cliente, o prezzo interno + prezzo del
+tecnico esterno) e non ha un indice, quindi Postgres deve ordinare tutte le righe filtrate
+prima di prendere la pagina — il costo cresce con l'archivio.
+
+**La scelta.** Invece di indicizzare entrambi, si toglie l'ordinamento per "Totale": è il meno
+usato dei due (il cliente si cerca per nome, il totale serve solo a un controllo occasionale) e
+la colonna resta comunque visibile in tabella. L'ordinamento per "Cliente" rimane, e resta in
+backlog (`docs/BACKLOG.md`) insieme al costo residuo.
+
+**Cosa.** Tolto `sortKey`/`defaultSortDirection` dalla colonna "Prezzo totale", tolta l'opzione
+dal menu "Ordina per", tolto `"totalPrice"` dai valori di `sortBy` accettati dalla rotta
+(lista e export CSV, che condividono lo schema) e dal ramo di ordinamento della query. La
+colonna e il suo valore restano invariati, solo non più cliccabile per ordinare.
+
+**File.** `backend/src/routes/reports.ts`, `backend/src/db/queries/report.ts`,
+`frontend/src/pages/reports/components/report-columns.tsx`,
+`frontend/src/pages/reports/components/types.ts`, `frontend/src/lib/api/reports.ts`,
+`frontend/src/pages/reports/hooks/useReportsRows.ts`, `ReportsPage.test.tsx`.
+
+---
+
 ## 2026-09-17 — "Elimina" mancante nelle schede di collaboratore e tecnico
 
 **Il problema.** Report, intervento e cliente hanno appena avuto "Elimina" nella loro scheda

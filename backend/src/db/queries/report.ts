@@ -14,7 +14,7 @@ import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { parseIdSearch } from "./search";
 import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
 
-type ReportSortBy = "createdAt" | "customer" | "totalPrice";
+type ReportSortBy = "createdAt" | "customer";
 
 type ListReportsParams = {
     page?: number;
@@ -109,13 +109,8 @@ export const listReports = async ({
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const customerSortExpr = sql<string>`coalesce(nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), ''), '-')`;
-    const totalPriceSortExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
-    const sortColumn =
-        sortBy === "customer"
-            ? customerSortExpr
-            : sortBy === "totalPrice"
-              ? totalPriceSortExpr
-              : reportTable.created_at;
+    const totalPriceExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
+    const sortColumn = sortBy === "customer" ? customerSortExpr : reportTable.created_at;
     const orderByClause = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
     const baseQuery = db
@@ -143,7 +138,7 @@ export const listReports = async ({
             technician: sql<string>`coalesce(nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), ''), '-')`,
             internalPrice: reportTable.price,
             technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
-            totalPrice: sql<number>`${totalPriceSortExpr}::int`,
+            totalPrice: sql<number>`${totalPriceExpr}::int`,
             closed: reportTable.closed,
             createdAt: reportTable.created_at,
             updatedAt: reportTable.updated_at,

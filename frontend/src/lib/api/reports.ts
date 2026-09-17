@@ -55,7 +55,7 @@ export type ReportCreateInput = {
     price?: number;
 };
 
-export type ReportSortBy = "createdAt" | "customer" | "totalPrice";
+export type ReportSortBy = "createdAt" | "customer";
 
 export type ListReportsParams = {
     page?: number;

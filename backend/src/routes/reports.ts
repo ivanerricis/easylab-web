@@ -25,7 +25,7 @@ const reportPaymentMethods = ["non_paid", "cash", "card"] as const;
 type ReportPaymentMethod = (typeof reportPaymentMethods)[number];
 const paidPaymentMethods = new Set<ReportPaymentMethod>(["cash", "card"]);
 
-const reportSortFields = ["createdAt", "customer", "totalPrice"] as const;
+const reportSortFields = ["createdAt", "customer"] as const;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 // Estende lo schema di lista condiviso invece di ridichiararne i campi: `page`, `pageSize`

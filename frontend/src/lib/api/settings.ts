@@ -125,8 +125,10 @@ export const restoreBackupFromUpload = async (
 };
 
 /** Chiave che cifra l'archivio di backup: va esportata e conservata altrove, perché non
- * viene mai inclusa nell'archivio stesso (vedi backend/src/services/backupKey.ts). */
-export const getBackupKey = async () => (await api.get<{ key: string }>("/settings/backup/key")).data;
+ * viene mai inclusa nell'archivio stesso (vedi backend/src/services/backupKey.ts). Richiede
+ * di nuovo la password, come il ripristino: vedi backend/src/routes/settings.ts. */
+export const getBackupKey = async (password: string) =>
+    (await api.post<{ key: string }>("/settings/backup/key", { password })).data;
 
 export type LogoStatusDto = {
     hasCustomLogo: boolean;

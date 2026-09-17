@@ -71,7 +71,12 @@ export const userActionLogger = (request: Request, _response: Response, next: Ne
     }
 
     const response = _response;
-    const ip = getClientIp(request);
+    // Sanificato come `user` ed `error` qui sotto: oggi arriva solo da `CF-Connecting-IP`
+    // (che Cloudflare sovrascrive sempre, vedi clientIp.ts) o dal socket TCP, quindi non
+    // può contenere `|` o a-capo — ma se in futuro cambiasse la catena di proxy, questo
+    // campo non deve restare l'unico dei quattro senza la stessa protezione.
+    const rawIp = getClientIp(request);
+    const ip = rawIp.replace(/\|/g, "/").replace(/\s+/g, " ").trim() || "unknown";
     const action = specificLabel ?? formatAction(request.method, normalizedPath);
     response.once("finish", () => {
         const now = new Date();

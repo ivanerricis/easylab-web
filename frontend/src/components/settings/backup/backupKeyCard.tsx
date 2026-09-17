@@ -24,13 +24,8 @@ const BackupKeyCard = ({ panel }: { panel: BackupPanel }) => (
             />
         ) : (
             <div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    disabled={panel.isLoadingBackupKey}
-                    onClick={() => void panel.handleRevealBackupKey()}
-                >
-                    {panel.isLoadingBackupKey ? "Caricamento..." : "Mostra ed esporta la chiave"}
+                <Button type="button" variant="outline" onClick={panel.openBackupKeyDialog}>
+                    Mostra ed esporta la chiave
                 </Button>
             </div>
         )}

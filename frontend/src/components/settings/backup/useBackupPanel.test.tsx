@@ -474,15 +474,38 @@ describe("useBackupPanel: chiave di backup", () => {
         expect(api.getBackupKey).not.toHaveBeenCalled();
     });
 
-    it("la mostra dopo averla richiesta, e non la richiede una seconda volta", async () => {
-        api.getBackupKey.mockResolvedValue({ key: "ab".repeat(32) });
+    it("chiede di nuovo la password prima di mostrarla", async () => {
         const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+        });
+
+        expect(result.current.isBackupKeyDialogOpen).toBe(true);
 
         await act(async () => {
             await result.current.handleRevealBackupKey();
         });
 
+        expect(api.getBackupKey).not.toHaveBeenCalled();
+    });
+
+    it("la mostra dopo aver confermato la password, e non la richiede una seconda volta", async () => {
+        api.getBackupKey.mockResolvedValue({ key: "ab".repeat(32) });
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+            result.current.setBackupKeyPassword("segreta");
+        });
+
+        await act(async () => {
+            await result.current.handleRevealBackupKey();
+        });
+
+        expect(api.getBackupKey).toHaveBeenCalledWith("segreta");
         expect(result.current.backupKey).toBe("ab".repeat(32));
+        expect(result.current.isBackupKeyDialogOpen).toBe(false);
 
         await act(async () => {
             await result.current.handleRevealBackupKey();
@@ -491,15 +514,21 @@ describe("useBackupPanel: chiave di backup", () => {
         expect(api.getBackupKey).toHaveBeenCalledTimes(1);
     });
 
-    it("segnala l'errore se il recupero della chiave fallisce", async () => {
-        api.getBackupKey.mockRejectedValue(new Error("Accesso negato"));
+    it("segnala l'errore se la password è sbagliata, senza chiudere il dialogo", async () => {
+        api.getBackupKey.mockRejectedValue(new Error("Password errata"));
         const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+            result.current.setBackupKeyPassword("sbagliata");
+        });
 
         await act(async () => {
             await result.current.handleRevealBackupKey();
         });
 
-        expect(toast.error).toHaveBeenCalledWith("Accesso negato");
+        expect(toast.error).toHaveBeenCalledWith("Password errata");
         expect(result.current.backupKey).toBeNull();
+        expect(result.current.isBackupKeyDialogOpen).toBe(true);
     });
 });

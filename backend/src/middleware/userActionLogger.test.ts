@@ -12,6 +12,7 @@ vi.mock("../services/logManager", () => ({
 }));
 
 import { appendUserActionLog } from "../services/logManager";
+import { getClientIp } from "./clientIp";
 import { userActionLogger } from "./userActionLogger";
 
 const createResponse = (statusCode: number, locals: Record<string, unknown> = {}) => {
@@ -91,6 +92,18 @@ describe("userActionLogger", () => {
 
         const line = vi.mocked(appendUserActionLog).mock.calls[0][0];
         expect(line).toContain("user=mario / rossi admin | action=");
+    });
+
+    it("ripulisce l'IP da pipe e a-capo prima di scriverlo nel log", async () => {
+        vi.mocked(getClientIp).mockReturnValueOnce("1.2.3.4 | rossi\nadmin");
+        const res = createResponse(200);
+
+        userActionLogger(createRequest("POST", "/api/devices", { username: "mario" }), res, vi.fn() as NextFunction);
+        res.emit("finish");
+        await flushMicrotasks();
+
+        const line = vi.mocked(appendUserActionLog).mock.calls[0][0];
+        expect(line).toContain("ip=1.2.3.4 / rossi admin | user=");
     });
 
     it("non registra le GET senza un'etichetta dedicata", () => {

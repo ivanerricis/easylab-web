@@ -2,6 +2,7 @@ import { SettingsSection } from "@/components/settings/settingsUi";
 import BackupConfigurationCard from "./backup/backupConfigurationCard";
 import BackupDumpsCard from "./backup/backupDumpsCard";
 import BackupKeyCard from "./backup/backupKeyCard";
+import BackupKeyDialog from "./backup/backupKeyDialog";
 import BackupRestoreCard from "./backup/backupRestoreCard";
 import BackupRestoreDialog from "./backup/backupRestoreDialog";
 import BackupStatusCard from "./backup/backupStatusCard";
@@ -24,6 +25,7 @@ const BackupSettingsPanel = () => {
             <BackupDumpsCard panel={panel} />
             <BackupRestoreCard panel={panel} />
             <BackupRestoreDialog panel={panel} />
+            <BackupKeyDialog panel={panel} />
         </SettingsSection>
     );
 };

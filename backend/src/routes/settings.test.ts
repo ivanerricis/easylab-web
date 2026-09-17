@@ -61,6 +61,7 @@ import settingsRouter from "./settings";
 import { errorHandler } from "../middleware/errorHandler";
 import { ApiError } from "../services/apiError";
 import {
+    exportBackupKey,
     getBackupDumpPath,
     refreshBackupSchedule,
     restoreBackupFromExisting,
@@ -123,7 +124,7 @@ describe("settings router: permessi", () => {
     it.each([
         ["get", "/api/settings/backup/download/db-backup-20260101-120000.tar.gz"],
         ["get", "/api/settings/backup/list"],
-        ["get", "/api/settings/backup/key"],
+        ["post", "/api/settings/backup/key"],
         ["get", "/api/settings/logs"],
         ["get", "/api/settings/logs/retention"],
         ["put", "/api/settings/logs/retention"],
@@ -216,12 +217,35 @@ describe("settings router: chiave di backup", () => {
     });
 
     // Non è un segreto dell'app come la password SMB: l'amministratore deve poterla
-    // rileggere per esportarla e conservarla altrove (vedi services/backupKey.ts).
-    it("l'amministratore può esportare la chiave di backup", async () => {
-        const response = await request(buildApp(true)).get("/api/settings/backup/key");
+    // rileggere per esportarla e conservarla altrove (vedi services/backupKey.ts). Ma è
+    // la chiave che rende leggibile qualsiasi backup rubato, quindi chiede di nuovo la
+    // password come il ripristino.
+    it("l'amministratore può esportare la chiave di backup dopo aver confermato la password", async () => {
+        const response = await request(buildApp(true))
+            .post("/api/settings/backup/key")
+            .send({ password: "segreta" });
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ key: "ab".repeat(32) });
+        expect(assertOwnPassword).toHaveBeenCalledWith(1, "segreta");
+    });
+
+    it("con la password sbagliata non esporta la chiave", async () => {
+        vi.mocked(assertOwnPassword).mockRejectedValueOnce(new ApiError("La password non è corretta", 400));
+
+        const response = await request(buildApp(true))
+            .post("/api/settings/backup/key")
+            .send({ password: "sbagliata" });
+
+        expect(response.status).toBe(400);
+        expect(exportBackupKey).not.toHaveBeenCalled();
+    });
+
+    it("senza password risponde 400", async () => {
+        const response = await request(buildApp(true)).post("/api/settings/backup/key").send({});
+
+        expect(response.status).toBe(400);
+        expect(assertOwnPassword).not.toHaveBeenCalled();
     });
 
     it("rifiuta una chiave incollata di lunghezza sbagliata nel ripristino", async () => {

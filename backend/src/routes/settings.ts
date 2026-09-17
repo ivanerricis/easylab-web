@@ -91,6 +91,12 @@ const backupRestoreSchema = z
     })
     .strict();
 
+const backupKeyExportSchema = z
+    .object({
+        password: restorePasswordSchema,
+    })
+    .strict();
+
 const smbTestSchema = z
     .object({
         host: z.string().trim().min(1).max(255),
@@ -286,8 +292,11 @@ settingsRouter.post("/backup/smb/test", validate({ body: smbTestSchema }), async
 
 // Espone la chiave che cifra l'archivio di backup, cosi l'amministratore puo copiarla e
 // conservarla altrove: e l'unico modo per ripristinare un backup se questo server viene
-// perso insieme al suo disco (vedi services/backupKey.ts).
-settingsRouter.get("/backup/key", async (_req, res) => {
+// perso insieme al suo disco (vedi services/backupKey.ts). Richiede di nuovo la password,
+// come il ripristino: e la chiave che rende leggibile qualsiasi backup rubato dal NAS, quindi
+// una sessione admin rubata non deve bastare a esportarla.
+settingsRouter.post("/backup/key", validate({ body: backupKeyExportSchema }), async (req, res) => {
+    await assertOwnPassword(req.user!.id, req.body.password);
     res.json({ key: await exportBackupKey() });
 });
 

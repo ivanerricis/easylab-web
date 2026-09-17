@@ -11,6 +11,41 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — La chiave di cifratura dei backup si esportava senza richiedere di nuovo la password
+
+**Il problema.** `GET /api/settings/backup/key` restituiva la chiave a qualsiasi sessione
+admin autenticata, senza altra verifica — a differenza del ripristino di un backup
+(`POST /api/settings/backup/restore`), che richiede sempre `assertOwnPassword` prima di
+procedere. La chiave rende leggibile qualsiasi backup rubato dal NAS o dal disco del server:
+con una sessione admin rubata (cookie sottratto, dispositivo lasciato sbloccato) bastava
+aprire quella pagina per portarsela via, mentre il ripristino no.
+
+**Cosa.** La rotta è diventata `POST /api/settings/backup/key` con `{ password }` nel corpo,
+validata con lo stesso schema del ripristino e verificata con `assertOwnPassword` prima di
+chiamare `exportBackupKey()` (`backend/src/routes/settings.ts`). Il frontend apre ora un
+dialog "Conferma password" (`frontend/src/components/settings/backup/backupKeyDialog.tsx`)
+prima di rivelare la chiave, con lo stesso pattern del dialog di conferma ripristino.
+Verificato con Playwright (sessione admin reale) a 1280px e 480px: pulsante di conferma
+disabilitato a campo vuoto, toast "La password non è corretta" con password sbagliata,
+nessun overflow su mobile.
+
+---
+
+## 2026-09-17 — Il campo IP del log azioni non era sanificato come gli altri campi sulla stessa riga
+
+**Il problema.** In `userActionLogger.ts` i campi `user` ed `error` della riga di log vengono
+sanificati (via il carattere `|`, che è il separatore dei campi, e le sequenze di a-capo) prima
+di essere scritti — un residuo del fix precedente sulla falsificabilità di `X-Forwarded-For`. Il
+campo `ip` no: restava l'unico dei tre senza la stessa protezione, un'incoerenza difensiva anche
+se oggi non exploitabile (l'IP arriva solo da `CF-Connecting-IP`, sovrascritto da Cloudflare
+all'edge, o dal socket TCP — mai testo scelto da un chiamante).
+
+**Cosa.** `ip` passa dalla stessa pulizia di `user`: `|` sostituito, spazi e a-capo collassati.
+Aggiunto un test analogo a quello già esistente per lo username sporco
+(`userActionLogger.test.ts`).
+
+---
+
 ## 2026-09-17 — L'ordine dei pulsanti nella conferma "Modifiche non salvate" si invertiva su mobile
 
 **Il problema.** Il footer standard dei dialoghi (`DialogFooter`) usa `flex-col-reverse` sotto

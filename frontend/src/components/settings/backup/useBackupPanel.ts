@@ -87,6 +87,8 @@ export const useBackupPanel = () => {
     const [outputDir, setOutputDir] = useState("backups");
     const [backupKey, setBackupKey] = useState<string | null>(null);
     const [isLoadingBackupKey, setIsLoadingBackupKey] = useState(false);
+    const [isBackupKeyDialogOpen, setIsBackupKeyDialogOpen] = useState(false);
+    const [backupKeyPassword, setBackupKeyPassword] = useState("");
 
     const isDirty = isSettingsFormDirty(formValues, savedValues, ["smbPassword"]);
 
@@ -354,15 +356,35 @@ export const useBackupPanel = () => {
         setRestorePassword("");
     };
 
+    const openBackupKeyDialog = () => {
+        if (backupKey) {
+            return;
+        }
+
+        setBackupKeyPassword("");
+        setIsBackupKeyDialogOpen(true);
+    };
+
+    const closeBackupKeyDialog = () => {
+        if (isLoadingBackupKey) {
+            return;
+        }
+
+        setIsBackupKeyDialogOpen(false);
+        setBackupKeyPassword("");
+    };
+
     const handleRevealBackupKey = async () => {
-        if (isLoadingBackupKey || backupKey) {
+        if (isLoadingBackupKey || backupKey || !backupKeyPassword) {
             return;
         }
 
         try {
             setIsLoadingBackupKey(true);
-            const result = await getBackupKey();
+            const result = await getBackupKey(backupKeyPassword);
             setBackupKey(result.key);
+            setIsBackupKeyDialogOpen(false);
+            setBackupKeyPassword("");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile recuperare la chiave di backup"));
         } finally {
@@ -478,6 +500,9 @@ export const useBackupPanel = () => {
         setRestorePassword,
         backupKey,
         isLoadingBackupKey,
+        isBackupKeyDialogOpen,
+        backupKeyPassword,
+        setBackupKeyPassword,
         loadDumpFiles,
         handleSave,
         handleTestSmbConnection,
@@ -487,6 +512,8 @@ export const useBackupPanel = () => {
         openRestoreConfirm,
         closeRestoreConfirm,
         handleConfirmRestore,
+        openBackupKeyDialog,
+        closeBackupKeyDialog,
         handleRevealBackupKey,
     };
 };

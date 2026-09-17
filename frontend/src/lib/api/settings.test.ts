@@ -79,10 +79,10 @@ describe("api impostazioni", () => {
     });
 
     it("esporta la chiave di backup", async () => {
-        const get = vi.spyOn(api, "get").mockResolvedValue({ data: { key: "ab".repeat(32) } });
+        const post = vi.spyOn(api, "post").mockResolvedValue({ data: { key: "ab".repeat(32) } });
 
-        await expect(getBackupKey()).resolves.toEqual({ key: "ab".repeat(32) });
-        expect(get).toHaveBeenCalledWith("/settings/backup/key");
+        await expect(getBackupKey("segreta")).resolves.toEqual({ key: "ab".repeat(32) });
+        expect(post).toHaveBeenCalledWith("/settings/backup/key", { password: "segreta" });
     });
 
     it("carica il logo nel campo 'logo'", async () => {

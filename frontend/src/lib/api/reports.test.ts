@@ -52,7 +52,7 @@ describe("api report", () => {
             collaboratorId: 4,
             customerId: 5,
             technicianId: 6,
-            sortBy: "totalPrice",
+            sortBy: "customer",
             sortOrder: "desc",
         });
 
@@ -68,7 +68,7 @@ describe("api report", () => {
                 collaboratorId: 4,
                 customerId: 5,
                 technicianId: 6,
-                sortBy: "totalPrice",
+                sortBy: "customer",
                 sortOrder: "desc",
             },
             signal: undefined,

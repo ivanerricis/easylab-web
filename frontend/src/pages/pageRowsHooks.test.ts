@@ -99,7 +99,7 @@ describe("hook delle righe delle pagine", () => {
             useReportsRows({
                 searchText: "",
                 visibilityFilter: "open",
-                sortOption: "totalPrice:asc",
+                sortOption: "customer:asc",
                 currentPage: 1,
                 pageSize: 10,
             })
@@ -109,7 +109,7 @@ describe("hook delle righe delle pagine", () => {
             expect(result.current.reportRows).toHaveLength(2);
         });
         expect(listReports).toHaveBeenCalledWith(
-            expect.objectContaining({ visibility: "open", sortBy: "totalPrice", sortOrder: "asc" })
+            expect.objectContaining({ visibility: "open", sortBy: "customer", sortOrder: "asc" })
         );
 
         act(() => {

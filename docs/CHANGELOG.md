@@ -11,6 +11,41 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Dipendenze: aggiornamenti maggiori (vitest 5, nodemailer 10, plugin React 6)
+
+**Perché applicati a mano.** Le quattro PR di Dependabot (#6, #7, #9, #10) toccavano gli stessi
+lockfile, quindi unirle una dopo l'altra da GitHub avrebbe richiesto di aspettare ogni volta il
+rebase. In più ogni merge fatto dal sito lascia in cima un commit che l'aggiornamento del server
+rifiuta (voce qui sotto). Le stesse versioni sono state installate in locale e provate qui.
+Dependabot chiude da solo le PR superate.
+
+**Cosa, e come è stato verificato.**
+- **nodemailer 9 → 10** (backend, runtime). L'unica modifica incompatibile dichiarata è Node 20 o
+  più, e noi usiamo il 24. Il rischio vero era un altro: la 10 è riscritta in TypeScript con
+  build ESM e CommonJS, e il backend compilato la importa come export predefinito
+  (`nodemailer_1.default`). Typecheck e test restano verdi comunque, perché l'SMTP nei test è
+  simulato. Quindi l'invio è stato provato davvero, con un server SMTP locale (`smtp-server`)
+  con STARTTLS obbligatorio e autenticazione:
+  - `testEmailConnection` compilato ha inviato;
+  - un messaggio con PDF allegato, logo incorporato (`cid`) e oggetto accentato è arrivato
+    intatto;
+  - una password sbagliata dà `EmailManagerError` 502;
+  - un certificato non fidato viene ancora rifiutato (la verifica su cui conta il commento di
+    `buildTransporter`).
+- **vitest 4 → 5** (backend e frontend, solo sviluppo). Suite unitarie, test sul database, typecheck
+  e build verdi, senza modifiche ai test.
+- **`@vitejs/plugin-react` 5 → 6** (frontend, solo build). Toglie le opzioni Babel, che non usiamo,
+  e richiede Vite 8, che abbiamo. In locale npm si fermava su una dipendenza opzionale (Babel 8,
+  tramite `@rolldown/plugin-babel`) che non installiamo: il lockfile è quello di Dependabot, con
+  vitest aggiunto sopra e verificato con `npm ci`.
+- `vite.config.ts` usa `import.meta.dirname` al posto di `__dirname`. Vite 8.3 avvisava che il
+  futuro caricatore della configurazione non accetterà più `__dirname`.
+
+**File.** `backend/package.json`, `backend/package-lock.json`, `frontend/package.json`,
+`frontend/package-lock.json`, `frontend/vite.config.ts`.
+
+---
+
 ## 2026-09-17 — Dipendenze: Dependabot per gruppi di minori, primi aggiornamenti unificati
 
 **Il problema.** Le due PR di Dependabot (frontend, backend) mettevano tutti gli aggiornamenti in
@@ -22,9 +57,9 @@ faceva fallire l'intera PR, e con lui restavano fermi anche decine di aggiorname
   per PR. Sono esclusi i maggiori di `typescript` (bloccato a monte) e di `@types/node` (deve
   seguire il Node 24 dei Dockerfile).
 - Unite le PR dei minori: backend #5 (fra gli altri `pg`, `zod`, `multer`) e frontend #8 (fra gli
-  altri React 19.3, `axios`, `vite` 8.3), più `actions/setup-python` 7 (#1). Restano aperte, da
-  valutare una per una, vitest 5 (backend e frontend), `@vitejs/plugin-react` 6 e nodemailer 10.
-  Per quest'ultima serve una prova d'invio vera, perché i test simulano l'SMTP.
+  altri React 19.3, `axios`, `vite` 8.3), più `actions/setup-python` 7 (#1). I maggiori (vitest 5,
+  `@vitejs/plugin-react` 6, nodemailer 10) sono stati applicati lo stesso giorno, nella voce qui
+  sopra.
 - `entityDialogs.test.tsx` ha lo stesso margine di 20 secondi degli altri test con dialoghi.
   Con la suite intera il modulo del cliente superava i 5 secondi, e il test scaduto faceva
   fallire quello dopo.

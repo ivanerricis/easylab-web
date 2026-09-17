@@ -20,6 +20,10 @@ import { renderWithProviders } from "@/test/render";
 
 const save = () => userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
+// Il modulo del cliente si compila campo per campo: con tutta la suite in parallelo può
+// superare i 5 secondi, e un test scaduto continua a scrivere nel DOM di quello dopo.
+vi.setConfig({ testTimeout: 20000 });
+
 beforeEach(() => {
     vi.clearAllMocks();
 });

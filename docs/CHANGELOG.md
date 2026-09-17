@@ -11,6 +11,34 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Dipendenze: Dependabot per gruppi di minori, primi aggiornamenti unificati
+
+**Il problema.** Le due PR di Dependabot (frontend, backend) mettevano tutti gli aggiornamenti in
+un gruppo solo, maggiori compresi. TypeScript 7, che `typescript-eslint` non supporta ancora,
+faceva fallire l'intera PR, e con lui restavano fermi anche decine di aggiornamenti innocui.
+
+**Cosa.**
+- `.github/dependabot.yml`: i gruppi prendono solo minori e patch, mentre i maggiori arrivano uno
+  per PR. Sono esclusi i maggiori di `typescript` (bloccato a monte) e di `@types/node` (deve
+  seguire il Node 24 dei Dockerfile).
+- Unite le PR dei minori: backend #5 (fra gli altri `pg`, `zod`, `multer`) e frontend #8 (fra gli
+  altri React 19.3, `axios`, `vite` 8.3), più `actions/setup-python` 7 (#1). Restano aperte, da
+  valutare una per una, vitest 5 (backend e frontend), `@vitejs/plugin-react` 6 e nodemailer 10.
+  Per quest'ultima serve una prova d'invio vera, perché i test simulano l'SMTP.
+- `entityDialogs.test.tsx` ha lo stesso margine di 20 secondi degli altri test con dialoghi.
+  Con la suite intera il modulo del cliente superava i 5 secondi, e il test scaduto faceva
+  fallire quello dopo.
+
+**Da ricordare.** Un merge fatto dal sito di GitHub produce un commit firmato dalla chiave di
+GitHub, e l'aggiornamento da Impostazioni lo rifiuta ("non ha una firma valida", vedi
+DEPLOY.md, "Firma dei commit"). È successo con questi merge. Il rimedio è un commit firmato dal
+computer abituale sopra di loro, come questo. Dopo ogni merge da GitHub va fatto subito.
+
+**File.** `.github/dependabot.yml`, `backend/package-lock.json`, `frontend/package.json`,
+`frontend/package-lock.json`, `frontend/src/components/dialogs/create/entityDialogs.test.tsx`.
+
+---
+
 ## 2026-09-17 — Ricerca libera di report e interventi: una query per tabella
 
 **Il problema.** La ricerca era un'unica condizione `OR` sulle colonne di cinque tabelle unite

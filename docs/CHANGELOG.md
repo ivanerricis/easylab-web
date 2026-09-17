@@ -11,6 +11,21 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — "Elimina" mancante nelle schede di collaboratore e tecnico
+
+**Il problema.** Report, intervento e cliente hanno appena avuto "Elimina" nella loro scheda
+(voce precedente). Un secondo giro sulle altre pagine ha trovato la stessa cosa mancante per
+collaboratore e tecnico: le API `deleteCollaborator`/`deleteTechnician` esistevano già, usate
+identiche nei rispettivi elenchi, ma non erano raggiungibili dalla scheda.
+
+**Cosa.** Stesso `DetailDeleteButton` delle altre tre schede: conferma ELIMINA, poi torna
+all'elenco sostituendo la voce della cronologia.
+
+**File.** `frontend/src/pages/collaborators/CollaboratorPage.tsx`,
+`frontend/src/pages/technicians/TechnicianPage.tsx`, `peoplePages.test.tsx`.
+
+---
+
 ## 2026-09-17 — Date "solo giorno" dei PDF un giorno indietro
 
 **Il problema.** Nei PDF la data dell'intervento e l'intervallo dei resoconti uscivano un giorno

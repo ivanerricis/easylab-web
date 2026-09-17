@@ -7,6 +7,7 @@ import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { entityPaths } from "@/lib/entityPaths";
 import RefreshButton from "@/components/refresh-button";
+import DetailDeleteButton from "@/components/detail-delete-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CreateCollaboratorDialog, {
@@ -23,6 +24,7 @@ import {
     getApiErrorMessage,
     getApiErrorStatus,
     getCollaborator,
+    deleteCollaborator,
     getCollaboratorInterventionsPrintUrl,
     getCollaboratorReportsPrintUrl,
     listInterventions,
@@ -290,6 +292,16 @@ const CollaboratorPage = () => {
                         </TooltipTrigger>
                         <TooltipContent>{printTitle}</TooltipContent>
                     </Tooltip>
+
+                    <DetailDeleteButton
+                        label="Elimina collaboratore"
+                        title="Elimina collaboratore"
+                        description={`Sei sicuro di voler eliminare il collaboratore ${collaboratorName}?`}
+                        onDelete={() => deleteCollaborator(collaboratorId)}
+                        successMessage="Collaboratore eliminato con successo"
+                        errorMessage="Impossibile eliminare il collaboratore"
+                        redirectTo="/collaborators"
+                    />
                 </div>
             </div>
 

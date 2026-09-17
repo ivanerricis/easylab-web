@@ -22,6 +22,8 @@ const api = vi.hoisted(() => ({
     deleteReportTechnician: vi.fn(),
     updateCollaborator: vi.fn(),
     updateTechnician: vi.fn(),
+    deleteCollaborator: vi.fn(),
+    deleteTechnician: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -50,8 +52,20 @@ vi.mock("@/lib/utils", async () => {
 });
 
 const toastError = vi.fn();
+const toastSuccess = vi.fn();
 
-vi.mock("sonner", () => ({ toast: { error: (...args: unknown[]) => toastError(...args), success: vi.fn() } }));
+vi.mock("sonner", () => ({
+    toast: {
+        error: (...args: unknown[]) => toastError(...args),
+        success: (...args: unknown[]) => toastSuccess(...args),
+    },
+}));
+
+const confirmDelete = async () => {
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+};
 
 let editValues: unknown;
 
@@ -191,6 +205,22 @@ describe("CollaboratorPage", () => {
         expect(openPrintWindow).toHaveBeenLastCalledWith("interventions:40");
     });
 
+    it("elimina il collaboratore e torna all'elenco", async () => {
+        api.deleteCollaborator.mockResolvedValue({});
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina collaboratore" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent("Luca Bianchi");
+        await confirmDelete();
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith("/collaborators", { replace: true });
+        });
+        expect(api.deleteCollaborator).toHaveBeenCalledWith(40);
+        expect(toastSuccess).toHaveBeenCalledWith("Collaboratore eliminato con successo");
+    });
+
     it("mostra 'non trovato' con un id non valido", async () => {
         renderWithProviders(<CollaboratorPage />, { route: "/collaborators/x", path: "/collaborators/:id" });
 
@@ -263,6 +293,21 @@ describe("TechnicianPage", () => {
         await waitFor(() => {
             expect(api.listReports).toHaveBeenCalledTimes(2);
         });
+    });
+
+    it("elimina il tecnico e torna all'elenco", async () => {
+        api.deleteTechnician.mockResolvedValue({});
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Elimina tecnico" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent("Paolo Neri");
+        await confirmDelete();
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith("/technicians", { replace: true });
+        });
+        expect(api.deleteTechnician).toHaveBeenCalledWith(50);
     });
 });
 

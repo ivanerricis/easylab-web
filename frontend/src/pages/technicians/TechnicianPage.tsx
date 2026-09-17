@@ -3,6 +3,7 @@ import DetailItem from "@/components/detail-item";
 import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
+import DetailDeleteButton from "@/components/detail-delete-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ import TablePagination from "@/components/table-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     createReportTechnician,
+    deleteTechnician,
     getApiErrorMessage,
     getApiErrorStatus,
     getTechnician,
@@ -218,6 +220,16 @@ const TechnicianPage = () => {
                         </TooltipTrigger>
                         <TooltipContent>Modifica tecnico</TooltipContent>
                     </Tooltip>
+
+                    <DetailDeleteButton
+                        label="Elimina tecnico"
+                        title="Elimina tecnico"
+                        description={`Sei sicuro di voler eliminare il tecnico ${technicianName}?`}
+                        onDelete={() => deleteTechnician(technicianId)}
+                        successMessage="Tecnico eliminato con successo"
+                        errorMessage="Impossibile eliminare il tecnico"
+                        redirectTo="/technicians"
+                    />
                 </div>
             </div>
 

@@ -187,7 +187,12 @@ const CustomDialog = ({
                                 Se chiudi adesso, quello che hai inserito in questa finestra andrà perso.
                             </DialogDescription>
                         </DialogHeader>
-                        <DialogFooter className="mt-2">
+                        {/* `flex-col` invece del `flex-col-reverse` di default: sotto `sm` il
+                            footer normale mette in cima il pulsante che sta per ultimo nel
+                            markup (di solito il submit, l'azione consigliata). Qui invece è il
+                            primo, quello sicuro, a essere l'azione consigliata — lasciando la
+                            reverse finiva in cima "Chiudi senza salvare". */}
+                        <DialogFooter className="mt-2 flex-col sm:flex-row">
                             <Button
                                 type="button"
                                 size="lg"

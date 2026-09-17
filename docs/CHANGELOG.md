@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — L'ordine dei pulsanti nella conferma "Modifiche non salvate" si invertiva su mobile
+
+**Il problema.** Il footer standard dei dialoghi (`DialogFooter`) usa `flex-col-reverse` sotto
+`sm`: serve a portare in cima, su mobile, il pulsante scritto per ultimo nel markup — di solito
+il submit, l'azione consigliata. La conferma di scarto (`customDialog.tsx`) segue però l'ordine
+opposto: il pulsante sicuro ("Continua a modificare") è il primo nel markup, quello rischioso
+("Chiudi senza salvare") il secondo. Ereditando il `flex-col-reverse` di default, su mobile
+finiva in cima proprio l'azione distruttiva — il contrario di quello che l'`autoFocus` sul
+pulsante sicuro segnala essere la scelta consigliata.
+
+**Cosa.** Il footer di quel dialogo passa ora `flex-col sm:flex-row` (niente `-reverse`):
+l'ordine desktop resta invariato (erano già disposti così), su mobile "Continua a modificare"
+resta in cima. Verificato con screenshot Playwright a 1280px e 390px, sia su questo dialogo sia
+sulle altre form che lo condividono (intervento, report, collaboratore, tecnico, dispositivo,
+difetto) — nessuna delle altre presenta overflow orizzontale o layout rotti su mobile.
+
+---
+
 ## 2026-09-16 — L'ultima fase dell'aggiornamento restava segnata come "in corso"
 
 **Il problema.** Quando l'aggiornamento arrivava a `state: "success"`, il pannello smetteva di

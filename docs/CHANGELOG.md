@@ -11,6 +11,36 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Unicità case-insensitive per dispositivi e difetti
+
+**Il problema.** `device.name` e `issue.description` avevano un vincolo `UNIQUE` di Postgres,
+che confronta byte per byte: "iPhone 13" e "iphone 13" convivevano come due voci distinte nel
+catalogo. Il difetto "Altro" era già protetto senza guardare le maiuscole
+(`isCatchAllIssueDescription` in `issueCatalog.ts`), ma solo quella riga — ogni altra voce di
+dispositivo o difetto no. Trovato con una scansione mirata del codice, non da un incidente.
+
+**Cosa è cambiato.** Il vincolo `UNIQUE(name)`/`UNIQUE(description)` è stato sostituito da un
+indice unico su `lower(name)`/`lower(description)` (migration `0031`,
+`backend/src/db/schema.ts`): stessa protezione a livello di database, ma senza distinguere le
+maiuscole. `errorHandler.ts` traduceva il vecchio nome del vincolo in un messaggio italiano;
+aggiornato sui nuovi nomi degli indici (`device_name_lower_idx`, `issue_description_lower_idx`),
+che è quello che Postgres riporta anche per una violazione su un indice invece che su un
+vincolo con nome proprio. Verificato con due nuovi test sul database vero
+(`device.db.test.ts`, `issue.db.test.ts`, `npm run test:db`), che inseriscono un duplicato con
+maiuscole diverse e controllano che venga rifiutato.
+
+**Trappola incontrata:** `npm run db:migrate` (da `drizzle.config.ts`) punta al registro delle
+migrazioni nello schema `public`, che è vuoto — lo stack applica le migrazioni con
+`node migrate.js` (usato da `docker-compose`, sia dev sia produzione), che usa il registro di
+default di `drizzle-orm` nello schema `drizzle`. Usare `npm run db:migrate` avrebbe tentato di
+riapplicare tutta la storia dalla `0000`. Già annotato più sotto in questo file (17/9,
+"Ricerca libera... UNION"); qui si è ripetuto l'errore e serve da promemoria per la prossima volta.
+
+**Pulizia collegata:** `catchAllIssueLabel` in `frontend/src/lib/issues.ts` non era più
+esportato fuori dal file — tolto l'`export`.
+
+---
+
 ## 2026-09-17 — Dipendenze: aggiornamenti maggiori (vitest 5, nodemailer 10, plugin React 6)
 
 **Perché applicati a mano.** Le quattro PR di Dependabot (#6, #7, #9, #10) toccavano gli stessi

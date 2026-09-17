@@ -118,10 +118,13 @@ export const deviceTable = pgTable(
     "device",
     {
         id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-        name: varchar("name", { length: 255 }).notNull().unique(),
+        name: varchar("name", { length: 255 }).notNull(),
         ...timestamps,
     },
     (table) => [
+        // Senza maiuscole: altrimenti "iPhone 13" e "iphone 13" convivrebbero come due voci
+        // distinte nel catalogo, cosa che il vincolo di Postgres di per sé non impedisce.
+        uniqueIndex("device_name_lower_idx").on(sql`lower(${table.name})`),
         index("device_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
         index("device_created_at_idx").on(table.created_at),
     ]
@@ -131,10 +134,15 @@ export const IssueTable = pgTable(
     "issue",
     {
         id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-        description: varchar("description", { length: 255 }).notNull().unique(),
+        description: varchar("description", { length: 255 }).notNull(),
         ...timestamps,
     },
-    (table) => [index("issue_description_trgm_idx").using("gin", sql`${table.description} gin_trgm_ops`)]
+    (table) => [
+        // Stessa ragione del catalogo dispositivi: senza questo, "Altro" e "altro" potrebbero
+        // convivere, e la protezione di `issueCatalog.ts` sulla voce generica presume che non accada.
+        uniqueIndex("issue_description_lower_idx").on(sql`lower(${table.description})`),
+        index("issue_description_trgm_idx").using("gin", sql`${table.description} gin_trgm_ops`),
+    ]
 );
 
 export const reportTechnicianTable = pgTable(

@@ -7,7 +7,7 @@
  * marchi quella voce come speciale — è una tabella che l'utente gestisce dalla pagina
  * Difetti come tutte le altre.
  */
-export const catchAllIssueLabel = "Altro";
+const catchAllIssueLabel = "Altro";
 
 export const isCatchAllIssue = (description: string | null | undefined) =>
     (description ?? "").trim().toLowerCase() === catchAllIssueLabel.toLowerCase();

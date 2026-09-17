@@ -218,6 +218,13 @@
       "when": 1776370007000,
       "tag": "0030_add_intervention_to_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1776370008000,
+      "tag": "0031_device_issue_case_insensitive_unique",
+      "breakpoints": true
     }
   ]
 }

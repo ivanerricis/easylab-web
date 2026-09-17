@@ -83,8 +83,8 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
 // a chi usa l'app. Il dettaglio resta nel registro lato server, tramite `apiErrorMessage`.
 const UNIQUE_MESSAGES: Record<string, string> = {
     user_username_unique: "Esiste già un utente con questo nome.",
-    device_name_unique: "Esiste già un dispositivo con questo nome.",
-    issue_description_unique: "Esiste già un guasto con questa descrizione.",
+    device_name_lower_idx: "Esiste già un dispositivo con questo nome.",
+    issue_description_lower_idx: "Esiste già un guasto con questa descrizione.",
     technician_vat_number_unique: "Esiste già un tecnico con questa partita IVA.",
 };
 

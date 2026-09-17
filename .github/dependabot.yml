@@ -1,4 +1,15 @@
 version: 2
+
+# Minori e patch arrivano insieme in una PR per pacchetto (frontend, backend). Gli aggiornamenti
+# maggiori restano fuori dal gruppo e arrivano uno per PR: prima erano tutti nello stesso
+# gruppo, e un solo maggiore incompatibile (TypeScript 7) faceva fallire l'intera PR,
+# bloccando anche gli aggiornamenti innocui.
+#
+# Maggiori ignorati del tutto:
+# - typescript: `typescript-eslint` non supporta ancora la 7 (provato e annullato il
+#   2026-07-28). Da togliere da qui quando la supporterà.
+# - @types/node: i tipi devono seguire la versione di Node dei Dockerfile e della CI (24), non
+#   l'ultima uscita. Si alzano a mano insieme alle immagini.
 updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -8,6 +19,14 @@ updates:
       frontend-dependencies:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 10
 
   - package-ecosystem: "npm"
@@ -18,6 +37,14 @@ updates:
       backend-dependencies:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"

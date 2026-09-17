@@ -11,12 +11,62 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Ricerca libera di report e interventi: una query per tabella
+
+**Il problema.** La ricerca era un'unica condizione `OR` sulle colonne di cinque tabelle unite
+(report, cliente, dispositivo, difetto, collaboratore; tre per gli interventi). Postgres usa gli
+indici trigram solo quando l'`OR` riguarda una tabella sola, quindi leggeva l'intero archivio
+unito e filtrava dopo. Il costo cresceva con l'archivio e non con i risultati: una ricerca senza
+risultati costava quanto una piena. La parte più cara era il **conteggio del totale**, che deve
+arrivare in fondo. La pagina, con un termine comune, si fermava presto: "rossi" costava 2,4 ms
+per le righe e 320 ms per il totale. Dal 2026-09-16 la stessa ricerca parte anche dalla ricerca
+globale (Ctrl+K), a ogni lettera digitata e da qualunque pagina.
+
+**Cosa.** `matchingReportIds` e `matchingInterventionIds` costruiscono l'`UNION` degli id, con un
+ramo per tabella, ognuno sui propri indici. La query della lista resta quella di prima, con
+`id IN (…)` al posto dell'`OR`. Siccome la ricerca ora riguarda solo l'id, il totale non ha più
+bisogno dei join né con la ricerca né senza. I campi cercati non cambiano: lo confermano i 61 test
+di `npm run test:db`, scritti prima della riscrittura. Sono stati anche verificati togliendo un
+ramo alla volta: sette alterazioni, tutte scoperte.
+
+**Misure** sul database di sviluppo (20.000 report, 8000 interventi).
+
+In SQL, pagina più totale:
+
+| Ricerca | Prima | Dopo |
+|---|---|---|
+| Report, "rossi" (2003 risultati) | 325 ms | 90 ms |
+| Report, password | 525 ms | 33 ms |
+| Report, nessun risultato | 800 ms | 4 ms |
+| Interventi, "stampante" | 84 ms | 50 ms |
+| Interventi, nessun risultato | 140 ms | 1 ms |
+
+Via API, mediane:
+
+| Ricerca | Prima | Dopo |
+|---|---|---|
+| Report, "rossi" | 310 ms | 90 ms |
+| Report, password | 301 ms | 47–54 ms |
+| Report, nessun risultato | 381 ms | 33–62 ms |
+| Interventi | 74 ms | 47 ms |
+
+**Limite noto.** Un termine che corrisponde a moltissime righe (qui "rossi", in un report su
+dieci) costa ancora circa 90 ms. Il ramo del cliente produce migliaia di id da ordinare prima
+della pagina, dove la vecchia forma si fermava alle prime dieci. È il caso raro. Quello frequente
+(un nome preciso, un telefono, un numero) e quello peggiore di prima (nessun risultato) sono i
+più veloci.
+
+**File.** `backend/src/db/queries/report.ts`, `backend/src/db/queries/intervention.ts`,
+`scripts/dev/bench-api.mjs` (tolto lo scenario "ordina per totale", che non esiste più).
+
+---
+
 ## 2026-09-17 — Test sul database vero (prima parte)
 
 **Il problema.** Nessuno dei circa 970 test del backend eseguiva l'SQL: le query erano sostituite
 da un finto che restituisce le righe scritte nel test. Una join che perde righe, un filtro sul
 giorno sbagliato o una condizione di ricerca dimenticata restavano verdi. Il caso concreto è la
-riscrittura della ricerca libera con `UNION` (BACKLOG, **Prestazioni**): senza un modo di
+riscrittura della ricerca libera con `UNION` (voce qui sopra, fatta subito dopo): senza un modo di
 confrontare i risultati prima e dopo, riscriverla voleva dire fidarsi.
 
 **Cosa.**

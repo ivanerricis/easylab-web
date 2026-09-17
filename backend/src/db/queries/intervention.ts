@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, getTableColumns, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import { collaboratorTable, customerTable, interventionTable } from "../schema";
 import type { NewIntervention, UpdateIntervention } from "../types";
@@ -30,6 +31,51 @@ type ListInterventionsParams = {
     unpaginatedLimit?: UnpaginatedLimit;
 };
 
+const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
+
+/**
+ * Gli id degli interventi che corrispondono alla ricerca libera: una query per tabella, unite,
+ * come `matchingReportIds` in `report.ts` (lì il perché). Misure sul database di sviluppo
+ * (8000 interventi, pagina + totale): "stampante" 84 → 50 ms, nessun risultato 140 → 1 ms.
+ *
+ * Tipo e stato non ci sono: nessuno dei due ha un indice che regga un `ILIKE '%…%'`, e la
+ * pagina ha i due menù dedicati (`status` e `type`, confronti esatti più sotto). Problema e
+ * note non sono mai stati fra i rami, e non hanno un indice trigram: aggiungerli vuol dire
+ * aggiungere prima l'indice.
+ */
+const matchingInterventionIds = (search: string) => {
+    const pattern = `%${search}%`;
+    const idSearch = parseIdSearch(search);
+    const interventionIds = () => db.select({ id: interventionTable.id }).from(interventionTable);
+
+    return union(
+        interventionIds().where(
+            or(
+                idSearch != null ? eq(interventionTable.id, idSearch) : undefined,
+                containsText(interventionTable.description, pattern)
+            )
+        ),
+        interventionIds()
+            .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
+            .where(
+                or(
+                    containsText(customerTable.firstName, pattern),
+                    containsText(customerTable.lastName, pattern),
+                    containsText(customerTable.phoneNumber, pattern),
+                    containsText(customerTable.phoneNumberSecondary, pattern)
+                )
+            ),
+        interventionIds()
+            .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
+            .where(
+                or(
+                    containsText(collaboratorTable.firstName, pattern),
+                    containsText(collaboratorTable.lastName, pattern)
+                )
+            )
+    );
+};
+
 export const listInterventions = async ({
     page,
     pageSize,
@@ -49,24 +95,9 @@ export const listInterventions = async ({
     timeZone,
 }: ListInterventionsParams) => {
     const trimmedSearch = search?.trim();
-    const searchPattern = `%${trimmedSearch ?? ""}%`;
-    const idSearch = trimmedSearch ? parseIdSearch(trimmedSearch) : null;
-    // Tipo e stato non stanno più fra i rami di ricerca: nessuno dei due ha un indice che
-    // regga un `ILIKE '%…%'`, e la pagina interventi ha già i due menù a tendina dedicati
-    // (`status` e `type` arrivano qui come parametri e diventano confronti esatti, poche
-    // righe più sotto), che filtrano meglio e senza costo.
-    const searchConditions = trimmedSearch
-        ? [
-              ...(idSearch != null ? [eq(interventionTable.id, idSearch)] : []),
-              sql`${interventionTable.description}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumber}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumberSecondary}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.lastName}::text ILIKE ${searchPattern}`,
-          ]
-        : [];
+    const searchCondition = trimmedSearch
+        ? inArray(interventionTable.id, matchingInterventionIds(trimmedSearch))
+        : undefined;
     const statusCondition = status !== "all" ? eq(interventionTable.status, status) : undefined;
     const typeCondition = type !== "all" ? eq(interventionTable.type, type) : undefined;
     const dateCondition = onLocalDays(interventionTable.created_at, { from: dateFrom, to: dateTo }, timeZone);
@@ -111,7 +142,6 @@ export const listInterventions = async ({
         : undefined;
     const customerCondition = customerId ? eq(interventionTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(interventionTable.collaboratorId, collaboratorId) : undefined;
-    const searchCondition = searchConditions.length > 0 ? or(...searchConditions) : undefined;
     const whereConditions = [
         statusCondition,
         typeCondition,
@@ -170,19 +200,15 @@ export const listInterventions = async ({
     }
 
     /**
-     * Il totale porta i join solo quando la ricerca li usa, come in `listReports`: `customer_id` e
-     * `collaborator_id` sono NOT NULL con chiave esterna, quindi le due inner join non possono né
-     * scartare né duplicare righe, e senza ricerca contare `intervention` da sola dà lo stesso
-     * numero leggendo una tabella invece di tre.
+     * Il totale senza i join, come in `listReports`: `customer_id` e `collaborator_id` sono NOT
+     * NULL con chiave esterna, quindi le due inner join non possono né scartare né duplicare
+     * righe, e contare `intervention` da sola dà lo stesso numero leggendo una tabella invece di
+     * tre. La ricerca guarda solo `intervention.id` (vedi `matchingInterventionIds`).
      */
-    const countSelect = db.select({ total: sql<number>`count(*)` }).from(interventionTable);
-    const countQuery =
-        searchConditions.length > 0
-            ? countSelect
-                  .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
-                  .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
-                  .where(whereClause)
-            : countSelect.where(whereClause);
+    const countQuery = db
+        .select({ total: sql<number>`count(*)` })
+        .from(interventionTable)
+        .where(whereClause);
 
     const [items, totalCountRows] = await Promise.all([
         baseQuery

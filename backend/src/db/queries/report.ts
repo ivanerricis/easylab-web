@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, getTableColumns, gte, inArray, or, sql, type SQLWrapper } from "drizzle-orm";
+import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import {
     collaboratorTable,
@@ -35,6 +36,66 @@ type ListReportsParams = {
     unpaginatedLimit?: UnpaginatedLimit;
 };
 
+const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
+
+/**
+ * Gli id dei report che corrispondono alla ricerca libera: una query per tabella, unite.
+ *
+ * Prima era un'unica `OR` sulle colonne di cinque tabelle unite. Postgres usa gli indici
+ * trigram solo se l'`OR` riguarda una tabella sola, quindi leggeva l'intero archivio unito e
+ * filtrava dopo: anche una ricerca senza risultati costava come una piena, e il conteggio del
+ * totale di più. Qui ogni ramo resta su una tabella e sui suoi indici. Misure sul database di
+ * sviluppo (20.000 report, pagina + totale): "rossi" 325 → 90 ms, una password 525 → 33 ms,
+ * nessun risultato 800 → 4 ms. Vedi CHANGELOG del 2026-09-17.
+ *
+ * Solo colonne di testo, più il numero del report come confronto esatto (vedi `search.ts`).
+ * Data, stato e metodo di pagamento si cercano dai filtri dedicati. `report.db.test.ts` elenca
+ * campo per campo cosa deve trovare.
+ */
+const matchingReportIds = (search: string) => {
+    const pattern = `%${search}%`;
+    const idSearch = parseIdSearch(search);
+    const reportIds = () => db.select({ id: reportTable.id }).from(reportTable);
+
+    return union(
+        reportIds().where(
+            or(
+                idSearch != null ? eq(reportTable.id, idSearch) : undefined,
+                containsText(reportTable.note, pattern),
+                containsText(reportTable.password, pattern),
+                containsText(reportTable.issueDescription, pattern),
+                containsText(reportTable.serviceDescription, pattern)
+            )
+        ),
+        reportIds()
+            .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
+            .where(
+                or(
+                    containsText(customerTable.firstName, pattern),
+                    containsText(customerTable.lastName, pattern),
+                    containsText(customerTable.phoneNumber, pattern),
+                    containsText(customerTable.phoneNumberSecondary, pattern),
+                    containsText(customerTable.email, pattern)
+                )
+            ),
+        reportIds()
+            .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
+            .where(containsText(deviceTable.name, pattern)),
+        reportIds()
+            .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
+            .where(containsText(IssueTable.description, pattern)),
+        reportIds()
+            .innerJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
+            .where(
+                or(
+                    containsText(collaboratorTable.firstName, pattern),
+                    containsText(collaboratorTable.lastName, pattern),
+                    containsText(collaboratorTable.phoneNumber, pattern)
+                )
+            )
+    );
+};
+
 export const listReports = async ({
     page,
     pageSize,
@@ -51,31 +112,7 @@ export const listReports = async ({
     timeZone,
 }: ListReportsParams) => {
     const trimmedSearch = search?.trim();
-    const searchPattern = `%${trimmedSearch ?? ""}%`;
-    const idSearch = trimmedSearch ? parseIdSearch(trimmedSearch) : null;
-    // Solo colonne di testo, più il numero del report come confronto esatto: vedi `search.ts`
-    // per il perché le colonne non testuali sono state tolte. Data, stato e metodo di
-    // pagamento restano cercabili dai filtri dedicati sopra la tabella, dove peraltro
-    // funzionano davvero (la casella confrontava `cash`, non "contanti").
-    const searchConditions = trimmedSearch
-        ? [
-              ...(idSearch != null ? [eq(reportTable.id, idSearch)] : []),
-              sql`${reportTable.note}::text ILIKE ${searchPattern}`,
-              sql`${reportTable.password}::text ILIKE ${searchPattern}`,
-              sql`${reportTable.issueDescription}::text ILIKE ${searchPattern}`,
-              sql`${reportTable.serviceDescription}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumber}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumberSecondary}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.email}::text ILIKE ${searchPattern}`,
-              sql`${deviceTable.name}::text ILIKE ${searchPattern}`,
-              sql`${IssueTable.description}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.phoneNumber}::text ILIKE ${searchPattern}`,
-          ]
-        : [];
+    const searchCondition = trimmedSearch ? inArray(reportTable.id, matchingReportIds(trimmedSearch)) : undefined;
     const visibilityCondition =
         visibility === "open"
             ? eq(reportTable.closed, false)
@@ -86,7 +123,7 @@ export const listReports = async ({
     const customerCondition = customerId ? eq(reportTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(reportTable.collaboratorId, collaboratorId) : undefined;
     // Sottoquery e non condizione sul join qui sotto: il conteggio della paginazione non porta
-    // con sé i join (vedi il commento su `countSelect`), quindi una condizione su
+    // con sé i join (vedi il commento su `countQuery`), quindi una condizione su
     // `report_technician` lì non avrebbe la tabella a cui riferirsi.
     const technicianCondition = technicianId
         ? inArray(
@@ -97,7 +134,6 @@ export const listReports = async ({
                   .where(eq(reportTechnicianTable.technicianId, technicianId))
           )
         : undefined;
-    const searchCondition = searchConditions.length > 0 ? or(...searchConditions) : undefined;
     const whereConditions = [
         visibilityCondition,
         dateCondition,
@@ -168,27 +204,18 @@ export const listReports = async ({
     /**
      * Il totale non porta con sé i join delle righe.
      *
-     * Le colonne unite servono a *mostrare* un report (nome cliente, dispositivo, difetto) e
-     * a cercarci dentro, non a contarlo: `device_id`, `issue_id` e `customer_id` sono NOT
-     * NULL con vincolo di chiave esterna, quindi le inner join non possono né scartare né
-     * duplicare righe, e quella su `collaborator` è una left join, che per definizione non
-     * cambia un conteggio. Il pianificatore elimina da solo le left join inutilizzate, ma non
-     * le inner join: quelle andavano tolte scrivendole.
-     *
-     * Quando c'è una ricerca libera i join restano, perché le condizioni parlano proprio di
-     * quelle tabelle: lì il conteggio costa quanto prima, ed è la voce 4 del backlog
-     * prestazioni ad occuparsene.
+     * Le colonne unite servono a *mostrare* un report (nome cliente, dispositivo, difetto), non
+     * a contarlo: `device_id`, `issue_id` e `customer_id` sono NOT NULL con vincolo di chiave
+     * esterna, quindi le inner join non possono né scartare né duplicare righe, e quella su
+     * `collaborator` è una left join, che per definizione non cambia un conteggio. Il
+     * pianificatore elimina da solo le left join inutilizzate, ma non le inner join: quelle
+     * andavano tolte scrivendole. Anche la ricerca guarda solo `report.id` (vedi
+     * `matchingReportIds`), quindi vale con e senza.
      */
-    const countSelect = db.select({ total: sql<number>`count(*)` }).from(reportTable);
-    const countQuery =
-        searchConditions.length > 0
-            ? countSelect
-                  .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
-                  .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
-                  .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
-                  .leftJoin(collaboratorTable, eq(collaboratorTable.id, reportTable.collaboratorId))
-                  .where(whereClause)
-            : countSelect.where(whereClause);
+    const countQuery = db
+        .select({ total: sql<number>`count(*)` })
+        .from(reportTable)
+        .where(whereClause);
 
     const [items, totalCountRows] = await Promise.all([
         baseQuery

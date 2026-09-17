@@ -223,7 +223,6 @@ const run = async () => {
         ["Report, ricerca su password 'pw12'", "Report", "/reports?page=1&pageSize=10&visibility=all&search=pw12"],
         ["Report, ricerca senza risultati", "Report", "/reports?page=1&pageSize=10&visibility=all&search=zzzqwx"],
         ["Report, ordina per cliente", "Report", "/reports?page=1&pageSize=10&visibility=all&sortBy=customer&sortOrder=asc"],
-        ["Report, ordina per totale", "Report", "/reports?page=1&pageSize=10&visibility=all&sortBy=totalPrice&sortOrder=desc"],
         ["Report, filtro per data (2 mesi)", "Report", `/reports?page=1&pageSize=10&visibility=all&dateFrom=${dateFrom}&dateTo=${dateTo}`],
         [`Report, lista SENZA paginazione (${counts.reports} righe)`, "Report", "/reports"],
         ["Report, statistiche dashboard", "Report", `/reports/stats?month=${monthKey}`],

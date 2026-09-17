@@ -221,9 +221,7 @@ describe("settings router: chiave di backup", () => {
     // la chiave che rende leggibile qualsiasi backup rubato, quindi chiede di nuovo la
     // password come il ripristino.
     it("l'amministratore può esportare la chiave di backup dopo aver confermato la password", async () => {
-        const response = await request(buildApp(true))
-            .post("/api/settings/backup/key")
-            .send({ password: "segreta" });
+        const response = await request(buildApp(true)).post("/api/settings/backup/key").send({ password: "segreta" });
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ key: "ab".repeat(32) });
@@ -233,9 +231,7 @@ describe("settings router: chiave di backup", () => {
     it("con la password sbagliata non esporta la chiave", async () => {
         vi.mocked(assertOwnPassword).mockRejectedValueOnce(new ApiError("La password non è corretta", 400));
 
-        const response = await request(buildApp(true))
-            .post("/api/settings/backup/key")
-            .send({ password: "sbagliata" });
+        const response = await request(buildApp(true)).post("/api/settings/backup/key").send({ password: "sbagliata" });
 
         expect(response.status).toBe(400);
         expect(exportBackupKey).not.toHaveBeenCalled();

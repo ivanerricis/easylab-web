@@ -11,6 +11,52 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-17 — Test sul database vero (prima parte)
+
+**Il problema.** Nessuno dei circa 970 test del backend eseguiva l'SQL: le query erano sostituite
+da un finto che restituisce le righe scritte nel test. Una join che perde righe, un filtro sul
+giorno sbagliato o una condizione di ricerca dimenticata restavano verdi. Il caso concreto è la
+riscrittura della ricerca libera con `UNION` (BACKLOG, **Prestazioni**): senza un modo di
+confrontare i risultati prima e dopo, riscriverla voleva dire fidarsi.
+
+**Cosa.**
+- `npm run test:db` esegue i file `*.db.test.ts` su un Postgres vero, con una config a parte
+  (`vitest.db.config.mts`). `npm test` li esclude e resta com'era, veloce e senza database.
+- In locale usa `<POSTGRES_DB>_test` nello stesso container dello stack di sviluppo, con le
+  credenziali del `.env` della radice. È un altro database: i dati di sviluppo non si toccano.
+  `TEST_DATABASE_URL` lo sostituisce (la usa la CI).
+- A ogni esecuzione il database viene eliminato, ricreato e migrato con lo stesso migrator della
+  produzione. Così lo schema è esattamente quello di `backend/drizzle/`. Prima di ogni test le
+  tabelle vengono svuotate (`TRUNCATE … RESTART IDENTITY`) e i file girano uno alla volta.
+- **Tre protezioni contro il database sbagliato**, perché la suite elimina un database e ne
+  svuota le tabelle: la preparazione rifiuta un nome che non finisce con `_test` prima di
+  collegarsi (provato con l'indirizzo di sviluppo: si ferma, i 20.000 report restano); lo stesso
+  controllo limita il nome a `[a-z0-9_]`, perché finisce in un `DROP DATABASE`; ogni file
+  ricontrolla `current_database()` prima della prima `TRUNCATE`.
+- CI: un servizio `postgres:16` nel job backend e un passo `npm run test:db`.
+- 61 test su `listReports` e `listInterventions`:
+  - ricerca campo per campo (report, cliente, dispositivo, difetto, collaboratore), per numero
+    esatto, con maiuscole, spazi e accenti;
+  - totale coerente con la ricerca e nessun duplicato;
+  - filtri: date nel fuso del laboratorio a cavallo della mezzanotte, intervallo del calendario
+    con gli interventi senza data, cliente, collaboratore e tecnico;
+  - ordinamento, paginazione e campi composti dai join.
+- I test che fissano un comportamento di oggi e non un desiderio lo dicono nel nome: gli accenti
+  non vengono ignorati, e la ricerca non guarda problema e note degli interventi.
+
+**Verifica.** I test sono passati al primo colpo, quindi le query sono state alterate di proposito
+undici volte, una alla volta, controllando ogni volta con `git diff` che l'alterazione fosse
+applicata. Esempi: un ramo di ricerca tolto, il collaboratore in inner join, le date in UTC, il
+numero cercato come testo, il compenso del tecnico ignorato, il totale senza filtri, gli
+interventi senza data esclusi dal calendario. Ogni alterazione ha fatto fallire almeno un test.
+
+**File.** `backend/vitest.db.config.mts`, `backend/vitest.config.mts`, `backend/package.json`,
+`backend/tsconfig.build.json` (esclude `src/test/`), `backend/src/test/db/{globalSetup,setup,fixtures}.ts`,
+`backend/src/db/queries/{report,intervention}.db.test.ts`, `.github/workflows/ci.yml`, `README.md`.
+Seconda parte (altre query, vincoli, cancellazioni) in BACKLOG.
+
+---
+
 ## 2026-09-17 — Tolto l'ordinamento dei report per "Totale"
 
 **Il problema.** Un giro di misure sul database di sviluppo (20.000 report) durante un
@@ -33,7 +79,11 @@ colonna e il suo valore restano invariati, solo non più cliccabile per ordinare
 **File.** `backend/src/routes/reports.ts`, `backend/src/db/queries/report.ts`,
 `frontend/src/pages/reports/components/report-columns.tsx`,
 `frontend/src/pages/reports/components/types.ts`, `frontend/src/lib/api/reports.ts`,
-`frontend/src/pages/reports/hooks/useReportsRows.ts`, `ReportsPage.test.tsx`.
+`frontend/src/pages/reports/hooks/useReportsRows.ts`, `ReportsPage.test.tsx`, e in un secondo
+commit `lib/api/reports.test.ts` e `pages/pageRowsHooks.test.ts`, che passavano ancora
+`totalPrice` e avevano rotto il typecheck in CI. In locale era sfuggito perché nel frontend
+`npx tsc --noEmit` non controlla nulla (il `tsconfig.json` della radice ha solo i riferimenti):
+il comando giusto è `npm run typecheck` (`tsc -b`).
 
 ---
 

@@ -66,6 +66,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # Per `npm run test:db`, che esegue le query su un Postgres vero. Stessa versione maggiore
+    # dei compose. Il database lo ricrea la suite: queste credenziali esistono solo qui.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -80,6 +96,9 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:db
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/masso_test
       - run: npm run build
 
   # I job qui sopra compilano nella working copy, dove ogni file è presente per

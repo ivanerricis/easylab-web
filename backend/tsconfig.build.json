@@ -1,6 +1,6 @@
 {
     "extends": "./tsconfig.json",
-    // I test restano coperti da `npm run typecheck` (che usa tsconfig.json), ma
-    // non devono finire in dist/.
-    "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+    // I test e i loro helper (src/test/) restano coperti da `npm run typecheck` (che usa
+    // tsconfig.json), ma non devono finire in dist/.
+    "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test/**"]
 }

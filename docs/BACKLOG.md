@@ -61,7 +61,9 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   globale (Ctrl+K, 2026-09-16) chiama la stessa `listReports`/`listInterventions` a ogni
   tastiera digitata (da due lettere in su) da qualunque pagina, non solo dalle liste — lo stesso
   costo, prima confinato alle pagine Report/Interventi, ora gira ovunque nell'app. Non cambia la
-  soluzione, ma alza la priorità.
+  soluzione, ma alza la priorità. Dal 2026-09-17 la riscrittura ha una rete di sicurezza:
+  `report.db.test.ts` e `intervention.db.test.ts` elencano campo per campo cosa la ricerca deve
+  trovare (`npm run test:db`).
 - Ordinare i report per "Cliente" costa circa 100 ms a pagina (20.000 report), contro i 15-25 ms
   della paginazione semplice o dell'ordine per data. La causa è la stessa famiglia del punto
   sopra: l'espressione di ordinamento (`concat_ws` su nome e cognome del cliente) nasce dal join
@@ -92,8 +94,9 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   `ReportsPage` coprono già i quattro casi.
 - `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
   file del codice la legge: configurazione morta, da togliere o da ricollegare.
-- [Test sul database vero](#test-sul-database-vero): l'SQL del backend non lo esegue nessun
-  test. Rimandato di proposito il 2026-09-14, con il piano già pronto.
+- [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): l'infrastruttura
+  e i test di `listReports`/`listInterventions` ci sono dal 2026-09-17 (CHANGELOG); restano le
+  altre query, i vincoli e le cancellazioni.
 - Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
   "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
@@ -173,41 +176,27 @@ riconoscibili e risolve il contrasto con una variabile in più.
 i colori `oklch` in RGB con un canvas (il parsing diretto delle stringhe `oklch` dà numeri
 sbagliati). Controllare tutte e tre le intensità, in chiaro e in scuro.
 
-## Test sul database vero
+## Test sul database vero, seconda parte
 
-**Il problema.** Nessuno dei test del backend (circa 950 a settembre 2026) parla con un database: le query sono
-sostituite da un finto che restituisce le righe scritte nel test. Si verifica così cosa fa il
-codice *con* quelle righe (permessi, validazione, errori), ma l'SQL mandato a Postgres non lo
-esegue nessun test: se è sbagliato, resta tutto verde. Il query layer (`backend/src/db/queries/*`)
-è fra il 15% e il 30% di copertura, ed è l'unico buco rimasto dopo il lavoro del 2026-09-14
-(backend al 90% delle righe).
+*La prima parte è fatta il 2026-09-17 (CHANGELOG): `npm run test:db`, un database `_test` a parte,
+il servizio Postgres in CI e 61 test su `listReports` e `listInterventions`. Istruzioni nel
+README, "Test e controlli".*
 
-Esempi di cosa passerebbe inosservato:
+**Cosa resta scoperto.** Le altre query di `backend/src/db/queries/` girano ancora solo contro il
+database finto. Le più utili da coprire, in ordine:
 
-- un filtro o un ordinamento che non fa quello che dovrebbe (è già successo con l'`orderBy`
-  degli interventi, il 2026-07-30, scoperto solo dall'app vera);
-- una join che duplica o perde righe (il report con il tecnico esterno collegato);
-- la ricerca libera su cinque tabelle — proprio quella da riscrivere con `UNION` per le
-  prestazioni (vedi più in alto, **Prestazioni**): senza test sul database vero, riscriverla
-  vuol dire fidarsi;
-- i vincoli, per esempio l'unicità di "Altro", che il codice controlla da sé perché il vincolo
-  unico di Postgres distingue le maiuscole.
+- **i vincoli che il codice controlla da sé**, per esempio l'unicità di "Altro" fra dispositivi e
+  difetti, che il codice verifica a mano perché il vincolo unico di Postgres distingue le
+  maiuscole;
+- **le cancellazioni con chiavi esterne**: cliente, collaboratore, tecnico, dispositivo o difetto
+  ancora usati da un report o da un intervento (cosa risponde Postgres, e cosa ne fa la rotta);
+- **le statistiche della dashboard** (`getReportStats`, `getInterventionStats`): somme per mese
+  nel fuso del laboratorio;
+- **le liste delle anagrafiche** (clienti, collaboratori, tecnici, dispositivi, difetti): ricerca e
+  paginazione, più semplici di report e interventi ma con la stessa forma;
+- **sessioni e codici di recupero** (`authManager`), oggi provati con un finto `db` a catena.
 
-**Perché è rimandato.** Non c'è un ostacolo tecnico: serve un Postgres acceso durante i test, e
-questo cambia una scelta fatta il 2026-07-28, cioè una CI che gira senza database.
-
-**Il piano, quando si fa.**
-
-1. **CI**: un `services: postgres` nel job `backend` di `.github/workflows/ci.yml` (stessa
-   versione maggiore del compose di produzione), circa un minuto in più a ogni push.
-2. **In locale**: un database solo per i test, **mai** quello del dev stack
-   (`masso-web_postgres_data_dev`), che altrimenti i test sovrascriverebbero. Un database a
-   parte nello stesso container di sviluppo, o testcontainers.
-3. **Preparazione**: le migrazioni di `backend/drizzle/` creano le tabelle all'avvio della
-   suite; ogni test parte da uno stato noto (transazione annullata alla fine, o tabelle svuotate).
-4. **Separati dagli altri**: in una cartella o con un suffisso propri (per esempio
-   `*.db.test.ts`) e un comando a parte, così `npm test` resta veloce e senza database; la CI li
-   lancia entrambi. I test esistenti non cambiano.
-5. **Da dove cominciare**: le query di report e interventi (`report.ts`, `intervention.ts`) —
-   ricerca, filtri, paginazione — che sono le più complesse e le più soggette a modifiche. Poi
-   i vincoli e le cancellazioni con chiavi esterne.
+Come aggiungerne: un file `*.db.test.ts` accanto alla query, righe create con gli helper di
+`backend/src/test/db/fixtures.ts` (da estendere se serve), tabelle già vuote a ogni test.
+Quando un test passa al primo colpo, conviene alterare la query di proposito e controllare che
+fallisca.

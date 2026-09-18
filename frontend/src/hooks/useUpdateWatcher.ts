@@ -37,11 +37,17 @@ export const useUpdateWatcher = () => {
                 wasUpdatingRef.current = true;
                 // Riasserito a ogni giro di proposito: se qualcun altro toglie il blocco
                 // (il pannello Impostazioni lo fa quando rinuncia ad aspettare) torna su.
-                setBusy({
+                // Aggiornamento funzionale per non cancellare steps/activeStepKey: sulla scheda
+                // che ha lanciato l'aggiornamento è updateSettingsPanel a tenerli aggiornati con
+                // la fase reale, e questo poller (che gira su ogni scheda) non li conosce.
+                // Sovrascriverli qui li farebbe sparire e ricomparire a ogni giro.
+                setBusy((prev) => ({
                     title: "Aggiornamento in corso...",
                     description:
                         "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
-                });
+                    steps: prev?.steps,
+                    activeStepKey: prev?.activeStepKey,
+                }));
                 return;
             }
 

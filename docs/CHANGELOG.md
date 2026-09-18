@@ -11,6 +11,25 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-18 — I puntini di fase dell'aggiornamento non sparivano più a intermittenza
+
+**Perché.** Durante un aggiornamento due poller scrivevano sullo stesso stato "busy" condiviso:
+il pannello Impostazioni (ogni 3s, con `steps`/`activeStepKey` sulla fase reale) e
+`useUpdateWatcher` (ogni 5s, montato globalmente su ogni scheda per bloccare anche le postazioni
+che non hanno il pannello aperto). Il secondo riaffermava il blocco senza `steps`, quindi
+sovrascriveva quello del pannello e i puntini di fase sparivano finché il pannello non li
+rimetteva al giro successivo — un flickering visibile sulla stessa scheda che ha lanciato
+l'aggiornamento.
+
+**Come.** `useUpdateWatcher.ts` ora usa un aggiornamento funzionale di `setBusy` che preserva
+`steps`/`activeStepKey` dallo stato precedente invece di sostituirlo per intero. Tipo di
+`BusyGuardContextValue.setBusy` allargato per accettare anche la forma funzionale (già
+supportata dal `useState` sottostante, mancava solo nel tipo esposto dal context).
+
+**File:** `frontend/src/hooks/useUpdateWatcher.ts`, `frontend/src/components/busy-guard-context.ts`.
+
+---
+
 ## 2026-09-18 — Scorciatoie da tastiera, con il loro elenco
 
 **Perché lettere nude e non Ctrl+qualcosa.** Ctrl+N, Ctrl+T e Ctrl+W se li tiene il browser: non

@@ -22,7 +22,7 @@ export type BusyGuardState = {
 };
 
 export type BusyGuardContextValue = {
-    setBusy: (state: BusyGuardState | null) => void;
+    setBusy: (state: BusyGuardState | null | ((prev: BusyGuardState | null) => BusyGuardState | null)) => void;
 };
 
 export const BusyGuardContext = createContext<BusyGuardContextValue | null>(null);

@@ -54,6 +54,7 @@ import { toInterventionCreatePayload } from "@/lib/interventionForm";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
+import { usePageShortcut } from "@/hooks/usePageShortcut";
 
 const getMonthKey = (date: Date) => {
     const year = date.getFullYear();
@@ -109,6 +110,10 @@ const DashboardPage = () => {
     const navigate = useNavigate();
     const [dialogCreateReportOpen, setDialogCreateReportOpen] = useState(false);
     const [dialogCreateInterventionOpen, setDialogCreateInterventionOpen] = useState(false);
+    // Qui i pulsanti di creazione sono due, quindi non c'è una "n" sola che possa valere per
+    // entrambi: una lettera per ciascuno, l'iniziale di quello che aprono.
+    usePageShortcut("r", () => setDialogCreateReportOpen(true));
+    usePageShortcut("i", () => setDialogCreateInterventionOpen(true));
     // L'intervallo lo decide il calendario, che è l'unico a sapere quali giorni sta
     // disegnando; qui viene solo tenuto in stato per poterlo passare al caricamento.
     // Confrontare i due estremi evita di rilanciare la richiesta quando il calendario

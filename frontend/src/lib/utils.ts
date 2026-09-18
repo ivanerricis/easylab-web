@@ -120,6 +120,14 @@ export function formatEuro(value: number | null | undefined) {
 }
 
 /**
+ * Il tasto che accompagna le scorciatoie, scritto come lo scriverebbe chi sta davanti allo
+ * schermo: ⌘ sui Mac, Ctrl altrove. Sta qui perché lo leggono sia la ricerca globale sia
+ * l'elenco delle scorciatoie, e due copie del controllo avevano già preso strade diverse.
+ */
+export const isMacLike = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+export const modifierKey = isMacLike ? "⌘" : "Ctrl";
+
+/**
  * Il campo facoltativo di un form: la casella vuota diventa `null`, non la stringa "".
  *
  * Le API distinguono i due casi — `null` è "non compilato", `""` sarebbe un valore vero e

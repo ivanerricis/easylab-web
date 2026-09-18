@@ -40,6 +40,7 @@ import {
     useUrlSearchText,
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
+import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { openPrintWindow, trimOrNull } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
 import { showCreatedToast } from "@/lib/createdToast";
@@ -52,6 +53,7 @@ const ReportsPage = () => {
     const navigate = useNavigate();
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    usePageShortcut("n", () => setIsCreateDialogOpen(true));
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [reportIdToEdit, setReportIdToEdit] = useState<number | null>(null);

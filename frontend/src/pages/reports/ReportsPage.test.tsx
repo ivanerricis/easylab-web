@@ -206,6 +206,68 @@ describe("ReportsPage", () => {
         expect(within(table()).getByText("Chiuso")).toBeInTheDocument();
     });
 
+    it('apre la creazione con "n"', async () => {
+        await renderPage();
+        expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
+
+        await userEvent.keyboard("n");
+
+        expect(screen.getByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
+    });
+
+    /** La protezione che conta: "n" è una lettera, e nella ricerca si deve poter scrivere. */
+    it('scrivendo nella ricerca, "n" non apre la creazione', async () => {
+        await renderPage();
+
+        await userEvent.type(screen.getByRole("searchbox"), "notebook");
+
+        expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
+        expect(screen.getByRole("searchbox")).toHaveValue("notebook");
+    });
+
+    /**
+     * Con un menu aperto le lettere servono già a Radix per saltare alla voce che inizia così:
+     * "n" deve restare al menu, non aprire anche la creazione dietro.
+     */
+    it('col menu "Colonne" aperto, "n" non apre la creazione', async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Colonne" }));
+        await screen.findByRole("menu");
+        await userEvent.keyboard("n");
+
+        expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
+    });
+
+    it('con la tendina di un filtro aperta, "n" non apre la creazione', async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Filtra per stato" }));
+        await screen.findByRole("listbox");
+        await userEvent.keyboard("n");
+
+        expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
+    });
+
+    /**
+     * Il dettaglio del difetto è un Popover, che a differenza di menu e tendine non si tiene le
+     * lettere: senza la protezione, "n" lo lascerebbe aperto e gli spalancherebbe sopra la
+     * creazione di un report.
+     */
+    it('col dettaglio di una cella aperto, "n" non apre la creazione', async () => {
+        // Il Popover compare solo dove c'è il testo scritto a mano dietro la voce di catalogo.
+        api.listReports.mockResolvedValue(
+            page([buildReport(1, { issue: "Altro", issueDescription: "Non si accende più dopo la pioggia" })])
+        );
+        await renderPage();
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Altro" }));
+        await screen.findByText("Non si accende più dopo la pioggia");
+        await userEvent.keyboard("n");
+
+        expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
+    });
+
     /** Dalla dashboard si arriva qui con `?visibility=closed`: il filtro deve rispettarlo. */
     it("legge il filtro di stato dall'indirizzo", async () => {
         await renderPage("/reports?visibility=closed");

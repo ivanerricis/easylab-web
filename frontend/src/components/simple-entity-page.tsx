@@ -9,6 +9,7 @@ import TablePagination from "@/components/table-pagination";
 import { useSearchableRows } from "@/hooks/useSearchableRows";
 import { listUrlParams, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
+import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { getApiErrorMessage } from "@/lib/api";
 import type { PaginatedResponse } from "@/lib/api/client";
 import { useState, type ReactNode } from "react";
@@ -103,6 +104,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     isRowLocked,
 }: SimpleEntityPageProps<TRow, TValues>) => {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    usePageShortcut("n", () => setIsCreateDialogOpen(true));
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     // Ricerca e pagina stanno nell'indirizzo, come nelle altre liste: vedi `useListUrlState`.
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();

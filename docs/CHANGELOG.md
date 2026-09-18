@@ -11,6 +11,56 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-18 — Scorciatoie da tastiera, con il loro elenco
+
+**Perché lettere nude e non Ctrl+qualcosa.** Ctrl+N, Ctrl+T e Ctrl+W se li tiene il browser: non
+arrivano alla pagina nemmeno con `preventDefault`, quindi non sono utilizzabili. Ctrl+R si
+potrebbe intercettare, ma è il ricarica pagina, memoria muscolare di chiunque, e l'app ha già il
+suo pulsante "Aggiorna". Restano le lettere nude, che è poi quello che fanno GitHub, Linear e
+Gmail.
+
+**Cosa c'è adesso**, oltre al Ctrl+K della ricerca globale che c'era già:
+
+| Tasto | Dove | Cosa fa |
+| --- | --- | --- |
+| `/` | pagine a elenco | porta il focus sulla ricerca della pagina |
+| `n` | pagine a elenco | apre la creazione (report, intervento, cliente, anagrafiche) |
+| `r` / `i` | dashboard | nuovo report / nuovo intervento |
+| `Ctrl+Invio` | finestre | salva |
+| `?` | ovunque | l'elenco delle scorciatoie |
+
+Sulla dashboard servono due lettere perché i pulsanti di creazione sono due: una `n` sola non
+saprebbe quale dei due aprire.
+
+**La protezione, che è il punto delicato** (`frontend/src/hooks/usePageShortcut.ts`). Una lettera
+nuda non deve scattare mentre la si sta scrivendo: l'hook si ferma se il focus è in un campo,
+un'area di testo o un elemento modificabile, e se è dentro uno strato aperto sopra la pagina.
+Quest'ultimo controllo guarda il **ruolo** (`dialog`, `menu`, `listbox`) e non il nome del
+componente, così un primitivo Radix nuovo è coperto senza aggiungerlo a un elenco che nessuno
+ricorderebbe di aggiornare; il tooltip resta fuori da sé, che ha ruolo `tooltip`, e non deve
+spegnere le scorciatoie solo perché il mouse ci è passato sopra.
+
+Menu e tendine in realtà si tengono già il tasto da soli (Radix lo usa per saltare alla voce che
+inizia così, e ferma la propagazione): il caso che si rompeva davvero era il **Popover** del
+dettaglio di una cella, che le lettere non se le tiene — "n" ci avrebbe aperto sopra la creazione
+di un report. C'è un test per ognuno di questi casi in `ReportsPage.test.tsx`.
+
+**Ctrl+Invio** sta sul `<form>` di `customDialog.tsx`, una volta sola per tutte le finestre.
+L'Invio da solo già inviava il modulo, ma non dalle aree di testo — Note, descrizioni — dove va a
+capo, ed è proprio lì che si finisce di compilare.
+
+**L'elenco con "?"** (`shortcuts-legend.tsx`, montato in `MainLayout`) esiste perché le
+scorciatoie sono diventate sette e la documentazione parla a chi amministra il server, non a chi
+sta al banco: gli unici indizi a schermo erano il chip "Ctrl K" e il badge "/", cioè due su sette.
+
+**Pulizia fatta insieme:** `isMacLike`/`modifierKey` erano copiati in due punti e avevano già
+preso strade diverse — ora stanno in `lib/utils.ts`; il chip dei tasti era la stessa classe in tre
+copie con tre misure diverse — ora è `components/ui/kbd.tsx`; il badge "/" si nasconde col focus
+via CSS (`group-focus-within/input-group`) invece che con uno stato React, e sta nell'addon che
+`InputGroup` già prevede.
+
+---
+
 ## 2026-09-17 — Unicità case-insensitive per dispositivi e difetti
 
 **Il problema.** `device.name` e `issue.description` avevano un vincolo `UNIQUE` di Postgres,

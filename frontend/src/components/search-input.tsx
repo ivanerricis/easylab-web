@@ -1,6 +1,8 @@
 import { Search, X } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
+import { usePageShortcut } from "@/hooks/usePageShortcut";
+import Kbd from "./ui/kbd";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./ui/input-group";
 
 type Props = {
@@ -14,6 +16,9 @@ type Props = {
 
 const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, className }: Props) => {
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // "/" porta il focus qui, senza doverci cliccare sopra prima di scrivere.
+    usePageShortcut("/", () => inputRef.current?.focus());
 
     const handleClear = () => {
         onValueChange("");
@@ -39,6 +44,7 @@ const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, cl
                 // nascosta in index.css, altrimenti sarebbe doppia con quella qui sotto.
                 type="search"
                 aria-label={label ?? placeholder}
+                aria-keyshortcuts="/"
                 placeholder={placeholder}
                 value={value}
                 onChange={(event) => onValueChange(event.target.value)}
@@ -52,11 +58,17 @@ const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, cl
                 }}
             />
             {/* Il pulsante compare solo se c'è qualcosa da cancellare. Prima stava lì sempre,
-                anche a campo vuoto, dove premerlo non faceva niente. */}
-            {value === "" ? null : (
+                anche a campo vuoto, dove premerlo non faceva niente. A campo vuoto lo stesso
+                spazio ricorda la scorciatoia, e col focus dentro sparisce: chi ci sta già
+                scrivendo non ha più bisogno di sapere come arrivarci. */}
+            {value !== "" ? (
                 <InputGroupButton className="mr-1" size="icon-sm" aria-label="Cancella ricerca" onClick={handleClear}>
                     <X className="text-primary" />
                 </InputGroupButton>
+            ) : (
+                <InputGroupAddon align="inline-end" className="group-focus-within/input-group:hidden">
+                    <Kbd className="hidden py-0 sm:inline-block">/</Kbd>
+                </InputGroupAddon>
             )}
         </InputGroup>
     );

@@ -28,6 +28,7 @@ import { customerSortOptions, DEFAULT_CUSTOMER_SORT_OPTION, type CustomerSortOpt
 import { useCustomersRows } from "./hooks/useCustomersRows";
 import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
+import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { openPrintWindow } from "@/lib/utils";
 import { toCustomerPayload } from "@/lib/customers";
 import { entityPaths } from "@/lib/entityPaths";
@@ -39,6 +40,7 @@ type CustomerPrintKind = "reports" | "interventions";
 const CustomersPage = () => {
     const navigate = useNavigate();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    usePageShortcut("n", () => setIsCreateDialogOpen(true));
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     // Ricerca, ordinamento e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();

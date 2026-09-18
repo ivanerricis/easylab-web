@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import LoadingPage from "@/components/loadingPage";
 // import { ModeToggle } from "@/components/mode-toggle"
 import GlobalSearch from "@/components/global-search";
+import ShortcutsLegend from "@/components/shortcuts-legend";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { UserBadge } from "@/components/user-badge";
 import MainSidebar from "@/components/main-sidebar";
@@ -35,6 +36,8 @@ export const MainLayout = () => {
                         {/* La ricerca sta qui e non in una pagina: vale per tutta l'app, e
                             Ctrl+K la apre da qualunque punto. */}
                         <GlobalSearch />
+                        {/* Non si vede: è solo l'elenco che "?" apre. */}
+                        <ShortcutsLegend />
                         <NotificationsMenu />
                         {/* <ModeToggle /> */}
                         <UserBadge />

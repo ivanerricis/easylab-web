@@ -110,6 +110,45 @@ describe("SearchInput", () => {
 
         expect(screen.getByRole("searchbox", { name: "Cerca report..." })).toBeInTheDocument();
     });
+
+    it('porta il focus sul campo con "/"', async () => {
+        render(<ControlledSearch />);
+
+        await userEvent.keyboard("/");
+
+        expect(screen.getByRole("searchbox")).toHaveFocus();
+    });
+
+    it('non intercetta "/" mentre si scrive in un altro campo', async () => {
+        render(
+            <>
+                <input aria-label="Altro campo" />
+                <ControlledSearch />
+            </>
+        );
+
+        await userEvent.click(screen.getByLabelText("Altro campo"));
+        await userEvent.keyboard("/");
+
+        expect(screen.getByLabelText("Altro campo")).toHaveValue("/");
+        expect(screen.getByRole("searchbox")).not.toHaveFocus();
+    });
+
+    it('non intercetta "/" mentre un dialogo è aperto sopra la pagina', async () => {
+        render(
+            <>
+                <div role="dialog">
+                    <button>Nel dialogo</button>
+                </div>
+                <ControlledSearch />
+            </>
+        );
+
+        screen.getByText("Nel dialogo").focus();
+        await userEvent.keyboard("/");
+
+        expect(screen.getByRole("searchbox")).not.toHaveFocus();
+    });
 });
 
 describe("PaymentMethodSelector", () => {

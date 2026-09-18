@@ -139,6 +139,20 @@ const CustomDialog = ({
                         event.preventDefault();
                         onConfirm?.();
                     }}
+                    onKeyDown={(event) => {
+                        // Ctrl+Invio (⌘+Invio su Mac) conferma da qualunque campo. L'Invio da solo
+                        // già invia il modulo, ma non dalle aree di testo — Note, descrizioni —
+                        // dove va a capo, ed è proprio lì che si finisce di compilare.
+                        if (
+                            (event.ctrlKey || event.metaKey) &&
+                            event.key === "Enter" &&
+                            showConfirmButton &&
+                            !confirmDisabled
+                        ) {
+                            event.preventDefault();
+                            onConfirm?.();
+                        }
+                    }}
                 >
                     <DialogHeader>
                         {title ? <DialogTitle className="text-lg">{title}</DialogTitle> : null}

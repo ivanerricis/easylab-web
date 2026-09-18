@@ -15,7 +15,8 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getApiErrorMessage, listCustomers, listInterventions, listReports } from "@/lib/api";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isMacLike, modifierKey } from "@/lib/utils";
+import Kbd from "@/components/ui/kbd";
 import type { CustomerDto, InterventionDto, ReportDto } from "@/types/dtos";
 import {
     BookUser,
@@ -70,8 +71,7 @@ const normalize = (value: string) =>
  */
 const isSearchable = (query: string) => query.length >= 2 || /^#?\d+$/.test(query);
 
-const isMacLike = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
-const shortcutLabel = isMacLike ? "⌘K" : "Ctrl K";
+const shortcutLabel = `${modifierKey} K`;
 
 const customerName = (customer: CustomerDto) => `${customer.firstName} ${customer.lastName ?? ""}`.trim();
 
@@ -190,9 +190,7 @@ const GlobalSearch = () => {
             >
                 <Search className="size-5" />
                 <span className="hidden sm:inline">Cerca…</span>
-                <kbd className="pointer-events-none hidden rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground sm:inline">
-                    {shortcutLabel}
-                </kbd>
+                <Kbd className="hidden py-0 sm:inline">{shortcutLabel}</Kbd>
             </Button>
 
             <CommandDialog

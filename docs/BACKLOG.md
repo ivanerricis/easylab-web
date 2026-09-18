@@ -57,7 +57,11 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   (`concat_ws` su nome e cognome del cliente) nasce dal join col cliente e non ha un indice,
   quindi Postgres deve materializzare e ordinare tutte le righe che passano i filtri prima di
   applicare `LIMIT`/`OFFSET` — il costo cresce con l'archivio, non con la pagina. Misurato il 2026-09-17 (`backend/src/db/queries/report.ts`, `customerSortExpr`).
-  Nessuna soluzione ancora valutata. **L'ordinamento per "Totale" aveva lo stesso costo ed è
+  Nessuna soluzione ancora valutata. Stessa natura, più lieve: la lista report predefinita (solo
+  aperti) e il riquadro stati della dashboard contano su `closed` senza indice, quindi scorrono la
+  tabella intera (pochi ms oggi su 20.000 report, crescono con l'archivio); un indice parziale
+  `report(created_at) WHERE NOT closed` li coprirebbe (revisione del 2026-09-18).
+  **L'ordinamento per "Totale" aveva lo stesso costo ed è
   stato tolto lo stesso giorno** (CHANGELOG), non risolto: la colonna resta in tabella, solo non
   più cliccabile per ordinare.
 - I dialoghi di creazione (report, intervento) caricano `listDevices()` e `listIssues()` interi
@@ -72,13 +76,31 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   uguale. Urgenza bassa.
 
 **Qualità**
-- La riconciliazione del tecnico esterno al salvataggio di un report (aggiungi / aggiorna il
-  prezzo / sostituisci / togli) è copiata identica in `ReportsPage`, `ReportPage` e
-  `TechnicianPage`. Il commento di `toReportUpdatePayload` dice che lì "le tre non sono uguali",
-  ma lo sono: cambia solo cosa si ricarica dopo. Candidata a una `syncReportTechnician` in
-  `lib/reportForm.ts`, come è stato fatto per la nota degli interventi (CHANGELOG del
-  2026-09-11): è esattamente il tipo di copia che prima o poi si allontana. I test di
-  `ReportsPage` coprono già i quattro casi.
+- Dalla revisione di qualità del 2026-09-18 (il resto è nel CHANGELOG dello stesso giorno):
+  - **Il fuso orario cambia `process.env.TZ` per tutto il processo** (`companyManager.applyTimeZone`).
+    Il bug del 2026-09-17 ("Date solo giorno un giorno indietro") nasceva da qui, ed è stato curato
+    rendendo immune `formatting.ts`, ma la causa è rimasta: oggi convivono il fuso passato come
+    parametro (query, PDF) e quello globale implicito (scheduler dei backup, nomi degli archivi,
+    `backupState.computeNextRunAt`). Il prossimo formattatore creato all'import ripete il bug. La
+    strada: passare il fuso anche a scheduler e nomi dei file, ricavando le parti della data con
+    `Intl` come fa `currentMonthKey`, e smettere di toccare `TZ`. Rimandato perché tocca backup e
+    scheduler, che vanno riprovati a mano.
+  - **Regole di dominio scritte due volte.** "Pagato ⇒ prezzo > 0" sta nello schema zod della POST
+    dei report e a mano nella PUT; "chiuso ⇒ collaboratore" a mano in entrambe; per gli interventi
+    `superRefine` in creazione e `if` in modifica, con messaggi diversi. Per i report la forma
+    giusta sono due CHECK di riga nel database tradotti in `errorHandler`; per gli interventi una
+    funzione sola applicata alla riga risultante (corpo + riga esistente). Serve una migration che
+    prima verifichi i dati esistenti.
+  - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
+    hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
+    data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
+  - **`text-lg!` su circa 40 campi dei dialoghi**, per battere il `text-base md:text-sm` del
+    primitivo `Input`. Un campo nuovo che lo dimentica esce più piccolo. Va deciso una volta sola,
+    in `CustomDialog` o come variante del primitivo, con una verifica visiva di tutti i dialoghi.
+  - **`EntityTable` disegna ogni riga due volte** (tabella e scheda mobile, una delle due nascosta
+    via CSS) e senza memo: con "Tutte" (fino a 5000 righe) si sente sulla digitazione nella ricerca
+    e sul trascinamento delle colonne. Con 10-50 righe è irrilevante. Attenzione: il ResizeObserver
+    di `useResizableColumns` presuppone che la tabella sia sempre montata.
 - `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
   file del codice la legge: configurazione morta, da togliere o da ricollegare.
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): l'infrastruttura
@@ -172,11 +194,14 @@ README, "Test e controlli".*
 **Cosa resta scoperto.** Le altre query di `backend/src/db/queries/` girano ancora solo contro il
 database finto. Le più utili da coprire, in ordine:
 
-- **i vincoli che il codice controlla da sé**, per esempio l'unicità di "Altro" fra dispositivi e
-  difetti, che il codice verifica a mano perché il vincolo unico di Postgres distingue le
-  maiuscole;
+- ~~i vincoli che il codice controlla da sé~~: l'unicità senza maiuscole di dispositivi e difetti
+  (compreso "Altro") la garantisce l'indice `lower()` della migration 0031, il controllo a mano
+  è stato tolto il 2026-09-18 e `issue.db.test.ts` prova l'indice; restano da coprire gli altri
+  vincoli, se ne compariranno;
 - **le cancellazioni con chiavi esterne**: cliente, collaboratore, tecnico, dispositivo o difetto
-  ancora usati da un report o da un intervento (cosa risponde Postgres, e cosa ne fa la rotta);
+  ancora usati da un report o da un intervento (cosa risponde Postgres, e cosa ne fa la rotta).
+  Il caso del report con un tecnico esterno, che prima non si eliminava, è coperto da
+  `reportWrite.db.test.ts` dal 2026-09-18;
 - **le statistiche della dashboard** (`getReportStats`, `getInterventionStats`): somme per mese
   nel fuso del laboratorio;
 - **le liste delle anagrafiche** (clienti, collaboratori, tecnici, dispositivi, difetti): ricerca e

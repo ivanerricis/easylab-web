@@ -11,6 +11,159 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-18 — Revisione di qualità di tutto il repository: riuso, semplificazione, efficienza, altitudine
+
+Revisione dell'intero codice, non di un diff: quattro angolazioni (codice che reimplementa un
+helper esistente, complessità inutile, lavoro sprecato, correzioni fatte al livello sbagliato)
+ciascuna su backend e frontend. Per strada sono usciti anche quattro difetti veri, sistemati qui
+insieme alla causa. Quello che è stato valutato e rimandato è nel BACKLOG ("Qualità" e
+"Prestazioni", con la stessa data); quello scartato è in fondo a questa voce.
+
+### Difetti trovati per strada
+
+- **Un report con un tecnico esterno non si poteva eliminare.** La chiave esterna
+  `report_technician → report` era "no action", e né la rotta né il frontend toglievano prima la
+  riga del tecnico: Postgres rifiutava, e l'utente leggeva "è ancora assegnato a uno o più
+  tecnici". Migration `0032_report_technician_cascade.sql`: la chiave è in cascata, il tecnico se
+  ne va con il suo report. Quella verso `technician` resta "no action": eliminare un tecnico che ha
+  ancora report va impedito.
+- **Le impostazioni email si cancellavano da sole.** Se `email-settings.json` conteneva una porta
+  fuori regola, `sanitizeState` lanciava dentro il `try` di lettura e il `catch` riscriveva il file
+  con i default: spariva l'intera configurazione, password cifrata compresa, senza un messaggio.
+  Stesso rischio per `backup-settings.json` (frequenza, porta SMB). Vedi l'archivio unico qui sotto.
+  Inoltre `updateEmailSettings` modificava la cache *prima* di validare: un salvataggio rifiutato
+  restava in memoria come fosse riuscito, senza essere su disco.
+- **L'export CSV degli interventi ignorava `scheduledDate`.** Lo schema lo accettava, ma la rotta
+  estraeva i campi con una copia del tipo scritta a mano, e quello lì mancava. Oggi il frontend non
+  lo manda all'export, quindi non si vedeva; la causa (tipi copiati) è sistemata sotto.
+- **"Sei sicuro di voler eliminare il tecnico Mario ?"** Tre conferme di eliminazione costruivano
+  il nome a mano senza `trim`, e senza cognome restava lo spazio prima del punto di domanda.
+
+### Backend
+
+- **Il tecnico esterno viaggia con il report.** `POST`/`PUT /api/reports` accettano
+  `technicianId` (`null` lo toglie, assente lo lascia com'è) e `technicianPrice`, e
+  `createReport`/`updateReportById` scrivono report e tecnico nella stessa transazione, con un
+  upsert sulla chiave primaria (`report_id`, dalla 0004). Tolta la risorsa
+  `/api/report-technicians/:reportId/:technicianId` con la sua query e i suoi test. Il perché:
+  dalla 0004 un report ha al più un tecnico, cioè è un suo attributo, ma l'API lo esponeva ancora
+  come una relazione molti-a-molti, e ogni pagina che salvava un report decideva da sé fra quattro
+  casi (aggiungi, aggiorna il prezzo, sostituisci, togli) con due o tre richieste separate, non
+  atomiche. Quella logica era copiata identica in tre pagine, ed era in BACKLOG come candidata a
+  una `syncReportTechnician` sul client: sarebbe stato un cerotto sul sintomo. Un compenso senza
+  il tecnico si rifiuta (400), perché non si capirebbe di chi è.
+- **`updated_at` lo scrive lo schema.** `$onUpdate` nell'oggetto `timestamps` di `schema.ts`, con
+  `default(null)` perché drizzle altrimenti lo userebbe anche all'inserimento, e la scheda del
+  report mostrerebbe una "Ultima modifica" mai avvenuta. Prima lo scrivevano a mano tre query su
+  otto: clienti, tecnici, dispositivi e difetti lo lasciavano NULL per sempre. Quando la PUT di un
+  report cambia solo il tecnico, la riga del report non ha campi e drizzle rifiuta un `set` vuoto:
+  lì si scrive `updated_at` e basta (trovato dal test sul database vero, il finto non lo vedeva).
+- **Le stampe usano le query di dettaglio.** `GET /reports/:id/print` e le due rotte di stampa ed
+  email dell'intervento chiamano `getReportDetailById`/`getInterventionDetailById` invece di
+  riscrivere gli stessi join; le query di dettaglio portano in più i due telefoni separati (e
+  l'email, per l'intervento). Tolta anche la `sum()` sul compenso del tecnico, dove per chiave c'è
+  al più una riga. Il CHANGELOG del 2026-09-14 racconta proprio un campo arrivato solo in una
+  delle due query. **La ricevuta non nomina il tecnico esterno**: prima come adesso il suo compenso
+  entra solo nel totale, e un test lo verifica (`reports.test.ts`).
+- **Resoconti PDF di cliente e collaboratore: una funzione sola**
+  (`routes/summaryPrint.ts`, `registerSummaryPrintRoutes`). Erano quattro handler quasi uguali,
+  circa 180 righe copiate, e le copie divergevano già. Insieme, un **tetto di 2000 righe con
+  errore esplicito**: senza date il resoconto di un collaboratore caricava tutti i suoi report
+  dall'inizio dell'archivio, e pdfmake li impagina in modo sincrono bloccando tutte le postazioni;
+  oltre le 5000 righe, poi, il PDF veniva troncato in silenzio. `UnpaginatedLimit` con
+  `onOverflow: "reject"` ora porta il suo messaggio, così l'export e il resoconto dicono ciascuno
+  cosa restringere.
+- **I tipi della query vengono dagli schemi zod** (`z.infer`) nelle liste ed export di report e
+  interventi: niente più copie scritte a mano che dimenticano un campo (vedi l'export qui sopra).
+- **Un solo archivio per le impostazioni JSON** (`services/jsonSettingsStore.ts`): azienda,
+  email, backup e conservazione dei log avevano quattro copie di cache, lettura, scrittura e
+  invalidazione. Il file si riscrive con i default solo se non esiste; se esiste ma non si legge o
+  non è valido, i default valgono in memoria, il file resta com'è per poterlo correggere, e il log
+  lo dice. Il ripristino svuota tutte le cache con `invalidateJsonSettingsCaches()` invece di
+  elencarle una per una. In `emailManager` una porta fuori regola nel file torna al default e il
+  resto della configurazione resta.
+- **Un solo lettore dei file di chiave** (`services/keyFile.ts`) per `secret.key` e `backup.key`.
+  La correzione EL-03 era andata fatta due volte, e la copia dei backup aveva perso la promessa
+  condivisa: due richieste concorrenti al primo avvio facevano fallire la seconda sul `wx`. Test
+  nuovo per quel caso.
+- Pulizie piccole: `containsText` in `db/queries/search.ts` e `personName`/`personNameOrDash` in
+  `db/queries/personName.ts`, usate da tutte le query invece delle copie di `ILIKE` e `concat_ws`;
+  il cookie di sessione scade con la sessione (`expires: result.expiresAt`) invece di una durata
+  sua, che il passaggio da 30 a 7 giorni aveva dovuto cambiare in due file; `notifications.ts` usa
+  `idParamsSchema` e perde il `try/catch → next` che Express 5 rende superfluo; in `issues.ts` via
+  il controllo a mano sul doppione di "Altro", ormai coperto dall'indice `lower()` della 0031 (lo
+  prova `issue.db.test.ts`), restano le protezioni su rinomina ed eliminazione.
+
+### Frontend
+
+- **Il tecnico nel salvataggio del report**: `toReportUpdatePayload` porta `technicianId` e
+  `technicianPrice`, le tre pagine chiamano solo `updateReport`, via `existingTechnicianId` dal
+  dialogo e `lib/api/reportTechnicians.ts`.
+- **Niente ritocco a mano della riga dopo un salvataggio** in `ReportsPage` e `InterventionsPage`:
+  la lista si ricaricava comunque subito dopo, e il ritocco copiava sul client la regola del totale
+  (prezzo interno più compenso), mostrando per un istante una riga a metà. Tolti anche
+  `updateReportRow`, `updateInterventionRow` e `updateRow` di `usePaginatedRows`.
+- **Stato del report e badge condiviso.** `lib/reports.ts` (`formatReportStatus`,
+  `reportStatusColor`, `reportVisibilityOptions`, `paymentMethodLabels`) come `lib/interventions.ts`
+  fa per gli interventi: "Chiuso/Aperto" era scritto in sei punti e il colore in quattro.
+  `components/status-badge.tsx` sui token `--status-*` (mappa in `lib/statusColors.ts`) sostituisce
+  le tre mappe di colori Tailwind grezzi della scheda report, della scheda intervento e del popover
+  del calendario: senza, la correzione del contrasto in BACKLOG non li avrebbe raggiunti. Nella
+  misura grande (la card di stato delle schede) niente pallino: con il pallino "Programmato" usciva
+  dalla card a 1440px (misurato).
+- **Il modulo intervento è uno.** `lib/interventionForm.ts` (`InterventionFormState`,
+  `validateInterventionForm`, `toInterventionSubmitFields`) e
+  `components/dialogs/intervention-form-fields.tsx` (collaboratore e sezione "Intervento"): i
+  dialoghi di creazione e modifica avevano ciascuno circa 230 righe di campi più stato, validazione
+  e payload, e ogni modifica andava fatta due volte. Le copie si erano allontanate: il suggerimento
+  nella descrizione c'era solo in creazione, e il collaboratore si controllava in due modi.
+- **`toReportCreatePayload`** in `lib/reportForm.ts`, per l'elenco report, la scheda cliente e la
+  Dashboard, che costruivano lo stesso oggetto in tre copie.
+- **Le schede di cliente e collaboratore condividono le tab**: `useReportsAndInterventionsOf`
+  (due liste, filtri e impaginazioni separati) e `components/reports-interventions-tabs.tsx`.
+  `FilterSelect` ha una variante `inline` per il filtro accanto alle tab e al titolo (anche nella
+  scheda tecnico), al posto di cinque `Select` scritti a mano con le stesse classi.
+- **`formatPersonName`** in `lib/people.ts` al posto di una dozzina di copie (vedi "Mario ?"), ed
+  **`EuroInput`** in `components/euro-input.tsx` al posto di tre.
+- **I formattatori `Intl` si creano una volta** in `lib/utils.ts`, non a ogni cella di ogni render.
+- Pulizie piccole: `onSubmit` obbligatorio nei sei dialoghi di creazione (il ramo senza non si
+  eseguiva mai); in `createReportDialog` un solo stato per catalogo (una `Map` nome → id, i
+  suggerimenti sono le chiavi) e `toCustomerPayload` al posto dei `String(...).trim()`;
+  `InterventionSchedule` al posto di quattro celle "Data/Orario" (il popover del calendario ora
+  scrive l'orario come le tabelle, senza "·"); `formatYesNo` e `paymentMethodLabels` al posto delle
+  copie della scheda report; tolto il secondo `ThemeProvider` in `main.tsx`, con gli stessi default
+  di quello in `App`.
+
+### Da sapere per la messa in produzione
+
+La migration 0032 cambia una chiave esterna (DROP + ADD CONSTRAINT): è istantanea sui volumi del
+laboratorio e non tocca i dati. La rotta `/api/report-technicians` non esiste più: backend e
+frontend vanno aggiornati insieme, come avviene già con l'aggiornamento automatico. Le impostazioni
+JSON esistenti si leggono come prima.
+
+### Scartato, e perché
+
+- **Statistiche ricaricate al cambio di mese della dashboard:** due query piccole a ogni clic,
+  costo irrilevante per un'app interna.
+- **Cache del logo SVG convertito in PNG:** decine di millisecondi a stampa, e solo con un logo SVG.
+- **Dashboard con nove stati invece di uno:** vero, ma è estetica del codice su un componente che
+  funziona.
+- **Sanificazione del log azioni campo per campo:** già trattata il 2026-09-17; il resto è minore.
+- **Una query dedicata con le sole colonne del resoconto PDF:** le colonne in più sono testi da
+  255 caratteri; su 2000 righe (il tetto nuovo) non pesano, il costo vero è l'impaginazione.
+- **Tab del collaboratore nell'indirizzo come quella del cliente:** resta in memoria; il componente
+  condiviso accetta entrambe le forme, se servirà.
+
+**Verifiche.** Backend: typecheck, lint, 967 test unitari e 73 sul database vero (`npm run
+test:db`: tecnico nella transazione, cascata, `updated_at`, doppione di "Altro"). Frontend:
+typecheck, lint, 699 test. Controllo visivo con Playwright a 1440, 1100 e 390px sulle schede di
+report, intervento, cliente, collaboratore e tecnico, sull'elenco report, sui due dialoghi
+dell'intervento e sul popover del calendario, più un salvataggio vero dal dialogo di modifica di un
+report con tecnico: una sola `PUT` con `technicianId` e `technicianPrice`, risposta 200, nessuna
+chiamata alla vecchia rotta.
+
+---
+
 ## 2026-09-18 — I puntini di fase dell'aggiornamento non sparivano più a intermittenza
 
 **Perché.** Durante un aggiornamento due poller scrivevano sullo stesso stato "busy" condiviso:

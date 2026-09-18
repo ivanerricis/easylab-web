@@ -2,15 +2,14 @@
  * Impostazioni del backup: forma dello stato persistito in data/backup-settings.json,
  * validazione in lettura, cache in memoria e proiezione verso il frontend.
  */
-import fs from "node:fs";
 import { BackupManagerError } from "./backupError";
 import {
+    backupSettingsFileName,
     defaultMaxBackupsToKeep,
     defaultOutputDir,
     getConfiguredOutputDir,
-    settingsDir,
-    settingsFilePath,
 } from "./backupFiles";
+import { createJsonSettingsStore } from "./jsonSettingsStore";
 import { defaultSmbPort } from "./backupSmb";
 import { decryptSecret } from "./secretCrypto";
 import { isEmailConfigured, isStoredEmailPasswordUsable } from "./emailManager";
@@ -76,8 +75,6 @@ export const defaultState: BackupSettingsState = {
     lastRestoreError: null,
     lastRestoreFileName: null,
 };
-
-let cachedState: BackupSettingsState | null = null;
 
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -219,31 +216,20 @@ export const sanitizeState = (input: Partial<BackupSettingsState>): BackupSettin
     };
 };
 
-export const persistState = async (state: BackupSettingsState) => {
-    await fs.promises.mkdir(settingsDir, { recursive: true });
-    await fs.promises.writeFile(settingsFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
-};
+// Chi chiama modifica lo stato caricato sul posto e poi lo salva: `load` restituisce sempre lo
+// stesso oggetto della cache, quindi le modifiche restano visibili anche prima del salvataggio.
+const store = createJsonSettingsStore({
+    fileName: backupSettingsFileName,
+    defaults: defaultState,
+    sanitize: sanitizeState,
+});
 
-export const loadState = async () => {
-    if (cachedState) {
-        return cachedState;
-    }
+export const persistState = store.save;
 
-    try {
-        const raw = await fs.promises.readFile(settingsFilePath, "utf-8");
-        cachedState = sanitizeState(JSON.parse(raw) as Partial<BackupSettingsState>);
-    } catch {
-        cachedState = { ...defaultState };
-        await persistState(cachedState);
-    }
-
-    return cachedState;
-};
+export const loadState = store.load;
 
 /** Da chiamare quando backup-settings.json è cambiato sotto la cache (es. dopo un ripristino). */
-export const invalidateBackupStateCache = () => {
-    cachedState = null;
-};
+export const invalidateBackupStateCache = store.invalidate;
 
 // I segreti sono cifrati con data/secret.key, esclusa dai backup di proposito. Su una
 // macchina con chiave diversa restano illeggibili: va detto subito e per iscritto,

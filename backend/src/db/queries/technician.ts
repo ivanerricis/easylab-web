@@ -3,7 +3,7 @@ import { db } from "../index";
 import { technicianTable } from "../schema";
 import type { NewTechnician, UpdateTechnician } from "../types";
 import { takeUnpaginated } from "./pagination";
-import { parseIdSearch } from "./search";
+import { containsText, parseIdSearch } from "./search";
 
 type ListTechniciansParams = {
     page?: number;
@@ -18,10 +18,10 @@ export const listTechnicians = async ({ page, pageSize, search }: ListTechnician
     const searchConditions = trimmedSearch
         ? [
               ...(idSearch != null ? [eq(technicianTable.id, idSearch)] : []),
-              sql`${technicianTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${technicianTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${technicianTable.phoneNumber}::text ILIKE ${searchPattern}`,
-              sql`${technicianTable.vatNumber}::text ILIKE ${searchPattern}`,
+              containsText(technicianTable.firstName, searchPattern),
+              containsText(technicianTable.lastName, searchPattern),
+              containsText(technicianTable.phoneNumber, searchPattern),
+              containsText(technicianTable.vatNumber, searchPattern),
           ]
         : [];
     const whereClause = searchConditions.length > 0 ? or(...searchConditions) : undefined;

@@ -1,3 +1,11 @@
+import { sql, type SQLWrapper } from "drizzle-orm";
+
+/**
+ * "La colonna contiene il testo", senza distinguere le maiuscole: la forma che gli indici trigram
+ * delle colonne di ricerca coprono. `pattern` arriva già con i `%` attorno.
+ */
+export const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
+
 /**
  * Ricerca per numero nella casella di testo libero.
  *

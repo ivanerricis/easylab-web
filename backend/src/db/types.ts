@@ -6,7 +6,6 @@ import {
     interventionTable,
     IssueTable,
     reportTable,
-    reportTechnicianTable,
     technicianTable,
 } from "./schema";
 
@@ -27,9 +26,6 @@ export type UpdateDevice = Partial<Omit<NewDevice, "id">>;
 
 export type NewIssue = InferInsertModel<typeof IssueTable>;
 export type UpdateIssue = Partial<Omit<NewIssue, "id">>;
-
-export type NewReportTechnician = InferInsertModel<typeof reportTechnicianTable>;
-export type UpdateReportTechnician = Partial<Omit<NewReportTechnician, "reportId" | "technicianId">>;
 
 export type NewIntervention = InferInsertModel<typeof interventionTable>;
 export type UpdateIntervention = Partial<Omit<NewIntervention, "id">>;

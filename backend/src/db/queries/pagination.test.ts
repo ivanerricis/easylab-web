@@ -38,11 +38,11 @@ describe("takeUnpaginated", () => {
 
     it("per gli export, oltre il tetto rifiuta con un 400 invece di consegnare un file incompleto", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const small = { maxRows: 2, onOverflow: "reject" } as const;
+        const small = { maxRows: 2, onOverflow: "reject", tooLargeMessage: "Troppe righe" } as const;
         const result = takeUnpaginated(fakeQuery(3), "prova", small);
 
         await expect(result).rejects.toBeInstanceOf(ExportTooLargeError);
-        await expect(result).rejects.toMatchObject({ statusCode: 400 });
+        await expect(result).rejects.toMatchObject({ statusCode: 400, message: "Troppe righe" });
         expect(warn).not.toHaveBeenCalled();
     });
 });

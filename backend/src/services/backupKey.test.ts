@@ -101,6 +101,18 @@ describe("getOrCreateBackupKey, file presente ma inutilizzabile", () => {
             expect.objectContaining({ mode: 0o600, flag: "wx" })
         );
     });
+
+    // Due backup (o un backup e un export della chiave) al primo avvio: prima ognuno generava la
+    // sua chiave, e la seconda scrittura falliva sul `wx`. Ora condividono la stessa generazione.
+    it("due richieste concorrenti al primo avvio ricevono la stessa chiave, scritta una volta", async () => {
+        readFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+        const { getOrCreateBackupKey: load } = await loadModule();
+
+        const [first, second] = await Promise.all([load(), load()]);
+
+        expect(first.equals(second)).toBe(true);
+        expect(writeFile).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("exportBackupKey", () => {

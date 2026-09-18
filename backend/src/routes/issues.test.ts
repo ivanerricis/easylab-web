@@ -72,24 +72,31 @@ describe("protezione della voce generica del catalogo difetti", () => {
      * convivere "Altro" e "altro": nel dialogo del report sembrerebbero entrambe la voce
      * generica, e quale delle due vinca dipenderebbe dall'ordine della lista.
      */
-    it('rifiuta di creare un secondo "altro", anche scritto diversamente', async () => {
-        for (const description of ["Altro", "altro", "ALTRO", "  Altro  "]) {
-            vi.clearAllMocks();
+    // Il doppione non lo ferma più la rotta ma l'indice unico su lower(description) (migration
+    // 0031): qui si verifica che la rotta lasci passare la richiesta e traduca l'errore di
+    // Postgres. Che l'indice rifiuti davvero "altro" accanto ad "Altro" lo prova issue.db.test.ts.
+    const uniqueViolation = () =>
+        Object.assign(new Error("duplicate key value violates unique constraint"), {
+            code: "23505",
+            constraint: "issue_description_lower_idx",
+        });
 
-            const response = await request(buildApp()).post("/api/issues").send({ description });
+    it('un secondo "altro" arriva al database, che lo rifiuta con 409', async () => {
+        vi.mocked(createIssue).mockRejectedValue(uniqueViolation());
 
-            expect(response.status, description).toBe(409);
-            expect(createIssue, description).not.toHaveBeenCalled();
-        }
+        const response = await request(buildApp()).post("/api/issues").send({ description: "altro" });
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toBe("Esiste già un guasto con questa descrizione.");
     });
 
-    it('rifiuta di rinominare un difetto qualunque in "Altro"', async () => {
+    it('rinominare un difetto qualunque in "Altro" arriva al database, che lo rifiuta con 409', async () => {
         vi.mocked(getIssueById).mockResolvedValue([normale] as never);
+        vi.mocked(updateIssueById).mockRejectedValue(uniqueViolation());
 
         const response = await request(buildApp()).put("/api/issues/2").send({ description: "altro" });
 
         expect(response.status).toBe(409);
-        expect(updateIssueById).not.toHaveBeenCalled();
     });
 
     it("lascia creare e rinominare i difetti normali", async () => {

@@ -74,10 +74,11 @@ describe("POST /api/auth/login", () => {
     });
 
     it("consegna il cookie di sessione quando la 2FA non è attiva", async () => {
+        const expiresAt = new Date("2030-01-08T10:00:00Z");
         vi.mocked(login).mockResolvedValue({
             status: "authenticated",
             token: "un-token",
-            expiresAt: new Date(),
+            expiresAt,
             user: { ...publicUser, twoFactorEnabled: false },
         });
 
@@ -88,6 +89,8 @@ describe("POST /api/auth/login", () => {
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({ username: "mario" });
         expect(sessionCookieOf(response)).toContain(sessionCookie("un-token"));
+        // Il cookie scade con la sessione, non dopo una durata scritta a parte.
+        expect(sessionCookieOf(response)).toContain(`Expires=${expiresAt.toUTCString()}`);
     });
 
     // Il cuore della 2FA: se una sessione nascesse già qui, il secondo fattore sarebbe una

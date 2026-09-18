@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ApiError } from "./apiError";
+import { createJsonSettingsStore } from "./jsonSettingsStore";
 
 const logDir = path.join(process.cwd(), "logs");
 const logFilePrefix = "user-actions-";
@@ -9,15 +10,12 @@ const dayKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 const dailyLogFileNamePattern = /^user-actions-\d{4}-\d{2}-\d{2}\.log$/;
 let lastCleanupDay = "";
 
-const settingsDir = path.join(process.cwd(), "data");
-const retentionSettingsPath = path.join(settingsDir, "log-settings.json");
 const minRetentionDays = 1;
 const maxRetentionDays = 90;
 
 export type LogRetentionState = { maxDays: number };
 
 const defaultRetention: LogRetentionState = { maxDays: 7 };
-let cachedRetention: LogRetentionState | null = null;
 
 const sanitizeRetention = (input: Partial<LogRetentionState>): LogRetentionState => {
     const maxDays = Number(input.maxDays);
@@ -30,25 +28,17 @@ const sanitizeRetention = (input: Partial<LogRetentionState>): LogRetentionState
     };
 };
 
-// A differenza delle altre impostazioni persistite (company/backup), qui un valore mancante
-// o illeggibile non viene riscritto su disco: il default vale finché nessuno lo cambia
-// davvero, invece di aggiungere una scrittura a ogni riga di log del primo giorno.
-const loadRetention = async (): Promise<LogRetentionState> => {
-    if (cachedRetention) {
-        return cachedRetention;
-    }
+// A differenza delle altre impostazioni persistite (company/backup), qui un file mancante non
+// viene scritto: il default vale finché nessuno lo cambia davvero, invece di aggiungere una
+// scrittura alla prima riga di log del giorno.
+const retentionStore = createJsonSettingsStore({
+    fileName: "log-settings.json",
+    defaults: defaultRetention,
+    sanitize: sanitizeRetention,
+    persistDefaults: false,
+});
 
-    try {
-        const raw = await fs.promises.readFile(retentionSettingsPath, "utf-8");
-        cachedRetention = sanitizeRetention(JSON.parse(raw) as Partial<LogRetentionState>);
-    } catch {
-        cachedRetention = { ...defaultRetention };
-    }
-
-    return cachedRetention;
-};
-
-export const getLogRetentionDays = async (): Promise<number> => (await loadRetention()).maxDays;
+export const getLogRetentionDays = async (): Promise<number> => (await retentionStore.load()).maxDays;
 
 export const setLogRetentionDays = async (maxDays: number): Promise<LogRetentionState> => {
     if (!Number.isInteger(maxDays) || maxDays < minRetentionDays || maxDays > maxRetentionDays) {
@@ -59,9 +49,7 @@ export const setLogRetentionDays = async (maxDays: number): Promise<LogRetention
     }
 
     const next = { maxDays };
-    await fs.promises.mkdir(settingsDir, { recursive: true });
-    await fs.promises.writeFile(retentionSettingsPath, `${JSON.stringify(next, null, 2)}\n`, "utf-8");
-    cachedRetention = next;
+    await retentionStore.save(next);
 
     return next;
 };

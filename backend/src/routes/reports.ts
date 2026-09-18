@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
     createReport,
@@ -9,9 +8,8 @@ import {
     getReportStats,
     listReports,
     updateReportById,
+    type ReportTechnicianInput,
 } from "../db/queries/report";
-import { db } from "../db";
-import { customerTable, deviceTable, IssueTable, reportTechnicianTable, reportTable } from "../db/schema";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
@@ -63,65 +61,68 @@ const reportBodySchema = z
         closed: z.boolean().optional(),
         paymentMethod: z.enum(reportPaymentMethods).optional(),
         price: z.coerce.number().int().min(0).optional(),
+        // Il tecnico esterno viaggia con il report: `null` lo toglie, assente lo lascia com'è.
+        // Vedi `ReportTechnicianInput`.
+        technicianId: z.coerce.number().int().positive().nullable().optional(),
+        technicianPrice: z.coerce.number().int().min(0).optional(),
     })
     .strict();
 
-const reportCreateBodySchema = reportBodySchema.refine(
-    (value) => {
-        const paymentMethod = value.paymentMethod ?? "non_paid";
-        const price = value.price ?? 0;
+// Un compenso senza dire di quale tecnico non ha un significato univoco (il tecnico di prima?
+// nessuno?): si mandano insieme.
+const technicianPriceNeedsTechnician = {
+    check: (value: { technicianId?: number | null; technicianPrice?: number }) =>
+        value.technicianPrice === undefined || value.technicianId !== undefined,
+    message: { message: "Il compenso del tecnico va inviato insieme al tecnico", path: ["technicianPrice"] },
+};
 
-        return !paidPaymentMethods.has(paymentMethod) || price > 0;
-    },
-    {
-        message: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
-        path: ["price"],
-    }
-);
+const reportCreateBodySchema = reportBodySchema
+    .refine(
+        (value) => {
+            const paymentMethod = value.paymentMethod ?? "non_paid";
+            const price = value.price ?? 0;
 
-const reportUpdateBodySchema = reportBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field is required",
+            return !paidPaymentMethods.has(paymentMethod) || price > 0;
+        },
+        {
+            message: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
+            path: ["price"],
+        }
+    )
+    .refine(technicianPriceNeedsTechnician.check, technicianPriceNeedsTechnician.message);
+
+const reportUpdateBodySchema = reportBodySchema
+    .partial()
+    .refine((value) => Object.keys(value).length > 0, {
+        message: "At least one field is required",
+    })
+    .refine(technicianPriceNeedsTechnician.check, technicianPriceNeedsTechnician.message);
+
+/** Separa il tecnico dai campi della riga `report`: vanno in due tabelle. */
+const splitTechnician = <T extends { technicianId?: number | null; technicianPrice?: number }>({
+    technicianId,
+    technicianPrice,
+    ...report
+}: T) => ({
+    report,
+    technician:
+        technicianId === undefined
+            ? undefined
+            : ({
+                  technicianId,
+                  price: technicianId == null ? 0 : (technicianPrice ?? 0),
+              } satisfies ReportTechnicianInput),
 });
 
 reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, res) => {
-    const {
-        page,
-        pageSize,
-        search,
-        visibility,
-        dateFrom,
-        dateTo,
-        collaboratorId,
-        customerId,
-        technicianId,
-        sortBy,
-        sortOrder,
-    } = req.query as unknown as {
-        page?: number;
-        pageSize?: number;
-        search?: string;
-        visibility?: "all" | "open" | "closed";
-        dateFrom?: string;
-        dateTo?: string;
-        collaboratorId?: number;
-        customerId?: number;
-        technicianId?: number;
-        sortBy?: (typeof reportSortFields)[number];
-        sortOrder?: "asc" | "desc";
-    };
+    // Il tipo viene dallo schema, non da una copia scritta a mano: una copia dimentica i campi
+    // nuovi, e un filtro accettato dallo schema ma non letto qui verrebbe ignorato in silenzio.
+    const query = req.query as unknown as z.infer<typeof reportListQuerySchema>;
+    const { page, pageSize } = query;
 
     const reports = await listReports({
-        page,
-        pageSize,
-        search,
-        visibility: visibility ?? (page == null || pageSize == null ? "all" : "open"),
-        dateFrom,
-        dateTo,
-        collaboratorId,
-        customerId,
-        technicianId,
-        sortBy,
-        sortOrder,
+        ...query,
+        visibility: query.visibility ?? (page == null || pageSize == null ? "all" : "open"),
         timeZone: await getAppTimeZone(),
     });
 
@@ -139,29 +140,11 @@ const reportPaymentMethodLabels: Record<ReportPaymentMethod, string> = {
 };
 
 reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), async (req, res) => {
-    const { search, visibility, dateFrom, dateTo, collaboratorId, customerId, technicianId, sortBy, sortOrder } =
-        req.query as unknown as {
-            search?: string;
-            visibility?: "all" | "open" | "closed";
-            dateFrom?: string;
-            dateTo?: string;
-            collaboratorId?: number;
-            customerId?: number;
-            technicianId?: number;
-            sortBy?: (typeof reportSortFields)[number];
-            sortOrder?: "asc" | "desc";
-        };
+    const query = req.query as unknown as z.infer<typeof reportExportQuerySchema>;
 
     const reports = await listReports({
-        search,
-        visibility: visibility ?? "all",
-        dateFrom,
-        dateTo,
-        collaboratorId,
-        customerId,
-        technicianId,
-        sortBy,
-        sortOrder,
+        ...query,
+        visibility: query.visibility ?? "all",
         timeZone: await getAppTimeZone(),
         unpaginatedLimit: exportRowLimit,
     });
@@ -211,48 +194,16 @@ reportsRouter.get("/stats", validate({ query: reportStatsQuerySchema }), async (
 reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
-    const [reportRows, technicianPriceRows] = await Promise.all([
-        db
-            .select({
-                id: reportTable.id,
-                note: reportTable.note,
-                password: reportTable.password,
-                issueDescription: reportTable.issueDescription,
-                serviceDescription: reportTable.serviceDescription,
-                issueLabel: IssueTable.description,
-                dataBackup: reportTable.dataBackup,
-                charger: reportTable.charger,
-                alerted: reportTable.alerted,
-                price: reportTable.price,
-                createdAt: reportTable.created_at,
-                customerFirstName: customerTable.firstName,
-                customerLastName: customerTable.lastName,
-                customerPhone: customerTable.phoneNumber,
-                customerPhoneSecondary: customerTable.phoneNumberSecondary,
-                deviceName: deviceTable.name,
-            })
-            .from(reportTable)
-            .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))
-            .innerJoin(deviceTable, eq(deviceTable.id, reportTable.deviceId))
-            .innerJoin(IssueTable, eq(IssueTable.id, reportTable.issueId))
-            .where(eq(reportTable.id, id)),
-        db
-            .select({ technicianPrice: sql<number>`coalesce(sum(${reportTechnicianTable.price}), 0)::int` })
-            .from(reportTechnicianTable)
-            .where(eq(reportTechnicianTable.reportId, id)),
-    ]);
+    const [report] = await getReportDetailById(id);
 
-    if (reportRows.length === 0) {
+    if (!report) {
         res.status(404).json({ message: "Report not found" });
         return;
     }
 
-    const report = reportRows[0];
-    const customerName = `${report.customerFirstName} ${report.customerLastName ?? ""}`.trim();
     const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
-    const customerPhoneLabel = formatPhoneLabel(report.customerPhone, report.customerPhoneSecondary);
-    const technicianPrice = Number(technicianPriceRows[0]?.technicianPrice ?? 0);
-    const totalPrice = Number(report.price ?? 0) + technicianPrice;
+    const customerPhoneLabel = formatPhoneLabel(report.customerPhoneNumber, report.customerPhoneSecondary);
+    const totalPrice = report.price + Number(report.technicianPrice);
 
     const pdfBuffer = await createReportPdfBuffer({
         id: report.id,
@@ -260,7 +211,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         labEmail,
         labAddress,
         labPhone,
-        customerName,
+        customerName: report.customerName ?? "",
         customerPhone: customerPhoneLabel,
         deviceName: report.deviceName,
         /**
@@ -269,7 +220,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
          * l'etichetta non direbbe niente a chi legge; per tutti gli altri difetti vale
          * l'etichetta stessa, che è già una descrizione.
          */
-        issueDescription: report.issueDescription?.trim() || report.issueLabel,
+        issueDescription: report.issueDescription?.trim() || report.issueName,
         serviceDescription: report.serviceDescription,
         note: report.note ?? "-",
         password: report.password ?? "-",
@@ -277,7 +228,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         charger: report.charger,
         alerted: report.alerted,
         totalPrice,
-        createdAtLabel: formatDateLabel(report.createdAt, timeZone),
+        createdAtLabel: formatDateLabel(report.created_at, timeZone),
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -304,19 +255,16 @@ reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, 
     // invece continua a controllarlo a mano, perché lì il metodo di pagamento e il prezzo
     // possono arrivare da campi diversi (uno dal corpo parziale, l'altro dalla riga
     // esistente) e lo schema non ha modo di vedere la combinazione risultante.
-    const paymentMethod = (req.body.paymentMethod ?? "non_paid") as ReportPaymentMethod;
-    const price = req.body.price ?? 0;
+    const { report, technician } = splitTechnician(req.body as z.infer<typeof reportCreateBodySchema>);
+    const paymentMethod = report.paymentMethod ?? "non_paid";
+    const price = report.price ?? 0;
 
-    if (req.body.closed && req.body.collaboratorId == null) {
+    if (report.closed && report.collaboratorId == null) {
         res.status(400).json({ message: "Per chiudere un report è necessario indicare un collaboratore" });
         return;
     }
 
-    const createdReport = await createReport({
-        ...req.body,
-        paymentMethod,
-        price,
-    });
+    const createdReport = await createReport({ ...report, paymentMethod, price }, technician);
 
     res.status(201).json(createdReport[0]);
 });
@@ -330,8 +278,9 @@ reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateB
         return;
     }
 
-    const nextPaymentMethod = (req.body.paymentMethod ?? existingReport[0].paymentMethod) as ReportPaymentMethod;
-    const nextPrice = req.body.price ?? existingReport[0].price;
+    const { report, technician } = splitTechnician(req.body as z.infer<typeof reportUpdateBodySchema>);
+    const nextPaymentMethod = (report.paymentMethod ?? existingReport[0].paymentMethod) as ReportPaymentMethod;
+    const nextPrice = report.price ?? existingReport[0].price;
 
     if (paidPaymentMethods.has(nextPaymentMethod) && nextPrice <= 0) {
         res.status(400).json({
@@ -343,16 +292,16 @@ reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateB
     // Come per il prezzo qui sopra: la combinazione da validare nasce dall'unione del corpo
     // parziale con la riga esistente, quindi lo schema non può vederla. `collaboratorId` usa
     // `!== undefined` e non `??` perché `null` è un valore significativo ("svuota il campo").
-    const nextClosed = req.body.closed ?? existingReport[0].closed;
+    const nextClosed = report.closed ?? existingReport[0].closed;
     const nextCollaboratorId =
-        req.body.collaboratorId !== undefined ? req.body.collaboratorId : existingReport[0].collaboratorId;
+        report.collaboratorId !== undefined ? report.collaboratorId : existingReport[0].collaboratorId;
 
     if (nextClosed && nextCollaboratorId == null) {
         res.status(400).json({ message: "Per chiudere un report è necessario indicare un collaboratore" });
         return;
     }
 
-    const updatedReport = await updateReportById(id, req.body);
+    const updatedReport = await updateReportById(id, report, technician);
 
     if (updatedReport.length === 0) {
         res.status(404).json({ message: "Report not found" });

@@ -60,10 +60,8 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
         onDeleteParent: "Impossibile eliminare il cliente: è ancora associato a uno o più report.",
         onInvalidReference: "Il cliente selezionato non esiste.",
     },
-    report_technician_report_id_report_id_fk: {
-        onDeleteParent: "Impossibile eliminare il report: è ancora assegnato a uno o più tecnici.",
-        onInvalidReference: "Il report selezionato non esiste.",
-    },
+    // Nessuna voce per `report_technician_report_id_report_id_fk`: dalla migration 0032 è in
+    // cascata, e il tecnico si scrive nella stessa transazione del suo report.
     report_technician_technician_id_technician_id_fk: {
         onDeleteParent: "Impossibile eliminare il tecnico: è ancora assegnato a uno o più report.",
         onInvalidReference: "Il tecnico selezionato non esiste.",

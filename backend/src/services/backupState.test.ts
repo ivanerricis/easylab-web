@@ -25,7 +25,8 @@ const emailManagerMock = vi.hoisted(() => ({
 vi.mock("./emailManager", () => emailManagerMock);
 
 import { BackupManagerError } from "./backupError";
-import { settingsFilePath } from "./backupFiles";
+import path from "node:path";
+import { backupSettingsFileName } from "./backupFiles";
 import {
     defaultState,
     findSecretsToReconfigure,
@@ -171,7 +172,7 @@ describe("persistState", () => {
 
         expect(fsPromisesMock.mkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
         const [writtenPath, writtenContent, encoding] = fsPromisesMock.writeFile.mock.calls[0];
-        expect(writtenPath).toBe(settingsFilePath);
+        expect(writtenPath).toBe(path.join(process.cwd(), "data", backupSettingsFileName));
         expect(writtenContent.endsWith("\n")).toBe(true);
         expect(JSON.parse(writtenContent)).toEqual(defaultState);
         expect(encoding).toBe("utf-8");
@@ -198,7 +199,7 @@ describe("loadState", () => {
     });
 
     it("se il file manca, ripiega sui default e li persiste", async () => {
-        fsPromisesMock.readFile.mockRejectedValueOnce(new Error("ENOENT"));
+        fsPromisesMock.readFile.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
         fsPromisesMock.mkdir.mockResolvedValueOnce(undefined);
         fsPromisesMock.writeFile.mockResolvedValueOnce(undefined);
 
@@ -206,6 +207,20 @@ describe("loadState", () => {
 
         expect(state).toEqual(defaultState);
         expect(fsPromisesMock.writeFile).toHaveBeenCalledTimes(1);
+    });
+
+    // Prima qualunque errore di lettura riscriveva il file con i default: una porta fuori regola
+    // costava l'intera configurazione, password cifrata del NAS compresa.
+    it("se il file c'è ma non è valido, usa i default senza riscriverlo", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        fsPromisesMock.readFile.mockResolvedValueOnce(JSON.stringify({ ...defaultState, smbPort: 70000 }));
+
+        const state = await loadState();
+
+        expect(state).toEqual(defaultState);
+        expect(fsPromisesMock.writeFile).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
     });
 
     it("invalidateBackupStateCache forza una rilettura da disco", async () => {

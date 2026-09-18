@@ -15,30 +15,6 @@ vi.mock("../db/queries/intervention", () => ({
     getInterventionStats: vi.fn(),
 }));
 
-// `/:id/print` e `/:id/send-email` interrogano `db` direttamente (join su cliente e
-// collaboratore), senza passare dal query layer: va mockato a parte con un costruttore
-// concatenabile, come già fa `authManager.test.ts` per lo stesso motivo.
-type SelectBuilder = {
-    from: () => SelectBuilder;
-    innerJoin: () => SelectBuilder;
-    where: () => SelectBuilder;
-    then: (resolve: (rows: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise<unknown>;
-};
-
-const queryResult = (rows: unknown[]): SelectBuilder => {
-    const builder: SelectBuilder = {
-        from: () => builder,
-        innerJoin: () => builder,
-        where: () => builder,
-        then: (resolve, reject) => Promise.resolve(rows).then(resolve, reject),
-    };
-    return builder;
-};
-
-vi.mock("../db", () => ({
-    db: { select: vi.fn() },
-}));
-
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
     getAppTimeZone: vi.fn(async () => "Europe/Rome"),
@@ -69,7 +45,6 @@ import {
     listInterventions,
     updateInterventionById,
 } from "../db/queries/intervention";
-import { db } from "../db";
 import { getLabConfig } from "../config/lab";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
 import { buildInterventionEmail } from "../services/interventionEmail";
@@ -99,7 +74,7 @@ const labConfig = {
 // Quello che finisce nell'intestazione del PDF: il fuso serve solo a scrivere le date.
 const { timeZone: _timeZone, ...labHeader } = labConfig;
 
-// Riga così come la restituisce la query congiunta di `/:id/print` e `/:id/send-email`.
+// Riga così come la restituisce `getInterventionDetailById`, che servono anche stampa ed email.
 const printRow = {
     id: 1,
     type: "intervento_sede",
@@ -111,14 +86,12 @@ const printRow = {
     interventionDate: "2026-01-10",
     startTime: "09:00:00",
     endTime: "10:00:00",
-    createdAt: new Date("2026-01-01T10:00:00Z"),
-    customerFirstName: "Mario",
-    customerLastName: "Rossi",
-    customerPhone: "02 1234567",
+    created_at: new Date("2026-01-01T10:00:00Z"),
+    customerName: "Mario Rossi",
+    customerPhoneNumber: "02 1234567",
     customerPhoneSecondary: null,
     customerEmail: "mario.rossi@example.test",
-    collaboratorFirstName: "Luigi",
-    collaboratorLastName: "Bianchi",
+    collaboratorName: "Luigi Bianchi",
 };
 
 // Riga così come la restituisce `getInterventionById`/`updateInterventionById`: colonne
@@ -291,7 +264,7 @@ describe("interventions router", () => {
 
     describe("GET /:id/print", () => {
         it("risponde 404 quando l'intervento non esiste", async () => {
-            vi.mocked(db.select).mockReturnValue(queryResult([]) as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/interventions/999/print");
 
@@ -300,7 +273,7 @@ describe("interventions router", () => {
         });
 
         it("genera il pdf con i dati formattati e i giusti header di risposta", async () => {
-            vi.mocked(db.select).mockReturnValue(queryResult([printRow]) as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([printRow] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
 
@@ -342,12 +315,12 @@ describe("interventions router", () => {
             const response = await request(buildApp()).post("/api/interventions/1/send-email");
 
             expect(response.status).toBe(429);
-            expect(db.select).not.toHaveBeenCalled();
+            expect(getInterventionDetailById).not.toHaveBeenCalled();
             expect(sendEmail).not.toHaveBeenCalled();
         });
 
         it("risponde 404 quando l'intervento non esiste", async () => {
-            vi.mocked(db.select).mockReturnValue(queryResult([]) as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).post("/api/interventions/999/send-email");
 
@@ -356,7 +329,7 @@ describe("interventions router", () => {
         });
 
         it("risponde 400 quando il cliente non ha un'email", async () => {
-            vi.mocked(db.select).mockReturnValue(queryResult([{ ...printRow, customerEmail: null }]) as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([{ ...printRow, customerEmail: null }] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
 
             const response = await request(buildApp()).post("/api/interventions/1/send-email");
@@ -367,7 +340,7 @@ describe("interventions router", () => {
         });
 
         it("invia l'email con pdf e logo allegati, nominando il file sulla data dell'intervento", async () => {
-            vi.mocked(db.select).mockReturnValue(queryResult([printRow]) as never);
+            vi.mocked(getInterventionDetailById).mockResolvedValue([printRow] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
             vi.mocked(loadPrintableLogo).mockResolvedValue({
@@ -407,11 +380,9 @@ describe("interventions router", () => {
         });
 
         it("senza data intervento e senza logo usa la data di creazione e non allega il logo", async () => {
-            vi.mocked(db.select).mockReturnValue(
-                queryResult([
-                    { ...printRow, interventionDate: null, createdAt: new Date("2026-03-05T12:00:00Z") },
-                ]) as never
-            );
+            vi.mocked(getInterventionDetailById).mockResolvedValue([
+                { ...printRow, interventionDate: null, created_at: new Date("2026-03-05T12:00:00Z") },
+            ] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
             vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);

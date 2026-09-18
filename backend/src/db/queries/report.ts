@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gte, inArray, or, sql, type SQLWrapper } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, or, sql } from "drizzle-orm";
 import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import {
@@ -12,7 +12,8 @@ import {
 } from "../schema";
 import type { NewReport, UpdateReport } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
-import { parseIdSearch } from "./search";
+import { personName, personNameOrDash } from "./personName";
+import { containsText, parseIdSearch } from "./search";
 import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
 
 type ReportSortBy = "createdAt" | "customer";
@@ -35,8 +36,6 @@ type ListReportsParams = {
     /** Tetto e comportamento senza paginazione: gli export passano `exportRowLimit`. */
     unpaginatedLimit?: UnpaginatedLimit;
 };
-
-const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
 
 /**
  * Gli id dei report che corrispondono alla ricerca libera: una query per tabella, unite.
@@ -144,7 +143,7 @@ export const listReports = async ({
     ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
-    const customerSortExpr = sql<string>`coalesce(nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), ''), '-')`;
+    const customerSortExpr = personNameOrDash(customerTable.firstName, customerTable.lastName);
     const totalPriceExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
     const sortColumn = sortBy === "customer" ? customerSortExpr : reportTable.created_at;
     const orderByClause = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
@@ -171,7 +170,7 @@ export const listReports = async ({
             >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
             device: deviceTable.name,
             issue: IssueTable.description,
-            technician: sql<string>`coalesce(nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), ''), '-')`,
+            technician: personNameOrDash(collaboratorTable.firstName, collaboratorTable.lastName),
             internalPrice: reportTable.price,
             technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
             totalPrice: sql<number>`${totalPriceExpr}::int`,
@@ -301,9 +300,6 @@ export const getReportStats = async (month: string | undefined, timeZone: string
 
 export const getReportById = (id: number) => db.select().from(reportTable).where(eq(reportTable.id, id));
 
-const personName = (firstName: SQLWrapper, lastName: SQLWrapper) =>
-    sql<string | null>`nullif(concat_ws(' ', ${firstName}, ${lastName}), '')`;
-
 /**
  * Il report con i nomi di ciò a cui rimanda e con il suo tecnico esterno (`technicianId` null e
  * `technicianPrice` 0 se non ce l'ha).
@@ -312,6 +308,9 @@ const personName = (firstName: SQLWrapper, lastName: SQLWrapper) =>
  * dispositivi, difetti, collaboratori e tecnici, più il cliente a parte: sei richieste per
  * aprire un report. Il tecnico ci viaggia per lo stesso motivo: il dialogo di modifica lo vuole
  * sempre, e prima lo cercava scaricando l'intera `report_technician`.
+ *
+ * La usa anche la stampa della ricevuta (`GET /reports/:id/print`), che prima riscriveva gli
+ * stessi join per conto suo: da lì i due telefoni separati, che la ricevuta scrive entrambi.
  */
 export const getReportDetailById = (id: number) =>
     db
@@ -321,6 +320,8 @@ export const getReportDetailById = (id: number) =>
             customerPhone: sql<
                 string | null
             >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
+            customerPhoneNumber: customerTable.phoneNumber,
+            customerPhoneSecondary: customerTable.phoneNumberSecondary,
             deviceName: deviceTable.name,
             issueName: IssueTable.description,
             collaboratorName: personName(collaboratorTable.firstName, collaboratorTable.lastName),
@@ -338,16 +339,59 @@ export const getReportDetailById = (id: number) =>
         .leftJoin(technicianTable, eq(technicianTable.id, reportTechnicianTable.technicianId))
         .where(eq(reportTable.id, id));
 
-export const createReport = (data: NewReport) => db.insert(reportTable).values(data).returning();
+/**
+ * Il tecnico esterno di un report, come arriva con il report stesso: `technicianId` null lo toglie.
+ *
+ * Prima era una risorsa a parte (`/api/report-technicians/:reportId/:technicianId`), e ogni pagina
+ * che salvava un report decideva da sé se aggiungere, aggiornare, sostituire o togliere la riga,
+ * con due o tre richieste dopo quella del report. Quella logica era copiata identica in tre pagine,
+ * e un errore a metà lasciava il report salvato col tecnico vecchio. Dalla migration 0004 un report
+ * ha al più un tecnico, quindi è un suo attributo: si scrive nella stessa transazione.
+ */
+export type ReportTechnicianInput = { technicianId: number | null; price: number };
 
-export const updateReportById = (id: number, data: UpdateReport) =>
-    db
-        .update(reportTable)
-        .set({
-            ...data,
-            updated_at: new Date(),
-        })
-        .where(eq(reportTable.id, id))
-        .returning();
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const setReportTechnician = async (tx: Transaction, reportId: number, technician: ReportTechnicianInput) => {
+    if (technician.technicianId == null) {
+        await tx.delete(reportTechnicianTable).where(eq(reportTechnicianTable.reportId, reportId));
+        return;
+    }
+
+    const values = { technicianId: technician.technicianId, price: technician.price };
+
+    await tx
+        .insert(reportTechnicianTable)
+        .values({ reportId, ...values })
+        .onConflictDoUpdate({ target: reportTechnicianTable.reportId, set: values });
+};
+
+export const createReport = (data: NewReport, technician?: ReportTechnicianInput) =>
+    db.transaction(async (tx) => {
+        const createdReport = await tx.insert(reportTable).values(data).returning();
+
+        if (technician) {
+            await setReportTechnician(tx, createdReport[0].id, technician);
+        }
+
+        return createdReport;
+    });
+
+/**
+ * `updated_at` lo scrive lo schema (`$onUpdate`). Quando cambia solo il tecnico la riga del report
+ * non ha campi da scrivere, e drizzle rifiuta un `set` vuoto ("No values to set"): lì si scrive
+ * `updated_at` e basta, che è anche giusto, perché il report è cambiato.
+ */
+export const updateReportById = (id: number, data: UpdateReport, technician?: ReportTechnicianInput) =>
+    db.transaction(async (tx) => {
+        const fields = Object.keys(data).length > 0 ? data : { updated_at: new Date() };
+        const updatedReport = await tx.update(reportTable).set(fields).where(eq(reportTable.id, id)).returning();
+
+        if (technician && updatedReport.length > 0) {
+            await setReportTechnician(tx, id, technician);
+        }
+
+        return updatedReport;
+    });
 
 export const deleteReportById = (id: number) => db.delete(reportTable).where(eq(reportTable.id, id)).returning();

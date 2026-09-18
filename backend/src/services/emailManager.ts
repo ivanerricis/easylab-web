@@ -1,11 +1,8 @@
-import fs from "node:fs";
-import path from "node:path";
 import nodemailer from "nodemailer";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { ApiError } from "./apiError";
+import { createJsonSettingsStore } from "./jsonSettingsStore";
 
-const settingsDir = path.join(process.cwd(), "data");
-const settingsFilePath = path.join(settingsDir, "email-settings.json");
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type EmailSettingsState = {
@@ -45,14 +42,11 @@ const defaultState: EmailSettingsState = {
     passwordEncrypted: null,
 };
 
-let cachedState: EmailSettingsState | null = null;
-
 const sanitizeState = (input: Partial<EmailSettingsState>): EmailSettingsState => {
-    const port = Number(input.port ?? defaultState.port);
-
-    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-        throw new EmailManagerError("La porta SMTP deve essere un numero valido", 400);
-    }
+    const storedPort = Number(input.port ?? defaultState.port);
+    // Una porta fuori regola nel file torna al default e il resto resta: prima faceva scartare
+    // l'intero file, password cifrata compresa. Quella inviata dall'interfaccia la valida la rotta.
+    const port = Number.isInteger(storedPort) && storedPort > 0 && storedPort <= 65535 ? storedPort : defaultState.port;
 
     return {
         enabled: Boolean(input.enabled ?? defaultState.enabled),
@@ -66,32 +60,17 @@ const sanitizeState = (input: Partial<EmailSettingsState>): EmailSettingsState =
     };
 };
 
-const persistState = async (state: EmailSettingsState) => {
-    await fs.promises.mkdir(settingsDir, { recursive: true });
-    await fs.promises.writeFile(settingsFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
-};
+const store = createJsonSettingsStore({
+    fileName: "email-settings.json",
+    defaults: defaultState,
+    sanitize: sanitizeState,
+});
 
-const loadState = async () => {
-    if (cachedState) {
-        return cachedState;
-    }
-
-    try {
-        const raw = await fs.promises.readFile(settingsFilePath, "utf-8");
-        cachedState = sanitizeState(JSON.parse(raw) as Partial<EmailSettingsState>);
-    } catch {
-        cachedState = { ...defaultState };
-        await persistState(cachedState);
-    }
-
-    return cachedState;
-};
+const loadState = store.load;
 
 // Dopo un ripristino il file delle impostazioni è stato riscritto da fuori:
 // la cache in memoria non rispecchia più il disco.
-export const invalidateEmailSettingsCache = () => {
-    cachedState = null;
-};
+export const invalidateEmailSettingsCache = store.invalidate;
 
 // La password è cifrata con data/secret.key, che di proposito non finisce nei
 // backup. Se il backup viene ripristinato dove la chiave è diversa, il valore
@@ -137,36 +116,37 @@ export type EmailSettingsInput = Pick<
 
 export const updateEmailSettings = async (input: EmailSettingsInput) => {
     const current = await loadState();
+    // Un oggetto nuovo, non la cache modificata sul posto: se la validazione qui sotto rifiuta,
+    // in memoria deve restare quello che c'è su disco, non una configurazione mai salvata.
+    const next: EmailSettingsState = {
+        ...current,
+        enabled: input.enabled,
+        host: input.host.trim(),
+        port: input.port,
+        secure: input.secure,
+        username: input.username.trim(),
+        fromName: input.fromName.trim(),
+        fromEmail: input.fromEmail.trim(),
+        passwordEncrypted: input.password ? await encryptSecret(input.password) : current.passwordEncrypted,
+    };
 
-    current.enabled = input.enabled;
-    current.host = input.host.trim();
-    current.port = input.port;
-    current.secure = input.secure;
-    current.username = input.username.trim();
-    current.fromName = input.fromName.trim();
-    current.fromEmail = input.fromEmail.trim();
-
-    if (input.password) {
-        current.passwordEncrypted = await encryptSecret(input.password);
-    }
-
-    if (current.enabled) {
-        if (!current.host || !current.username || !current.fromEmail) {
+    if (next.enabled) {
+        if (!next.host || !next.username || !next.fromEmail) {
             throw new EmailManagerError("Per abilitare l'invio email specifica host, utente ed email mittente", 400);
         }
 
-        if (!emailPattern.test(current.fromEmail)) {
+        if (!emailPattern.test(next.fromEmail)) {
             throw new EmailManagerError("L'email mittente non è valida", 400);
         }
 
-        if (!current.passwordEncrypted) {
+        if (!next.passwordEncrypted) {
             throw new EmailManagerError("Specifica una password per l'account email", 400);
         }
     }
 
-    await persistState(current);
+    await store.save(next);
 
-    return toPublicState(current);
+    return toPublicState(next);
 };
 
 const buildTransporter = (config: EmailConnectionConfig) =>

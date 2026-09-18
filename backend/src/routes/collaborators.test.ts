@@ -191,6 +191,7 @@ describe("collaborators router", () => {
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
                 timeZone: "Europe/Rome",
+                unpaginatedLimit: expect.objectContaining({ maxRows: 2000, onOverflow: "reject" }),
             });
             const [data] = vi.mocked(createCustomerReportsPdfBuffer).mock.calls[0];
             expect(data).toMatchObject({
@@ -230,6 +231,7 @@ describe("collaborators router", () => {
                 dateFrom: undefined,
                 dateTo: undefined,
                 timeZone: "Europe/Rome",
+                unpaginatedLimit: expect.objectContaining({ maxRows: 2000, onOverflow: "reject" }),
             });
             expect(createCustomerInterventionsPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({

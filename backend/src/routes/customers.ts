@@ -6,15 +6,12 @@ import {
     listCustomers,
     updateCustomerById,
 } from "../db/queries/customer";
-import { listReports } from "../db/queries/report";
-import { listInterventions } from "../db/queries/intervention";
-import { createCustomerReportsPdfBuffer } from "../services/reportPdf";
-import { createCustomerInterventionsPdfBuffer } from "../services/interventionPdf";
 import { getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
-import { buildDateRangeLabel, formatDateLabel, formatPhoneLabel, formatScheduleLabel } from "./formatting";
-import { createCrudRouter, idParamsSchema, printRangeQuerySchema } from "./crudRouter";
+import { formatPhoneLabel } from "./formatting";
+import { createCrudRouter } from "./crudRouter";
+import { registerSummaryPrintRoutes } from "./summaryPrint";
 import { validate } from "./validation";
 
 const customerExportQuerySchema = z.object({
@@ -111,101 +108,12 @@ const customersRouter = createCrudRouter({
             res.send(csv);
         });
 
-        router.get(
-            "/:id/reports/print",
-            validate({ params: idParamsSchema, query: printRangeQuerySchema }),
-            async (req, res) => {
-                const { id } = req.params as unknown as { id: number };
-                const { dateFrom, dateTo } = req.query as unknown as {
-                    dateFrom?: string;
-                    dateTo?: string;
-                };
-                const context = await loadCustomerPrintContext(id);
-
-                if (!context) {
-                    res.status(404).json({ message: "Customer not found" });
-                    return;
-                }
-
-                const reportsResult = await listReports({
-                    customerId: id,
-                    dateFrom,
-                    dateTo,
-                    timeZone: context.timeZone,
-                });
-                const reports = Array.isArray(reportsResult) ? reportsResult : reportsResult.items;
-
-                const pdfBuffer = await createCustomerReportsPdfBuffer({
-                    ...context,
-                    rangeLabel: buildDateRangeLabel(dateFrom, dateTo),
-                    reportCount: reports.length,
-                    reports: reports.map((report) => ({
-                        id: report.id,
-                        createdAtLabel: formatDateLabel(report.createdAt, context.timeZone),
-                        deviceName: report.device,
-                        issueDescription: report.issue,
-                        closed: report.closed,
-                        alerted: report.alerted,
-                        paymentMethod: report.paymentMethod as "non_paid" | "cash" | "card",
-                        totalPrice: report.totalPrice,
-                    })),
-                });
-
-                res.setHeader("Content-Type", "application/pdf");
-                res.setHeader("Content-Disposition", `inline; filename=customer-${id}-reports.pdf`);
-                res.send(pdfBuffer);
-            }
-        );
-
-        router.get(
-            "/:id/interventions/print",
-            validate({ params: idParamsSchema, query: printRangeQuerySchema }),
-            async (req, res) => {
-                const { id } = req.params as unknown as { id: number };
-                const { dateFrom, dateTo } = req.query as unknown as {
-                    dateFrom?: string;
-                    dateTo?: string;
-                };
-                const context = await loadCustomerPrintContext(id);
-
-                if (!context) {
-                    res.status(404).json({ message: "Customer not found" });
-                    return;
-                }
-
-                const interventionsResult = await listInterventions({
-                    customerId: id,
-                    dateFrom,
-                    dateTo,
-                    timeZone: context.timeZone,
-                });
-                const interventions = Array.isArray(interventionsResult)
-                    ? interventionsResult
-                    : interventionsResult.items;
-
-                const pdfBuffer = await createCustomerInterventionsPdfBuffer({
-                    ...context,
-                    rangeLabel: buildDateRangeLabel(dateFrom, dateTo),
-                    interventionCount: interventions.length,
-                    interventions: interventions.map((intervention) => ({
-                        id: intervention.id,
-                        createdAtLabel: formatDateLabel(intervention.createdAt, context.timeZone),
-                        type: intervention.type as "consegna_materiale" | "intervento_sede" | "intervento_remoto",
-                        status: intervention.status as "programmato" | "in_lavorazione" | "completato",
-                        description: intervention.description,
-                        scheduleLabel: formatScheduleLabel(
-                            intervention.interventionDate,
-                            intervention.startTime,
-                            intervention.endTime
-                        ),
-                    })),
-                });
-
-                res.setHeader("Content-Type", "application/pdf");
-                res.setHeader("Content-Disposition", `inline; filename=customer-${id}-interventions.pdf`);
-                res.send(pdfBuffer);
-            }
-        );
+        registerSummaryPrintRoutes(router, {
+            filePrefix: "customer",
+            notFoundMessage: "Customer not found",
+            loadContext: loadCustomerPrintContext,
+            filterFor: (id) => ({ customerId: id }),
+        });
     },
 });
 

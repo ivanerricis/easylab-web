@@ -3,7 +3,7 @@ import { db } from "../index";
 import { customerTable } from "../schema";
 import type { NewCustomer, UpdateCustomer } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
-import { parseIdSearch } from "./search";
+import { containsText, parseIdSearch } from "./search";
 
 type ListCustomersParams = {
     page?: number;
@@ -29,12 +29,12 @@ export const listCustomers = async ({
     const searchConditions = trimmedSearch
         ? [
               ...(idSearch != null ? [eq(customerTable.id, idSearch)] : []),
-              sql`${customerTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumber}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.phoneNumberSecondary}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.email}::text ILIKE ${searchPattern}`,
-              sql`${customerTable.city}::text ILIKE ${searchPattern}`,
+              containsText(customerTable.firstName, searchPattern),
+              containsText(customerTable.lastName, searchPattern),
+              containsText(customerTable.phoneNumber, searchPattern),
+              containsText(customerTable.phoneNumberSecondary, searchPattern),
+              containsText(customerTable.email, searchPattern),
+              containsText(customerTable.city, searchPattern),
           ]
         : [];
     const whereClause = searchConditions.length > 0 ? or(...searchConditions) : undefined;

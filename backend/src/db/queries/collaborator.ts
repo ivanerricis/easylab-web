@@ -3,7 +3,7 @@ import { db } from "../index";
 import { collaboratorTable } from "../schema";
 import type { NewCollaborator, UpdateCollaborator } from "../types";
 import { takeUnpaginated } from "./pagination";
-import { parseIdSearch } from "./search";
+import { containsText, parseIdSearch } from "./search";
 
 type ListCollaboratorsParams = {
     page?: number;
@@ -18,9 +18,9 @@ export const listCollaborators = async ({ page, pageSize, search }: ListCollabor
     const searchConditions = trimmedSearch
         ? [
               ...(idSearch != null ? [eq(collaboratorTable.id, idSearch)] : []),
-              sql`${collaboratorTable.firstName}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.lastName}::text ILIKE ${searchPattern}`,
-              sql`${collaboratorTable.phoneNumber}::text ILIKE ${searchPattern}`,
+              containsText(collaboratorTable.firstName, searchPattern),
+              containsText(collaboratorTable.lastName, searchPattern),
+              containsText(collaboratorTable.phoneNumber, searchPattern),
           ]
         : [];
     const whereClause = searchConditions.length > 0 ? or(...searchConditions) : undefined;
@@ -51,25 +51,10 @@ export const listCollaborators = async ({ page, pageSize, search }: ListCollabor
 export const getCollaboratorById = (id: number) =>
     db.select().from(collaboratorTable).where(eq(collaboratorTable.id, id));
 
-export const createCollaborator = (data: NewCollaborator) =>
-    db
-        .insert(collaboratorTable)
-        .values({
-            ...data,
-            created_at: new Date(),
-            updated_at: new Date(),
-        })
-        .returning();
+export const createCollaborator = (data: NewCollaborator) => db.insert(collaboratorTable).values(data).returning();
 
 export const updateCollaboratorById = (id: number, data: UpdateCollaborator) =>
-    db
-        .update(collaboratorTable)
-        .set({
-            ...data,
-            updated_at: new Date(),
-        })
-        .where(eq(collaboratorTable.id, id))
-        .returning();
+    db.update(collaboratorTable).set(data).where(eq(collaboratorTable.id, id)).returning();
 
 export const deleteCollaboratorById = (id: number) =>
     db.delete(collaboratorTable).where(eq(collaboratorTable.id, id)).returning();

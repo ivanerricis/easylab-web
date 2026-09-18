@@ -24,29 +24,18 @@ const protectedIssueError = () =>
         409
     );
 
-const duplicateCatchAllError = () =>
-    new ApiError(`Esiste già il difetto "${catchAllIssueDescription}", e ne serve uno solo.`, 409);
-
 /**
- * Le tre strade da cui la voce generica potrebbe sparire o sdoppiarsi.
+ * Le due strade da cui la voce generica potrebbe sparire: rinominarla o eliminarla.
  *
  * Vengono registrate prima delle rotte generate dal factory, che in Express vince il primo
  * match: qui si controlla e si passa oltre con `next()`, così la logica CRUD resta una sola.
- * Il confronto è senza maiuscole perché il vincolo di unicità di Postgres non lo è: senza
- * questo, "altro" e "Altro" convivrebbero e nel dialogo del report sembrerebbero entrambe la
- * voce generica.
+ *
+ * Il doppione ("altro" accanto ad "Altro", creato o ottenuto rinominando un'altra voce) qui non
+ * si controlla più: dalla migration 0031 lo rifiuta l'indice unico su `lower(description)`, con
+ * il messaggio di `errorHandler`. Il controllo a mano esisteva perché il vincolo di prima
+ * distingueva le maiuscole, e dopo la 0031 era rimasto come seconda copia della stessa regola.
  */
 const protectCatchAllIssue = (router: Router) => {
-    router.post("/", async (req, res, next) => {
-        const description = (req.body as { description?: unknown }).description;
-
-        if (typeof description === "string" && isCatchAllIssueDescription(description)) {
-            throw duplicateCatchAllError();
-        }
-
-        next();
-    });
-
     router.put("/:id", validate({ params: idParamsSchema }), async (req, res, next) => {
         const { id } = req.params as unknown as { id: number };
         const description = (req.body as { description?: unknown }).description;
@@ -65,10 +54,6 @@ const protectCatchAllIssue = (router: Router) => {
 
         if (isCatchAllIssueDescription(issue.description) && !isCatchAllIssueDescription(description)) {
             throw protectedIssueError();
-        }
-
-        if (!isCatchAllIssueDescription(issue.description) && isCatchAllIssueDescription(description)) {
-            throw duplicateCatchAllError();
         }
 
         next();

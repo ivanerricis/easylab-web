@@ -74,9 +74,9 @@ const enableInput = (overrides: Partial<EmailSettingsInput> = {}): EmailSettings
 beforeEach(() => {
     vi.clearAllMocks();
     invalidateEmailSettingsCache();
-    // Senza file su disco `loadState` cade nel catch e riparte dai default: è lo stato
-    // di partenza realistico di un'installazione appena creata.
-    readFile.mockRejectedValue(new Error("ENOENT"));
+    // Senza file su disco `loadState` riparte dai default: è lo stato di partenza realistico
+    // di un'installazione appena creata.
+    readFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     writeFile.mockResolvedValue(undefined);
     mkdir.mockResolvedValue(undefined);
     encryptSecret.mockImplementation(async (value: string) => `cifrato:${value}`);
@@ -101,6 +101,19 @@ describe("invalidateEmailSettingsCache", () => {
         invalidateEmailSettingsCache();
         await isEmailConfigured();
         expect(readFile).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("lettura del file", () => {
+    // Prima una porta fuori regola faceva scartare il file intero e riscriverlo coi default:
+    // spariva anche la password cifrata, senza che nessuno se ne accorgesse.
+    it("una porta non valida torna al default e il resto della configurazione resta", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedState({ port: 70000 })));
+
+        const settings = await getEmailSettings();
+
+        expect(settings).toMatchObject({ port: 587, host: "smtp.easylab.it", passwordSet: true });
+        expect(writeFile).not.toHaveBeenCalled();
     });
 });
 
@@ -176,6 +189,19 @@ describe("updateEmailSettings", () => {
         expect(result.host).toBe("smtp.test");
         expect(result.username).toBe("u");
         expect(writeFile).toHaveBeenCalledTimes(1);
+    });
+
+    // La cache era l'oggetto modificato sul posto prima della validazione: un salvataggio
+    // rifiutato restava in memoria come se fosse andato a buon fine, senza essere su disco.
+    it("un salvataggio rifiutato non cambia le impostazioni in memoria", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedState({ enabled: false, host: "smtp.vecchio" })));
+
+        await expect(updateEmailSettings(enableInput({ host: "", fromEmail: "" }))).rejects.toMatchObject({
+            statusCode: 400,
+        });
+
+        expect(await getEmailSettings()).toMatchObject({ enabled: false, host: "smtp.vecchio" });
+        expect(writeFile).not.toHaveBeenCalled();
     });
 
     it("rifiuta l'abilitazione senza host, utente o mittente", async () => {

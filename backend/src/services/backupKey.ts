@@ -6,62 +6,19 @@
  * disastro che porta via server e disco insieme renderebbe illeggibile anche l'ultimo
  * backup rimasto sul NAS - esattamente il caso in cui servirebbe di più.
  */
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { BackupManagerError } from "./backupError";
+import { createKeyFile } from "./keyFile";
 
-const keyDir = path.join(process.cwd(), "data");
-const keyFilePath = path.join(keyDir, "backup.key");
 export const backupKeyLength = 32;
 
-let cachedKey: Buffer | null = null;
+const backupKey = createKeyFile({
+    fileName: "backup.key",
+    length: backupKeyLength,
+    invalidKeyError: () =>
+        new BackupManagerError("data/backup.key non contiene una chiave valida: il file non è stato sovrascritto", 500),
+});
 
-export const getOrCreateBackupKey = async (): Promise<Buffer> => {
-    if (cachedKey) {
-        return cachedKey;
-    }
-
-    // Solo l'assenza del file porta a generarne una nuova, come in `secretCrypto.ts`. Prima
-    // qualunque errore di lettura rigenerava la chiave scrivendoci sopra: i backup successivi
-    // uscivano cifrati con una chiave mai esportata, e la copia custodita dall'admin smetteva
-    // di aprirli senza che nessuno se ne accorgesse.
-    let raw: string | null = null;
-
-    try {
-        raw = await fs.promises.readFile(keyFilePath, "utf-8");
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-            throw error;
-        }
-    }
-
-    if (raw !== null) {
-        const key = Buffer.from(raw.trim(), "hex");
-
-        if (key.length !== backupKeyLength) {
-            throw new BackupManagerError(
-                "data/backup.key non contiene una chiave valida: il file non è stato sovrascritto",
-                500
-            );
-        }
-
-        cachedKey = key;
-        return cachedKey;
-    }
-
-    const key = crypto.randomBytes(backupKeyLength);
-    await fs.promises.mkdir(keyDir, { recursive: true });
-    // `wx`: se nel frattempo il file è comparso, meglio fallire che scrivergli sopra.
-    await fs.promises.writeFile(keyFilePath, `${key.toString("hex")}\n`, {
-        encoding: "utf-8",
-        mode: 0o600,
-        flag: "wx",
-    });
-    cachedKey = key;
-
-    return cachedKey;
-};
+export const getOrCreateBackupKey = backupKey.load;
 
 export const exportBackupKey = async (): Promise<string> => (await getOrCreateBackupKey()).toString("hex");
 
@@ -86,13 +43,7 @@ export const decodeBackupKeyOverride = (hex: string): Buffer => {
  * useranno la stessa chiave di quelli già esistenti sul NAS.
  */
 export const setBackupKey = async (hex: string): Promise<void> => {
-    const key = decodeBackupKeyOverride(hex);
-
-    await fs.promises.mkdir(keyDir, { recursive: true });
-    await fs.promises.writeFile(keyFilePath, `${key.toString("hex")}\n`, { encoding: "utf-8", mode: 0o600 });
-    cachedKey = key;
+    await backupKey.replace(decodeBackupKeyOverride(hex));
 };
 
-export const invalidateBackupKeyCache = () => {
-    cachedKey = null;
-};
+export const invalidateBackupKeyCache = backupKey.invalidate;

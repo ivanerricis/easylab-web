@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
     createIntervention,
@@ -10,8 +9,6 @@ import {
     listInterventions,
     updateInterventionById,
 } from "../db/queries/intervention";
-import { db } from "../db";
-import { collaboratorTable, customerTable, interventionTable } from "../db/schema";
 import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
 import { buildInterventionEmail } from "../services/interventionEmail";
@@ -148,57 +145,18 @@ const interventionUpdateBodySchema = interventionBodySchema.partial().refine((va
 });
 
 interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), async (req, res) => {
-    const {
-        page,
-        pageSize,
-        search,
-        status,
-        type,
-        dateFrom,
-        dateTo,
-        scheduledDate,
-        scheduledFrom,
-        scheduledTo,
-        collaboratorId,
-        customerId,
-        sortBy,
-        sortOrder,
-    } = req.query as unknown as {
-        page?: number;
-        pageSize?: number;
-        search?: string;
-        status?: "all" | (typeof interventionStatuses)[number];
-        type?: "all" | InterventionType;
-        dateFrom?: string;
-        dateTo?: string;
-        scheduledDate?: string;
-        scheduledFrom?: string;
-        scheduledTo?: string;
-        collaboratorId?: number;
-        customerId?: number;
-        sortBy?: (typeof interventionSortFields)[number];
-        sortOrder?: "asc" | "desc";
-    };
+    // Il tipo viene dallo schema, come in `reports.ts`: l'export qui sotto, con la sua copia
+    // scritta a mano, accettava `scheduledDate` ma non lo passava alla query.
+    const query = req.query as unknown as z.infer<typeof interventionListQuerySchema>;
 
     const interventions = await listInterventions({
-        page,
-        pageSize,
-        search,
-        status: status ?? "all",
-        type: type ?? "all",
-        dateFrom,
-        dateTo,
-        scheduledDate,
-        scheduledFrom,
-        scheduledTo,
-        collaboratorId,
-        customerId,
-        sortBy,
-        sortOrder,
+        ...query,
+        status: query.status ?? "all",
+        type: query.type ?? "all",
         timeZone: await getAppTimeZone(),
     });
 
-    sendListResponse(res, interventions, page, pageSize);
+    sendListResponse(res, interventions, query.page, query.pageSize);
 });
 
 // Come in `reports.ts`: gli stessi filtri della lista meno pagina e dimensione pagina, perché
@@ -208,44 +166,12 @@ const interventionExportQuerySchema = interventionListQuerySchema.omit({ page: t
 // Prima di "/:id": un percorso a un solo segmento come "/export.csv" finirebbe altrimenti
 // nella rotta del dettaglio, che lo rifiuterebbe come id non numerico.
 interventionsRouter.get("/export.csv", validate({ query: interventionExportQuerySchema }), async (req, res) => {
-    const {
-        search,
-        status,
-        type,
-        dateFrom,
-        dateTo,
-        scheduledFrom,
-        scheduledTo,
-        collaboratorId,
-        customerId,
-        sortBy,
-        sortOrder,
-    } = req.query as unknown as {
-        search?: string;
-        status?: "all" | (typeof interventionStatuses)[number];
-        type?: "all" | InterventionType;
-        dateFrom?: string;
-        dateTo?: string;
-        scheduledFrom?: string;
-        scheduledTo?: string;
-        collaboratorId?: number;
-        customerId?: number;
-        sortBy?: (typeof interventionSortFields)[number];
-        sortOrder?: "asc" | "desc";
-    };
+    const query = req.query as unknown as z.infer<typeof interventionExportQuerySchema>;
 
     const interventions = await listInterventions({
-        search,
-        status: status ?? "all",
-        type: type ?? "all",
-        dateFrom,
-        dateTo,
-        scheduledFrom,
-        scheduledTo,
-        collaboratorId,
-        customerId,
-        sortBy,
-        sortOrder,
+        ...query,
+        status: query.status ?? "all",
+        type: query.type ?? "all",
         timeZone: await getAppTimeZone(),
         unpaginatedLimit: exportRowLimit,
     });
@@ -284,42 +210,16 @@ interventionsRouter.get("/stats", async (_req, res) => {
 });
 
 const loadInterventionPrintContext = async (id: number) => {
-    const interventionRows = await db
-        .select({
-            id: interventionTable.id,
-            type: interventionTable.type,
-            description: interventionTable.description,
-            problem: interventionTable.problem,
-            note: interventionTable.note,
-            price: interventionTable.price,
-            toInvoice: interventionTable.toInvoice,
-            status: interventionTable.status,
-            interventionDate: interventionTable.interventionDate,
-            startTime: interventionTable.startTime,
-            endTime: interventionTable.endTime,
-            createdAt: interventionTable.created_at,
-            customerFirstName: customerTable.firstName,
-            customerLastName: customerTable.lastName,
-            customerPhone: customerTable.phoneNumber,
-            customerPhoneSecondary: customerTable.phoneNumberSecondary,
-            customerEmail: customerTable.email,
-            collaboratorFirstName: collaboratorTable.firstName,
-            collaboratorLastName: collaboratorTable.lastName,
-        })
-        .from(interventionTable)
-        .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
-        .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
-        .where(eq(interventionTable.id, id));
+    const [intervention] = await getInterventionDetailById(id);
 
-    if (interventionRows.length === 0) {
+    if (!intervention) {
         return null;
     }
 
-    const intervention = interventionRows[0];
-    const customerName = `${intervention.customerFirstName} ${intervention.customerLastName ?? ""}`.trim();
-    const collaboratorName = `${intervention.collaboratorFirstName} ${intervention.collaboratorLastName ?? ""}`.trim();
+    const customerName = intervention.customerName ?? "";
+    const collaboratorName = intervention.collaboratorName ?? "";
     const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
-    const customerPhoneLabel = formatPhoneLabel(intervention.customerPhone, intervention.customerPhoneSecondary);
+    const customerPhoneLabel = formatPhoneLabel(intervention.customerPhoneNumber, intervention.customerPhoneSecondary);
 
     return {
         customerName,
@@ -332,7 +232,7 @@ const loadInterventionPrintContext = async (id: number) => {
         // Date grezze, per il nome del file allegato: le etichette formattate sono per
         // gli occhi del cliente, non per un nome di file.
         interventionDate: intervention.interventionDate,
-        createdAt: intervention.createdAt,
+        createdAt: intervention.created_at,
         pdfData: {
             id: intervention.id,
             labName,
@@ -353,7 +253,7 @@ const loadInterventionPrintContext = async (id: number) => {
             interventionDateLabel: intervention.interventionDate ? formatDayLabel(intervention.interventionDate) : null,
             startTime: intervention.startTime,
             endTime: intervention.endTime,
-            createdAtLabel: formatDateLabel(intervention.createdAt, timeZone),
+            createdAtLabel: formatDateLabel(intervention.created_at, timeZone),
         },
     };
 };

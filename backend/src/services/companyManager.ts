@@ -1,9 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { ApiError } from "./apiError";
-
-const settingsDir = path.join(process.cwd(), "data");
-const settingsFilePath = path.join(settingsDir, "company-settings.json");
+import { createJsonSettingsStore } from "./jsonSettingsStore";
 
 export type CompanySettingsState = {
     name: string;
@@ -50,8 +46,6 @@ const defaultState: CompanySettingsState = {
     timeZone: initialTimeZone,
 };
 
-let cachedState: CompanySettingsState | null = null;
-
 const sanitizeState = (input: Partial<CompanySettingsState>): CompanySettingsState => ({
     name: typeof input.name === "string" && input.name.trim() ? input.name.trim() : defaultState.name,
     email: typeof input.email === "string" ? input.email.trim() : defaultState.email,
@@ -71,33 +65,22 @@ const applyTimeZone = (state: CompanySettingsState) => {
     }
 };
 
-const persistState = async (state: CompanySettingsState) => {
-    await fs.promises.mkdir(settingsDir, { recursive: true });
-    await fs.promises.writeFile(settingsFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
-};
+const store = createJsonSettingsStore({
+    fileName: "company-settings.json",
+    defaults: defaultState,
+    sanitize: sanitizeState,
+});
 
 const loadState = async () => {
-    if (cachedState) {
-        return cachedState;
-    }
+    const state = await store.load();
 
-    try {
-        const raw = await fs.promises.readFile(settingsFilePath, "utf-8");
-        cachedState = sanitizeState(JSON.parse(raw) as Partial<CompanySettingsState>);
-    } catch {
-        cachedState = { ...defaultState };
-        await persistState(cachedState);
-    }
-
-    applyTimeZone(cachedState);
-    return cachedState;
+    applyTimeZone(state);
+    return state;
 };
 
 // Dopo un ripristino il file delle impostazioni è stato riscritto da fuori:
 // la cache in memoria non rispecchia più il disco.
-export const invalidateCompanySettingsCache = () => {
-    cachedState = null;
-};
+export const invalidateCompanySettingsCache = store.invalidate;
 
 export const getCompanySettings = async (): Promise<CompanySettingsState> => loadState();
 
@@ -118,8 +101,7 @@ export const updateCompanySettings = async (input: CompanySettingsInput) => {
 
     const current = await loadState();
     const next = sanitizeState({ ...input, timeZone: input.timeZone ?? current.timeZone });
-    await persistState(next);
-    cachedState = next;
+    await store.save(next);
     applyTimeZone(next);
 
     return next;

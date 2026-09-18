@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, getTableColumns, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, or, sql, type SQL } from "drizzle-orm";
 import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import { collaboratorTable, customerTable, interventionTable } from "../schema";
 import type { NewIntervention, UpdateIntervention } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
-import { parseIdSearch } from "./search";
+import { personName, personNameOrDash } from "./personName";
+import { containsText, parseIdSearch } from "./search";
 import { onLocalDays, toLocalTimestamp } from "./timeZone";
 
 type InterventionSortBy = "createdAt" | "interventionDate" | "customer" | "status";
@@ -30,8 +31,6 @@ type ListInterventionsParams = {
     /** Tetto e comportamento senza paginazione: gli export passano `exportRowLimit`. */
     unpaginatedLimit?: UnpaginatedLimit;
 };
-
-const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
 
 /**
  * Gli id degli interventi che corrispondono alla ricerca libera: una query per tabella, unite,
@@ -154,7 +153,7 @@ export const listInterventions = async ({
     ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
-    const customerSortExpr = sql<string>`coalesce(nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), ''), '-')`;
+    const customerSortExpr = personNameOrDash(customerTable.firstName, customerTable.lastName);
     const sortColumn =
         sortBy === "customer"
             ? customerSortExpr
@@ -187,7 +186,7 @@ export const listInterventions = async ({
             customerPhone: sql<
                 string | null
             >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
-            collaborator: sql<string>`coalesce(nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), ''), '-')`,
+            collaborator: personNameOrDash(collaboratorTable.firstName, collaboratorTable.lastName),
             createdAt: interventionTable.created_at,
             updatedAt: interventionTable.updated_at,
         })
@@ -247,20 +246,22 @@ export const getInterventionById = (id: number) =>
  * L'intervento con il nome e il telefono del cliente e il nome del collaboratore: la pagina di
  * dettaglio li mostra, e prima per trovarli scaricava l'intero elenco dei collaboratori più il
  * cliente con una richiesta a parte.
+ *
+ * La usano anche la stampa e l'email della ricevuta (`loadInterventionPrintContext`), che prima
+ * riscrivevano gli stessi join per conto loro: da lì i due telefoni separati e l'email.
  */
 export const getInterventionDetailById = (id: number) =>
     db
         .select({
             ...getTableColumns(interventionTable),
-            customerName: sql<
-                string | null
-            >`nullif(concat_ws(' ', ${customerTable.firstName}, ${customerTable.lastName}), '')`,
+            customerName: personName(customerTable.firstName, customerTable.lastName),
             customerPhone: sql<
                 string | null
             >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
-            collaboratorName: sql<
-                string | null
-            >`nullif(concat_ws(' ', ${collaboratorTable.firstName}, ${collaboratorTable.lastName}), '')`,
+            customerPhoneNumber: customerTable.phoneNumber,
+            customerPhoneSecondary: customerTable.phoneNumberSecondary,
+            customerEmail: customerTable.email,
+            collaboratorName: personName(collaboratorTable.firstName, collaboratorTable.lastName),
         })
         .from(interventionTable)
         .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
@@ -270,14 +271,7 @@ export const getInterventionDetailById = (id: number) =>
 export const createIntervention = (data: NewIntervention) => db.insert(interventionTable).values(data).returning();
 
 export const updateInterventionById = (id: number, data: UpdateIntervention) =>
-    db
-        .update(interventionTable)
-        .set({
-            ...data,
-            updated_at: new Date(),
-        })
-        .where(eq(interventionTable.id, id))
-        .returning();
+    db.update(interventionTable).set(data).where(eq(interventionTable.id, id)).returning();
 
 export const deleteInterventionById = (id: number) =>
     db.delete(interventionTable).where(eq(interventionTable.id, id)).returning();

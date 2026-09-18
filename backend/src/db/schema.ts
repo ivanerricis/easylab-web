@@ -14,7 +14,14 @@ import {
 import { sql } from "drizzle-orm";
 
 const timestamps = {
-    updated_at: timestamp(),
+    // Scritto da drizzle a ogni `update()` delle tabelle che usano questi campi. Prima lo
+    // impostavano a mano tre query su otto (collaboratore, report, intervento): clienti,
+    // tecnici, dispositivi e difetti lo lasciavano NULL per sempre. Il `default` NULL serve
+    // all'inserimento: senza, drizzle chiamerebbe anche lì `$onUpdate`, e un report appena
+    // creato mostrerebbe in scheda una "Ultima modifica" che non c'è stata.
+    updated_at: timestamp()
+        .default(sql`null`)
+        .$onUpdate(() => new Date()),
     created_at: timestamp().defaultNow().notNull(),
 };
 
@@ -148,9 +155,10 @@ export const IssueTable = pgTable(
 export const reportTechnicianTable = pgTable(
     "report_technician",
     {
+        // Cascata: il tecnico è un attributo del report, e se ne va con lui (migration 0032).
         reportId: integer("report_id")
             .notNull()
-            .references(() => reportTable.id),
+            .references(() => reportTable.id, { onDelete: "cascade" }),
         technicianId: integer("technician_id")
             .notNull()
             .references(() => technicianTable.id),

@@ -16,18 +16,12 @@ import { assertNoOperationInProgress, beginRestore, endRestore } from "./backupL
 import { resetPublicSchema, runPsql, runTar } from "./backupProcess";
 import { BackupDecryptAuthError, decryptArchiveFile, isEncryptedArchiveFile } from "./backupCrypto";
 import { decodeBackupKeyOverride, setBackupKey } from "./backupKey";
-import {
-    findSecretsToReconfigure,
-    invalidateBackupStateCache,
-    loadState,
-    persistState,
-    toPublicState,
-} from "./backupState";
+import { findSecretsToReconfigure, loadState, persistState, toPublicState } from "./backupState";
 import { clearUnreadableTwoFactorSecrets } from "./authManager";
 import { findNonPlainEntry, findUnsafeTarEntry } from "./archiveSafety";
 import { writeRestrictedSql } from "./restoreSql";
-import { getCompanySettings, invalidateCompanySettingsCache } from "./companyManager";
-import { invalidateEmailSettingsCache } from "./emailManager";
+import { getCompanySettings } from "./companyManager";
+import { invalidateJsonSettingsCaches } from "./jsonSettingsStore";
 
 // Estrae l'archivio e restituisce dove trovare dump e impostazioni. Per il formato
 // storico (.sql puro) non c'è nulla da estrarre e non ci sono impostazioni.
@@ -130,10 +124,8 @@ const restoreDataEntries = async (dataDir: string) => {
         await fs.promises.cp(source, path.join(settingsDir, entry), { recursive: true });
     }
 
-    // I file sono cambiati sotto le cache in memoria dei tre manager.
-    invalidateBackupStateCache();
-    invalidateEmailSettingsCache();
-    invalidateCompanySettingsCache();
+    // I file sono cambiati sotto le cache in memoria: tutte, non una lista da tenere aggiornata.
+    invalidateJsonSettingsCaches();
     // Ricaricati subito, non alla prima richiesta: i dati azienda portano il fuso orario, che il
     // processo deve adottare prima che lo scheduler dei backup calcoli il prossimo orario.
     await getCompanySettings();

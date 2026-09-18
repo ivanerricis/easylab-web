@@ -15,30 +15,6 @@ vi.mock("../db/queries/report", () => ({
     getReportStats: vi.fn(),
 }));
 
-// `/:id/print` interroga `db` direttamente (join su cliente, dispositivo, difetto e prezzo
-// tecnico), senza passare dal query layer: va mockato a parte con un costruttore
-// concatenabile, come già fa `authManager.test.ts` per lo stesso motivo.
-type SelectBuilder = {
-    from: () => SelectBuilder;
-    innerJoin: () => SelectBuilder;
-    where: () => SelectBuilder;
-    then: (resolve: (rows: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise<unknown>;
-};
-
-const queryResult = (rows: unknown[]): SelectBuilder => {
-    const builder: SelectBuilder = {
-        from: () => builder,
-        innerJoin: () => builder,
-        where: () => builder,
-        then: (resolve, reject) => Promise.resolve(rows).then(resolve, reject),
-    };
-    return builder;
-};
-
-vi.mock("../db", () => ({
-    db: { select: vi.fn() },
-}));
-
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
     getAppTimeZone: vi.fn(async () => "Europe/Rome"),
@@ -57,7 +33,6 @@ import {
     listReports,
     updateReportById,
 } from "../db/queries/report";
-import { db } from "../db";
 import { getLabConfig } from "../config/lab";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import reportsRouter from "./reports";
@@ -83,24 +58,24 @@ const labConfig = {
 // Quello che finisce nell'intestazione del PDF: il fuso serve solo a scrivere le date.
 const { timeZone: _timeZone, ...labHeader } = labConfig;
 
-// Riga così come la restituisce la query congiunta di `/:id/print`.
+// Riga così come la restituisce `getReportDetailById`, che serve anche la stampa.
 const printReportRow = {
     id: 1,
     note: "Richiamare per ritiro",
     password: "1234",
     issueDescription: "Schermo incrinato sull'angolo",
     serviceDescription: "Sostituito display",
-    issueLabel: "Schermo rotto",
+    issueName: "Schermo rotto",
     dataBackup: true,
     charger: false,
     alerted: true,
     price: 50,
-    createdAt: new Date("2026-01-01T10:00:00Z"),
-    customerFirstName: "Mario",
-    customerLastName: "Rossi",
-    customerPhone: "02 1234567",
+    created_at: new Date("2026-01-01T10:00:00Z"),
+    customerName: "Mario Rossi",
+    customerPhoneNumber: "02 1234567",
     customerPhoneSecondary: null,
     deviceName: "iPhone 12",
+    technicianPrice: 20,
 };
 
 // Riga così come la restituisce `getReportById`/`updateReportById`: colonne grezze della
@@ -287,11 +262,7 @@ describe("reports router", () => {
 
     describe("GET /:id/print", () => {
         it("risponde 404 quando il report non esiste", async () => {
-            // Le due select del `Promise.all` partono entrambe prima del controllo sulla
-            // prima: vanno mockate tutte e due anche quando conta solo l'assenza del report.
-            vi.mocked(db.select)
-                .mockReturnValueOnce(queryResult([]) as never)
-                .mockReturnValueOnce(queryResult([{ technicianPrice: 0 }]) as never);
+            vi.mocked(getReportDetailById).mockResolvedValue([] as never);
 
             const response = await request(buildApp()).get("/api/reports/999/print");
 
@@ -301,9 +272,7 @@ describe("reports router", () => {
         });
 
         it("somma il compenso del tecnico al prezzo interno e usa il problema scritto a mano", async () => {
-            vi.mocked(db.select)
-                .mockReturnValueOnce(queryResult([printReportRow]) as never)
-                .mockReturnValueOnce(queryResult([{ technicianPrice: 20 }]) as never);
+            vi.mocked(getReportDetailById).mockResolvedValue([printReportRow] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createReportPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
 
@@ -328,9 +297,9 @@ describe("reports router", () => {
         });
 
         it("usa l'etichetta del difetto quando manca il problema scritto a mano", async () => {
-            vi.mocked(db.select)
-                .mockReturnValueOnce(queryResult([{ ...printReportRow, issueDescription: null }]) as never)
-                .mockReturnValueOnce(queryResult([{ technicianPrice: 0 }]) as never);
+            vi.mocked(getReportDetailById).mockResolvedValue([
+                { ...printReportRow, issueDescription: null, technicianPrice: 0 },
+            ] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createReportPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
 
@@ -339,6 +308,22 @@ describe("reports router", () => {
             expect(createReportPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({ issueDescription: "Schermo rotto", totalPrice: 50 })
             );
+        });
+
+        // La ricevuta va al cliente: il tecnico esterno è un fatto interno del laboratorio. Il suo
+        // compenso entra solo nel totale, e la query di dettaglio porta con sé nome e id del tecnico.
+        it("non passa al PDF niente del tecnico esterno oltre al totale", async () => {
+            vi.mocked(getReportDetailById).mockResolvedValue([
+                { ...printReportRow, technicianId: 12, technicianName: "Luca Verdi" },
+            ] as never);
+            vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
+            vi.mocked(createReportPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
+
+            await request(buildApp()).get("/api/reports/1/print");
+
+            const [pdfData] = vi.mocked(createReportPdfBuffer).mock.calls[0];
+            expect(Object.keys(pdfData).filter((key) => /technician/i.test(key))).toEqual([]);
+            expect(JSON.stringify(pdfData)).not.toContain("Luca Verdi");
         });
     });
 
@@ -396,7 +381,34 @@ describe("reports router", () => {
             const response = await request(buildApp()).post("/api/reports").send(minimalBody);
 
             expect(response.status).toBe(201);
-            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ paymentMethod: "non_paid", price: 0 }));
+            // Nessun tecnico nel corpo: il secondo argomento resta vuoto e la riga del tecnico non si tocca.
+            expect(createReport).toHaveBeenCalledWith(
+                expect.objectContaining({ paymentMethod: "non_paid", price: 0 }),
+                undefined
+            );
+        });
+
+        it("crea il report e il suo tecnico esterno in un colpo solo", async () => {
+            vi.mocked(createReport).mockResolvedValue([storedReport] as never);
+
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, technicianId: 12, technicianPrice: 30 });
+
+            expect(response.status).toBe(201);
+            const [reportFields, technician] = vi.mocked(createReport).mock.calls[0];
+            expect(reportFields).not.toHaveProperty("technicianId");
+            expect(reportFields).not.toHaveProperty("technicianPrice");
+            expect(technician).toEqual({ technicianId: 12, price: 30 });
+        });
+
+        it("rifiuta un compenso del tecnico senza il tecnico", async () => {
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, technicianPrice: 30 });
+
+            expect(response.status).toBe(400);
+            expect(createReport).not.toHaveBeenCalled();
         });
 
         it("rifiuta di chiudere un report senza indicare un collaboratore", async () => {
@@ -436,7 +448,10 @@ describe("reports router", () => {
                 .send({ ...minimalBody, closed: true, collaboratorId: 3 });
 
             expect(response.status).toBe(201);
-            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ closed: true, collaboratorId: 3 }));
+            expect(createReport).toHaveBeenCalledWith(
+                expect.objectContaining({ closed: true, collaboratorId: 3 }),
+                undefined
+            );
         });
 
         it("rifiuta un campo non previsto dallo schema", async () => {
@@ -472,7 +487,33 @@ describe("reports router", () => {
             const response = await request(buildApp()).put("/api/reports/1").send({ note: "Richiamare" });
 
             expect(response.status).toBe(200);
-            expect(updateReportById).toHaveBeenCalledWith(1, { note: "Richiamare" });
+            expect(updateReportById).toHaveBeenCalledWith(1, { note: "Richiamare" }, undefined);
+        });
+
+        /**
+         * Il tecnico viaggia con il report nella stessa richiesta. Prima era una risorsa a parte e
+         * ogni pagina decideva da sé se aggiungerlo, aggiornarlo, sostituirlo o toglierlo.
+         */
+        it.each([
+            [
+                "assegna o sostituisce il tecnico",
+                { technicianId: 12, technicianPrice: 30 },
+                { technicianId: 12, price: 30 },
+            ],
+            [
+                "toglie il tecnico con null, azzerando il compenso",
+                { technicianId: null, technicianPrice: 30 },
+                { technicianId: null, price: 0 },
+            ],
+            ["senza compenso lo considera zero", { technicianId: 12 }, { technicianId: 12, price: 0 }],
+        ])("%s", async (_label, body, expectedTechnician) => {
+            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+            vi.mocked(updateReportById).mockResolvedValue([storedReport] as never);
+
+            const response = await request(buildApp()).put("/api/reports/1").send(body);
+
+            expect(response.status).toBe(200);
+            expect(updateReportById).toHaveBeenCalledWith(1, {}, expectedTechnician);
         });
 
         // Il pagamento resta "cash" perché non viene toccato dal corpo: solo il prezzo

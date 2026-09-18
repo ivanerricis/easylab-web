@@ -25,7 +25,8 @@ import { validate } from "./validation";
 
 const authRouter = Router();
 
-const sessionMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
+// Il cookie scade quando scade la sessione (`expiresAt` di `login`), invece di avere una durata
+// sua scritta qui: il passaggio da 30 a 7 giorni aveva dovuto toccare due costanti in due file.
 
 const loginBodySchema = z
     .object({
@@ -98,7 +99,7 @@ authRouter.post("/login", validate({ body: loginBodySchema }), async (req, res) 
         return;
     }
 
-    res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, maxAge: sessionMaxAgeMs });
+    res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, expires: result.expiresAt });
     res.json(result.user);
 });
 
@@ -113,7 +114,7 @@ authRouter.post("/login/2fa", validate({ body: twoFactorLoginBodySchema }), asyn
         return;
     }
 
-    res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, maxAge: sessionMaxAgeMs });
+    res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, expires: result.expiresAt });
     res.json(result.user);
 });
 

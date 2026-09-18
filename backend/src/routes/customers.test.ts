@@ -273,6 +273,7 @@ describe("customers router", () => {
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
                 timeZone: "Europe/Rome",
+                unpaginatedLimit: expect.objectContaining({ maxRows: 2000, onOverflow: "reject" }),
             });
             expect(createCustomerReportsPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -347,6 +348,7 @@ describe("customers router", () => {
                 dateFrom: undefined,
                 dateTo: undefined,
                 timeZone: "Europe/Rome",
+                unpaginatedLimit: expect.objectContaining({ maxRows: 2000, onOverflow: "reject" }),
             });
             expect(createCustomerInterventionsPdfBuffer).toHaveBeenCalledWith(
                 expect.objectContaining({

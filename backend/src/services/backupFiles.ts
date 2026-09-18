@@ -8,7 +8,7 @@ import path from "node:path";
 import { BackupManagerError } from "./backupError";
 
 export const settingsDir = path.join(process.cwd(), "data");
-export const settingsFilePath = path.join(settingsDir, "backup-settings.json");
+export const backupSettingsFileName = "backup-settings.json";
 export const defaultOutputDir = "backups";
 export const defaultMaxBackupsToKeep = 14;
 

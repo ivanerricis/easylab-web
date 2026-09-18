@@ -60,7 +60,6 @@ vi.mock("./backupKey", () => backupKeyMock);
 
 const backupStateMock = vi.hoisted(() => ({
     findSecretsToReconfigure: vi.fn(),
-    invalidateBackupStateCache: vi.fn(),
     loadState: vi.fn(),
     persistState: vi.fn(),
     toPublicState: vi.fn(),
@@ -74,14 +73,11 @@ vi.mock("./archiveSafety", () => archiveSafetyMock);
 const restoreSqlMock = vi.hoisted(() => ({ writeRestrictedSql: vi.fn() }));
 vi.mock("./restoreSql", () => restoreSqlMock);
 
-const companyManagerMock = vi.hoisted(() => ({
-    getCompanySettings: vi.fn(),
-    invalidateCompanySettingsCache: vi.fn(),
-}));
+const companyManagerMock = vi.hoisted(() => ({ getCompanySettings: vi.fn() }));
 vi.mock("./companyManager", () => companyManagerMock);
 
-const emailManagerMock = vi.hoisted(() => ({ invalidateEmailSettingsCache: vi.fn() }));
-vi.mock("./emailManager", () => emailManagerMock);
+const jsonSettingsStoreMock = vi.hoisted(() => ({ invalidateJsonSettingsCaches: vi.fn() }));
+vi.mock("./jsonSettingsStore", () => jsonSettingsStoreMock);
 
 const authManagerMock = vi.hoisted(() => ({ clearUnreadableTwoFactorSecrets: vi.fn() }));
 vi.mock("./authManager", () => authManagerMock);
@@ -205,7 +201,7 @@ describe("restoreBackupFromExisting", () => {
         // restoreDataEntries deve scattare.
         expect(fsPromisesMock.access).not.toHaveBeenCalled();
         expect(fsPromisesMock.cp).not.toHaveBeenCalled();
-        expect(backupStateMock.invalidateBackupStateCache).not.toHaveBeenCalled();
+        expect(jsonSettingsStoreMock.invalidateJsonSettingsCaches).not.toHaveBeenCalled();
 
         expect(backupStateMock.persistState).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -262,12 +258,10 @@ describe("restoreBackupFromExisting", () => {
 
         // Ricarica lo stato dopo aver sovrascritto backup-settings.json dall'archivio.
         expect(backupStateMock.loadState).toHaveBeenCalledTimes(2);
-        expect(backupStateMock.invalidateBackupStateCache).toHaveBeenCalledTimes(1);
-        expect(emailManagerMock.invalidateEmailSettingsCache).toHaveBeenCalledTimes(1);
-        expect(companyManagerMock.invalidateCompanySettingsCache).toHaveBeenCalledTimes(1);
+        expect(jsonSettingsStoreMock.invalidateJsonSettingsCaches).toHaveBeenCalledTimes(1);
         // Ricaricati subito: i dati azienda portano il fuso orario, che il processo adotta al caricamento.
         expect(companyManagerMock.getCompanySettings.mock.invocationCallOrder[0]).toBeGreaterThan(
-            companyManagerMock.invalidateCompanySettingsCache.mock.invocationCallOrder[0]
+            jsonSettingsStoreMock.invalidateJsonSettingsCaches.mock.invocationCallOrder[0]
         );
 
         // Solo le due voci effettivamente presenti vengono copiate.

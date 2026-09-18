@@ -66,6 +66,47 @@
     padding: 2px 6px;
 }
 
+/*
+ * Colore per stato: bordo pieno, interno dello stesso colore ma tenue (via color-mix, così
+ * segue anche il tema chiaro/scuro senza bisogno di due varianti di sfondo). Il colore del
+ * testo distingue solo qui light/dark: sull'interno tenue un colore fisso non aveva contrasto
+ * sufficiente su entrambi gli sfondi.
+ *
+ * Il mix è "in srgb" e non "in oklch": mescolare in oklch con var(--background) (praticamente
+ * acromatico, croma ~0) fa impazzire l'interpolazione della tonalità in Chromium/Edge e i tre
+ * stati finiscono tutti sulla stessa tinta rosa pallido invece che verde/giallo/rosso
+ * (verificato via color-mix isolato prima e dopo la modifica).
+ */
+.rbc-event.rbc-event-status-completato {
+    background-color: color-mix(in srgb, var(--color-green-500) 15%, var(--background));
+    border: 1px solid var(--color-green-500);
+    color: var(--color-green-700);
+}
+
+.rbc-event.rbc-event-status-in-lavorazione {
+    background-color: color-mix(in srgb, var(--color-yellow-400) 18%, var(--background));
+    border: 1px solid var(--color-yellow-500);
+    color: var(--color-yellow-700);
+}
+
+.rbc-event.rbc-event-status-programmato {
+    background-color: color-mix(in srgb, var(--color-red-500) 15%, var(--background));
+    border: 1px solid var(--color-red-500);
+    color: var(--color-red-700);
+}
+
+.dark .rbc-event.rbc-event-status-completato {
+    color: var(--color-green-400);
+}
+
+.dark .rbc-event.rbc-event-status-in-lavorazione {
+    color: var(--color-yellow-400);
+}
+
+.dark .rbc-event.rbc-event-status-programmato {
+    color: var(--color-red-400);
+}
+
 .rbc-show-more {
     color: var(--primary);
     background-color: transparent;

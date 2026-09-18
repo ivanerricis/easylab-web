@@ -53,12 +53,13 @@ const messages: Messages = {
     showMore: (total) => `+${total} altri`,
 };
 
-// Stili inline: il CSS di react-big-calendar definisce già .rbc-event con la stessa
-// specificità delle classi Tailwind e viene caricato dopo, quindi vincerebbe sempre lui.
-const statusEventStyle: Record<InterventionStatus, { backgroundColor: string; color: string }> = {
-    completato: { backgroundColor: "var(--color-green-500)", color: "#fff" },
-    in_lavorazione: { backgroundColor: "var(--color-yellow-400)", color: "#fff" },
-    programmato: { backgroundColor: "var(--color-red-500)", color: "#fff" },
+// Classe abbinata a `.rbc-event` in calendar-theme.css: da sola avrebbe la stessa
+// specificità di .rbc-event (definita da react-big-calendar e caricata dopo, quindi
+// vincerebbe sempre lei), ma la coppia di classi ha specificità maggiore e vince sempre.
+const statusEventClassName: Record<InterventionStatus, string> = {
+    completato: "rbc-event-status-completato",
+    in_lavorazione: "rbc-event-status-in-lavorazione",
+    programmato: "rbc-event-status-programmato",
 };
 
 /**
@@ -179,7 +180,7 @@ const InterventionsCalendar = ({
 
     const eventPropGetter = useMemo<EventPropGetter<InterventionCalendarEvent>>(
         () => (event) => ({
-            style: statusEventStyle[event.resource.status],
+            className: statusEventClassName[event.resource.status],
         }),
         []
     );

@@ -16,7 +16,9 @@ solo l'evoluzione del codice e dell'infrastruttura.
 **Perché.** Le schede degli interventi nel calendario (dashboard e pagina Calendario, stesso
 componente) erano tinte a piena forza — sfondo verde/giallo/rosso e testo bianco — leggibili ma
 pesanti su una griglia mensile piena di schede. Ora solo il bordo resta a colore pieno; l'interno
-è lo stesso colore ma tenue, e il testo prende la tinta dello stato invece del bianco fisso.
+è lo stesso colore ma tenue, e il testo resta del colore standard delle altre scritte (non tinto
+per stato: un primo tentativo colorava anche il testo, scartato per restare coerenti col resto
+dell'interfaccia).
 
 **Un bug scoperto nel farlo.** Il tenue nasce da `color-mix()` tra il colore dello stato e
 `var(--background)`. Con `in oklch` (lo spazio già usato altrove nel file, es. `.rbc-today`), il

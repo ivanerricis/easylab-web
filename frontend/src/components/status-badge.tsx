@@ -30,7 +30,9 @@ const StatusBadge = ({ color, size = "sm", className, children }: StatusBadgePro
         >
             {/* Il pallino solo nella misura piccola: nella card di stato delle schede, che a 1440px
                 è larga poco più di "Programmato" in 24px, spingeva la parola fuori dal bordo. */}
-            {style && size === "sm" ? <span aria-hidden="true" className={cn("size-1.5 rounded-full", style.dot)} /> : null}
+            {style && size === "sm" ? (
+                <span aria-hidden="true" className={cn("size-1.5 rounded-full", style.dot)} />
+            ) : null}
             {children}
         </span>
     );

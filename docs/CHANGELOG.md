@@ -11,28 +11,6 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
-## 2026-09-18 — Schede del calendario: solo il bordo a tinta piena, l'interno tenue
-
-**Perché.** Le schede degli interventi nel calendario (dashboard e pagina Calendario, stesso
-componente) erano tinte a piena forza — sfondo verde/giallo/rosso e testo bianco — leggibili ma
-pesanti su una griglia mensile piena di schede. Ora solo il bordo resta a colore pieno; l'interno
-è lo stesso colore ma tenue, e il testo prende la tinta dello stato invece del bianco fisso.
-
-**Un bug scoperto nel farlo.** Il tenue nasce da `color-mix()` tra il colore dello stato e
-`var(--background)`. Con `in oklch` (lo spazio già usato altrove nel file, es. `.rbc-today`), il
-risultato per tutti e tre gli stati finiva sulla stessa tinta rosa pallido invece che
-verde/giallo/rosso — `var(--background)` è quasi acromatico (croma ~0) e l'interpolazione della
-tonalità in Chromium/Edge impazzisce su quell'estremo. Verificato isolando `color-mix()` fuori
-dal componente: `in srgb` con gli stessi input dà il tenue atteso, `in oklch` no. Le tre nuove
-regole usano quindi `in srgb`; `.rbc-today` resta `in oklch` perché mescola con `transparent`, non
-con `var(--background)`, e lì il problema non si presenta.
-
-File: `frontend/src/pages/calendar/calendar-theme.css` (nuove regole `.rbc-event-status-*`),
-`frontend/src/pages/calendar/components/interventions-calendar.tsx` (`eventPropGetter` passa una
-`className` invece di uno `style` inline, così le regole CSS possono vincere per specificità).
-
----
-
 ## 2026-09-18 — Scorciatoie da tastiera, con il loro elenco
 
 **Perché lettere nude e non Ctrl+qualcosa.** Ctrl+N, Ctrl+T e Ctrl+W se li tiene il browser: non

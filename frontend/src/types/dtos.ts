@@ -73,12 +73,6 @@ export type IssueDto = {
     updatedAt: string | null;
 };
 
-export type ReportTechnicianDto = {
-    reportId: number;
-    technicianId: number;
-    price: number;
-};
-
 export type InterventionType = "consegna_materiale" | "intervento_sede" | "intervento_remoto";
 
 export type InterventionStatus = "programmato" | "in_lavorazione" | "completato";

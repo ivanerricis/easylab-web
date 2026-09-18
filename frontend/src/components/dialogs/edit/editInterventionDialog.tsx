@@ -1,44 +1,24 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
+import {
+    InterventionCollaboratorField,
+    InterventionDetailsSection,
+} from "@/components/dialogs/intervention-form-fields";
+import { hasFormChanged } from "@/lib/formField";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import DatePickerField from "@/components/date-picker-field";
-import PaidStatusSelector from "@/components/paid-status-selector";
-import ToInvoiceSelector from "@/components/to-invoice-selector";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
-    getInterventionValidationError,
-    type InterventionField,
-    interventionDateLabel,
-    interventionDescriptionLabel,
-    interventionStatusOptions,
-    interventionTypeOptions,
-    isOnSiteInterventionType,
-    isScheduledInterventionStatus,
-} from "@/lib/interventions";
+    emptyInterventionFormState,
+    interventionFieldOrder,
+    toInterventionSubmitFields,
+    validateInterventionForm,
+    type InterventionFieldErrors,
+    type InterventionFormState,
+} from "@/lib/interventionForm";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
-import { startTransition, useEffect, useState, type ComponentProps } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
-
-const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
-
-/** Un campo prezzo con il simbolo dell'euro davanti: prima era un numero nudo. */
-const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
-    <div className="relative">
-        <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-lg text-muted-foreground"
-        >
-            €
-        </span>
-        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
-    </div>
-);
 
 export type EditInterventionSubmitValues = {
     interventionId: number;
@@ -68,19 +48,6 @@ type EditInterventionDialogProps = {
     onSubmit: (values: EditInterventionSubmitValues) => Promise<void>;
 };
 
-type FieldErrors = Partial<Record<"collaboratorId" | "price" | InterventionField, string>>;
-
-/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
-const fieldOrder = [
-    "collaboratorId",
-    "interventionDate",
-    "startTime",
-    "endTime",
-    "problem",
-    "description",
-    "price",
-] as const;
-
 const EditInterventionDialog = ({
     open,
     interventionId,
@@ -89,36 +56,30 @@ const EditInterventionDialog = ({
     onSubmit,
 }: EditInterventionDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
-    const [errors, setErrors] = useState<FieldErrors>({});
+    const [errors, setErrors] = useState<InterventionFieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadedInterventionId, setLoadedInterventionId] = useState<number | null>(null);
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
 
-    const [formValues, setFormValues] = useState({
-        type: "consegna_materiale" as InterventionType,
-        status: "programmato" as InterventionStatus,
-        description: "",
-        problem: "",
-        note: "",
-        price: "",
-        paid: false,
-        toInvoice: false,
-        collaboratorId: "",
-        interventionDate: "",
-        startTime: "",
-        endTime: "",
-    });
+    const [formValues, setFormValues] = useState<InterventionFormState>(() => emptyInterventionFormState(""));
 
     // I valori come sono arrivati dal server: finché non ci sono (caricamento), il modulo non
     // può essere "modificato", e chiudere non chiede niente.
-    const [savedFormValues, setSavedFormValues] = useState<typeof formValues | null>(null);
+    const [savedFormValues, setSavedFormValues] = useState<InterventionFormState | null>(null);
     const isDirty =
         loadedInterventionId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
 
-    const isOnSite = isOnSiteInterventionType(formValues.type);
-    // Un intervento ancora da svolgere non ha orari né lavoro da descrivere: i campi
-    // restano compilabili, ma smettono di essere obbligatori e l'etichetta lo dice.
-    const isScheduled = isScheduledInterventionStatus(formValues.status);
+    /** Applica i campi cambiati e toglie l'errore a quelli toccati. */
+    const handleChange = (patch: Partial<InterventionFormState>) => {
+        setFormValues((prev) => ({ ...prev, ...patch }));
+        setErrors((prev) => {
+            const next = { ...prev };
+            for (const field of Object.keys(patch)) {
+                delete next[field as keyof InterventionFieldErrors];
+            }
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (!open || !interventionId) {
@@ -139,7 +100,7 @@ const EditInterventionDialog = ({
                 ]);
 
                 setCollaborators(collaboratorsData);
-                const loadedFormValues = {
+                const loadedFormValues: InterventionFormState = {
                     type: intervention.type,
                     status: intervention.status,
                     description: intervention.description ?? "",
@@ -174,31 +135,13 @@ const EditInterventionDialog = ({
             return;
         }
 
-        const collaboratorId = Number(formValues.collaboratorId);
-
         // Tutti gli errori in un colpo solo, ciascuno accanto al proprio campo: prima ogni
         // controllo usciva dalla funzione con un toast, che non diceva quale campo correggere.
-        const nextErrors: FieldErrors = {};
-
-        if (!Number.isInteger(collaboratorId) || collaboratorId <= 0) {
-            nextErrors.collaboratorId = "Seleziona un collaboratore valido";
-        }
-
-        const price = formValues.price.trim() === "" ? null : Number(formValues.price);
-
-        if (price != null && (!Number.isFinite(price) || price < 0)) {
-            nextErrors.price = "Il prezzo deve essere maggiore o uguale a zero";
-        }
-
-        const validationError = getInterventionValidationError(formValues);
-
-        if (validationError) {
-            nextErrors[validationError.field] = validationError.message;
-        }
+        const nextErrors = validateInterventionForm(formValues);
 
         setErrors(nextErrors);
 
-        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
+        const firstInvalidField = interventionFieldOrder.find((field) => nextErrors[field]);
 
         if (firstInvalidField) {
             document.getElementById(firstInvalidField)?.focus();
@@ -207,21 +150,7 @@ const EditInterventionDialog = ({
 
         try {
             setIsSubmitting(true);
-            await onSubmit({
-                interventionId,
-                type: formValues.type,
-                status: formValues.status,
-                description: formValues.description.trim() || null,
-                problem: isOnSite ? formValues.problem.trim() : null,
-                note: formValues.note.trim() || null,
-                price,
-                paid: formValues.paid,
-                toInvoice: formValues.toInvoice,
-                collaboratorId,
-                interventionDate: formValues.interventionDate,
-                startTime: isOnSite ? formValues.startTime || null : null,
-                endTime: isOnSite ? formValues.endTime || null : null,
-            });
+            await onSubmit({ interventionId, ...toInterventionSubmitFields(formValues) });
 
             toast.success("Intervento aggiornato con successo");
             onOpenChange(false);
@@ -280,276 +209,16 @@ const EditInterventionDialog = ({
                                         </Select>
                                     </div>
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="collaboratorId" className="text-lg">
-                                            Collaboratore
-                                            <RequiredMark />
-                                        </Label>
-                                        <Select
-                                            value={formValues.collaboratorId}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }));
-                                                setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
-                                            }}
-                                        >
-                                            <SelectTrigger
-                                                id="collaboratorId"
-                                                {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Seleziona collaboratore" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {collaborators.map((collaborator) => (
-                                                    <SelectItem key={collaborator.id} value={String(collaborator.id)}>
-                                                        {formatPersonName(
-                                                            collaborator.firstName,
-                                                            collaborator.lastName
-                                                        )}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FieldError id="collaboratorId" error={errors.collaboratorId} />
-                                    </div>
+                                    <InterventionCollaboratorField
+                                        values={formValues}
+                                        errors={errors}
+                                        onChange={handleChange}
+                                        collaborators={collaborators}
+                                    />
                                 </div>
                             </section>
 
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Intervento
-                                </h3>
-
-                                <div className="grid items-start gap-4 lg:grid-cols-2">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="type" className="text-lg">
-                                            Tipo intervento
-                                        </Label>
-                                        <Select
-                                            value={formValues.type}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({ ...prev, type: value as InterventionType }))
-                                            }
-                                        >
-                                            <SelectTrigger id="type" className="w-full">
-                                                <SelectValue placeholder="Seleziona tipo" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {interventionTypeOptions.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="status" className="text-lg">
-                                            Stato
-                                        </Label>
-                                        <Select
-                                            value={formValues.status}
-                                            onValueChange={(value) =>
-                                                setFormValues((prev) => ({
-                                                    ...prev,
-                                                    status: value as InterventionStatus,
-                                                }))
-                                            }
-                                        >
-                                            <SelectTrigger id="status" className="w-full">
-                                                <SelectValue placeholder="Seleziona stato" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {interventionStatusOptions.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="interventionDate" className="text-lg">
-                                            {interventionDateLabel(formValues.type)}
-                                            <RequiredMark />
-                                        </Label>
-                                        <DatePickerField
-                                            id="interventionDate"
-                                            {...fieldErrorAria("interventionDate", errors.interventionDate)}
-                                            value={formValues.interventionDate}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, interventionDate: value }));
-                                                setErrors((prev) => ({ ...prev, interventionDate: undefined }));
-                                            }}
-                                        />
-                                        <FieldError id="interventionDate" error={errors.interventionDate} />
-                                    </div>
-
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="price" className="text-lg">
-                                            Prezzo
-                                            <span className="text-base text-muted-foreground"> (facoltativo)</span>
-                                        </Label>
-                                        <EuroInput
-                                            {...fieldProps("price", { error: errors.price })}
-                                            value={formValues.price}
-                                            onChange={(event) => {
-                                                setFormValues((prev) => ({ ...prev, price: event.target.value }));
-                                                setErrors((prev) => ({ ...prev, price: undefined }));
-                                            }}
-                                        />
-                                        <FieldError id="price" error={errors.price} />
-                                    </div>
-
-                                    {/*
-                                     * Larghi quanto tutta la sezione: dentro mezza colonna le due schede
-                                     * radio si stringono sotto i 200px e "Non da fatturare" andava a capo,
-                                     * lasciando la riga sfalsata rispetto al pagamento qui accanto.
-                                     */}
-                                    <div className="grid gap-1 lg:col-span-2">
-                                        <Label className="text-lg">Pagamento</Label>
-                                        <PaidStatusSelector
-                                            value={formValues.paid}
-                                            onValueChange={(paid) => setFormValues((prev) => ({ ...prev, paid }))}
-                                        />
-                                    </div>
-
-                                    <div className="grid gap-1 lg:col-span-2">
-                                        <Label className="text-lg">Fatturazione</Label>
-                                        <ToInvoiceSelector
-                                            value={formValues.toInvoice}
-                                            onValueChange={(toInvoice) =>
-                                                setFormValues((prev) => ({ ...prev, toInvoice }))
-                                            }
-                                        />
-                                    </div>
-
-                                    {isOnSite ? (
-                                        // Anche gli orari occupano tutta la sezione, come le altre coppie:
-                                        // stretti in mezza colonna le due etichette andavano a capo
-                                        // ("Ora / inizio") e i campi non erano allineati con quelli sopra.
-                                        <div className="grid grid-cols-2 items-start gap-4 lg:col-span-2">
-                                            <div className="grid gap-1">
-                                                <Label htmlFor="startTime" className="text-lg">
-                                                    Ora inizio
-                                                    {isScheduled ? (
-                                                        <span className="text-base text-muted-foreground">
-                                                            {" "}
-                                                            (facoltativa)
-                                                        </span>
-                                                    ) : (
-                                                        <RequiredMark />
-                                                    )}
-                                                </Label>
-                                                <Input
-                                                    {...fieldProps("startTime", { error: errors.startTime })}
-                                                    className="text-lg!"
-                                                    type="time"
-                                                    value={formValues.startTime}
-                                                    onChange={(event) => {
-                                                        setFormValues((prev) => ({
-                                                            ...prev,
-                                                            startTime: event.target.value,
-                                                        }));
-                                                        setErrors((prev) => ({ ...prev, startTime: undefined }));
-                                                    }}
-                                                />
-                                                <FieldError id="startTime" error={errors.startTime} />
-                                            </div>
-
-                                            <div className="grid gap-1">
-                                                <Label htmlFor="endTime" className="text-lg">
-                                                    Ora fine
-                                                    {isScheduled ? (
-                                                        <span className="text-base text-muted-foreground">
-                                                            {" "}
-                                                            (facoltativa)
-                                                        </span>
-                                                    ) : (
-                                                        <RequiredMark />
-                                                    )}
-                                                </Label>
-                                                <Input
-                                                    {...fieldProps("endTime", { error: errors.endTime })}
-                                                    className="text-lg!"
-                                                    type="time"
-                                                    value={formValues.endTime}
-                                                    onChange={(event) => {
-                                                        setFormValues((prev) => ({
-                                                            ...prev,
-                                                            endTime: event.target.value,
-                                                        }));
-                                                        setErrors((prev) => ({ ...prev, endTime: undefined }));
-                                                    }}
-                                                />
-                                                <FieldError id="endTime" error={errors.endTime} />
-                                            </div>
-                                        </div>
-                                    ) : null}
-
-                                    {isOnSite ? (
-                                        <div className="grid gap-1 lg:col-span-2">
-                                            <Label htmlFor="problem" className="text-lg">
-                                                Problema
-                                                <RequiredMark />
-                                            </Label>
-                                            <Textarea
-                                                {...fieldProps("problem", { error: errors.problem })}
-                                                className="resize-none text-lg!"
-                                                rows={4}
-                                                placeholder="Descrivi il problema riscontrato"
-                                                value={formValues.problem}
-                                                onChange={(event) => {
-                                                    setFormValues((prev) => ({ ...prev, problem: event.target.value }));
-                                                    setErrors((prev) => ({ ...prev, problem: undefined }));
-                                                }}
-                                            />
-                                            <FieldError id="problem" error={errors.problem} />
-                                        </div>
-                                    ) : null}
-
-                                    <div className="grid gap-1 lg:col-span-2">
-                                        <Label htmlFor="description" className="text-lg">
-                                            {interventionDescriptionLabel(formValues.type)}
-                                            {isScheduled ? (
-                                                <span className="text-base text-muted-foreground"> (facoltativo)</span>
-                                            ) : (
-                                                <RequiredMark />
-                                            )}
-                                        </Label>
-                                        <Textarea
-                                            {...fieldProps("description", { error: errors.description })}
-                                            className="resize-none text-lg!"
-                                            rows={4}
-                                            value={formValues.description}
-                                            onChange={(event) => {
-                                                setFormValues((prev) => ({ ...prev, description: event.target.value }));
-                                                setErrors((prev) => ({ ...prev, description: undefined }));
-                                            }}
-                                        />
-                                        <FieldError id="description" error={errors.description} />
-                                    </div>
-
-                                    <div className="grid gap-1 lg:col-span-2">
-                                        <Label htmlFor="note" className="text-lg">
-                                            Note
-                                            <span className="text-base text-muted-foreground"> (facoltative)</span>
-                                        </Label>
-                                        <Textarea
-                                            id="note"
-                                            className="resize-none text-lg!"
-                                            rows={4}
-                                            placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
-                                            value={formValues.note}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({ ...prev, note: event.target.value }))
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                            </section>
+                            <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
                         </div>
                     )}
                 </div>

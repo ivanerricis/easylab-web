@@ -1,8 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem from "@/components/detail-item";
-import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
-import OpenEntityButton from "@/components/open-entity-button";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { entityPaths } from "@/lib/entityPaths";
@@ -14,12 +12,9 @@ import CreateCollaboratorDialog, {
     type CollaboratorSubmitValues,
 } from "@/components/dialogs/create/createCollaboratorDialog";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
-import { toCollaboratorPayload } from "@/lib/people";
+import { formatPersonName, toCollaboratorPayload } from "@/lib/people";
 import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import TablePagination from "@/components/table-pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     getApiErrorMessage,
     getApiErrorStatus,
@@ -27,22 +22,16 @@ import {
     deleteCollaborator,
     getCollaboratorInterventionsPrintUrl,
     getCollaboratorReportsPrintUrl,
-    listInterventions,
-    listReports,
     updateCollaborator,
 } from "@/lib/api";
-import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Printer } from "lucide-react";
-import type { CollaboratorDto, InterventionDto, ReportDto } from "@/types/dtos";
-import type { ReportVisibilityFilter } from "../reports/components/types";
-import type { InterventionStatusFilter } from "../interventions/components/types";
+import type { CollaboratorDto } from "@/types/dtos";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { usePaginatedRows } from "@/hooks/usePaginatedRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
-import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { collaboratorInterventionColumns, collaboratorReportColumns } from "./components/collaborator-detail-columns";
+import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
+import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
 
 /**
  * La scheda del collaboratore: due sezioni, i report che ha portato e gli interventi che gli
@@ -74,23 +63,17 @@ import { collaboratorInterventionColumns, collaboratorReportColumns } from "./co
  * e per stampare il resoconto del tab aperto: prima la scheda mostrava solo il nome, e per
  * leggere il telefono o correggerlo bisognava tornare all'elenco.
  */
-type CollaboratorTab = "reports" | "interventions";
-
 const CollaboratorPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const collaboratorId = Number(id);
     const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(true);
     const [collaborator, setCollaborator] = useState<CollaboratorDto | null>(null);
-    const collaboratorName = collaborator
-        ? `${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim()
-        : "Collaboratore";
+    const collaboratorName = collaborator ? formatPersonName(collaborator) : "Collaboratore";
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     useDocumentTitle(collaboratorName);
-    const [activeTab, setActiveTab] = useState<CollaboratorTab>("reports");
-    const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("all");
-    const [interventionStatusFilter, setInterventionStatusFilter] = useState<InterventionStatusFilter>("all");
+    const [activeTab, setActiveTab] = useState<ReportsInterventionsTab>("reports");
 
     const hasValidCollaboratorId = useMemo(
         () => Number.isInteger(collaboratorId) && collaboratorId > 0,
@@ -109,61 +92,13 @@ const CollaboratorPage = () => {
         navigate(entityPaths.intervention(interventionId));
     };
 
-    // Le due sezioni si impaginano per conto proprio: righe per pagina e pagina corrente sono
-    // separate, altrimenti sfogliare i report riporterebbe gli interventi alla prima pagina.
-    const [reportsPageSize, setReportsPageSize] = useTableRowsPerPage("collaborator-reports");
-    const { currentPage: reportsPage, setCurrentPage: setReportsPage } = useTablePagination({
-        resetDependencies: [visibilityFilter, reportsPageSize],
+    const lists = useReportsAndInterventionsOf({
+        owner: { collaboratorId },
+        tableKeyPrefix: "collaborator",
+        ownerLabel: "del collaboratore",
     });
-
-    const [interventionsPageSize, setInterventionsPageSize] = useTableRowsPerPage("collaborator-interventions");
-    const { currentPage: interventionsPage, setCurrentPage: setInterventionsPage } = useTablePagination({
-        resetDependencies: [interventionStatusFilter, interventionsPageSize],
-    });
-
-    const {
-        rows: reportRows,
-        totalItems: reportsTotalItems,
-        totalPages: reportsTotalPages,
-        isInitialLoading: areReportsInitialLoading,
-        isRefetching: areReportsRefetching,
-        isLoading: areReportsLoading,
-        reload: reloadReports,
-    } = usePaginatedRows<ReportDto>({
-        fetchRows: (signal) =>
-            listReports({
-                page: reportsPage,
-                pageSize: reportsPageSize,
-                visibility: visibilityFilter,
-                collaboratorId,
-                signal,
-            }),
-        queryKey: [collaboratorId, reportsPage, reportsPageSize, visibilityFilter],
-        errorMessage: "Impossibile caricare i report del collaboratore",
-        initialLoading: false,
-    });
-
-    const {
-        rows: interventionRows,
-        totalItems: interventionsTotalItems,
-        totalPages: interventionsTotalPages,
-        isInitialLoading: areInterventionsInitialLoading,
-        isRefetching: areInterventionsRefetching,
-        isLoading: areInterventionsLoading,
-        reload: reloadInterventions,
-    } = usePaginatedRows<InterventionDto>({
-        fetchRows: (signal) =>
-            listInterventions({
-                page: interventionsPage,
-                pageSize: interventionsPageSize,
-                status: interventionStatusFilter,
-                collaboratorId,
-                signal,
-            }),
-        queryKey: [collaboratorId, interventionsPage, interventionsPageSize, interventionStatusFilter],
-        errorMessage: "Impossibile caricare gli interventi del collaboratore",
-        initialLoading: false,
-    });
+    const { reload: reloadReports } = lists.reports;
+    const { reload: reloadInterventions } = lists.interventions;
 
     const loadCollaborator = useCallback(async () => {
         try {
@@ -264,7 +199,7 @@ const CollaboratorPage = () => {
                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     <RefreshButton
                         onRefresh={handleRefresh}
-                        isRefreshing={areReportsLoading || areInterventionsLoading}
+                        isRefreshing={lists.isLoading}
                         label="Aggiorna i dati del collaboratore"
                     />
 
@@ -317,135 +252,17 @@ const CollaboratorPage = () => {
                 </Card>
             ) : null}
 
-            <Tabs
-                value={activeTab}
-                onValueChange={(value) => setActiveTab(value as CollaboratorTab)}
-                className="min-h-0 flex-1"
-            >
-                {/* Tab e filtro sulla stessa riga, anche su mobile: su due righe il filtro
-                    sembrava un controllo a sé, staccato dalla lista che filtra, e toglieva una
-                    riga alla tabella. Il filtro è uno solo e mostra le voci del tab aperto. */}
-                <div className="flex items-center justify-between gap-2">
-                    <TabsList>
-                        <TabsTrigger value="reports" className="px-2 sm:px-3">
-                            Report
-                        </TabsTrigger>
-                        <TabsTrigger value="interventions" className="px-2 sm:px-3">
-                            Interventi
-                        </TabsTrigger>
-                    </TabsList>
-                    {activeTab === "interventions" ? (
-                        <Select
-                            value={interventionStatusFilter}
-                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
-                        >
-                            <SelectTrigger
-                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                                aria-label="Filtra gli interventi per stato"
-                            >
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti gli interventi</SelectItem>
-                                {interventionStatusOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    ) : (
-                        <Select
-                            value={visibilityFilter}
-                            onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
-                        >
-                            <SelectTrigger
-                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                                aria-label="Filtra i report per stato"
-                            >
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti i report</SelectItem>
-                                <SelectItem value="open">Report aperti</SelectItem>
-                                <SelectItem value="closed">Report chiusi</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
-                </div>
-
-                <TabsContent value="reports" aria-label="Report del collaboratore" className="min-h-0 flex-1">
-                    {/* Come nelle altre pagine a elenco: quest'area scorre da sola (in
-                        entrambe le direzioni — il contenitore principale del layout ha
-                        overflow-x nascosto, e allargando le colonne la tabella può diventare
-                        più larga della pagina), lasciando l'impaginazione ferma in fondo
-                        invece di farla scorrere via con la tabella. */}
-                    <div className="min-h-0 flex-1 overflow-auto">
-                        <EntityTable
-                            tableKey="collaborator-reports"
-                            columns={collaboratorReportColumns}
-                            rows={reportRows}
-                            getRowKey={(row) => row.id}
-                            emptyMessage="Nessun report associato a questo collaboratore."
-                            renderRowActions={(row) => (
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.report(row.id)}
-                                    aria-label={`Apri report ${row.id}`}
-                                />
-                            )}
-                            getRowStatusColor={(row) => (row.closed ? "green" : "red")}
-                            onRowOpen={(row) => handleOpenReport(row.id)}
-                            isInitialLoading={areReportsInitialLoading}
-                            isRefetching={areReportsRefetching}
-                            skeletonRowCount={reportsPageSize}
-                        />
-                    </div>
-
-                    <TablePagination
-                        currentPage={reportsPage}
-                        totalPages={reportsTotalPages}
-                        totalItems={reportsTotalItems}
-                        pageSize={reportsPageSize}
-                        onPageChange={setReportsPage}
-                        onPageSizeChange={setReportsPageSize}
-                    />
-                </TabsContent>
-
-                <TabsContent value="interventions" aria-label="Interventi del collaboratore" className="min-h-0 flex-1">
-                    {/* Stesso motivo della tabella dei report. */}
-                    <div className="min-h-0 flex-1 overflow-auto">
-                        <EntityTable
-                            tableKey="collaborator-interventions"
-                            columns={collaboratorInterventionColumns}
-                            rows={interventionRows}
-                            getRowKey={(row) => row.id}
-                            emptyMessage="Nessun intervento associato a questo collaboratore."
-                            renderRowActions={(row) => (
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.intervention(row.id)}
-                                    aria-label={`Apri intervento ${row.id}`}
-                                />
-                            )}
-                            getRowStatusColor={(row) => interventionStatusColor[row.status]}
-                            onRowOpen={(row) => handleOpenIntervention(row.id)}
-                            isInitialLoading={areInterventionsInitialLoading}
-                            isRefetching={areInterventionsRefetching}
-                            skeletonRowCount={interventionsPageSize}
-                        />
-                    </div>
-
-                    <TablePagination
-                        currentPage={interventionsPage}
-                        totalPages={interventionsTotalPages}
-                        totalItems={interventionsTotalItems}
-                        pageSize={interventionsPageSize}
-                        onPageChange={setInterventionsPage}
-                        onPageSizeChange={setInterventionsPageSize}
-                    />
-                </TabsContent>
-            </Tabs>
+            <ReportsInterventionsTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                lists={lists}
+                reportColumns={collaboratorReportColumns}
+                interventionColumns={collaboratorInterventionColumns}
+                tableKeyPrefix="collaborator"
+                ownerNoun="collaboratore"
+                onOpenReport={handleOpenReport}
+                onOpenIntervention={handleOpenIntervention}
+            />
         </div>
     );
 };

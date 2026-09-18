@@ -18,7 +18,7 @@ type DeviceDialogMode = "create" | "edit";
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: DeviceSubmitValues) => Promise<void> | void;
+    onSubmit: (values: DeviceSubmitValues) => Promise<void> | void;
     mode?: DeviceDialogMode;
     initialValues?: DeviceDto | null;
 };
@@ -48,11 +48,6 @@ const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", ini
         setNameError(undefined);
 
         if (isSubmitting) {
-            return;
-        }
-
-        if (!onSubmit) {
-            onOpenChange(false);
             return;
         }
 

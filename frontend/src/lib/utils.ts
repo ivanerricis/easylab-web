@@ -20,7 +20,27 @@ export function openPrintWindow(url: string) {
     return printWindow;
 }
 
-export function formatDateTime(value: string | null | undefined) {
+/**
+ * I formattatori si creano una volta sola, non a ogni chiamata: costruirne uno costa molto più
+ * che usarlo, e le tabelle ne chiamano uno per cella a ogni render (con "Tutte", migliaia). Il
+ * fuso è quello del dispositivo (CHANGELOG del 2026-09-15), che per una pagina aperta non cambia.
+ */
+const dateTimeFormatter = new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+});
+const dateFormatter = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
+const euroFormatter = new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
+const formatDateWith = (formatter: Intl.DateTimeFormat, value: string | null | undefined) => {
     if (!value) {
         return "-";
     }
@@ -30,30 +50,15 @@ export function formatDateTime(value: string | null | undefined) {
         return "-";
     }
 
-    return new Intl.DateTimeFormat("it-IT", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(date);
+    return formatter.format(date);
+};
+
+export function formatDateTime(value: string | null | undefined) {
+    return formatDateWith(dateTimeFormatter, value);
 }
 
 export function formatDate(value: string | null | undefined) {
-    if (!value) {
-        return "-";
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return "-";
-    }
-
-    return new Intl.DateTimeFormat("it-IT", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-    }).format(date);
+    return formatDateWith(dateFormatter, value);
 }
 
 /**
@@ -96,6 +101,9 @@ export function formatRelativeTime(value: string | null | undefined, now: Date =
     return formatter.format(-Math.floor(elapsedSeconds / seconds), unit);
 }
 
+/** "Sì"/"No" per i campi booleani mostrati come testo (spunte della scheda report, fatturazione). */
+export const formatYesNo = (value: boolean) => (value ? "Sì" : "No");
+
 export function formatFileSize(sizeBytes: number) {
     if (sizeBytes < 1024) {
         return `${sizeBytes} B`;
@@ -111,12 +119,7 @@ export function formatFileSize(sizeBytes: number) {
 export function formatEuro(value: number | null | undefined) {
     const amount = typeof value === "number" && Number.isFinite(value) ? value : 0;
 
-    return new Intl.NumberFormat("it-IT", {
-        style: "currency",
-        currency: "EUR",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(amount);
+    return euroFormatter.format(amount);
 }
 
 /**

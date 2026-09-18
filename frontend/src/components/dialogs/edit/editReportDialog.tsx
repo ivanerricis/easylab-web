@@ -11,11 +11,11 @@ import { getApiErrorMessage, getReport, listCollaborators, listDevices, listIssu
 import { isCatchAllIssue } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
-import { startTransition, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
-
-const formatPersonName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
+import EuroInput from "@/components/euro-input";
+import { formatPersonName } from "@/lib/people";
 
 /**
  * Un riquadro del dialogo. `content-start` tiene i campi in alto quando la sezione si allunga
@@ -27,19 +27,6 @@ const FormSection = ({ title, className, children }: { title: string; className?
         <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
         {children}
     </section>
-);
-
-/** Un campo prezzo con il simbolo dell'euro davanti: prima era un numero nudo. */
-const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
-    <div className="relative">
-        <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-lg text-muted-foreground"
-        >
-            €
-        </span>
-        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
-    </div>
 );
 
 /**
@@ -68,7 +55,6 @@ export type EditReportSubmitValues = {
     issueId: number;
     collaboratorId: number | null;
     technicianId: number | null;
-    existingTechnicianId: number | null;
     technicianPrice: number;
     /**
      * Il problema riscontrato, che è quello stampato sulla ricevuta. Vale solo con il
@@ -110,7 +96,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
     const [issues, setIssues] = useState<IssueDto[]>([]);
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
     const [technicians, setTechnicians] = useState<TechnicianDto[]>([]);
-    const [existingTechnicianId, setExistingTechnicianId] = useState<number | null>(null);
 
     const [formValues, setFormValues] = useState({
         customerId: "",
@@ -162,7 +147,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 setIssues(issuesData);
                 setCollaborators(collaboratorsData);
                 setTechnicians(techniciansData);
-                setExistingTechnicianId(report.technicianId);
                 const loadedFormValues = {
                     customerId: String(report.customerId),
                     deviceId: String(report.deviceId),
@@ -273,7 +257,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 issueId,
                 collaboratorId,
                 technicianId,
-                existingTechnicianId,
                 technicianPrice,
                 issueDescription: needsProblemText ? formValues.issueDescription.trim() : null,
                 serviceDescription: formValues.serviceDescription.trim() || null,
@@ -397,10 +380,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 <SelectItem value="none">Nessuno</SelectItem>
                                                 {collaborators.map((collaborator) => (
                                                     <SelectItem key={collaborator.id} value={String(collaborator.id)}>
-                                                        {formatPersonName(
-                                                            collaborator.firstName,
-                                                            collaborator.lastName
-                                                        )}
+                                                        {formatPersonName(collaborator)}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -550,10 +530,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                     <SelectItem value="none">Nessuno</SelectItem>
                                                     {technicians.map((technician) => (
                                                         <SelectItem key={technician.id} value={String(technician.id)}>
-                                                            {formatPersonName(
-                                                                technician.firstName,
-                                                                technician.lastName
-                                                            )}
+                                                            {formatPersonName(technician)}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

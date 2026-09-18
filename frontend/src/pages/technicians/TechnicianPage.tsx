@@ -11,24 +11,20 @@ import EditReportDialog, { type EditReportSubmitValues } from "@/components/dial
 import CreateTechnicianDialog, {
     type TechnicianSubmitValues,
 } from "@/components/dialogs/create/createTechnicianDialog";
-import { toTechnicianPayload } from "@/lib/people";
+import { formatPersonName, toTechnicianPayload } from "@/lib/people";
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import TablePagination from "@/components/table-pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-    createReportTechnician,
     deleteTechnician,
     getApiErrorMessage,
     getApiErrorStatus,
     getTechnician,
     listReports,
-    deleteReportTechnician,
     updateReport,
-    updateReportTechnician,
     updateTechnician,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ListFilter, Pencil } from "lucide-react";
 import type { ReportDto, TechnicianDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
@@ -42,6 +38,8 @@ import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { technicianReportColumns } from "./components/technician-detail-columns";
+import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
+import FilterSelect from "@/components/filters/filter-select";
 
 /**
  * La scheda del tecnico esterno: i suoi dati e i report che gli sono stati affidati.
@@ -62,7 +60,7 @@ const TechnicianPage = () => {
     const technicianId = Number(id);
     const [isTechnicianLoading, setIsTechnicianLoading] = useState(true);
     const [technician, setTechnician] = useState<TechnicianDto | null>(null);
-    const technicianName = technician ? `${technician.firstName} ${technician.lastName ?? ""}`.trim() : "Tecnico";
+    const technicianName = technician ? formatPersonName(technician) : "Tecnico";
     useDocumentTitle(technicianName);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -107,27 +105,6 @@ const TechnicianPage = () => {
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
         await updateReport(values.reportId, toReportUpdatePayload(values));
-
-        if (values.technicianId != null) {
-            if (values.existingTechnicianId == null) {
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            } else if (values.existingTechnicianId === values.technicianId) {
-                await updateReportTechnician(values.reportId, values.technicianId, values.technicianPrice);
-            } else {
-                await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            }
-        } else if (values.existingTechnicianId != null) {
-            await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-        }
 
         await reloadReports();
     };
@@ -260,22 +237,15 @@ const TechnicianPage = () => {
                     schede di cliente e collaboratore. */}
                 <div className="flex items-center justify-between gap-2">
                     <h2 className="shrink-0 text-lg font-semibold">Report affidati</h2>
-                    <Select
+                    <FilterSelect
+                        variant="inline"
                         value={visibilityFilter}
-                        onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
-                    >
-                        <SelectTrigger
-                            className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                            aria-label="Filtra i report per stato"
-                        >
-                            <SelectValue placeholder="Filtra per stato" />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                            <SelectItem value="all">Tutti i report</SelectItem>
-                            <SelectItem value="open">Report aperti</SelectItem>
-                            <SelectItem value="closed">Report chiusi</SelectItem>
-                        </SelectContent>
-                    </Select>
+                        onValueChange={setVisibilityFilter}
+                        options={reportVisibilityOptions}
+                        allOption={{ value: "all", label: "Tutti i report" }}
+                        label="Filtra i report per stato"
+                        icon={ListFilter}
+                    />
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-auto">
@@ -303,7 +273,7 @@ const TechnicianPage = () => {
                                 </TableActionButton>
                             </>
                         )}
-                        getRowStatusColor={(row) => (row.closed ? "green" : "red")}
+                        getRowStatusColor={(row) => reportStatusColor(row.closed)}
                         onRowOpen={(row) => handleOpenReport(row.id)}
                         isInitialLoading={areReportsInitialLoading}
                         isRefetching={areReportsRefetching}

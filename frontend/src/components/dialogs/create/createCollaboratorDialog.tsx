@@ -20,7 +20,7 @@ type CollaboratorDialogMode = "create" | "edit";
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: CollaboratorSubmitValues) => Promise<void> | void;
+    onSubmit: (values: CollaboratorSubmitValues) => Promise<void> | void;
     mode?: CollaboratorDialogMode;
     initialValues?: CollaboratorDto | null;
 };
@@ -65,11 +65,6 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
         setErrors({});
 
         if (isSubmitting) {
-            return;
-        }
-
-        if (!onSubmit) {
-            onOpenChange(false);
             return;
         }
 

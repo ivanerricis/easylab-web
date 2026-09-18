@@ -356,7 +356,6 @@ describe("EditReportDialog", () => {
             issueId: 20,
             collaboratorId: null,
             technicianId: 50,
-            existingTechnicianId: 50,
             technicianPrice: 25,
             issueDescription: null,
             serviceDescription: "Sostituito display",

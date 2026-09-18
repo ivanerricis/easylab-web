@@ -12,22 +12,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-    createReportTechnician,
-    deleteReportTechnician,
     getApiErrorMessage,
     getApiErrorStatus,
     getReport,
     getReportPrintUrl,
     type ReportEntityDto,
     updateReport,
-    updateReportTechnician,
     deleteReport,
 } from "@/lib/api";
-import { formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
+import { formatDateTime, formatEuro, formatYesNo, openPrintWindow } from "@/lib/utils";
 import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import StatusBadge from "@/components/status-badge";
+import { formatReportStatus, paymentMethodLabels, reportStatusColor } from "@/lib/reports";
 
 type ReportPageDetails = {
     report: ReportEntityDto;
@@ -39,25 +38,6 @@ type ReportPageDetails = {
     technicians: Array<{ id: number; name: string; price: number }>;
     techniciansTotal: number;
 };
-
-const yesNo = (value: boolean) => (value ? "Sì" : "No");
-
-const paymentMethodLabel = (value: ReportEntityDto["paymentMethod"]) => {
-    if (value === "cash") {
-        return "Contanti";
-    }
-
-    if (value === "card") {
-        return "Carta";
-    }
-
-    return "Non pagato";
-};
-
-const statusBadgeClass = (value: boolean) =>
-    value
-        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-        : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
 
 const TableHeaderCell = ({ children }: { children: string }) => (
     <th className="border border-border/70 bg-muted/40 px-3 py-2 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -135,27 +115,6 @@ const ReportPage = () => {
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
         await updateReport(values.reportId, toReportUpdatePayload(values));
-
-        if (values.technicianId != null) {
-            if (values.existingTechnicianId == null) {
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            } else if (values.existingTechnicianId === values.technicianId) {
-                await updateReportTechnician(values.reportId, values.technicianId, values.technicianPrice);
-            } else {
-                await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            }
-        } else if (values.existingTechnicianId != null) {
-            await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-        }
 
         await loadDetails();
     };
@@ -292,11 +251,9 @@ const ReportPage = () => {
                         <CardTitle className="text-primary">Stato</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <span
-                            className={`inline-flex rounded-full px-3 py-1 text-2xl font-semibold ${statusBadgeClass(details.report.closed)}`}
-                        >
-                            {details.report.closed ? "Chiuso" : "Aperto"}
-                        </span>
+                        <StatusBadge size="lg" color={reportStatusColor(details.report.closed)}>
+                            {formatReportStatus(details.report.closed)}
+                        </StatusBadge>
                     </CardContent>
                 </Card>
 
@@ -332,7 +289,7 @@ const ReportPage = () => {
                         <CardTitle className="text-primary">Pagamento</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-semibold">{paymentMethodLabel(details.report.paymentMethod)}</p>
+                        <p className="text-2xl font-semibold">{paymentMethodLabels[details.report.paymentMethod]}</p>
                     </CardContent>
                 </Card>
             </div>
@@ -361,9 +318,9 @@ const ReportPage = () => {
                         modifica ma in questa pagina non compariva da nessuna parte.
                     */}
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem label="Alimentatore" value={yesNo(details.report.charger)} />
-                        <DetailItem label="Backup dati" value={yesNo(details.report.dataBackup)} />
-                        <DetailItem label="Avvisato" value={yesNo(details.report.alerted)} />
+                        <DetailItem label="Alimentatore" value={formatYesNo(details.report.charger)} />
+                        <DetailItem label="Backup dati" value={formatYesNo(details.report.dataBackup)} />
+                        <DetailItem label="Avvisato" value={formatYesNo(details.report.alerted)} />
                         <DetailItem label="Creato il" value={formatDateTime(details.report.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"

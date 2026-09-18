@@ -14,9 +14,6 @@ const api = {
     createReport: vi.fn(),
     updateReport: vi.fn(),
     deleteReport: vi.fn(),
-    createReportTechnician: vi.fn(),
-    updateReportTechnician: vi.fn(),
-    deleteReportTechnician: vi.fn(),
     getReportPrintUrl: vi.fn((id: number) => `/api/reports/${id}/print`),
     getReportsExportUrl: vi.fn((params: object) => `export:${JSON.stringify(params)}`),
 };
@@ -33,9 +30,6 @@ vi.mock("@/lib/api", async () => {
         createReport: forward("createReport"),
         updateReport: forward("updateReport"),
         deleteReport: forward("deleteReport"),
-        createReportTechnician: forward("createReportTechnician"),
-        updateReportTechnician: forward("updateReportTechnician"),
-        deleteReportTechnician: forward("deleteReportTechnician"),
         getReportPrintUrl: forward("getReportPrintUrl"),
         getReportsExportUrl: forward("getReportsExportUrl"),
     };
@@ -157,7 +151,6 @@ const baseEdit = {
     issueId: 20,
     collaboratorId: null,
     technicianId: null,
-    existingTechnicianId: null,
     technicianPrice: 0,
     issueDescription: null,
     serviceDescription: null,
@@ -192,9 +185,6 @@ beforeEach(() => {
     localStorage.clear();
     api.listReports.mockResolvedValue(page([buildReport(1), buildReport(2, { closed: true })]));
     api.updateReport.mockResolvedValue({});
-    api.createReportTechnician.mockResolvedValue({});
-    api.updateReportTechnician.mockResolvedValue({});
-    api.deleteReportTechnician.mockResolvedValue({});
 });
 
 describe("ReportsPage", () => {
@@ -505,68 +495,39 @@ describe("ReportsPage", () => {
         expect(screen.getByRole("button", { name: "Invia modifica 2 Cliente 2" })).toBeInTheDocument();
     });
 
+    /**
+     * Il tecnico viaggia nella stessa richiesta del report, e il server lo scrive nella stessa
+     * transazione. Prima questa pagina (e la scheda, e la scheda tecnico) sceglieva fra quattro
+     * casi — aggiungi, aggiorna il prezzo, sostituisci, togli — con richieste separate.
+     */
     describe("tecnico esterno al salvataggio", () => {
-        it("lo aggiunge se il report non ne aveva", async () => {
+        it("lo manda con il report, con il suo compenso", async () => {
             await renderPage();
 
             await submitEdit({ technicianId: 50, technicianPrice: 25 });
 
             await waitFor(() => {
-                expect(api.createReportTechnician).toHaveBeenCalledWith({ reportId: 1, technicianId: 50, price: 25 });
+                expect(api.updateReport).toHaveBeenCalledWith(
+                    1,
+                    expect.objectContaining({ price: 50, technicianId: 50, technicianPrice: 25 })
+                );
             });
-            expect(api.deleteReportTechnician).not.toHaveBeenCalled();
-            expect(api.updateReport).toHaveBeenCalledWith(1, expect.objectContaining({ price: 50 }));
-        });
-
-        it("ne aggiorna il prezzo se è lo stesso tecnico", async () => {
-            await renderPage();
-
-            await submitEdit({ technicianId: 50, existingTechnicianId: 50, technicianPrice: 40 });
-
-            await waitFor(() => {
-                expect(api.updateReportTechnician).toHaveBeenCalledWith(1, 50, 40);
-            });
-            expect(api.createReportTechnician).not.toHaveBeenCalled();
-        });
-
-        it("lo sostituisce se è cambiato", async () => {
-            await renderPage();
-
-            await submitEdit({ technicianId: 51, existingTechnicianId: 50, technicianPrice: 30 });
-
-            await waitFor(() => {
-                expect(api.createReportTechnician).toHaveBeenCalledWith({ reportId: 1, technicianId: 51, price: 30 });
-            });
-            expect(api.deleteReportTechnician).toHaveBeenCalledWith(1, 50);
-            // Prima si toglie il vecchio, poi si aggiunge il nuovo.
-            expect(api.deleteReportTechnician.mock.invocationCallOrder[0]).toBeLessThan(
-                api.createReportTechnician.mock.invocationCallOrder[0]
-            );
-        });
-
-        it("lo toglie se non è più indicato", async () => {
-            await renderPage();
-
-            await submitEdit({ technicianId: null, existingTechnicianId: 50 });
-
-            await waitFor(() => {
-                expect(api.deleteReportTechnician).toHaveBeenCalledWith(1, 50);
-            });
-            expect(api.createReportTechnician).not.toHaveBeenCalled();
-            expect(api.updateReportTechnician).not.toHaveBeenCalled();
-        });
-
-        it("non tocca nulla se non c'era e non c'è", async () => {
-            await renderPage();
-
-            await submitEdit({});
-
             await waitFor(() => {
                 expect(api.listReports).toHaveBeenCalledTimes(2);
             });
-            expect(api.createReportTechnician).not.toHaveBeenCalled();
-            expect(api.updateReportTechnician).not.toHaveBeenCalled();
-            expect(api.deleteReportTechnician).not.toHaveBeenCalled();
+        });
+
+        it("senza tecnico manda null e compenso zero, così il server lo toglie", async () => {
+            await renderPage();
+
+            await submitEdit({ technicianId: null, technicianPrice: 40 });
+
+            await waitFor(() => {
+                expect(api.updateReport).toHaveBeenCalledWith(
+                    1,
+                    expect.objectContaining({ technicianId: null, technicianPrice: 0 })
+                );
+            });
         });
     });
 

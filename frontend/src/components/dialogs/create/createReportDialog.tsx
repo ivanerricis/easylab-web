@@ -1,7 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
-import { formatCustomerOption } from "@/lib/customers";
+import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { isCatchAllIssue } from "@/lib/issues";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
@@ -57,7 +57,7 @@ export type CreateReportSubmitValues = {
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: CreateReportSubmitValues) => Promise<void> | void;
+    onSubmit: (values: CreateReportSubmitValues) => Promise<void> | void;
     /**
      * Il cliente da cui si parte, quando il dialogo si apre dalla sua scheda: la casella è già
      * compilata e il cliente già risolto, e resta modificabile. Il modulo non conta come
@@ -90,11 +90,14 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [isCreateDeviceDialogOpen, setIsCreateDeviceDialogOpen] = useState(false);
     const [isCreateIssueDialogOpen, setIsCreateIssueDialogOpen] = useState(false);
-    const [deviceOptions, setDeviceOptions] = useState<string[]>([]);
-    const [issueOptions, setIssueOptions] = useState<string[]>([]);
     const [customerIdByOption, setCustomerIdByOption] = useState<Record<string, number>>({});
-    const [deviceIdByOption, setDeviceIdByOption] = useState<Record<string, number>>({});
-    const [issueIdByOption, setIssueIdByOption] = useState<Record<string, number>>({});
+    // Un solo stato per catalogo: nome → id, e i suggerimenti sono le sue chiavi. Prima elenco e
+    // mappa erano due stati da aggiornare in coppia in tre punti diversi. `Map` e non un oggetto
+    // perché tiene l'ordine d'inserimento anche per i nomi fatti di sole cifre.
+    const [deviceIdByOption, setDeviceIdByOption] = useState<Map<string, number>>(() => new Map());
+    const [issueIdByOption, setIssueIdByOption] = useState<Map<string, number>>(() => new Map());
+    const deviceOptions = useMemo(() => [...deviceIdByOption.keys()], [deviceIdByOption]);
+    const issueOptions = useMemo(() => [...issueIdByOption.keys()], [issueIdByOption]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     // Messaggi, non booleani: il bordo rosso c'era già, ma il *perché* viveva solo nel toast
     // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
@@ -115,24 +118,26 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
     );
     const isDirty = hasFormChanged(formValues, initialFormValues);
 
+    /** Una voce di catalogo appena creata: entra fra i suggerimenti con il nome che le dà il server. */
+    const addDeviceOption = (device: { id: number; name: string }) =>
+        setDeviceIdByOption((prev) => new Map(prev).set(device.name, device.id));
+    const addIssueOption = (issue: { id: number; description: string }) =>
+        setIssueIdByOption((prev) => new Map(prev).set(issue.description, issue.id));
+
     useEffect(() => {
         if (open) {
             startTransition(() => {
                 setFieldErrors({});
                 setFormValues(initialFormValues);
                 setCustomerIdByOption(initialCustomerId == null ? {} : { [initialCustomerOption]: initialCustomerId });
-                setDeviceIdByOption({});
-                setIssueIdByOption({});
             });
 
             const loadOptions = async () => {
                 try {
                     const [devices, issues] = await Promise.all([listDevices(), listIssues()]);
 
-                    setDeviceOptions(devices.map((device) => device.name));
-                    setDeviceIdByOption(Object.fromEntries(devices.map((device) => [device.name, device.id])));
-                    setIssueOptions(issues.map((issue) => issue.description));
-                    setIssueIdByOption(Object.fromEntries(issues.map((issue) => [issue.description, issue.id])));
+                    setDeviceIdByOption(new Map(devices.map((device) => [device.name, device.id])));
+                    setIssueIdByOption(new Map(issues.map((issue) => [issue.description, issue.id])));
                 } catch (error) {
                     toast.error(getApiErrorMessage(error, "Impossibile caricare i suggerimenti"));
                 }
@@ -169,7 +174,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
         // Il difetto deve corrispondere a una voce del catalogo: la casella si scrive per
         // cercare, non per inventare. Per una voce nuova c'è il pulsante "+" qui accanto.
-        const issueId = issueIdByOption[formValues.issue.trim()] ?? null;
+        const issueId = issueIdByOption.get(formValues.issue.trim()) ?? null;
         const needsProblemText = isCatchAllIssue(formValues.issue);
 
         // Tutti gli errori in una passata: prima ogni controllo usciva dalla funzione, quindi
@@ -214,17 +219,12 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
             return;
         }
 
-        if (!onSubmit) {
-            onOpenChange(false);
-            return;
-        }
-
         try {
             setIsSubmitting(true);
             await onSubmit({
                 ...formValues,
                 customerId: customerIdByOption[formValues.customer] ?? null,
-                deviceId: deviceIdByOption[formValues.deviceType] ?? null,
+                deviceId: deviceIdByOption.get(formValues.deviceType) ?? null,
                 issueId,
                 // Fuori da "Altro" il problema non si scrive: l'etichetta del catalogo basta.
                 issueDescription: needsProblemText ? formValues.issueDescription.trim() : null,
@@ -324,11 +324,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                             options={deviceOptions}
                                             onCreate={async (value: string) => {
                                                 const createdDevice = await createDevice({ name: value });
-                                                setDeviceOptions((prev) => Array.from(new Set([...prev, value])));
-                                                setDeviceIdByOption((prev) => ({
-                                                    ...prev,
-                                                    [createdDevice.name]: createdDevice.id,
-                                                }));
+                                                addDeviceOption(createdDevice);
                                             }}
                                             onChange={(value: string) => {
                                                 setFormValues((prev) => ({ ...prev, deviceType: value }));
@@ -379,11 +375,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                             showAllOnFocus
                                             onCreate={async (value: string) => {
                                                 const createdIssue = await createIssue({ description: value });
-                                                setIssueOptions((prev) => Array.from(new Set([...prev, value])));
-                                                setIssueIdByOption((prev) => ({
-                                                    ...prev,
-                                                    [createdIssue.description]: createdIssue.id,
-                                                }));
+                                                addIssueOption(createdIssue);
                                             }}
                                             onChange={(value: string) => {
                                                 setFormValues((prev) => ({ ...prev, issue: value }));
@@ -548,18 +540,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 open={isCreateCustomerDialogOpen}
                 onOpenChange={setIsCreateCustomerDialogOpen}
                 onSubmit={async (values) => {
-                    const createdCustomer = await createCustomer({
-                        firstName: String(values.firstName).trim(),
-                        lastName: String(values.lastName).trim() === "" ? null : String(values.lastName).trim(),
-                        phoneNumber:
-                            String(values.phoneNumber).trim() === "" ? null : String(values.phoneNumber).trim(),
-                        phoneNumberSecondary:
-                            String(values.phoneNumberSecondary).trim() === ""
-                                ? null
-                                : String(values.phoneNumberSecondary).trim(),
-                        email: String(values.email).trim() === "" ? null : String(values.email).trim(),
-                        city: String(values.city).trim() === "" ? null : String(values.city).trim(),
-                    });
+                    const createdCustomer = await createCustomer(toCustomerPayload(values));
 
                     const customerOption = formatCustomerOption(
                         createdCustomer.firstName,
@@ -579,12 +560,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 open={isCreateDeviceDialogOpen}
                 onOpenChange={setIsCreateDeviceDialogOpen}
                 onSubmit={async (values) => {
-                    const createdDevice = await createDevice({
-                        name: String(values.name).trim(),
-                    });
+                    const createdDevice = await createDevice({ name: values.name.trim() });
 
-                    setDeviceOptions((prev) => Array.from(new Set([...prev, createdDevice.name])));
-                    setDeviceIdByOption((prev) => ({ ...prev, [createdDevice.name]: createdDevice.id }));
+                    addDeviceOption(createdDevice);
                     setFormValues((prev) => ({ ...prev, deviceType: createdDevice.name }));
                 }}
             />
@@ -593,12 +571,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 open={isCreateIssueDialogOpen}
                 onOpenChange={setIsCreateIssueDialogOpen}
                 onSubmit={async (values) => {
-                    const createdIssue = await createIssue({
-                        description: String(values.description).trim(),
-                    });
+                    const createdIssue = await createIssue({ description: values.description.trim() });
 
-                    setIssueOptions((prev) => Array.from(new Set([...prev, createdIssue.description])));
-                    setIssueIdByOption((prev) => ({ ...prev, [createdIssue.description]: createdIssue.id }));
+                    addIssueOption(createdIssue);
                     setFormValues((prev) => ({ ...prev, issue: createdIssue.description }));
                 }}
             />

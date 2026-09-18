@@ -32,6 +32,7 @@ import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { openPrintWindow } from "@/lib/utils";
 import { toCustomerPayload } from "@/lib/customers";
 import { entityPaths } from "@/lib/entityPaths";
+import { formatPersonName } from "@/lib/people";
 
 const sortOptionValues = customerSortOptions.map((option) => option.value);
 
@@ -223,7 +224,7 @@ const CustomersPage = () => {
                     title="Elimina cliente"
                     description={
                         customerToDelete
-                            ? `Sei sicuro di voler eliminare il cliente ${customerToDelete.firstName} ${customerToDelete.lastName ?? ""}?`
+                            ? `Sei sicuro di voler eliminare il cliente ${formatPersonName(customerToDelete)}?`
                             : "Sei sicuro di voler eliminare questo cliente?"
                     }
                     isDeleting={isDeleting}

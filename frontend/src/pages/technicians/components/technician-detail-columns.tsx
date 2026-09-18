@@ -3,6 +3,7 @@ import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
+import { formatReportStatus } from "@/lib/reports";
 
 /**
  * Colonne della tabella nella scheda del tecnico esterno.
@@ -48,7 +49,7 @@ export const technicianReportColumns: EntityColumn<ReportDto>[] = [
         key: "closed",
         header: "Stato",
         cardSlot: "badge",
-        render: (row) => (row.closed ? "Chiuso" : "Aperto"),
+        render: (row) => formatReportStatus(row.closed),
     },
     {
         key: "createdAt",

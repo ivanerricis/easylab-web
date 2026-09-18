@@ -50,7 +50,9 @@ describe("CalendarEventPopover", () => {
         expect(await screen.findByText("Anna Bianchi")).toBeInTheDocument();
         expect(screen.getByText("Completato")).toBeInTheDocument();
         expect(screen.getByText("Intervento da remoto")).toBeInTheDocument();
-        expect(screen.getByText("14/09/2026 · 09:00-10:30")).toBeInTheDocument();
+        // Lo stesso formato delle colonne "Data/Orario" (`InterventionSchedule`): l'orario in un
+        // elemento suo, che non va a capo sul trattino.
+        expect(screen.getByText("09:00-10:30").parentElement).toHaveTextContent("14/09/2026 09:00-10:30");
         expect(screen.getByText("Configurata la stampante di rete")).toBeInTheDocument();
 
         fireEvent.mouseLeave(anchor());

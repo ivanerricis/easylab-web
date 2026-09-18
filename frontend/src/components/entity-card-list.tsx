@@ -1,6 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
+import StatusBadge from "@/components/status-badge";
+import { isStatusColor, statusStyles } from "@/lib/statusColors";
 
 /**
  * Dove va una colonna nella scheda su mobile. Lo dice la colonna stessa, accanto alla sua
@@ -23,27 +25,6 @@ export type EntityCardColumn<T> = {
     header: string;
     render: (row: T) => ReactNode;
     cardSlot?: EntityCardSlot;
-};
-
-/** Gli stessi nomi di `data-status-color` sulle righe della tabella. */
-type StatusStyle = { stripe: string; badge: string; dot: string };
-
-const statusStyles: Record<string, StatusStyle> = {
-    red: {
-        stripe: "bg-status-red",
-        badge: "bg-status-red/12 text-status-red-foreground ring-status-red/25",
-        dot: "bg-status-red",
-    },
-    yellow: {
-        stripe: "bg-status-yellow",
-        badge: "bg-status-yellow/15 text-status-yellow-foreground ring-status-yellow/35",
-        dot: "bg-status-yellow",
-    },
-    green: {
-        stripe: "bg-status-green",
-        badge: "bg-status-green/12 text-status-green-foreground ring-status-green/25",
-        dot: "bg-status-green",
-    },
 };
 
 /**
@@ -145,7 +126,8 @@ const EntityCardList = <T,>({
     return (
         <div className={cn("flex flex-col gap-3 sm:hidden", className)}>
             {rows.map((row) => {
-                const status = statusStyles[getStatusColor?.(row) ?? ""];
+                const statusColor = getStatusColor?.(row);
+                const status = isStatusColor(statusColor) ? statusStyles[statusColor] : null;
                 const showIdBelowTitle = idColumn != null && titleColumns.length > 0;
 
                 return (
@@ -164,18 +146,10 @@ const EntityCardList = <T,>({
                                 ) : null}
                             </div>
                             {badgeColumn ? (
-                                <span
-                                    className={cn(
-                                        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ring-1 ring-inset",
-                                        status?.badge ?? "bg-muted text-muted-foreground ring-border"
-                                    )}
-                                >
-                                    {status ? (
-                                        <span aria-hidden="true" className={cn("size-1.5 rounded-full", status.dot)} />
-                                    ) : null}
+                                <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>
                                     <span className="sr-only">{badgeColumn.header}: </span>
                                     {badgeColumn.render(row)}
-                                </span>
+                                </StatusBadge>
                             ) : null}
                         </div>
 

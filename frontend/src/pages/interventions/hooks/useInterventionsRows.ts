@@ -1,6 +1,5 @@
 import { listInterventions } from "@/lib/api";
 import type { InterventionDto } from "@/types/dtos";
-import { useCallback } from "react";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import type { InterventionSortOption, InterventionStatusFilter, InterventionTypeFilter } from "../components/types";
 
@@ -30,7 +29,7 @@ export const useInterventionsRows = ({
         "createdAt" | "interventionDate" | "customer" | "status",
         "asc" | "desc",
     ];
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
         usePaginatedRows<InterventionDto>({
             fetchRows: (signal) =>
                 listInterventions({
@@ -50,13 +49,6 @@ export const useInterventionsRows = ({
             initialLoading: false,
         });
 
-    const updateInterventionRow = useCallback(
-        (interventionId: number, updater: (intervention: InterventionDto) => InterventionDto) => {
-            updateRow((intervention) => intervention.id === interventionId, updater);
-        },
-        [updateRow]
-    );
-
     return {
         interventionRows: rows,
         totalItems,
@@ -65,6 +57,5 @@ export const useInterventionsRows = ({
         isInitialLoading,
         isRefetching,
         loadInterventions: reload,
-        updateInterventionRow,
     };
 };

@@ -1,4 +1,6 @@
 import type { InterventionStatus, InterventionType } from "@/types/dtos";
+import { formatYesNo } from "@/lib/utils";
+import type { StatusColor } from "@/lib/statusColors";
 
 export const interventionTypeOptions: { value: InterventionType; label: string }[] = [
     { value: "consegna_materiale", label: "Consegna materiale" },
@@ -20,7 +22,7 @@ export const interventionStatusOptions: { value: InterventionStatus; label: stri
  * (elenco interventi, interventi del cliente, scheda del collaboratore) e la mappa era
  * ricopiata in ognuna: tre occasioni perché un colore cambi in un posto solo.
  */
-export const interventionStatusColor: Record<InterventionStatus, string> = {
+export const interventionStatusColor: Record<InterventionStatus, StatusColor> = {
     programmato: "red",
     in_lavorazione: "yellow",
     completato: "green",
@@ -133,7 +135,7 @@ export const formatInterventionTime = (value: string | null) => (value ? value.s
 
 export const formatPaidStatus = (value: boolean) => (value ? "Pagato" : "Non pagato");
 
-export const formatToInvoiceStatus = (value: boolean) => (value ? "Sì" : "No");
+export const formatToInvoiceStatus = formatYesNo;
 
 export const getTodayDateString = () => {
     const now = new Date();

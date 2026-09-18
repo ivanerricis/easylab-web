@@ -3,7 +3,7 @@ import CreateTechnicianDialog, {
 } from "@/components/dialogs/create/createTechnicianDialog";
 import SimpleEntityPage from "@/components/simple-entity-page";
 import { createTechnician, deleteTechnician, listTechnicians, updateTechnician } from "@/lib/api";
-import { toTechnicianPayload } from "@/lib/people";
+import { formatPersonName, toTechnicianPayload } from "@/lib/people";
 import type { TechnicianDto } from "@/types/dtos";
 import { entityPaths } from "@/lib/entityPaths";
 import { technicianColumns } from "./components/technician-columns";
@@ -27,9 +27,7 @@ const TechniciansPage = () => {
             onDelete={(row) => deleteTechnician(row.id)}
             notFoundMessage="Tecnico non trovato"
             deleteTitle="Elimina tecnico"
-            deleteDescription={(row) =>
-                `Sei sicuro di voler eliminare il tecnico ${row.firstName} ${row.lastName ?? ""}?`
-            }
+            deleteDescription={(row) => `Sei sicuro di voler eliminare il tecnico ${formatPersonName(row)}?`}
             deleteFallbackDescription="Sei sicuro di voler eliminare questo tecnico?"
             deleteSuccessMessage="Tecnico eliminato con successo"
             deleteErrorMessage="Impossibile eliminare il tecnico"

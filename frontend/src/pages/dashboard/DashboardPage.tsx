@@ -45,8 +45,8 @@ import {
     getInterventionStats,
     getReportStats,
 } from "@/lib/api";
-import { cn, formatEuro, openPrintWindow, trimOrNull } from "@/lib/utils";
-import { resolveReportReferences } from "@/lib/reportForm";
+import { cn, formatEuro, openPrintWindow } from "@/lib/utils";
+import { resolveReportReferences, toReportCreatePayload } from "@/lib/reportForm";
 import { showCreatedToast } from "@/lib/createdToast";
 import { entityPaths } from "@/lib/entityPaths";
 import { resolveCustomerId } from "@/lib/customerLookup";
@@ -209,18 +209,7 @@ const DashboardPage = () => {
     };
 
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
-
-        const createdReport = await createReport({
-            deviceId,
-            issueId,
-            customerId,
-            note: trimOrNull(values.notes),
-            password: trimOrNull(values.password),
-            issueDescription,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-        });
+        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
 
         await loadDashboardMetrics(selectedRevenueMonth);
 

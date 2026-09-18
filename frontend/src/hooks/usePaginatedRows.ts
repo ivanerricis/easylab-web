@@ -119,10 +119,6 @@ export const usePaginatedRows = <TRow>({
         []
     );
 
-    const updateRow = useCallback((matches: (row: TRow) => boolean, updater: (row: TRow) => TRow) => {
-        setRows((currentRows) => currentRows.map((row) => (matches(row) ? updater(row) : row)));
-    }, []);
-
     return {
         rows,
         totalItems,
@@ -148,6 +144,5 @@ export const usePaginatedRows = <TRow>({
          */
         isRefetching: isLoading && hasLoadedOnce,
         reload,
-        updateRow,
     };
 };

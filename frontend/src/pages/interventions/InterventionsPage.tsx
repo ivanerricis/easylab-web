@@ -86,25 +86,17 @@ const InterventionsPage = () => {
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("interventions");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("interventions");
-    const {
-        interventionRows,
-        totalItems,
-        totalPages,
-        isLoading,
-        isInitialLoading,
-        isRefetching,
-        loadInterventions,
-        updateInterventionRow,
-    } = useInterventionsRows({
-        searchText: committedSearchText,
-        statusFilter,
-        typeFilter,
-        sortOption,
-        dateFrom,
-        dateTo,
-        currentPage,
-        pageSize,
-    });
+    const { interventionRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadInterventions } =
+        useInterventionsRows({
+            searchText: committedSearchText,
+            statusFilter,
+            typeFilter,
+            sortOption,
+            dateFrom,
+            dateTo,
+            currentPage,
+            pageSize,
+        });
 
     const handleSortOptionChange = (value: InterventionSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_INTERVENTION_SORT_OPTION ? null : value });
@@ -156,18 +148,9 @@ const InterventionsPage = () => {
 
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
         await updateIntervention(values.interventionId, toInterventionUpdatePayload(values));
-
-        updateInterventionRow(values.interventionId, (intervention) => ({
-            ...intervention,
-            type: values.type,
-            status: values.status,
-            description: values.description,
-            collaboratorId: values.collaboratorId,
-            interventionDate: values.interventionDate,
-            startTime: values.startTime,
-            endTime: values.endTime,
-        }));
-
+        // Niente ritocco della riga in pagina prima di ricaricare: la lista si ricarica subito
+        // comunque (la riga può anche uscire dal filtro), e il ritocco copiava sul client regole
+        // del server, mostrando per un istante una riga a metà.
         await loadInterventions();
     };
 

@@ -21,9 +21,6 @@ const api = vi.hoisted(() => ({
     listTechnicians: vi.fn(),
     updateReport: vi.fn(),
     updateIntervention: vi.fn(),
-    createReportTechnician: vi.fn(),
-    updateReportTechnician: vi.fn(),
-    deleteReportTechnician: vi.fn(),
     deleteReport: vi.fn(),
     deleteIntervention: vi.fn(),
     sendInterventionEmail: vi.fn(),
@@ -148,7 +145,6 @@ beforeEach(() => {
     api.getReport.mockResolvedValue(report);
     api.updateReport.mockResolvedValue({});
     api.updateIntervention.mockResolvedValue({});
-    api.deleteReportTechnician.mockResolvedValue({});
 });
 
 describe("ReportPage", () => {
@@ -242,7 +238,7 @@ describe("ReportPage", () => {
     });
 
     it("stampa e, dopo una modifica che toglie il tecnico, ricarica la scheda", async () => {
-        editValues = { reportId: 5, technicianId: null, existingTechnicianId: 50, internalPrice: 80 };
+        editValues = { reportId: 5, technicianId: null, technicianPrice: 0, internalPrice: 80 };
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Stampa report" }));
@@ -252,7 +248,7 @@ describe("ReportPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Invia modifica" }));
 
         await waitFor(() => {
-            expect(api.deleteReportTechnician).toHaveBeenCalledWith(5, 50);
+            expect(api.updateReport).toHaveBeenCalledWith(5, expect.objectContaining({ technicianId: null }));
         });
         await waitFor(() => {
             expect(api.getReport).toHaveBeenCalledTimes(2);

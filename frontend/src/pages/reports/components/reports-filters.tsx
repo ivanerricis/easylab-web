@@ -4,14 +4,8 @@ import RefreshButton from "@/components/refresh-button";
 import SearchInput from "@/components/search-input";
 import type { ReactNode } from "react";
 import { ArrowUpDown, ListFilter } from "lucide-react";
+import { reportVisibilityOptions } from "@/lib/reports";
 import { reportSortOptions, type ReportSortOption, type ReportVisibilityFilter } from "./types";
-
-// La visibilità non ha un elenco di opzioni altrove: "aperti"/"chiusi" derivano dal
-// booleano `closed` del report, non da una colonna con valori propri.
-const reportVisibilityOptions: { value: ReportVisibilityFilter; label: string }[] = [
-    { value: "open", label: "Report aperti" },
-    { value: "closed", label: "Report chiusi" },
-];
 
 type ReportsFiltersProps = {
     searchText: string;

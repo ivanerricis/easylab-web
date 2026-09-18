@@ -6,7 +6,6 @@ export * from "./collaborators";
 export * from "./devices";
 export * from "./issues";
 export * from "./reports";
-export * from "./reportTechnicians";
 export * from "./interventions";
 export * from "./notifications";
 export * from "./technicians";

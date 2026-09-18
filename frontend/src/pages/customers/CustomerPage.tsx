@@ -1,9 +1,7 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem from "@/components/detail-item";
-import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
-import OpenEntityButton from "@/components/open-entity-button";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { entityPaths } from "@/lib/entityPaths";
@@ -20,7 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { showCreatedToast } from "@/lib/createdToast";
-import { resolveReportReferences } from "@/lib/reportForm";
+import { resolveReportReferences, toReportCreatePayload } from "@/lib/reportForm";
 import { toInterventionCreatePayload } from "@/lib/interventionForm";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
@@ -28,9 +26,6 @@ import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import TablePagination from "@/components/table-pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     createIntervention,
     createReport,
@@ -42,27 +37,18 @@ import {
     getCustomerReportsPrintUrl,
     getInterventionPrintUrl,
     getReportPrintUrl,
-    listInterventions,
-    listReports,
     updateCustomer,
 } from "@/lib/api";
-import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
-import { formatDateTime, openPrintWindow, trimOrNull } from "@/lib/utils";
+import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
-import type { CustomerDto, InterventionDto, ReportDto } from "@/types/dtos";
-import type { ReportVisibilityFilter } from "../reports/components/types";
-import type { InterventionStatusFilter } from "../interventions/components/types";
+import type { CustomerDto } from "@/types/dtos";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { usePaginatedRows } from "@/hooks/usePaginatedRows";
-import { useTablePagination } from "@/hooks/useTablePagination";
-import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
-
-type CustomerTab = "reports" | "interventions";
-
-const formatCustomerName = (customer: CustomerDto) => `${customer.firstName} ${customer.lastName ?? ""}`.trim();
+import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
+import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
+import { formatPersonName } from "@/lib/people";
 
 /**
  * La scheda del cliente: i suoi dati, i suoi report e i suoi interventi.
@@ -87,15 +73,15 @@ const CustomerPage = () => {
     const location = useLocation();
     const { id } = useParams();
     const customerId = Number(id);
-    const activeTab: CustomerTab = location.pathname.endsWith("/interventions") ? "interventions" : "reports";
+    const activeTab: ReportsInterventionsTab = location.pathname.endsWith("/interventions")
+        ? "interventions"
+        : "reports";
 
     const [isCustomerLoading, setIsCustomerLoading] = useState(true);
     const [customer, setCustomer] = useState<CustomerDto | null>(null);
-    const customerName = customer ? formatCustomerName(customer) : "Cliente";
+    const customerName = customer ? formatPersonName(customer) : "Cliente";
     useDocumentTitle(activeTab === "interventions" ? `Interventi di ${customerName}` : customerName);
 
-    const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("all");
-    const [interventionStatusFilter, setInterventionStatusFilter] = useState<InterventionStatusFilter>("all");
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
@@ -107,7 +93,7 @@ const CustomerPage = () => {
     const [isNotFound, setIsNotFound] = useState(false);
     const handleBack = useGoBack("/clients");
 
-    const handleTabChange = (value: string) => {
+    const handleTabChange = (value: ReportsInterventionsTab) => {
         navigate(value === "interventions" ? `/clients/${customerId}/interventions` : `/clients/${customerId}`, {
             replace: true,
         });
@@ -133,60 +119,13 @@ const CustomerPage = () => {
         navigate(entityPaths.intervention(interventionId));
     };
 
-    // Come nella scheda collaboratore: le due liste si impaginano per conto proprio.
-    const [reportsPageSize, setReportsPageSize] = useTableRowsPerPage("customer-reports");
-    const { currentPage: reportsPage, setCurrentPage: setReportsPage } = useTablePagination({
-        resetDependencies: [visibilityFilter, reportsPageSize],
+    const lists = useReportsAndInterventionsOf({
+        owner: { customerId },
+        tableKeyPrefix: "customer",
+        ownerLabel: "del cliente",
     });
-
-    const [interventionsPageSize, setInterventionsPageSize] = useTableRowsPerPage("customer-interventions");
-    const { currentPage: interventionsPage, setCurrentPage: setInterventionsPage } = useTablePagination({
-        resetDependencies: [interventionStatusFilter, interventionsPageSize],
-    });
-
-    const {
-        rows: reportRows,
-        totalItems: reportsTotalItems,
-        totalPages: reportsTotalPages,
-        isInitialLoading: areReportsInitialLoading,
-        isRefetching: areReportsRefetching,
-        isLoading: areReportsLoading,
-        reload: reloadReports,
-    } = usePaginatedRows<ReportDto>({
-        fetchRows: (signal) =>
-            listReports({
-                page: reportsPage,
-                pageSize: reportsPageSize,
-                visibility: visibilityFilter,
-                customerId,
-                signal,
-            }),
-        queryKey: [customerId, reportsPage, reportsPageSize, visibilityFilter],
-        errorMessage: "Impossibile caricare i report del cliente",
-        initialLoading: false,
-    });
-
-    const {
-        rows: interventionRows,
-        totalItems: interventionsTotalItems,
-        totalPages: interventionsTotalPages,
-        isInitialLoading: areInterventionsInitialLoading,
-        isRefetching: areInterventionsRefetching,
-        isLoading: areInterventionsLoading,
-        reload: reloadInterventions,
-    } = usePaginatedRows<InterventionDto>({
-        fetchRows: (signal) =>
-            listInterventions({
-                page: interventionsPage,
-                pageSize: interventionsPageSize,
-                status: interventionStatusFilter,
-                customerId,
-                signal,
-            }),
-        queryKey: [customerId, interventionsPage, interventionsPageSize, interventionStatusFilter],
-        errorMessage: "Impossibile caricare gli interventi del cliente",
-        initialLoading: false,
-    });
+    const { reload: reloadReports } = lists.reports;
+    const { reload: reloadInterventions } = lists.interventions;
 
     const loadCustomer = useCallback(async () => {
         try {
@@ -213,23 +152,7 @@ const CustomerPage = () => {
     // nell'elenco: niente try/catch, l'errore lo mostra il dialogo; dopo si ricarica la lista
     // e l'avviso offre di aprire o stampare.
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const {
-            customerId: reportCustomerId,
-            deviceId,
-            issueId,
-            issueDescription,
-        } = await resolveReportReferences(values);
-
-        const createdReport = await createReport({
-            deviceId,
-            issueId,
-            customerId: reportCustomerId,
-            note: trimOrNull(values.notes),
-            password: trimOrNull(values.password),
-            issueDescription,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-        });
+        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
 
         await reloadReports();
 
@@ -343,7 +266,7 @@ const CustomerPage = () => {
                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     <RefreshButton
                         onRefresh={handleRefresh}
-                        isRefreshing={areReportsLoading || areInterventionsLoading}
+                        isRefreshing={lists.isLoading}
                         label="Aggiorna i dati del cliente"
                     />
 
@@ -425,127 +348,17 @@ const CustomerPage = () => {
                 </Card>
             ) : null}
 
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="min-h-0 flex-1">
-                {/* Tab e filtro sulla stessa riga, anche su mobile: su due righe il filtro
-                    sembrava un controllo a sé, staccato dalla lista che filtra, e toglieva una
-                    riga alla tabella. Il filtro è uno solo e mostra le voci del tab aperto. */}
-                <div className="flex items-center justify-between gap-2">
-                    <TabsList>
-                        <TabsTrigger value="reports" className="px-2 sm:px-3">
-                            Report
-                        </TabsTrigger>
-                        <TabsTrigger value="interventions" className="px-2 sm:px-3">
-                            Interventi
-                        </TabsTrigger>
-                    </TabsList>
-                    {activeTab === "interventions" ? (
-                        <Select
-                            value={interventionStatusFilter}
-                            onValueChange={(value) => setInterventionStatusFilter(value as InterventionStatusFilter)}
-                        >
-                            <SelectTrigger
-                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                                aria-label="Filtra gli interventi per stato"
-                            >
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti gli interventi</SelectItem>
-                                {interventionStatusOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    ) : (
-                        <Select
-                            value={visibilityFilter}
-                            onValueChange={(value) => setVisibilityFilter(value as ReportVisibilityFilter)}
-                        >
-                            <SelectTrigger
-                                className="min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                                aria-label="Filtra i report per stato"
-                            >
-                                <SelectValue placeholder="Filtra per stato" />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                                <SelectItem value="all">Tutti i report</SelectItem>
-                                <SelectItem value="open">Report aperti</SelectItem>
-                                <SelectItem value="closed">Report chiusi</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
-                </div>
-
-                <TabsContent value="reports" aria-label="Report del cliente" className="min-h-0 flex-1">
-                    {/* Come nelle altre liste: l'area della tabella scorre da sola e
-                        l'impaginazione resta ferma in fondo. */}
-                    <div className="min-h-0 flex-1 overflow-auto">
-                        <EntityTable
-                            tableKey="customer-reports"
-                            columns={customerReportColumns}
-                            rows={reportRows}
-                            getRowKey={(row) => row.id}
-                            emptyMessage="Nessun report associato a questo cliente."
-                            renderRowActions={(row) => (
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.report(row.id)}
-                                    aria-label={`Apri report ${row.id}`}
-                                />
-                            )}
-                            getRowStatusColor={(row) => (row.closed ? "green" : "red")}
-                            onRowOpen={(row) => handleOpenReport(row.id)}
-                            isInitialLoading={areReportsInitialLoading}
-                            isRefetching={areReportsRefetching}
-                            skeletonRowCount={reportsPageSize}
-                        />
-                    </div>
-
-                    <TablePagination
-                        currentPage={reportsPage}
-                        totalPages={reportsTotalPages}
-                        totalItems={reportsTotalItems}
-                        pageSize={reportsPageSize}
-                        onPageChange={setReportsPage}
-                        onPageSizeChange={setReportsPageSize}
-                    />
-                </TabsContent>
-
-                <TabsContent value="interventions" aria-label="Interventi del cliente" className="min-h-0 flex-1">
-                    <div className="min-h-0 flex-1 overflow-auto">
-                        <EntityTable
-                            tableKey="customer-interventions"
-                            columns={customerInterventionColumns}
-                            rows={interventionRows}
-                            getRowKey={(row) => row.id}
-                            emptyMessage="Nessun intervento associato a questo cliente."
-                            renderRowActions={(row) => (
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.intervention(row.id)}
-                                    aria-label={`Apri intervento ${row.id}`}
-                                />
-                            )}
-                            getRowStatusColor={(row) => interventionStatusColor[row.status]}
-                            onRowOpen={(row) => handleOpenIntervention(row.id)}
-                            isInitialLoading={areInterventionsInitialLoading}
-                            isRefetching={areInterventionsRefetching}
-                            skeletonRowCount={interventionsPageSize}
-                        />
-                    </div>
-
-                    <TablePagination
-                        currentPage={interventionsPage}
-                        totalPages={interventionsTotalPages}
-                        totalItems={interventionsTotalItems}
-                        pageSize={interventionsPageSize}
-                        onPageChange={setInterventionsPage}
-                        onPageSizeChange={setInterventionsPageSize}
-                    />
-                </TabsContent>
-            </Tabs>
+            <ReportsInterventionsTabs
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                lists={lists}
+                reportColumns={customerReportColumns}
+                interventionColumns={customerInterventionColumns}
+                tableKeyPrefix="customer"
+                ownerNoun="cliente"
+                onOpenReport={handleOpenReport}
+                onOpenIntervention={handleOpenIntervention}
+            />
         </div>
     );
 };

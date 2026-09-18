@@ -1,6 +1,7 @@
 import type { CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
 import { trimOrNull } from "@/lib/utils";
 import type { CustomerDto } from "@/types/dtos";
+import { formatPersonName } from "@/lib/people";
 
 /**
  * Dai valori del dialogo al corpo della richiesta: i campi facoltativi vuoti diventano `null`.
@@ -28,7 +29,7 @@ export const formatCustomerOption = (
     phoneNumber: string | null,
     phoneNumberSecondary: string | null
 ) => {
-    const fullName = `${firstName} ${lastName ?? ""}`.trim();
+    const fullName = formatPersonName({ firstName, lastName });
     return `${fullName} - ${phoneNumber?.trim() || phoneNumberSecondary?.trim() || "N/D"}`;
 };
 
@@ -45,7 +46,7 @@ const normalizeCustomerText = (value: string) =>
         .toLowerCase()
         .replace(/\s+/g, " ");
 
-const getCustomerFullName = (firstName: string, lastName: string | null) => `${firstName} ${lastName ?? ""}`.trim();
+const getCustomerFullName = (firstName: string, lastName: string | null) => formatPersonName({ firstName, lastName });
 
 export const resolveSelectedCustomer = (customers: CustomerDto[], rawValue: string) => {
     const normalizedRawValue = normalizeCustomerText(rawValue);

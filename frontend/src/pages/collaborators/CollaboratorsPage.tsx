@@ -3,7 +3,7 @@ import CreateCollaboratorDialog, {
 } from "@/components/dialogs/create/createCollaboratorDialog";
 import SimpleEntityPage from "@/components/simple-entity-page";
 import { createCollaborator, deleteCollaborator, listCollaborators, updateCollaborator } from "@/lib/api";
-import { toCollaboratorPayload } from "@/lib/people";
+import { formatPersonName, toCollaboratorPayload } from "@/lib/people";
 import type { CollaboratorDto } from "@/types/dtos";
 import { entityPaths } from "@/lib/entityPaths";
 import { collaboratorColumns } from "./components/collaborator-columns";
@@ -27,9 +27,7 @@ const CollaboratorsPage = () => {
             onDelete={(row) => deleteCollaborator(row.id)}
             notFoundMessage="Collaboratore non trovato"
             deleteTitle="Elimina collaboratore"
-            deleteDescription={(row) =>
-                `Sei sicuro di voler eliminare il collaboratore ${row.firstName} ${row.lastName ?? ""}?`
-            }
+            deleteDescription={(row) => `Sei sicuro di voler eliminare il collaboratore ${formatPersonName(row)}?`}
             deleteFallbackDescription="Sei sicuro di voler eliminare questo collaboratore?"
             deleteSuccessMessage="Collaboratore eliminato con successo"
             deleteErrorMessage="Impossibile eliminare il collaboratore"

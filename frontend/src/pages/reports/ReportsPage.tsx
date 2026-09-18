@@ -1,23 +1,13 @@
 import CreateEntityButton from "@/components/create-entity-button";
 import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import { toReportUpdatePayload } from "@/lib/reportForm";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
-import {
-    createReportTechnician,
-    createReport,
-    deleteReportTechnician,
-    deleteReport,
-    getApiErrorMessage,
-    getReportPrintUrl,
-    updateReport,
-    updateReportTechnician,
-} from "@/lib/api";
+import { createReport, deleteReport, getApiErrorMessage, getReportPrintUrl, updateReport } from "@/lib/api";
 import { useState } from "react";
 import type { ReportDto } from "@/types/dtos";
 import { toast } from "sonner";
@@ -41,10 +31,10 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
-import { openPrintWindow, trimOrNull } from "@/lib/utils";
+import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
 import { showCreatedToast } from "@/lib/createdToast";
-import { resolveReportReferences } from "@/lib/reportForm";
+import { resolveReportReferences, toReportCreatePayload, toReportUpdatePayload } from "@/lib/reportForm";
 
 const visibilityFilters: ReportVisibilityFilter[] = ["all", "open", "closed"];
 const sortOptionValues = reportSortOptions.map((option) => option.value);
@@ -72,24 +62,16 @@ const ReportsPage = () => {
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("reports");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("reports");
-    const {
-        reportRows,
-        totalItems,
-        totalPages,
-        isLoading,
-        isInitialLoading,
-        isRefetching,
-        loadReports,
-        updateReportRow,
-    } = useReportsRows({
-        searchText: committedSearchText,
-        visibilityFilter,
-        sortOption,
-        dateFrom,
-        dateTo,
-        currentPage,
-        pageSize,
-    });
+    const { reportRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadReports } =
+        useReportsRows({
+            searchText: committedSearchText,
+            visibilityFilter,
+            sortOption,
+            dateFrom,
+            dateTo,
+            currentPage,
+            pageSize,
+        });
 
     const handleSortOptionChange = (value: ReportSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_REPORT_SORT_OPTION ? null : value });
@@ -107,18 +89,7 @@ const ReportsPage = () => {
     // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
     // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const { customerId, deviceId, issueId, issueDescription } = await resolveReportReferences(values);
-
-        const createdReport = await createReport({
-            deviceId,
-            issueId,
-            customerId,
-            note: trimOrNull(values.notes),
-            password: trimOrNull(values.password),
-            issueDescription,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-        });
+        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
 
         await loadReports();
 
@@ -150,50 +121,10 @@ const ReportsPage = () => {
     };
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
-        const technicianTotal = values.technicianId == null ? 0 : values.technicianPrice;
-
         await updateReport(values.reportId, toReportUpdatePayload(values));
-
-        if (values.technicianId != null) {
-            if (values.existingTechnicianId == null) {
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            } else if (values.existingTechnicianId === values.technicianId) {
-                await updateReportTechnician(values.reportId, values.technicianId, values.technicianPrice);
-            } else {
-                await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-                await createReportTechnician({
-                    reportId: values.reportId,
-                    technicianId: values.technicianId,
-                    price: values.technicianPrice,
-                });
-            }
-        } else if (values.existingTechnicianId != null) {
-            await deleteReportTechnician(values.reportId, values.existingTechnicianId);
-        }
-
-        updateReportRow(values.reportId, (report) => ({
-            ...report,
-            customerId: values.customerId,
-            deviceId: values.deviceId,
-            issueId: values.issueId,
-            collaboratorId: values.collaboratorId,
-            serviceDescription: values.serviceDescription,
-            note: values.note,
-            password: values.password,
-            dataBackup: values.dataBackup,
-            charger: values.charger,
-            alerted: values.alerted,
-            closed: values.closed,
-            paymentMethod: values.paymentMethod,
-            internalPrice: values.internalPrice,
-            technicianPrice: technicianTotal,
-            totalPrice: values.internalPrice + technicianTotal,
-        }));
-
+        // Niente ritocco della riga in pagina prima di ricaricare: la lista si ricarica subito
+        // comunque (la riga può anche uscire dal filtro), e il ritocco copiava sul client regole
+        // del server (il totale come prezzo interno più compenso del tecnico), mostrando per un istante una riga a metà.
         await loadReports();
     };
 

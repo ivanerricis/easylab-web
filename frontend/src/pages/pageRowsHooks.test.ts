@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const listCustomers = vi.fn();
@@ -79,15 +79,9 @@ describe("hook delle righe delle pagine", () => {
             dateTo: "2026-09-30",
             signal: expect.any(AbortSignal),
         });
-
-        act(() => {
-            result.current.updateInterventionRow(1, (row) => ({ ...row, status: "completato" }));
-        });
-
-        expect(result.current.interventionRows).toEqual([{ id: 1, status: "completato" }]);
     });
 
-    it("useReportsRows passa la visibilità e aggiorna la sola riga indicata", async () => {
+    it("useReportsRows passa la visibilità e l'ordinamento", async () => {
         listReports.mockResolvedValue(
             page([
                 { id: 1, closed: false },
@@ -111,14 +105,5 @@ describe("hook delle righe delle pagine", () => {
         expect(listReports).toHaveBeenCalledWith(
             expect.objectContaining({ visibility: "open", sortBy: "customer", sortOrder: "asc" })
         );
-
-        act(() => {
-            result.current.updateReportRow(2, (row) => ({ ...row, closed: true }));
-        });
-
-        expect(result.current.reportRows).toEqual([
-            { id: 1, closed: false },
-            { id: 2, closed: true },
-        ]);
     });
 });

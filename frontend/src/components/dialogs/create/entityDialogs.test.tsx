@@ -112,6 +112,7 @@ describe("CreateCustomerDialog", () => {
                 open
                 mode="edit"
                 onOpenChange={() => {}}
+                onSubmit={vi.fn()}
                 initialValues={{
                     id: 1,
                     firstName: "Mario",
@@ -217,17 +218,6 @@ describe("CreateIssueDialog", () => {
             expect(onSubmit).toHaveBeenCalledWith({ description: "Schermo rotto" });
         });
     });
-
-    it("chiude senza salvare quando nessuno gestisce l'invio", async () => {
-        const onOpenChange = vi.fn();
-        renderWithProviders(<CreateIssueDialog open onOpenChange={onOpenChange} />);
-
-        await userEvent.type(screen.getByLabelText(/Descrizione/), "Schermo rotto");
-        await save();
-
-        expect(onOpenChange).toHaveBeenCalledWith(false);
-        expect(toastSuccess).not.toHaveBeenCalled();
-    });
 });
 
 /**
@@ -249,7 +239,7 @@ describe("modifiche non salvate", () => {
 
     it("chiude subito un modulo ancora vuoto", async () => {
         const onOpenChange = vi.fn();
-        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
         await userEvent.keyboard("{Escape}");
 
@@ -259,7 +249,7 @@ describe("modifiche non salvate", () => {
 
     it("con un modulo compilato chiede prima di chiudere, e si può tornare a scrivere", async () => {
         const onOpenChange = vi.fn();
-        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
         await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
         await userEvent.keyboard("{Escape}");
@@ -282,7 +272,7 @@ describe("modifiche non salvate", () => {
 
     it("chiede anche chiudendo con la X", async () => {
         const onOpenChange = vi.fn();
-        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
         await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
         await userEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -294,7 +284,7 @@ describe("modifiche non salvate", () => {
     /** "Annulla" è già la scelta esplicita di rinunciare: una seconda domanda sarebbe di troppo. */
     it("Annulla chiude senza chiedere", async () => {
         const onOpenChange = vi.fn();
-        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} />);
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
         await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
         await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
@@ -307,7 +297,13 @@ describe("modifiche non salvate", () => {
     it("in modifica non chiede se i dati sono quelli di partenza", async () => {
         const onOpenChange = vi.fn();
         renderWithProviders(
-            <CreateCustomerDialog open mode="edit" initialValues={customer} onOpenChange={onOpenChange} />
+            <CreateCustomerDialog
+                open
+                mode="edit"
+                initialValues={customer}
+                onOpenChange={onOpenChange}
+                onSubmit={vi.fn()}
+            />
         );
 
         await waitFor(() => {

@@ -1,28 +1,10 @@
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
-import { formatDate } from "@/lib/utils";
-import type { InterventionStatus } from "@/types/dtos";
+import { formatInterventionStatus, formatInterventionType, interventionStatusColor } from "@/lib/interventions";
 import { useState } from "react";
 import type { EventProps } from "react-big-calendar";
 import type { InterventionCalendarEvent } from "../hooks/useCalendarInterventions";
-
-const statusBadgeClass: Record<InterventionStatus, string> = {
-    completato: "bg-green-500/15 text-green-700 dark:text-green-400",
-    in_lavorazione: "bg-yellow-400/20 text-yellow-700 dark:text-yellow-400",
-    programmato: "bg-red-500/15 text-red-700 dark:text-red-400",
-};
-
-const formatSchedule = (intervention: InterventionCalendarEvent["resource"]) => {
-    if (!intervention.interventionDate) {
-        return "-";
-    }
-
-    if (!intervention.startTime || !intervention.endTime) {
-        return formatDate(intervention.interventionDate);
-    }
-
-    return `${formatDate(intervention.interventionDate)} · ${formatInterventionTime(intervention.startTime)}-${formatInterventionTime(intervention.endTime)}`;
-};
+import StatusBadge from "@/components/status-badge";
+import InterventionSchedule from "@/components/intervention-schedule";
 
 // Il popover si apre al passaggio del mouse (o al focus da tastiera): il click resta
 // libero di propagarsi fino a .rbc-event, che naviga al dettaglio dell'intervento.
@@ -55,11 +37,9 @@ const CalendarEventPopover = ({ event, title }: EventProps<InterventionCalendarE
                             <p className="font-semibold">{intervention.customer}</p>
                             <p className="text-sm text-muted-foreground">{intervention.collaborator}</p>
                         </div>
-                        <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass[intervention.status]}`}
-                        >
+                        <StatusBadge color={interventionStatusColor[intervention.status]}>
                             {formatInterventionStatus(intervention.status)}
-                        </span>
+                        </StatusBadge>
                     </div>
 
                     <div className="grid gap-1 text-sm">
@@ -69,7 +49,11 @@ const CalendarEventPopover = ({ event, title }: EventProps<InterventionCalendarE
                         </p>
                         <p>
                             <span className="text-muted-foreground">Quando: </span>
-                            {formatSchedule(intervention)}
+                            <InterventionSchedule
+                                interventionDate={intervention.interventionDate}
+                                startTime={intervention.startTime}
+                                endTime={intervention.endTime}
+                            />
                         </p>
                     </div>
 

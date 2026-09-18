@@ -1,6 +1,5 @@
 import { listReports } from "@/lib/api";
 import type { ReportDto } from "@/types/dtos";
-import { useCallback } from "react";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import type { ReportSortOption, ReportVisibilityFilter } from "../components/types";
 
@@ -25,7 +24,7 @@ export const useReportsRows = ({
     pageSize,
 }: UseReportsRowsParams) => {
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer", "asc" | "desc"];
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload, updateRow } =
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
         usePaginatedRows<ReportDto>({
             fetchRows: (signal) =>
                 listReports({
@@ -44,13 +43,6 @@ export const useReportsRows = ({
             initialLoading: false,
         });
 
-    const updateReportRow = useCallback(
-        (reportId: number, updater: (report: ReportDto) => ReportDto) => {
-            updateRow((report) => report.id === reportId, updater);
-        },
-        [updateRow]
-    );
-
     return {
         reportRows: rows,
         totalItems,
@@ -59,6 +51,5 @@ export const useReportsRows = ({
         isInitialLoading,
         isRefetching,
         loadReports: reload,
-        updateReportRow,
     };
 };

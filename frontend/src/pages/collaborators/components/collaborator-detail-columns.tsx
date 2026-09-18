@@ -1,10 +1,12 @@
 import CustomerLink from "@/components/customer-link";
 import type { EntityCardSlot } from "@/components/entity-card-list";
 import HoverDetailCell from "@/components/hover-detail-cell";
-import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
+import { formatDateTime } from "@/lib/utils";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
 import type { ReactNode } from "react";
+import { formatReportStatus } from "@/lib/reports";
+import InterventionSchedule from "@/components/intervention-schedule";
 
 /**
  * Colonne delle due tabelle della scheda collaboratore.
@@ -64,7 +66,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
         key: "closed",
         header: "Stato",
         cardSlot: "badge",
-        render: (row) => (row.closed ? "Chiuso" : "Aperto"),
+        render: (row) => formatReportStatus(row.closed),
     },
     {
         key: "createdAt",
@@ -104,26 +106,13 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
     {
         key: "schedule",
         header: "Data/Orario",
-        render: (row) => {
-            if (!row.interventionDate) {
-                return "-";
-            }
-
-            if (!row.startTime || !row.endTime) {
-                return formatDate(row.interventionDate);
-            }
-
-            // L'orario resta intero: in mezza scheda su mobile andava a capo sul trattino
-            // ("13:00-" / "14:30"). Così a capo va, se serve, fra la data e l'orario.
-            return (
-                <>
-                    {formatDate(row.interventionDate)}{" "}
-                    <span className="whitespace-nowrap">
-                        {formatInterventionTime(row.startTime)}-{formatInterventionTime(row.endTime)}
-                    </span>
-                </>
-            );
-        },
+        render: (row) => (
+            <InterventionSchedule
+                interventionDate={row.interventionDate}
+                startTime={row.startTime}
+                endTime={row.endTime}
+            />
+        ),
     },
     {
         key: "status",

@@ -23,7 +23,7 @@ type CustomerDialogMode = "create" | "edit";
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: CustomerSubmitValues) => Promise<void> | void;
+    onSubmit: (values: CustomerSubmitValues) => Promise<void> | void;
     mode?: CustomerDialogMode;
     initialValues?: CustomerDto | null;
 };
@@ -102,11 +102,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
         }
 
         if (isSubmitting) {
-            return;
-        }
-
-        if (!onSubmit) {
-            onOpenChange(false);
             return;
         }
 

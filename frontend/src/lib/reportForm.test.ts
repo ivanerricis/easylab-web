@@ -106,7 +106,6 @@ describe("toReportUpdatePayload", () => {
             issueId: 3,
             collaboratorId: 4,
             technicianId: null,
-            existingTechnicianId: null,
             technicianPrice: 0,
             issueDescription: "Si spegne dopo 10 minuti",
             serviceDescription: "Sostituita batteria",
@@ -135,6 +134,8 @@ describe("toReportUpdatePayload", () => {
             alerted: true,
             closed: true,
             price: 50,
+            technicianId: null,
+            technicianPrice: 0,
         });
     });
 });

@@ -19,3 +19,13 @@ export const toTechnicianPayload = (values: TechnicianSubmitValues) => ({
     phoneNumber: trimOrNull(values.phoneNumber),
     vatNumber: trimOrNull(values.vatNumber),
 });
+
+/**
+ * "Nome Cognome" di un cliente, collaboratore o tecnico: il cognome è facoltativo.
+ *
+ * Era ricostruito a mano in una dozzina di punti, e le copie si erano già allontanate: tre
+ * messaggi di conferma non toglievano lo spazio finale, e senza cognome chiedevano "Sei sicuro
+ * di voler eliminare il tecnico Mario ?".
+ */
+export const formatPersonName = (person: { firstName: string; lastName: string | null }) =>
+    `${person.firstName} ${person.lastName ?? ""}`.trim();

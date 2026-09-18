@@ -1,9 +1,10 @@
 import CustomerLink from "@/components/customer-link";
 import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
-import { formatDateTime, formatDate } from "@/lib/utils";
-import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
+import { formatDateTime } from "@/lib/utils";
+import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
+import InterventionSchedule from "@/components/intervention-schedule";
 
 // Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
 // di questa entità.
@@ -45,26 +46,13 @@ export const interventionColumns: InterventionColumn[] = [
         header: "Data/Orario",
         sortKey: "interventionDate",
         defaultSortDirection: "desc",
-        render: (row) => {
-            if (!row.interventionDate) {
-                return "-";
-            }
-
-            if (!row.startTime || !row.endTime) {
-                return formatDate(row.interventionDate);
-            }
-
-            // L'orario resta intero: in mezza scheda su mobile andava a capo sul trattino
-            // ("13:00-" / "14:30"). Così a capo va, se serve, fra la data e l'orario.
-            return (
-                <>
-                    {formatDate(row.interventionDate)}{" "}
-                    <span className="whitespace-nowrap">
-                        {formatInterventionTime(row.startTime)}-{formatInterventionTime(row.endTime)}
-                    </span>
-                </>
-            );
-        },
+        render: (row) => (
+            <InterventionSchedule
+                interventionDate={row.interventionDate}
+                startTime={row.startTime}
+                endTime={row.endTime}
+            />
+        ),
     },
     {
         key: "status",

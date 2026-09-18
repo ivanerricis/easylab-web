@@ -1,8 +1,10 @@
 import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
-import { formatInterventionStatus, formatInterventionTime, formatInterventionType } from "@/lib/interventions";
-import { formatDate, formatDateTime, formatEuro } from "@/lib/utils";
+import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
+import { formatDateTime, formatEuro } from "@/lib/utils";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
+import { formatReportStatus } from "@/lib/reports";
+import InterventionSchedule from "@/components/intervention-schedule";
 
 /**
  * Colonne delle due tabelle della scheda cliente.
@@ -42,7 +44,7 @@ export const customerReportColumns: EntityColumn<ReportDto>[] = [
         key: "closed",
         header: "Stato",
         cardSlot: "badge",
-        render: (row) => (row.closed ? "Chiuso" : "Aperto"),
+        render: (row) => formatReportStatus(row.closed),
     },
     {
         key: "createdAt",
@@ -72,25 +74,13 @@ export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
     {
         key: "schedule",
         header: "Data/Orario",
-        render: (row) => {
-            if (!row.interventionDate) {
-                return "-";
-            }
-
-            if (!row.startTime || !row.endTime) {
-                return formatDate(row.interventionDate);
-            }
-
-            // Come nella scheda collaboratore: se va a capo, va fra data e orario.
-            return (
-                <>
-                    {formatDate(row.interventionDate)}{" "}
-                    <span className="whitespace-nowrap">
-                        {formatInterventionTime(row.startTime)}-{formatInterventionTime(row.endTime)}
-                    </span>
-                </>
-            );
-        },
+        render: (row) => (
+            <InterventionSchedule
+                interventionDate={row.interventionDate}
+                startTime={row.startTime}
+                endTime={row.endTime}
+            />
+        ),
     },
     {
         key: "collaborator",

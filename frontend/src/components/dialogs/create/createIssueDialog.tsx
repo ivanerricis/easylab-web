@@ -18,7 +18,7 @@ type IssueDialogMode = "create" | "edit";
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: IssueSubmitValues) => Promise<void> | void;
+    onSubmit: (values: IssueSubmitValues) => Promise<void> | void;
     mode?: IssueDialogMode;
     initialValues?: IssueDto | null;
 };
@@ -48,11 +48,6 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
         setDescriptionError(undefined);
 
         if (isSubmitting) {
-            return;
-        }
-
-        if (!onSubmit) {
-            onOpenChange(false);
             return;
         }
 

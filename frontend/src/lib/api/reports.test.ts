@@ -9,7 +9,6 @@ import {
     listReports,
     updateReport,
 } from "./reports";
-import { createReportTechnician, deleteReportTechnician, updateReportTechnician } from "./reportTechnicians";
 
 /** Postgres restituisce i `numeric` come stringhe: il client li deve convertire. */
 const rawReport = {
@@ -98,21 +97,5 @@ describe("api report", () => {
 
         await expect(getReportStats("2026-09")).resolves.toEqual({ openCount: 3 });
         expect(get).toHaveBeenCalledWith("/reports/stats", { params: { month: "2026-09" } });
-    });
-});
-
-describe("api tecnici del report", () => {
-    it("indirizza la coppia report/tecnico nella rotta", async () => {
-        const post = vi.spyOn(api, "post").mockResolvedValue({ data: {} });
-        const put = vi.spyOn(api, "put").mockResolvedValue({ data: {} });
-        const del = vi.spyOn(api, "delete").mockResolvedValue({ data: {} });
-
-        await createReportTechnician({ reportId: 1, technicianId: 2, price: 30 });
-        await updateReportTechnician(1, 2, 45);
-        await deleteReportTechnician(1, 2);
-
-        expect(post).toHaveBeenCalledWith("/report-technicians", { reportId: 1, technicianId: 2, price: 30 });
-        expect(put).toHaveBeenCalledWith("/report-technicians/1/2", { price: 45 });
-        expect(del).toHaveBeenCalledWith("/report-technicians/1/2");
     });
 });

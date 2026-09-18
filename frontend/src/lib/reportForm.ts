@@ -1,7 +1,8 @@
 import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import { listDevices, listIssues } from "@/lib/api";
+import { listDevices, listIssues, type ReportCreateInput } from "@/lib/api";
 import { resolveCustomerId } from "@/lib/customerLookup";
+import { trimOrNull } from "@/lib/utils";
 
 export type ResolvedReportReferences = {
     customerId: number;
@@ -59,13 +60,33 @@ export const resolveReportReferences = async (values: CreateReportSubmitValues):
 };
 
 /**
- * I campi del report da mandare a `updateReport`.
+ * I campi del report da mandare a `createReport`, una volta risolti i riferimenti. Stava in tre
+ * copie — l'elenco report, la scheda cliente e la Dashboard — come la sua gemella
+ * `toInterventionCreatePayload`, con lo stesso rischio: nel payload i campi sono facoltativi, e
+ * una copia che dimentica un campo lo perde senza che niente se ne accorga.
+ */
+export const toReportCreatePayload = (
+    values: CreateReportSubmitValues,
+    references: ResolvedReportReferences
+): ReportCreateInput => ({
+    deviceId: references.deviceId,
+    issueId: references.issueId,
+    customerId: references.customerId,
+    note: trimOrNull(values.notes),
+    password: trimOrNull(values.password),
+    issueDescription: references.issueDescription,
+    dataBackup: values.dataBackup,
+    charger: values.charger,
+});
+
+/**
+ * I campi del report da mandare a `updateReport`, tecnico esterno compreso.
  *
  * Le tre pagine da cui si modifica un report — la scheda, l'elenco e la scheda tecnico —
  * costruivano questo stesso oggetto in tre copie identiche: aggiungere un campo voleva dire
  * ricordarsi di tre punti, e dimenticarne uno non rompeva la compilazione, perché nel
- * payload sono tutti facoltativi. La parte sui tecnici resta invece alle pagine: lì le tre
- * non sono uguali.
+ * payload sono tutti facoltativi. Il tecnico ci è entrato il 2026-09-18: prima ogni pagina lo
+ * riconciliava da sé con due o tre richieste separate dopo quella del report.
  */
 export const toReportUpdatePayload = (values: EditReportSubmitValues) => ({
     customerId: values.customerId,
@@ -82,4 +103,6 @@ export const toReportUpdatePayload = (values: EditReportSubmitValues) => ({
     closed: values.closed,
     paymentMethod: values.paymentMethod,
     price: values.internalPrice,
+    technicianId: values.technicianId,
+    technicianPrice: values.technicianId == null ? 0 : values.technicianPrice,
 });

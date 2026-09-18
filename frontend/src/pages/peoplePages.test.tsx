@@ -17,9 +17,6 @@ const api = vi.hoisted(() => ({
     listReports: vi.fn(),
     listInterventions: vi.fn(),
     updateReport: vi.fn(),
-    createReportTechnician: vi.fn(),
-    updateReportTechnician: vi.fn(),
-    deleteReportTechnician: vi.fn(),
     updateCollaborator: vi.fn(),
     updateTechnician: vi.fn(),
     deleteCollaborator: vi.fn(),
@@ -123,7 +120,6 @@ beforeEach(() => {
         ...timestamps,
     });
     api.updateReport.mockResolvedValue({});
-    api.updateReportTechnician.mockResolvedValue({});
 });
 
 describe("CollaboratorPage", () => {
@@ -277,7 +273,6 @@ describe("TechnicianPage", () => {
         editValues = {
             reportId: 5,
             technicianId: 50,
-            existingTechnicianId: 50,
             technicianPrice: 30,
             internalPrice: 80,
         };
@@ -288,7 +283,10 @@ describe("TechnicianPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Invia modifica 5" }));
 
         await waitFor(() => {
-            expect(api.updateReportTechnician).toHaveBeenCalledWith(5, 50, 30);
+            expect(api.updateReport).toHaveBeenCalledWith(
+                5,
+                expect.objectContaining({ technicianId: 50, technicianPrice: 30 })
+            );
         });
         await waitFor(() => {
             expect(api.listReports).toHaveBeenCalledTimes(2);

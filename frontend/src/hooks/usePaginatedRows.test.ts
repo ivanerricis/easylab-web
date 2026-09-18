@@ -261,37 +261,4 @@ describe("usePaginatedRows", () => {
 
         expect(toastError).not.toHaveBeenCalled();
     });
-
-    it("updateRow modifica solo le righe che corrispondono", async () => {
-        const fetchRows = vi.fn().mockResolvedValue(
-            buildResponse([
-                { id: 1, name: "A" },
-                { id: 2, name: "B" },
-            ])
-        );
-
-        const { result } = renderHook(() =>
-            usePaginatedRows<Row>({
-                fetchRows,
-                queryKey: [],
-                errorMessage: "Errore",
-            })
-        );
-
-        await waitFor(() => {
-            expect(result.current.rows).toHaveLength(2);
-        });
-
-        act(() => {
-            result.current.updateRow(
-                (row) => row.id === 2,
-                (row) => ({ ...row, name: "B modificata" })
-            );
-        });
-
-        expect(result.current.rows).toEqual([
-            { id: 1, name: "A" },
-            { id: 2, name: "B modificata" },
-        ]);
-    });
 });

@@ -35,6 +35,8 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { formatPersonName } from "@/lib/people";
+import { formatReportStatus } from "@/lib/reports";
 
 /** Quanti risultati per gruppo: è una scorciatoia, non un elenco. Per il resto c'è "Vedi tutti". */
 const resultsPerGroup = 5;
@@ -73,7 +75,7 @@ const isSearchable = (query: string) => query.length >= 2 || /^#?\d+$/.test(quer
 
 const shortcutLabel = `${modifierKey} K`;
 
-const customerName = (customer: CustomerDto) => `${customer.firstName} ${customer.lastName ?? ""}`.trim();
+const customerName = (customer: CustomerDto) => formatPersonName(customer);
 
 /**
  * La ricerca globale: una casella sola per clienti, report e interventi, più le pagine
@@ -264,7 +266,7 @@ const GlobalSearch = () => {
                                             </span>
                                         </div>
                                         <CommandShortcut className="tracking-normal">
-                                            {report.closed ? "Chiuso" : "Aperto"}
+                                            {formatReportStatus(report.closed)}
                                         </CommandShortcut>
                                     </CommandItem>
                                 ))}

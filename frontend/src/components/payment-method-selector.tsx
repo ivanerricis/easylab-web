@@ -1,6 +1,7 @@
 import type { PaymentMethod } from "@/types/dtos";
 import OptionSelector, { type SelectorOption } from "@/components/option-selector";
 import { Ban, Banknote, CreditCard } from "lucide-react";
+import { paymentMethodLabels } from "@/lib/reports";
 
 type Props = {
     value: PaymentMethod;
@@ -10,21 +11,9 @@ type Props = {
 };
 
 const paymentMethodOptions: SelectorOption<PaymentMethod>[] = [
-    {
-        value: "non_paid",
-        label: "Non pagato",
-        icon: Ban,
-    },
-    {
-        value: "cash",
-        label: "Contanti",
-        icon: Banknote,
-    },
-    {
-        value: "card",
-        label: "Carta",
-        icon: CreditCard,
-    },
+    { value: "non_paid", label: paymentMethodLabels.non_paid, icon: Ban },
+    { value: "cash", label: paymentMethodLabels.cash, icon: Banknote },
+    { value: "card", label: paymentMethodLabels.card, icon: CreditCard },
 ];
 
 const PaymentMethodSelector = ({ value, onValueChange, className, orientation = "horizontal" }: Props) => (

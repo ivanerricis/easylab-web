@@ -21,7 +21,7 @@ type TechnicianDialogMode = "create" | "edit";
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: TechnicianSubmitValues) => Promise<void> | void;
+    onSubmit: (values: TechnicianSubmitValues) => Promise<void> | void;
     mode?: TechnicianDialogMode;
     initialValues?: TechnicianDto | null;
 };
@@ -84,11 +84,6 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
         }
 
         if (isSubmitting) {
-            return;
-        }
-
-        if (!onSubmit) {
-            onOpenChange(false);
             return;
         }
 

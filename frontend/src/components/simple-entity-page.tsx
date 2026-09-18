@@ -23,7 +23,7 @@ import { toast } from "sonner";
 export type EntityDialogProps<TRow, TValues> = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit?: (values: TValues) => Promise<void> | void;
+    onSubmit: (values: TValues) => Promise<void> | void;
     mode?: "create" | "edit";
     initialValues?: TRow | null;
 };

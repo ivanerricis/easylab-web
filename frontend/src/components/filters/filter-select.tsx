@@ -33,6 +33,13 @@ type FilterSelectProps<TValue extends string> = {
      * elencano solo gli stati reali dell'entità.
      */
     allOption?: { value: TValue; label: string };
+    /**
+     * `toolbar` (il default) è la barra dei filtri delle liste: sotto `sm` si riduce all'icona.
+     * `inline` è il filtro accanto alle tab nelle schede di cliente, collaboratore e tecnico:
+     * lì il testo resta sempre, e su mobile il menu prende lo spazio che le tab lasciano. Prima
+     * quelle schede avevano cinque `Select` scritti a mano con le stesse classi.
+     */
+    variant?: "toolbar" | "inline";
 };
 
 const FilterSelect = <TValue extends string>({
@@ -42,15 +49,20 @@ const FilterSelect = <TValue extends string>({
     label,
     icon: Icon,
     allOption,
+    variant = "toolbar",
 }: FilterSelectProps<TValue>) => {
-    const isCompact = useIsMobile(FILTERS_COMPACT_BREAKPOINT);
+    const isCompact = useIsMobile(FILTERS_COMPACT_BREAKPOINT) && variant === "toolbar";
 
     return (
         <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
             {/* 40px come gli altri controlli della barra (vedi `SearchInput`). L'altezza di serie
                 del trigger sta in `data-[size=default]:h-9`, che vince su un `h-10` semplice. */}
             <SelectTrigger
-                className={cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")}
+                className={
+                    variant === "inline"
+                        ? "min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                        : cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")
+                }
                 aria-label={label}
             >
                 {isCompact ? <Icon className="size-4" /> : <SelectValue placeholder={label} />}

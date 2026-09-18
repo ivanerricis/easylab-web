@@ -6,6 +6,7 @@ import TableActionButton from "@/components/table-action-button";
 import type { ReportDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
 import type { ReportColumn } from "./report-columns";
+import { reportStatusColor } from "@/lib/reports";
 
 type ReportsTableProps = {
     columns: ReportColumn[];
@@ -27,7 +28,7 @@ type ReportsTableProps = {
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
 // in Impostazioni > Tema; la cella azioni torna a bg-background/text-foreground per non
 // colorare le icone dei pulsanti.
-const getStatusColor = (row: ReportDto) => (row.closed ? "green" : "red");
+const getStatusColor = (row: ReportDto) => reportStatusColor(row.closed);
 
 const ReportsTable = ({
     columns,

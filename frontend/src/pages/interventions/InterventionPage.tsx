@@ -31,30 +31,20 @@ import {
     formatInterventionType,
     formatPaidStatus,
     formatToInvoiceStatus,
+    interventionStatusColor,
     isOnSiteInterventionType,
 } from "@/lib/interventions";
 import { ArrowLeft, Pencil, Printer, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import StatusBadge from "@/components/status-badge";
 
 type InterventionPageDetails = {
     intervention: InterventionEntityDto;
     customerName: string;
     customerPhone: string | null;
     collaboratorName: string;
-};
-
-const statusBadgeClass = (status: InterventionEntityDto["status"]) => {
-    if (status === "completato") {
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
-    }
-
-    if (status === "in_lavorazione") {
-        return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
-    }
-
-    return "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
 };
 
 const InterventionPage = () => {
@@ -284,11 +274,9 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Stato</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <span
-                            className={`inline-flex rounded-full px-3 py-1 text-2xl font-semibold ${statusBadgeClass(details.intervention.status)}`}
-                        >
+                        <StatusBadge size="lg" color={interventionStatusColor[details.intervention.status]}>
                             {formatInterventionStatus(details.intervention.status)}
-                        </span>
+                        </StatusBadge>
                     </CardContent>
                 </Card>
 

@@ -16,7 +16,7 @@ const groups: { heading: string; rows: { keys: string[]; label: string }[] }[] =
         heading: "Nelle pagine a elenco",
         rows: [
             { keys: ["/"], label: "Vai alla ricerca della pagina" },
-            { keys: ["Esc"], label: "Svuota la ricerca" },
+            { keys: ["Esc"], label: "Svuota la ricerca, o toglie il focus se è già vuota" },
             { keys: ["n"], label: "Crea (report, intervento, cliente, dispositivo…)" },
         ],
     },

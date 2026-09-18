@@ -100,9 +100,10 @@ describe("SearchInput", () => {
         expect(input).toHaveValue("");
         expect(onParentKeyDown).not.toHaveBeenCalled();
 
-        // A campo vuoto Esc torna a fare il suo mestiere.
+        // A campo vuoto Esc toglie il focus invece di svuotare un campo già vuoto.
         await userEvent.keyboard("{Escape}");
         expect(onParentKeyDown).toHaveBeenCalled();
+        expect(input).not.toHaveFocus();
     });
 
     it("usa il segnaposto come nome accessibile se manca l'etichetta", () => {

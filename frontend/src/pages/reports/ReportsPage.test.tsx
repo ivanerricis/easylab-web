@@ -226,6 +226,23 @@ describe("ReportsPage", () => {
     });
 
     /**
+     * Con la ricerca già vuota, Esc toglie il focus invece di non fare niente: è quello che
+     * serve per tornare a usare "n" senza un clic in mezzo.
+     */
+    it('con la ricerca vuota, Esc libera il focus e "n" torna a funzionare', async () => {
+        await renderPage();
+        const search = screen.getByRole("searchbox");
+        await userEvent.click(search);
+        expect(search).toHaveFocus();
+
+        await userEvent.keyboard("{Escape}");
+        expect(search).not.toHaveFocus();
+
+        await userEvent.keyboard("n");
+        expect(screen.getByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
+    });
+
+    /**
      * Con un menu aperto le lettere servono già a Radix per saltare alla voce che inizia così:
      * "n" deve restare al menu, non aprire anche la creazione dietro.
      */

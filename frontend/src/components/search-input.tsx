@@ -49,12 +49,23 @@ const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, cl
                 value={value}
                 onChange={(event) => onValueChange(event.target.value)}
                 onKeyDown={(event) => {
-                    if (event.key === "Escape" && value !== "") {
-                        // Esc svuota il campo invece di chiudere il dialogo o la pagina che sta
-                        // intorno: è il comportamento che tutti i campi di ricerca hanno.
+                    if (event.key !== "Escape") {
+                        return;
+                    }
+
+                    if (value !== "") {
+                        // Il primo Esc svuota il campo invece di chiudere il dialogo o la
+                        // pagina che sta intorno: è il comportamento che tutti i campi di
+                        // ricerca hanno.
                         event.stopPropagation();
                         handleClear();
+                        return;
                     }
+
+                    // A campo già vuoto non c'è altro da svuotare: Esc toglie il focus, così
+                    // tornano attive le scorciatoie a lettera nuda (usePageShortcut), che
+                    // restano spente finché il focus è qui dentro.
+                    inputRef.current?.blur();
                 }}
             />
             {/* Il pulsante compare solo se c'è qualcosa da cancellare. Prima stava lì sempre,

@@ -121,6 +121,40 @@ describe("errorHandler", () => {
         expect(res.body.message).toBe("Il dispositivo selezionato non esiste.");
     });
 
+    it("mappa un CHECK di riga (23514) sul report su 400 col messaggio per il vincolo", () => {
+        const res = run({
+            code: "23514",
+            constraint: "report_paid_price_check",
+            message: 'new row for relation "report" violates check constraint "report_paid_price_check"',
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0");
+    });
+
+    it("mappa l'altro CHECK del report (chiuso ⇒ collaboratore) sul suo messaggio", () => {
+        const res = run({
+            code: "23514",
+            constraint: "report_closed_collaborator_check",
+            message: 'new row for relation "report" violates check constraint "report_closed_collaborator_check"',
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Per chiudere un report è necessario indicare un collaboratore");
+    });
+
+    it("per un CHECK non censito risponde con un messaggio generico, senza il dettaglio Postgres", () => {
+        const res = run({
+            code: "23514",
+            constraint: "altro_check",
+            detail: "Failing row contains (...).",
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("I dati inseriti non sono validi.");
+        expect(res.locals.apiErrorMessage).toBe("Failing row contains (...).");
+    });
+
     it("trova l'errore Postgres anche annidato dentro `cause`", () => {
         const res = run(new Error("wrapper", { cause: { code: "23502", detail: "Colonna mancante" } }));
 

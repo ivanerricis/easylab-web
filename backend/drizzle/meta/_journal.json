@@ -246,6 +246,13 @@
       "when": 1776370011000,
       "tag": "0034_customer_search_unaccent",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1776370012000,
+      "tag": "0035_report_domain_checks",
+      "breakpoints": true
     }
   ]
 }

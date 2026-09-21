@@ -21,7 +21,6 @@ import { validate } from "./validation";
 const reportsRouter = Router();
 const reportPaymentMethods = ["non_paid", "cash", "card"] as const;
 type ReportPaymentMethod = (typeof reportPaymentMethods)[number];
-const paidPaymentMethods = new Set<ReportPaymentMethod>(["cash", "card"]);
 
 const reportSortFields = ["createdAt", "customer"] as const;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -76,20 +75,20 @@ const technicianPriceNeedsTechnician = {
     message: { message: "Il compenso del tecnico va inviato insieme al tecnico", path: ["technicianPrice"] },
 };
 
-const reportCreateBodySchema = reportBodySchema
-    .refine(
-        (value) => {
-            const paymentMethod = value.paymentMethod ?? "non_paid";
-            const price = value.price ?? 0;
-
-            return !paidPaymentMethods.has(paymentMethod) || price > 0;
-        },
-        {
-            message: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
-            path: ["price"],
-        }
-    )
-    .refine(technicianPriceNeedsTechnician.check, technicianPriceNeedsTechnician.message);
+// Le due regole "pagato ⇒ prezzo > 0" e "chiuso ⇒ collaboratore" NON sono più controllate qui né
+// a mano nella rotta: le applica il CHECK di riga della migration 0035_report_domain_checks, che
+// `errorHandler.ts` traduce nello stesso messaggio italiano (vedi CHECK_MESSAGES lì). Un doppio
+// controllo — uno qui via zod e uno nel database — era esattamente la duplicazione che il
+// backlog segnalava, con il rischio concreto che i due si allontanassero nelle parole: la PUT,
+// che valida la riga *unione* di corpo parziale ed esistente, non può comunque vederle da uno
+// schema, quindi l'unico posto in cui *entrambe* le rotte vedono la riga davvero risultante è il
+// database. Il dialogo di creazione (`createReportDialog.tsx`) non raccoglie nemmeno pagamento,
+// prezzo o chiusura — li aggiunge solo il dialogo di modifica — quindi non perde nessun
+// evidenziamento di campo lasciando che sia il database a deciderlo.
+const reportCreateBodySchema = reportBodySchema.refine(
+    technicianPriceNeedsTechnician.check,
+    technicianPriceNeedsTechnician.message
+);
 
 const reportUpdateBodySchema = reportBodySchema
     .partial()
@@ -250,20 +249,12 @@ reportsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res)
 });
 
 reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, res) => {
-    // Il vincolo "pagato ⇒ prezzo > 0" è già applicato da `reportCreateBodySchema`, che
-    // rifiuta la richiesta prima di arrivare qui: la POST vede solo corpi validi. La PUT
-    // invece continua a controllarlo a mano, perché lì il metodo di pagamento e il prezzo
-    // possono arrivare da campi diversi (uno dal corpo parziale, l'altro dalla riga
-    // esistente) e lo schema non ha modo di vedere la combinazione risultante.
     const { report, technician } = splitTechnician(req.body as z.infer<typeof reportCreateBodySchema>);
     const paymentMethod = report.paymentMethod ?? "non_paid";
     const price = report.price ?? 0;
 
-    if (report.closed && report.collaboratorId == null) {
-        res.status(400).json({ message: "Per chiudere un report è necessario indicare un collaboratore" });
-        return;
-    }
-
+    // Il CHECK di riga sul database (migration 0035_report_domain_checks) fa rifiutare a
+    // Postgres sia questa sia la PUT qui sotto: vedi il commento su `reportCreateBodySchema`.
     const createdReport = await createReport({ ...report, paymentMethod, price }, technician);
 
     res.status(201).json(createdReport[0]);
@@ -279,28 +270,12 @@ reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateB
     }
 
     const { report, technician } = splitTechnician(req.body as z.infer<typeof reportUpdateBodySchema>);
-    const nextPaymentMethod = (report.paymentMethod ?? existingReport[0].paymentMethod) as ReportPaymentMethod;
-    const nextPrice = report.price ?? existingReport[0].price;
 
-    if (paidPaymentMethods.has(nextPaymentMethod) && nextPrice <= 0) {
-        res.status(400).json({
-            message: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
-        });
-        return;
-    }
-
-    // Come per il prezzo qui sopra: la combinazione da validare nasce dall'unione del corpo
-    // parziale con la riga esistente, quindi lo schema non può vederla. `collaboratorId` usa
-    // `!== undefined` e non `??` perché `null` è un valore significativo ("svuota il campo").
-    const nextClosed = report.closed ?? existingReport[0].closed;
-    const nextCollaboratorId =
-        report.collaboratorId !== undefined ? report.collaboratorId : existingReport[0].collaboratorId;
-
-    if (nextClosed && nextCollaboratorId == null) {
-        res.status(400).json({ message: "Per chiudere un report è necessario indicare un collaboratore" });
-        return;
-    }
-
+    // Prezzo/pagamento e chiusura/collaboratore non si controllano più qui a mano: la riga
+    // risultante (l'unione di questo corpo parziale con quella esistente) è quella che Postgres
+    // vede al momento dell'UPDATE, e il CHECK di riga della migration 0035_report_domain_checks
+    // la rifiuta da solo se viola una delle due regole. `errorHandler.ts` traduce la violazione
+    // nello stesso messaggio italiano che questa rotta dava prima a mano.
     const updatedReport = await updateReportById(id, report, technician);
 
     if (updatedReport.length === 0) {

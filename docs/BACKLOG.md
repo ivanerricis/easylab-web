@@ -85,12 +85,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     strada: passare il fuso anche a scheduler e nomi dei file, ricavando le parti della data con
     `Intl` come fa `currentMonthKey`, e smettere di toccare `TZ`. Rimandato perché tocca backup e
     scheduler, che vanno riprovati a mano.
-  - **Regole di dominio scritte due volte.** "Pagato ⇒ prezzo > 0" sta nello schema zod della POST
-    dei report e a mano nella PUT; "chiuso ⇒ collaboratore" a mano in entrambe; per gli interventi
-    `superRefine` in creazione e `if` in modifica, con messaggi diversi. Per i report la forma
-    giusta sono due CHECK di riga nel database tradotti in `errorHandler`; per gli interventi una
-    funzione sola applicata alla riga risultante (corpo + riga esistente). Serve una migration che
-    prima verifichi i dati esistenti.
   - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
     hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.

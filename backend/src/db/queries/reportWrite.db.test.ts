@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "../index";
-import { reportTechnicianTable } from "../schema";
-import { assignTechnician, insertReport, insertTechnician } from "../../test/db/fixtures";
+import { reportTable, reportTechnicianTable } from "../schema";
+import { assignTechnician, insertCollaborator, insertReport, insertTechnician } from "../../test/db/fixtures";
 import { createReport, deleteReportById, getReportDetailById, updateReportById } from "./report";
 
 const technicianRowsOf = (reportId: number) =>
@@ -91,6 +91,78 @@ describe("deleteReportById", () => {
 
         await expect(deleteReportById(report.id)).resolves.toHaveLength(1);
         expect(await technicianRowsOf(report.id)).toEqual([]);
+    });
+});
+
+/**
+ * Le due regole di dominio del report (migration 0035_report_domain_checks): prima erano
+ * scritte a mano nelle rotte, in due copie ciascuna che potevano allontanarsi nelle parole (vedi
+ * `reports.test.ts`, che prova la stessa cosa passando dalla rotta con la scrittura mockata).
+ * Qui invece si scrive per davvero sul database — anche con un `db.insert` diretto, che non
+ * passa da nessuna rotta — a prova che il vincolo è del database e non solo della rotta.
+ */
+describe("report: i due CHECK di riga (migration 0035_report_domain_checks)", () => {
+    // drizzle avvolge l'errore di Postgres in un `DrizzleQueryError`: `code` e `constraint` sono
+    // sull'errore originale, che sta in `.cause`, non sull'oggetto rifiutato direttamente.
+    it("un INSERT diretto pagato in contanti con prezzo zero è rifiutato da Postgres", async () => {
+        const base = await insertReport();
+
+        await expect(
+            db.insert(reportTable).values({
+                customerId: base.customerId,
+                deviceId: base.deviceId,
+                issueId: base.issueId,
+                paymentMethod: "cash",
+                price: 0,
+            })
+        ).rejects.toMatchObject({ cause: { code: "23514", constraint: "report_paid_price_check" } });
+    });
+
+    it("un INSERT diretto chiuso senza collaboratore è rifiutato da Postgres", async () => {
+        const base = await insertReport();
+
+        await expect(
+            db.insert(reportTable).values({
+                customerId: base.customerId,
+                deviceId: base.deviceId,
+                issueId: base.issueId,
+                closed: true,
+                collaboratorId: null,
+            })
+        ).rejects.toMatchObject({ cause: { code: "23514", constraint: "report_closed_collaborator_check" } });
+    });
+
+    it("un pagamento in contanti con prezzo positivo è accettato", async () => {
+        await expect(insertReport({ paymentMethod: "cash", price: 10 })).resolves.toMatchObject({
+            paymentMethod: "cash",
+            price: 10,
+        });
+    });
+
+    it("un report chiuso con un collaboratore è accettato", async () => {
+        const collaborator = await insertCollaborator();
+
+        await expect(insertReport({ closed: true, collaboratorId: collaborator.id })).resolves.toMatchObject({
+            closed: true,
+            collaboratorId: collaborator.id,
+        });
+    });
+
+    it("un UPDATE che porta il prezzo a zero con un metodo di pagamento già 'cash' è rifiutato", async () => {
+        const report = await insertReport({ paymentMethod: "cash", price: 50 });
+
+        await expect(updateReportById(report.id, { price: 0 })).rejects.toMatchObject({
+            cause: { code: "23514", constraint: "report_paid_price_check" },
+        });
+    });
+
+    it("un UPDATE che svuota il collaboratore di un report già chiuso è rifiutato", async () => {
+        const collaborator = await insertCollaborator();
+        const report = await insertReport({ closed: true, collaboratorId: collaborator.id });
+
+        await expect(updateReportById(report.id, { collaboratorId: null })).rejects.toMatchObject({
+            cause: { code: "23514", constraint: "report_closed_collaborator_check" },
+        });
     });
 });
 

@@ -174,10 +174,14 @@ describe("listReports: ricerca libera", () => {
     });
 
     it("si combina con gli altri filtri", async () => {
+        // Chiuso richiede un collaboratore (CHECK del database, migration
+        // 0035_report_domain_checks): la stessa riga serve a entrambi i report chiusi qui
+        // sotto, che non hanno altro a che fare con lui.
+        const collaborator = await insertCollaborator();
         const customer = await insertCustomer({ firstName: "Zefiro" });
         const open = await insertReport({ customerId: customer.id, closed: false });
-        await insertReport({ customerId: customer.id, closed: true });
-        await insertReport({ note: "zefiro", closed: true });
+        await insertReport({ customerId: customer.id, closed: true, collaboratorId: collaborator.id });
+        await insertReport({ note: "zefiro", closed: true, collaboratorId: collaborator.id });
 
         expect(await findIds({ search: "zefiro", visibility: "open" })).toEqual([open.id]);
     });
@@ -185,8 +189,9 @@ describe("listReports: ricerca libera", () => {
 
 describe("listReports: filtri", () => {
     it("filtra per visibilità", async () => {
+        const collaborator = await insertCollaborator();
         const open = await insertReport({ closed: false });
-        const closed = await insertReport({ closed: true });
+        const closed = await insertReport({ closed: true, collaboratorId: collaborator.id });
 
         expect(await findIds({ visibility: "open" })).toEqual([open.id]);
         expect(await findIds({ visibility: "closed" })).toEqual([closed.id]);
@@ -381,10 +386,21 @@ describe("getReportStats: confini del mese nel fuso del laboratorio", () => {
     const now = new Date("2026-02-15T12:00:00Z");
 
     it("un report nato a un'ora dalla mezzanotte locale resta nel mese vecchio, uno nato dopo passa al nuovo", async () => {
+        const collaborator = await insertCollaborator();
         // 23:00 a Roma (UTC+1, fuori dall'ora legale): ancora il 31 gennaio.
-        await insertReport({ closed: true, price: 100, created_at: new Date("2026-01-31T22:00:00Z") });
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 100,
+            created_at: new Date("2026-01-31T22:00:00Z"),
+        });
         // 00:00 a Roma: già il 1° febbraio, un'ora dopo in UTC.
-        await insertReport({ closed: true, price: 200, created_at: new Date("2026-01-31T23:00:00Z") });
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 200,
+            created_at: new Date("2026-01-31T23:00:00Z"),
+        });
 
         const stats = await getReportStats(undefined, timeZone, now);
 
@@ -394,14 +410,21 @@ describe("getReportStats: confini del mese nel fuso del laboratorio", () => {
     });
 
     it("l'incasso del mese somma il prezzo interno e il compenso del tecnico esterno, il netto lo sottrae", async () => {
+        const collaborator = await insertCollaborator();
         const technician = await insertTechnician();
         const withTechnician = await insertReport({
             closed: true,
+            collaboratorId: collaborator.id,
             price: 100,
             created_at: new Date("2026-02-10T10:00:00Z"),
         });
         await assignTechnician(withTechnician.id, technician.id, 30);
-        await insertReport({ closed: true, price: 50, created_at: new Date("2026-02-11T10:00:00Z") });
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 50,
+            created_at: new Date("2026-02-11T10:00:00Z"),
+        });
 
         const stats = await getReportStats("2026-02", timeZone, now);
 
@@ -410,8 +433,14 @@ describe("getReportStats: confini del mese nel fuso del laboratorio", () => {
     });
 
     it("un report ancora aperto non entra nell'incasso, ma conta fra quelli aperti", async () => {
+        const collaborator = await insertCollaborator();
         await insertReport({ closed: false, price: 999, created_at: new Date("2026-02-10T10:00:00Z") });
-        await insertReport({ closed: true, price: 40, created_at: new Date("2026-02-10T10:00:00Z") });
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 40,
+            created_at: new Date("2026-02-10T10:00:00Z"),
+        });
 
         const stats = await getReportStats("2026-02", timeZone, now);
 

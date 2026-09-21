@@ -89,6 +89,18 @@ const UNIQUE_MESSAGES: Record<string, string> = {
 const GENERIC_UNIQUE_MESSAGE = "Esiste già un elemento con questi dati.";
 const GENERIC_NOT_NULL_MESSAGE = "Campo obbligatorio mancante";
 
+// Come `UNIQUE_MESSAGES`: due regole di dominio del report (vedi migration
+// 0035_report_domain_checks) prima erano scritte due volte ciascuna, una volta nello schema/rotta
+// di creazione e una volta a mano sulla PUT, con parole non sempre identiche. Ora le applica un
+// solo CHECK di riga, a qualunque scrittura, e questa mappa traduce la violazione nello stesso
+// messaggio italiano che le rotte davano prima.
+const CHECK_MESSAGES: Record<string, string> = {
+    report_paid_price_check: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
+    report_closed_collaborator_check: "Per chiudere un report è necessario indicare un collaboratore",
+};
+
+const GENERIC_CHECK_MESSAGE = "I dati inseriti non sono validi.";
+
 const foreignKeyViolationMessage = ({ constraint, message }: PgError): string => {
     const known = constraint ? FK_MESSAGES[constraint] : undefined;
 
@@ -161,6 +173,13 @@ export const errorHandler = (
     if (code === "23502") {
         res.locals.apiErrorMessage = detail ?? GENERIC_NOT_NULL_MESSAGE;
         res.status(400).json({ message: GENERIC_NOT_NULL_MESSAGE });
+        return;
+    }
+
+    if (code === "23514") {
+        const clientMessage = (constraint && CHECK_MESSAGES[constraint]) || GENERIC_CHECK_MESSAGE;
+        res.locals.apiErrorMessage = detail ?? clientMessage;
+        res.status(400).json({ message: clientMessage });
         return;
     }
 

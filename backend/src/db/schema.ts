@@ -10,6 +10,7 @@ import {
     primaryKey,
     index,
     uniqueIndex,
+    check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -67,6 +68,13 @@ export const reportTable = pgTable(
         index("report_issue_description_trgm_idx").using("gin", sql`${table.issueDescription} gin_trgm_ops`),
         index("report_service_description_trgm_idx").using("gin", sql`${table.serviceDescription} gin_trgm_ops`),
         index("report_created_at_idx").on(table.created_at),
+        // Le due regole di dominio del report, prima scritte due volte ciascuna (una volta nello
+        // zod dello schema di creazione o in un `if` a mano, una volta in un altro `if` a mano
+        // sulla PUT, con la riga unione di corpo parziale e riga esistente). Un vincolo di riga
+        // qui le applica una volta sola, a qualunque scrittura, comprese quelle dirette che non
+        // passano dalla rotta. `errorHandler.ts` traduce la violazione nel messaggio italiano.
+        check("report_paid_price_check", sql`${table.paymentMethod} NOT IN ('cash', 'card') OR ${table.price} > 0`),
+        check("report_closed_collaborator_check", sql`NOT ${table.closed} OR ${table.collaboratorId} IS NOT NULL`),
     ]
 );
 

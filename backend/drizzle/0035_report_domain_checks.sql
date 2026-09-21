@@ -1,0 +1,23 @@
+-- Due regole di dominio sul report, prima scritte due volte ciascuna con parole a volte diverse
+-- (una nello zod schema di creazione o in un `if` a mano sulla POST, un'altra in un `if` a mano
+-- sulla PUT, che ricalcolava a mano la riga risultante da corpo parziale + riga esistente). Un
+-- vincolo di riga qui le applica una volta sola, a qualunque scrittura — comprese quelle dirette
+-- che non passano dalla rotta — e `errorHandler.ts` traduce la violazione (SQLSTATE 23514) nel
+-- messaggio italiano già usato dalle rotte. Vedi CHANGELOG del 2026-09-21.
+--
+-- ATTENZIONE PRIMA DI ESEGUIRE QUESTA MIGRAZIONE IN PRODUZIONE: un database con dati storici
+-- precedenti a queste regole potrebbe avere righe che le violano. Se ne esiste anche una sola,
+-- l'ALTER TABLE fallisce e la migrazione va in rollback (il migrator applica tutte le migrazioni
+-- pendenti in un'unica transazione: drizzle-orm/pg-core/dialect.js, PgDialect.migrate), quindi
+-- il database resta nello stato di prima, senza corruzione né perdita di dati. Prima di
+-- distribuire, un operatore deve eseguire su produzione, in sola lettura:
+--
+--   SELECT count(*) FROM report WHERE payment_method IN ('cash', 'card') AND price <= 0;
+--   SELECT count(*) FROM report WHERE closed = true AND collaborator_id IS NULL;
+--
+-- Su sviluppo (2026-09-21) entrambe le query restituiscono 0 righe. Se in produzione una delle
+-- due restituisce un numero maggiore di zero, le righe trovate vanno sistemate a mano (o il
+-- vincolo va discusso di nuovo) prima di applicare questa migrazione.
+ALTER TABLE "report" ADD CONSTRAINT "report_paid_price_check" CHECK ("payment_method" NOT IN ('cash', 'card') OR "price" > 0);
+--> statement-breakpoint
+ALTER TABLE "report" ADD CONSTRAINT "report_closed_collaborator_check" CHECK (NOT "closed" OR "collaborator_id" IS NOT NULL);

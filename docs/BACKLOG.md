@@ -94,9 +94,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
     hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
-  - **`text-lg!` su circa 40 campi dei dialoghi**, per battere il `text-base md:text-sm` del
-    primitivo `Input`. Un campo nuovo che lo dimentica esce più piccolo. Va deciso una volta sola,
-    in `CustomDialog` o come variante del primitivo, con una verifica visiva di tutti i dialoghi.
   - **`EntityTable` disegna ogni riga due volte** (tabella e scheda mobile, una delle due nascosta
     via CSS) e senza memo: con "Tutte" (fino a 5000 righe) si sente sulla digitazione nella ricerca
     e sul trascinamento delle colonne. Con 10-50 righe è irrilevante. Attenzione: il ResizeObserver

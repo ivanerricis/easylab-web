@@ -78,7 +78,6 @@ const PrintRangeDialog = ({
                                 <Input
                                     id="print-range-date-from"
                                     type="date"
-                                    className="text-lg!"
                                     value={dateFrom}
                                     max={dateTo || undefined}
                                     onChange={(event) => setDateFrom(event.target.value)}
@@ -91,7 +90,6 @@ const PrintRangeDialog = ({
                                 <Input
                                     id="print-range-date-to"
                                     type="date"
-                                    className="text-lg!"
                                     value={dateTo}
                                     min={dateFrom || undefined}
                                     onChange={(event) => setDateTo(event.target.value)}

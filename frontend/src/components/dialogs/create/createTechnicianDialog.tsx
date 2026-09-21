@@ -122,7 +122,6 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                     <FormField id="firstName" label="Nome" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}
-                            className="text-lg!"
                             // I dati di un'altra persona: il completamento automatico del browser
                             // proporrebbe qui il nome di chi sta al computer, non quello del
                             // tecnico che si sta inserendo.
@@ -138,7 +137,6 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                     <FormField id="lastName" label="Cognome" required error={errors.lastName}>
                         <Input
                             {...fieldProps("lastName", { error: errors.lastName, required: true })}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="Verdi"
                             value={formValues.lastName}
@@ -151,7 +149,6 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                     <FormField id="phoneNumber" label="Telefono">
                         <Input
                             {...fieldProps("phoneNumber")}
-                            className="text-lg!"
                             type="tel"
                             autoComplete="off"
                             placeholder="333 1234567"
@@ -164,7 +161,6 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                     <FormField id="vatNumber" label="Partita IVA">
                         <Input
                             {...fieldProps("vatNumber")}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="IT12345678901"
                             value={formValues.vatNumber}

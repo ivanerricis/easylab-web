@@ -85,7 +85,6 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
                 <FormField id="description" label="Descrizione" required error={descriptionError}>
                     <Textarea
                         {...fieldProps("description", { error: descriptionError, required: true })}
-                        className="text-lg!"
                         placeholder="Display rotto"
                         value={description}
                         onChange={(event) => {

@@ -184,7 +184,6 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                                 </Label>
                                 <Input
                                     {...fieldProps(field, { error: errors[field] })}
-                                    className="text-lg!"
                                     type="time"
                                     value={values[field]}
                                     onChange={(event) => onChange({ [field]: event.target.value })}
@@ -203,7 +202,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                         </Label>
                         <Textarea
                             {...fieldProps("problem", { error: errors.problem })}
-                            className="resize-none text-lg!"
+                            className="resize-none"
                             rows={4}
                             placeholder="Descrivi il problema riscontrato"
                             value={values.problem}
@@ -220,7 +219,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                     </Label>
                     <Textarea
                         {...fieldProps("description", { error: errors.description })}
-                        className="resize-none text-lg!"
+                        className="resize-none"
                         rows={4}
                         placeholder={
                             values.type === "consegna_materiale"
@@ -239,7 +238,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                     </Label>
                     <Textarea
                         id="note"
-                        className="resize-none text-lg!"
+                        className="resize-none"
                         rows={4}
                         placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
                         value={values.note}

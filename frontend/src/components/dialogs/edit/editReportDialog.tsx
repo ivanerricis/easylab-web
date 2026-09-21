@@ -435,7 +435,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Input
                                             id="password"
-                                            className="text-lg!"
                                             placeholder="Password dispositivo"
                                             value={formValues.password}
                                             onChange={(event) =>
@@ -454,7 +453,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 {...fieldProps("issueDescription", {
                                                     error: errors.issueDescription,
                                                 })}
-                                                className="text-lg!"
                                                 placeholder="Quello che il cliente legge sulla ricevuta"
                                                 maxLength={255}
                                                 value={formValues.issueDescription}
@@ -476,7 +474,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Textarea
                                             id="serviceDescription"
-                                            className="min-h-24 resize-none text-lg!"
+                                            className="min-h-24 resize-none"
                                             placeholder="Descrivi l'intervento"
                                             value={formValues.serviceDescription}
                                             onChange={(event) =>
@@ -494,7 +492,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         </Label>
                                         <Textarea
                                             id="note"
-                                            className="min-h-24 resize-none text-lg!"
+                                            className="min-h-24 resize-none"
                                             placeholder="Note"
                                             value={formValues.note}
                                             onChange={(event) =>

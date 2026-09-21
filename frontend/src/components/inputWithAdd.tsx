@@ -137,7 +137,7 @@ const InputWithAdd = ({
     return (
         <div className="relative w-full">
             <Input
-                className={cn("group h-full text-lg!", inputClassName)}
+                className={cn("group h-full", inputClassName)}
                 id={id}
                 aria-invalid={ariaInvalid}
                 aria-describedby={ariaDescribedBy}

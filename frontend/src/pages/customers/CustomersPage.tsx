@@ -200,7 +200,7 @@ const CustomersPage = () => {
                             Cosa stampare
                         </Label>
                         <Select value={printKind} onValueChange={(value) => setPrintKind(value as CustomerPrintKind)}>
-                            <SelectTrigger id="print-customer-kind" className="w-full text-lg!">
+                            <SelectTrigger id="print-customer-kind" className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent position="popper">

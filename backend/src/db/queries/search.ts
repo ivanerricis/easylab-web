@@ -7,6 +7,22 @@ import { sql, type SQLWrapper } from "drizzle-orm";
 export const containsText = (column: SQLWrapper, pattern: string) => sql`${column}::text ILIKE ${pattern}`;
 
 /**
+ * Come `containsText`, ma ignora anche gli accenti: "Nicolo" trova anche "Nicolò". Confronta
+ * `immutable_unaccent(colonna)` con `immutable_unaccent(pattern)` invece del testo grezzo — la
+ * funzione è definita nella migration 0034_customer_search_unaccent, un wrapper IMMUTABLE
+ * attorno a `unaccent()` (che di suo è STABLE e quindi non ammessa in un'espressione di indice).
+ * Copre un sovrainsieme di `containsText`: per testo senza accenti si comporta allo stesso modo,
+ * quindi non toglie mai corrispondenze già trovate, ne aggiunge solo di nuove.
+ *
+ * Usata solo dalla ricerca clienti (nome, cognome, città) per ora, di proposito: estenderla alle
+ * altre anagrafiche (collaboratori, tecnici, dispositivi, difetti, report, interventi)
+ * significherebbe aggiungere altrettanti indici funzionali GIN, fuori dallo scopo di questo
+ * intervento.
+ */
+export const containsTextAccentInsensitive = (column: SQLWrapper, pattern: string) =>
+    sql`immutable_unaccent(${column}::text) ILIKE immutable_unaccent(${pattern})`;
+
+/**
  * Ricerca per numero nella casella di testo libero.
  *
  * Le liste confrontavano con il testo digitato anche colonne che testo non sono — id, date,

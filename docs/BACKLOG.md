@@ -96,9 +96,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): fatta per intero
   il 2026-09-21, tranne la 2FA di `authManager`, ancora provata solo con un `db` finto.
-- Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
-  "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
-  soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
 
 **Sicurezza e messa in produzione**
 - **L'accesso d'emergenza dalla LAN non permette il login** (da EL-08, 2026-09-14). Il cookie di

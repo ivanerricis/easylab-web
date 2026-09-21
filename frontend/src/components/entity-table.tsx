@@ -6,7 +6,7 @@ import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 
 export type EntityColumn<TRow> = {
     /** `"actions"` è speciale: quella colonna ospita i pulsanti di riga, non un valore. */
@@ -106,6 +106,110 @@ const actionsColumnKey = "actions";
  */
 const maxSkeletonRows = 15;
 
+type EntityTableRowProps<TRow> = {
+    row: TRow;
+    rowKey: React.Key;
+    columns: EntityColumn<TRow>[];
+    isResizable: boolean;
+    getRowStatusColor?: (row: TRow) => string;
+    onRowOpen?: (row: TRow) => void;
+    renderRowActions: (row: TRow) => ReactNode;
+};
+
+/**
+ * Confronta solo le prop che contano per decidere se ridisegnare la riga: `row` — le liste
+ * sostituiscono l'intero array a ogni ricarica, quindi una riga davvero cambiata (anche solo
+ * modificata) arriva sempre con un riferimento nuovo — più `columns` e `isResizable`.
+ *
+ * `getRowStatusColor`, `onRowOpen` e `renderRowActions` restano fuori apposta: chi chiama
+ * `EntityTable` li passa quasi sempre come closure inline nel proprio corpo, quindi diversi a
+ * ogni suo render anche quando la riga non c'entra (la ricerca che digita cambia la pagina, non
+ * le righe). Confrontarli avrebbe vanificato `memo` a ogni battitura. Restano comunque corrette
+ * quando chiamate, perché `EntityTableRowImpl` le richiama sempre da capo — non da un ref — ogni
+ * volta che la riga si ridisegna per un motivo vero.
+ *
+ * Non generica (TRow fisso a `unknown`): è la forma che `memo` si aspetta per il suo secondo
+ * argomento, e il confronto qui dentro è comunque per campo, non serve conoscere TRow per davvero.
+ */
+const areRowPropsEqual = (prev: EntityTableRowProps<unknown>, next: EntityTableRowProps<unknown>) =>
+    prev.row === next.row &&
+    prev.rowKey === next.rowKey &&
+    prev.columns === next.columns &&
+    prev.isResizable === next.isResizable;
+
+/**
+ * Una riga della tabella, isolata in un componente a parte e avvolta in `memo`.
+ *
+ * Prima ogni riga veniva ridisegnata da capo a ogni render di `EntityTable`, anche quando né
+ * lei né le sue colonne erano cambiate: con "Tutte" (fino a 5000 righe) digitare nel campo di
+ * ricerca o trascinare una colonna ricalcolava tutte le celle di tutte le righe, anche quelle
+ * che il risultato non tocca. Qui `memo` (con `areRowPropsEqual` sopra) salta il render quando
+ * `row` non è cambiata.
+ */
+const EntityTableRowImpl = <TRow,>({
+    row,
+    rowKey,
+    columns,
+    isResizable,
+    getRowStatusColor,
+    onRowOpen,
+    renderRowActions,
+}: EntityTableRowProps<TRow>) => {
+    // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
+    // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti.
+    const truncateClassName = (columnKey: string) =>
+        isResizable && columnKey !== actionsColumnKey ? "overflow-hidden text-ellipsis" : undefined;
+
+    // Calcolati una volta sola per `row`, non ricreati a ogni carattere digitato altrove nella
+    // pagina: vedi il commento su `areRowPropsEqual`. La dipendenza è solo `row` di proposito —
+    // quando la riga stessa non cambia si riusa il risultato precedente, quando cambia si
+    // richiama la versione di `getRowStatusColor`/`renderRowActions` in ambito in quel momento,
+    // mai una vecchia letta da un ref (che arriverebbe in ritardo di un render, sbagliando
+    // proprio al primo montaggio della riga: coi dati appena caricati sarebbe ancora quella
+    // dello scheletro, senza righe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const statusColor = useMemo(() => getRowStatusColor?.(row), [row]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const actionsNode = useMemo(() => renderRowActions(row), [row]);
+
+    return (
+        <TableRow
+            data-status-color={statusColor}
+            className={onRowOpen ? "cursor-pointer select-none" : undefined}
+            onDoubleClick={onRowOpen ? () => onRowOpen(row) : undefined}
+        >
+            {columns.map((column) => (
+                <TableCell
+                    key={`${rowKey}-${column.key}`}
+                    className={cn(
+                        truncateClassName(column.key),
+                        column.key === actionsColumnKey && getRowStatusColor
+                            ? "bg-background text-foreground"
+                            : column.className
+                    )}
+                >
+                    {column.key === actionsColumnKey ? (
+                        // I pulsanti di riga sono l'unico punto interattivo della riga: fermare
+                        // qui il doppio click evita che un click ripetuto su un'azione apra
+                        // anche la scheda.
+                        <div
+                            className="flex items-center justify-end gap-2"
+                            onDoubleClick={(event) => event.stopPropagation()}
+                        >
+                            {actionsNode}
+                        </div>
+                    ) : (
+                        column.render(row)
+                    )}
+                </TableCell>
+            ))}
+        </TableRow>
+    );
+};
+
+// `memo` da solo non capisce i generici: il cast riporta il tipo che ha `EntityTableRowImpl`.
+const EntityTableRow = memo(EntityTableRowImpl, areRowPropsEqual) as typeof EntityTableRowImpl;
+
 /**
  * Tabella su desktop, elenco di schede su mobile: è la forma che hanno tutte le liste
  * dell'app. Prima ogni entità ne aveva una copia integrale — sette file identici a meno
@@ -150,6 +254,11 @@ const EntityTable = <TRow,>({
         [allColumns, hiddenColumnKeys]
     );
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
+    // Le schede su mobile mostrano tutte le colonne tranne le azioni, senza il filtro del menu
+    // "Colonne" (vedi il commento sulla prop `hiddenColumnKeys`): un `useMemo` a parte, e non
+    // un `.filter` dentro il JSX, perché altrimenti ogni render di `EntityTable` produceva un
+    // array nuovo e invalidava da solo il `memo` di ogni scheda più sotto.
+    const cardColumns = useMemo(() => allColumns.filter((column) => column.key !== actionsColumnKey), [allColumns]);
     const visibleSkeletonRows = Math.min(skeletonRowCount, maxSkeletonRows);
 
     const { tableRef, isResizable, getColumnWidth, getResizeHandleProps, tableStyle } = useResizableColumns({
@@ -161,7 +270,8 @@ const EntityTable = <TRow,>({
     useListScrollRestoration({ anchorRef: tableRef, tableKey, isReady: !isInitialLoading && rows.length > 0 });
 
     // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
-    // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti.
+    // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti. Questa versione serve
+    // solo all'intestazione: quella delle celle di riga vive in `EntityTableRowImpl`.
     const truncateClassName = (columnKey: string) =>
         isResizable && columnKey !== actionsColumnKey ? "overflow-hidden text-ellipsis" : undefined;
 
@@ -274,47 +384,29 @@ const EntityTable = <TRow,>({
                             </TableCell>
                         </TableRow>
                     ) : (
-                        rows.map((row) => (
-                            <TableRow
-                                key={getRowKey(row)}
-                                data-status-color={getRowStatusColor?.(row)}
-                                className={onRowOpen ? "cursor-pointer select-none" : undefined}
-                                onDoubleClick={onRowOpen ? () => onRowOpen(row) : undefined}
-                            >
-                                {columns.map((column) => (
-                                    <TableCell
-                                        key={`${getRowKey(row)}-${column.key}`}
-                                        className={cn(
-                                            truncateClassName(column.key),
-                                            column.key === actionsColumnKey && getRowStatusColor
-                                                ? "bg-background text-foreground"
-                                                : column.className
-                                        )}
-                                    >
-                                        {column.key === actionsColumnKey ? (
-                                            // I pulsanti di riga sono l'unico punto interattivo della
-                                            // riga: fermare qui il doppio click evita che un click
-                                            // ripetuto su un'azione apra anche la scheda.
-                                            <div
-                                                className="flex items-center justify-end gap-2"
-                                                onDoubleClick={(event) => event.stopPropagation()}
-                                            >
-                                                {renderRowActions(row)}
-                                            </div>
-                                        ) : (
-                                            column.render(row)
-                                        )}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))
+                        rows.map((row) => {
+                            const rowKey = getRowKey(row);
+
+                            return (
+                                <EntityTableRow
+                                    key={rowKey}
+                                    row={row}
+                                    rowKey={rowKey}
+                                    columns={columns}
+                                    isResizable={isResizable}
+                                    getRowStatusColor={getRowStatusColor}
+                                    onRowOpen={onRowOpen}
+                                    renderRowActions={renderRowActions}
+                                />
+                            );
+                        })
                     )}
                 </TableBody>
             </Table>
 
             <EntityCardList
                 className={cn("sm:hidden", isRefetching && "opacity-60 transition-opacity")}
-                columns={allColumns.filter((column) => column.key !== actionsColumnKey)}
+                columns={cardColumns}
                 rows={rows}
                 getRowKey={getRowKey}
                 getStatusColor={getRowStatusColor}

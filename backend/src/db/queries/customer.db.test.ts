@@ -37,6 +37,34 @@ describe("listCustomers: ricerca libera", () => {
         expect(await search("zefiro")).toEqual([target.id]);
     });
 
+    describe("non distingue gli accenti (nome, cognome, città)", () => {
+        it.each([
+            ["il nome", { firstName: "Nicolò" }, "Nicolo"],
+            ["il cognome", { firstName: "Mario", lastName: "Perù" }, "Peru"],
+            ["la città", { firstName: "Mario", city: "Forlì" }, "Forli"],
+        ])("trova per %s scritto senza accento", async (label, values, searchText) => {
+            const target = await insertCustomer(values);
+            const decoy = await insertCustomer();
+
+            expect(await search(searchText)).toEqual([target.id]);
+            expect(await search(searchText)).not.toContain(decoy.id);
+        });
+
+        it("il nome accentato si trova ancora scrivendolo con l'accento", async () => {
+            const target = await insertCustomer({ firstName: "Nicolò" });
+
+            expect(await search("Nicolò")).toEqual([target.id]);
+        });
+
+        it("togliere l'accento non fa comparire nomi non correlati", async () => {
+            const target = await insertCustomer({ firstName: "Nicolò" });
+            const unrelated = await insertCustomer({ firstName: "Marco", lastName: "Verdi" });
+
+            expect(await search("Nicolo")).toEqual([target.id]);
+            expect(await search("Nicolo")).not.toContain(unrelated.id);
+        });
+    });
+
     it("un numero trova il cliente con quell'id, non quelli che lo contengono", async () => {
         const customers = [];
         for (let index = 0; index < 12; index += 1) {

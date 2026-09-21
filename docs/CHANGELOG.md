@@ -11,6 +11,65 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Ricerca clienti insensibile agli accenti
+
+**Il problema.** La ricerca clienti confronta il testo con `ILIKE`, che ignora
+maiuscole/minuscole ma non gli accenti: digitando "Nicolo" non si trovava "Nicolò". Dal backlog:
+"Scegliendo dai suggerimenti il problema non si pone; la soluzione completa è l'estensione
+`unaccent` di Postgres nella ricerca clienti."
+
+**Cosa.** Nome, cognome e città del cliente (`listCustomers`, `backend/src/db/queries/customer.ts`)
+ora si cercano confrontando `immutable_unaccent(colonna) ILIKE immutable_unaccent(pattern)` invece
+del testo grezzo — nuovo helper `containsTextAccentInsensitive` accanto a `containsText` in
+`backend/src/db/queries/search.ts`. È un sovrainsieme del confronto precedente (per testo senza
+accenti si comporta identico), quindi aggiunge soltanto corrispondenze, non ne toglie: cercare
+"Nicolò" con l'accento continua a trovare "Nicolò" come prima. Telefono, secondo telefono ed
+email restano sul confronto semplice — non è testo dove l'accento cambia qualcosa.
+
+**Lo scoglio di `unaccent()`.** In Postgres `unaccent()` è marcata `STABLE`, non `IMMUTABLE`: non
+è ammessa dentro l'espressione di un indice ("functions in index expression must be marked
+IMMUTABLE"). Rimedio standard, applicato nella migration
+`backend/drizzle/0034_customer_search_unaccent.sql`: un wrapper SQL `IMMUTABLE` attorno a
+`unaccent`,
+```sql
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE OR REPLACE FUNCTION immutable_unaccent(text) RETURNS text AS $$
+  SELECT unaccent('unaccent', $1)
+$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+```
+usato sia nei nuovi indici GIN trigram (`customer_first_name_unaccent_trgm_idx`,
+`customer_last_name_unaccent_trgm_idx`, `customer_city_unaccent_trgm_idx`, sullo stesso modello
+degli indici trigram semplici della migration 0010) sia nella query. La forma a due argomenti di
+`unaccent` (`unaccent('unaccent', $1)`, dizionario esplicito) invece della forma a un argomento
+evita che il risultato dipenda dal `search_path` di chi esegue la query — con la forma a un
+argomento Postgres risolve il dizionario `unaccent` cercandolo negli schemi elencati in
+`search_path`, e uno `search_path` diverso da quello con cui l'indice è stato costruito potrebbe
+in teoria farlo puntare altrove.
+
+**Messa in produzione.** `unaccent`, come `pg_trgm` già in uso dalla migration 0010, è
+un'estensione "trusted": verificato sul Postgres di sviluppo creando un ruolo non superuser con
+solo il privilegio `CREATE` sul database, `CREATE EXTENSION unaccent` è andato a buon fine senza
+bisogno di superuser. Costruire i tre nuovi indici GIN sui 5000 clienti dei dati di sviluppo ha
+richiesto 47-73 ms ciascuno — trascurabile; il tempo cresce con il volume di produzione ma resta
+un'operazione a bassa priorità di lock (`CREATE INDEX`, non `CONCURRENTLY`, ma la tabella clienti
+non è enorme). La migration è puramente additiva (estensione nuova, funzione nuova, indici nuovi,
+ricerca allargata): non tocca vincoli né dati esistenti, non può rifiutare né perdere righe.
+
+**Deciso di proposito.** L'helper `containsText` condiviso da collaboratori, tecnici, dispositivi,
+difetti, report e interventi non è stato toccato: estenderlo ovunque avrebbe moltiplicato la
+dimensione della migration (un indice funzionale per colonna in più tabelle) oltre lo scopo di
+questo intervento. Restano sul confronto semplice — candidati a un giro successivo se emerge lo
+stesso problema.
+
+**Verificato.** `customer.db.test.ts` (nuovo blocco "non distingue gli accenti"): "Nicolo" trova
+"Nicolò", "Nicolò" scritto con l'accento continua a trovarsi, e un nome non correlato non compare
+per errore dopo aver tolto l'accento. `npm run test:db` (144 test), `npm run test` (970 test),
+`npm run typecheck` e `npm run lint` tutti puliti. Migration applicata due volte di seguito sul
+database di sviluppo (idempotente: `CREATE EXTENSION IF NOT EXISTS`, `CREATE OR REPLACE
+FUNCTION`, `CREATE INDEX IF NOT EXISTS`).
+
+---
+
 ## 2026-09-21 — Test sul database vero, seconda parte
 
 **Il problema.** La prima parte (2026-09-17) aveva coperto solo `listReports`/`listInterventions`.

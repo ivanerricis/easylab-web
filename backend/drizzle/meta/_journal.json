@@ -239,6 +239,13 @@
       "when": 1776370010000,
       "tag": "0033_report_technician_timestamps",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1776370011000,
+      "tag": "0034_customer_search_unaccent",
+      "breakpoints": true
     }
   ]
 }

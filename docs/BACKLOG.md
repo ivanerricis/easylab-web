@@ -101,8 +101,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     via CSS) e senza memo: con "Tutte" (fino a 5000 righe) si sente sulla digitazione nella ricerca
     e sul trascinamento delle colonne. Con 10-50 righe è irrilevante. Attenzione: il ResizeObserver
     di `useResizableColumns` presuppone che la tabella sia sempre montata.
-- `LAB_LOGO_TEXT` sta in `.env.example`, in `edit-env.sh` e nei due `docker-compose`, ma nessun
-  file del codice la legge: configurazione morta, da togliere o da ricollegare.
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): l'infrastruttura
   e i test di `listReports`/`listInterventions` ci sono dal 2026-09-17 (CHANGELOG); restano le
   altre query, i vincoli e le cancellazioni.

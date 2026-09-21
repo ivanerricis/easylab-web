@@ -34,7 +34,6 @@ services:
       LAB_EMAIL: ${LAB_EMAIL}
       LAB_ADDRESS: ${LAB_ADDRESS}
       LAB_PHONE: ${LAB_PHONE}
-      LAB_LOGO_TEXT: ${LAB_LOGO_TEXT}
     # Nessuna porta pubblicata: il backend è raggiungibile solo dalla rete interna della
     # compose, dove lo contatta nginx del frontend. Esporlo sull'host significherebbe
     # aggirare nginx, e con esso l'unico punto in cui l'IP reale del client è affidabile.

@@ -818,11 +818,7 @@ describe("interventions router", () => {
                 { ...onSiteBase, interventionDate: undefined },
                 { interventionDate: null },
             ],
-            [
-                "descrizione mancante a completamento",
-                { ...onSiteBase, description: undefined },
-                { description: null },
-            ],
+            ["descrizione mancante a completamento", { ...onSiteBase, description: undefined }, { description: null }],
             [
                 "problema riscontrato mancante su un intervento in sede",
                 { ...onSiteBase, problem: undefined },

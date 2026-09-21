@@ -11,6 +11,21 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Menu interattivo per gli script di gestione VM
+
+Gli script sotto `scripts/` ad uso manuale sulla VM (`edit-env.sh`, `configure-static-ip.sh`,
+`start-server.sh`, `install-tunnel.sh`, `install-updater.sh`, `reset-admin-password.sh`,
+`restore-db.sh`) andavano richiamati singolarmente da riga di comando, ricordandone nome e
+argomenti a memoria.
+
+Aggiunto `scripts/vm-menu.sh`: un menu interattivo che li richiama tutti (nessuna logica
+duplicata, solo i prompt per gli argomenti più comuni — es. `--no-build` per l'avvio,
+`--reset-2fa` per il reset password). Esclude di proposito `check-updates.sh` e
+`update-server.sh`, che restano di competenza di systemd e non vanno lanciati a mano. Le
+operazioni che richiedono root (`install-tunnel.sh`, `install-updater.sh`) sono richiamate con
+`sudo` dal menu stesso, cosi' funziona sia lanciandolo da root sia da utente normale.
+Documentato in [DEPLOY.md](DEPLOY.md#deploy-e-configurazione-server).
+
 ## 2026-09-21 — Tema scuro: popup "+N altri" del calendario era bianco
 
 Nella dashboard, cliccando "+N altri" su un giorno con più interventi di quanti ne stia la

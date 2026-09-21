@@ -4,6 +4,18 @@ Guida per installare l'app su una VM/CT Proxmox in produzione: primo avvio, domi
 
 Per lo sviluppo locale vedi il [README](https://github.com/ivanerricis/easylab-web#sviluppo-locale-hot-reload). Per backup/restore vedi [BACKUP.md](BACKUP.md). Per 2FA e reset password vedi [OPERATIONS.md](OPERATIONS.md).
 
+> **Scorciatoia:** tutti gli script ad uso manuale citati in questa pagina (`edit-env.sh`,
+> `configure-static-ip.sh`, `start-server.sh`, `install-tunnel.sh`, `install-updater.sh`,
+> `reset-admin-password.sh`, `restore-db.sh`) sono raggiungibili anche da un unico menu
+> interattivo:
+>
+> ```bash
+> ./scripts/vm-menu.sh
+> ```
+>
+> Non include `check-updates.sh` e `update-server.sh`: quelli li lancia systemd da solo (vedi
+> [Aggiornamento applicazione](#aggiornamento-applicazione)), non vanno eseguiti a mano.
+
 ## Installazione su Proxmox VM (prima volta)
 
 1. **Crea la VM** su Proxmox: Debian 13 o Ubuntu Server (consigliato Debian 13), rete in bridge sulla LAN, risorse minime indicative 2 vCPU / 4 GB RAM / 20 GB disco.
@@ -294,6 +306,7 @@ Alcuni accorgimenti per limitare lo spazio occupato su una VM di produzione a lu
 
 - `docker-compose.yml`: configurazione shared/server
 - `docker-compose.dev.yml`: configurazione sviluppo locale
+- `scripts/vm-menu.sh`: menu interattivo che raggruppa gli script di questa pagina
 - `backend/Dockerfile`: backend produzione
 - `backend/Dockerfile.dev`: backend sviluppo
 - `frontend/Dockerfile`: frontend produzione (build statico + nginx)

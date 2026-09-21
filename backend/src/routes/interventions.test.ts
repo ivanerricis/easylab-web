@@ -563,7 +563,18 @@ describe("interventions router", () => {
             expect(createIntervention).not.toHaveBeenCalled();
         });
 
-        it("richiede la descrizione quando lo stato non è solo 'programmato'", async () => {
+        it("non richiede la descrizione a un intervento in lavorazione", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...minimalBody, status: "in_lavorazione" });
+
+            expect(response.status).not.toBe(400);
+            expect(createIntervention).toHaveBeenCalled();
+        });
+
+        it("richiede la descrizione quando l'intervento è completato", async () => {
             const response = await request(buildApp())
                 .post("/api/interventions")
                 .send({ ...minimalBody, status: "completato" });

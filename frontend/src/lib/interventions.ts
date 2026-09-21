@@ -43,14 +43,21 @@ export const interventionDescriptionLabel = (value: InterventionType) =>
 /**
  * Un intervento ancora solo programmato descrive un lavoro non ancora svolto: l'orario esatto
  * e l'assistenza effettuata sono informazioni che nascono quando lo si fa, non quando lo si
- * mette in agenda. Diventano obbligatorie appena lo stato passa a "in lavorazione" o
- * "completato", altrimenti un intervento risulterebbe chiuso senza che risulti cosa è stato
- * fatto.
+ * mette in agenda. L'orario diventa obbligatorio appena lo stato passa a "in lavorazione";
+ * l'assistenza effettuata solo a "completato", vedi `isInterventionDescriptionRequired`.
  *
  * Il problema riscontrato non segue questa regola: è noto fin dalla chiamata del cliente ed è
  * il motivo per cui l'intervento viene programmato.
  */
 export const isScheduledInterventionStatus = (value: InterventionStatus) => value === "programmato";
+
+/**
+ * L'assistenza effettuata (o i materiali consegnati) è obbligatoria solo a intervento
+ * completato: mentre è "in lavorazione" il lavoro è ancora in corso e spesso non si sa ancora
+ * cosa verrà fatto, quindi il campo resta facoltativo come per un intervento programmato. Gli
+ * orari invece restano obbligatori già in lavorazione: si segnano quando si comincia.
+ */
+export const isInterventionDescriptionRequired = (value: InterventionStatus) => value === "completato";
 
 type InterventionFormValues = {
     type: InterventionType;
@@ -87,7 +94,7 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
     const scheduled = isScheduledInterventionStatus(values.status);
     const isOnSite = isOnSiteInterventionType(values.type);
 
-    if (!scheduled && values.description.trim() === "") {
+    if (isInterventionDescriptionRequired(values.status) && values.description.trim() === "") {
         return {
             field: "description",
             message:

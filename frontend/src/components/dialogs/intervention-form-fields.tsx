@@ -15,6 +15,7 @@ import {
     interventionStatusOptions,
     interventionTypeOptions,
     isOnSiteInterventionType,
+    isInterventionDescriptionRequired,
     isScheduledInterventionStatus,
 } from "@/lib/interventions";
 import { formatPersonName } from "@/lib/people";
@@ -220,7 +221,11 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                 <div className="grid gap-1 lg:col-span-2">
                     <Label htmlFor="description" className="text-lg">
                         {interventionDescriptionLabel(values.type)}
-                        {isScheduled ? <OptionalHint>facoltativo</OptionalHint> : <RequiredMark />}
+                        {isInterventionDescriptionRequired(values.status) ? (
+                            <RequiredMark />
+                        ) : (
+                            <OptionalHint>facoltativo</OptionalHint>
+                        )}
                     </Label>
                     <Textarea
                         {...fieldProps("description", { error: errors.description })}

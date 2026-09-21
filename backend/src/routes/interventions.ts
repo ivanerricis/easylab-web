@@ -90,14 +90,22 @@ const interventionBodySchema = z
 /**
  * Un intervento "programmato" è un lavoro che deve ancora essere svolto: l'orario esatto e
  * l'assistenza effettuata sono informazioni che nascono quando lo si fa, non quando lo si
- * mette in agenda. Restano invece obbligatorie negli altri due stati, altrimenti un
- * intervento potrebbe risultare completato senza che risulti cosa è stato fatto.
+ * mette in agenda. L'orario torna obbligatorio da "in lavorazione", l'assistenza effettuata
+ * solo a "completato" (vedi `isDescriptionRequired`): altrimenti un intervento potrebbe
+ * risultare completato senza che risulti cosa è stato fatto.
  *
  * Il problema riscontrato non segue questa regola: si conosce già al momento della chiamata
  * del cliente, ed è il motivo per cui l'intervento viene programmato.
  */
 const isScheduledStatus = (status?: (typeof interventionStatuses)[number]) =>
     (status ?? "programmato") === "programmato";
+
+/**
+ * L'assistenza effettuata è obbligatoria solo a intervento completato: "in lavorazione" vuol
+ * dire che il lavoro è ancora in corso, e cosa è stato fatto si scrive alla fine. Gli orari
+ * invece restano obbligatori già in lavorazione.
+ */
+const isDescriptionRequired = (status?: (typeof interventionStatuses)[number]) => status === "completato";
 
 const interventionCreateBodySchema = interventionBodySchema.superRefine((value, ctx) => {
     if (!value.interventionDate) {
@@ -106,10 +114,10 @@ const interventionCreateBodySchema = interventionBodySchema.superRefine((value, 
 
     const scheduled = isScheduledStatus(value.status);
 
-    if (!scheduled && !value.description) {
+    if (isDescriptionRequired(value.status) && !value.description) {
         ctx.addIssue({
             code: "custom",
-            message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento non è solo programmato",
+            message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento è completato",
             path: ["description"],
         });
     }
@@ -191,7 +199,9 @@ interventionsRouter.get("/export.csv", validate({ query: interventionExportQuery
         { header: "Data intervento", value: (intervention) => intervention.interventionDate },
         { header: "Ora inizio", value: (intervention) => intervention.startTime },
         { header: "Ora fine", value: (intervention) => intervention.endTime },
+        { header: "Problema", value: (intervention) => intervention.problem },
         { header: "Descrizione", value: (intervention) => intervention.description },
+        { header: "Note", value: (intervention) => intervention.note },
         { header: "Prezzo", value: (intervention) => intervention.price },
         { header: "Pagato", value: (intervention) => intervention.paid },
         { header: "Da fatturare", value: (intervention) => intervention.toInvoice },

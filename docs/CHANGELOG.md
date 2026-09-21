@@ -11,6 +11,37 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — "Assistenza effettuata" facoltativa per gli interventi in lavorazione
+
+La descrizione del lavoro svolto (o dei materiali consegnati) era obbligatoria appena lo stato
+lasciava "programmato". Ma "in lavorazione" vuol dire che il lavoro è in corso: cosa è stato fatto
+si sa alla fine, e pretenderlo prima costringeva a scrivere un segnaposto. Ora è obbligatoria solo
+a "completato", così un intervento chiuso ha sempre la sua descrizione. Gli orari restano
+obbligatori già in lavorazione: si segnano quando si comincia.
+
+Stessa regola in due posti, come le altre dell'intervento: `isInterventionDescriptionRequired` in
+`frontend/src/lib/interventions.ts` (validazione ed etichetta "facoltativo" del dialogo) e
+`isDescriptionRequired` in `backend/src/routes/interventions.ts`, che resta l'autorità.
+
+## 2026-09-21 — Liste: il cambio pagina torna in cima, "Indietro" ritrova la posizione
+
+Due difetti con la stessa causa. In quest'app la finestra non scorre mai: scorrono il contenitore
+della tabella (desktop), il riquadro che la avvolge (mobile, dove ci sono le schede) e il `<main>`
+del layout (pagine di dettaglio). Il browser e `ScrollRestoration` di React Router gestiscono solo
+lo scroll della finestra, quindi per questi contenitori non faceva niente nessuno.
+
+- **Cambio pagina:** chi scendeva fino ai pulsanti di paginazione restava in fondo, e vedeva la
+  fine della pagina nuova. Su mobile, con le schede, era evidente. Ora `TablePagination` riporta a
+  zero la lista che la precede (`scrollListToTop` in `frontend/src/lib/listScroll.ts`); il `<main>`
+  si muove solo quanto basta a mostrare l'inizio della lista, senza saltare in cima alla scheda del
+  cliente.
+- **"Indietro":** aprire un cliente dalla lista dei report e tornare indietro rimetteva la lista in
+  cima. `useListScrollRestoration` (usato da `EntityTable`, quindi vale per tutte le liste) salva in
+  sessionStorage la posizione di ogni contenitore a ogni scroll, con chiave `location.key` +
+  indirizzo, e la rimette quando le righe sono di nuovo in pagina. Si salva durante lo scroll e non
+  all'uscita perché allo smontaggio gli elementi sono già staccati e leggerebbero zero. L'indirizzo
+  sta nella chiave perché la prima voce della cronologia ha sempre `key` "default".
+
 ## 2026-09-18 — Revisione di qualità di tutto il repository: riuso, semplificazione, efficienza, altitudine
 
 Revisione dell'intero codice, non di un diff: quattro angolazioni (codice che reimplementa un

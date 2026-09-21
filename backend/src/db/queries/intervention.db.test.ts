@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { insertCollaborator, insertCustomer, insertIntervention } from "../../test/db/fixtures";
-import { listInterventions } from "./intervention";
+import { getInterventionStats, listInterventions } from "./intervention";
 
 const timeZone = "Europe/Rome";
 
@@ -337,6 +337,20 @@ describe("listInterventions: righe e join", () => {
             id: target.id,
             problem: "Non si accende",
             note: "Cliente da richiamare",
+        });
+    });
+});
+
+describe("getInterventionStats", () => {
+    it("conta gli interventi per stato, zero per gli stati senza righe", async () => {
+        await insertIntervention({ status: "programmato" });
+        await insertIntervention({ status: "programmato" });
+        await insertIntervention({ status: "in_lavorazione" });
+
+        expect(await getInterventionStats()).toEqual({
+            programmatoCount: 2,
+            inLavorazioneCount: 1,
+            completatoCount: 0,
         });
     });
 });

@@ -6,7 +6,9 @@ import {
     interventionTable,
     IssueTable,
     reportTable,
+    sessionTable,
     technicianTable,
+    userTable,
 } from "./schema";
 
 export type NewReport = InferInsertModel<typeof reportTable>;
@@ -29,3 +31,6 @@ export type UpdateIssue = Partial<Omit<NewIssue, "id">>;
 
 export type NewIntervention = InferInsertModel<typeof interventionTable>;
 export type UpdateIntervention = Partial<Omit<NewIntervention, "id">>;
+
+export type NewUser = InferInsertModel<typeof userTable>;
+export type NewSession = InferInsertModel<typeof sessionTable>;

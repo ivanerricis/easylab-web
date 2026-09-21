@@ -83,7 +83,7 @@ export function NotificationsMenu() {
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon-sm"
-                                                    className="size-5 shrink-0"
+                                                    className="size-6 shrink-0"
                                                     aria-label="Rimuovi notifica"
                                                     onClick={(event) =>
                                                         handleDismiss(event, section.source.key, notification.id)

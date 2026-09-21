@@ -11,6 +11,17 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Popup notifiche: pulsante di rimozione sotto il target touch minimo
+
+Il pulsante "X" per rimuovere una notifica nel popup campanella (`notifications-menu.tsx`)
+usava `size="icon-sm"` (32px) ma una `className="size-5"` successiva lo sovrascriveva
+tramite tailwind-merge, portandolo a 20×20px effettivi — sotto il minimo WCAG 2.2 di 24×24px
+CSS px per i target puntatore, oltre a essere scomodo da colpire su mobile in un elenco denso.
+Verificato con `getBoundingClientRect()` via Playwright prima e dopo. Portato a `size-6`
+(24×24px), al minimo raccomandato mantenendo la densità della lista. Verificato visivamente
+con screenshot Playwright a due larghezze (1440px desktop, 390px mobile) e in entrambi i temi;
+il resto del layout del popup (raggruppamento sezioni, badge, wrapping testo) era già corretto.
+
 ## 2026-09-21 — Menu interattivo per gli script di gestione VM
 
 Gli script sotto `scripts/` ad uso manuale sulla VM (`edit-env.sh`, `configure-static-ip.sh`,

@@ -11,6 +11,14 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Rimossa la variabile morta `LAB_LOGO_TEXT`
+
+`LAB_LOGO_TEXT` esisteva in `.env.example`, in `scripts/edit-env.sh` (elenco chiavi, default e
+riepilogo finale) e nel blocco `environment:` di entrambi i `docker-compose*.yml`, ma nessun
+punto del codice applicativo la leggeva mai: era configurazione morta, segnalata nel backlog
+qualità. Verificato con un `git grep` sull'intero repo prima di toccare nulla. Rimossa da tutti
+e quattro i file, senza toccare `.env` reale né altro file non correlato.
+
 ## 2026-09-21 — Popup notifiche: pulsante di rimozione sotto il target touch minimo
 
 Il pulsante "X" per rimuovere una notifica nel popup campanella (`notifications-menu.tsx`)

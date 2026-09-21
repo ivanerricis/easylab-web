@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_PATH="$REPO_ROOT/.env"
 
-declare -a KEYS=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB BACKUP_HOST_DIR PUBLIC_DOMAIN LAB_NAME LAB_EMAIL LAB_ADDRESS LAB_PHONE LAB_LOGO_TEXT)
+declare -a KEYS=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB BACKUP_HOST_DIR PUBLIC_DOMAIN LAB_NAME LAB_EMAIL LAB_ADDRESS LAB_PHONE)
 declare -A DEFAULTS=(
     [POSTGRES_USER]="easylab"
     [POSTGRES_PASSWORD]="easylab_password"
@@ -24,7 +24,6 @@ declare -A DEFAULTS=(
     [LAB_EMAIL]="info@easylab.local"
     [LAB_ADDRESS]="Indirizzo laboratorio"
     [LAB_PHONE]="+39 000 000 0000"
-    [LAB_LOGO_TEXT]="EasyLab"
 )
 declare -A CURRENT=()
 declare -A NEW=()
@@ -57,7 +56,7 @@ done
         echo "$key=${NEW[$key]}"
     done
     echo ""
-    for key in LAB_NAME LAB_EMAIL LAB_ADDRESS LAB_PHONE LAB_LOGO_TEXT; do
+    for key in LAB_NAME LAB_EMAIL LAB_ADDRESS LAB_PHONE; do
         echo "$key=${NEW[$key]}"
     done
 } > "$ENV_PATH"

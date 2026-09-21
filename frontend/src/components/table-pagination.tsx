@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/pagination";
 import RowsPerPageSelect from "@/components/rows-per-page-select";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { scrollListToTop } from "@/lib/listScroll";
+import { useRef } from "react";
 import type { TableRowsPerPageKey } from "@/lib/theme";
 
 /**
@@ -62,6 +64,18 @@ const TablePagination = ({
     // i numeri. Prima le tre zone stavano impilate su tre righe sotto `sm` — corretto per
     // spazio, ma l'utente si aspettava la stessa riga unica del desktop.
     const isCompact = useIsMobile(PAGINATION_COMPACT_BREAKPOINT);
+    const rootRef = useRef<HTMLDivElement>(null);
+
+    // La lista sta sempre subito prima di questo controllo, nello stesso contenitore: è la
+    // forma di tutte le pagine con una tabella. Vedi `scrollListToTop`.
+    const changePage = (page: number) => {
+        onPageChange(page);
+
+        const list = rootRef.current?.previousElementSibling;
+        if (list) {
+            scrollListToTop(list);
+        }
+    };
 
     if (totalItems <= 0) {
         return null;
@@ -78,7 +92,10 @@ const TablePagination = ({
         // larghezze diverse (ed è il caso normale: "Visualizzati 1-10 di 16" contro il
         // select). Sotto `sm` bastano tre elementi in riga: la versione compatta di conteggio
         // e paginazione è già abbastanza stretta da stare affiancata al selettore.
-        <div className="flex items-center justify-between gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4">
+        <div
+            ref={rootRef}
+            className="flex items-center justify-between gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4"
+        >
             {/* `role="status"` fa di questa riga l'annuncio dell'esito per chi usa uno screen
                 reader: cambia da sola a ogni ricerca, filtro e cambio pagina, quindi è già la
                 frase giusta ("Visualizzati 1-10 di 16") nel momento giusto. Senza, il
@@ -103,7 +120,7 @@ const TablePagination = ({
                             <PaginationItem>
                                 <PaginationPrevious
                                     disabled={currentPage === 1}
-                                    onClick={() => onPageChange(currentPage - 1)}
+                                    onClick={() => changePage(currentPage - 1)}
                                 />
                             </PaginationItem>
                             <PaginationItem>
@@ -114,7 +131,7 @@ const TablePagination = ({
                             <PaginationItem>
                                 <PaginationNext
                                     disabled={currentPage === totalPages}
-                                    onClick={() => onPageChange(currentPage + 1)}
+                                    onClick={() => changePage(currentPage + 1)}
                                 />
                             </PaginationItem>
                         </PaginationContent>
@@ -127,7 +144,7 @@ const TablePagination = ({
                             <PaginationItem>
                                 <PaginationPrevious
                                     disabled={currentPage === 1}
-                                    onClick={() => onPageChange(currentPage - 1)}
+                                    onClick={() => changePage(currentPage - 1)}
                                 />
                             </PaginationItem>
 
@@ -145,7 +162,7 @@ const TablePagination = ({
                                         <PaginationButton
                                             isActive={page === currentPage}
                                             aria-label={`Vai alla pagina ${page}`}
-                                            onClick={() => onPageChange(page)}
+                                            onClick={() => changePage(page)}
                                         >
                                             {page}
                                         </PaginationButton>
@@ -156,7 +173,7 @@ const TablePagination = ({
                             <PaginationItem>
                                 <PaginationNext
                                     disabled={currentPage === totalPages}
-                                    onClick={() => onPageChange(currentPage + 1)}
+                                    onClick={() => changePage(currentPage + 1)}
                                 />
                             </PaginationItem>
                         </PaginationContent>

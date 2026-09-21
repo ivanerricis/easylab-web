@@ -1,6 +1,7 @@
 import EntityCardList, { type EntityCardSlot } from "@/components/entity-card-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useListScrollRestoration } from "@/hooks/useListScrollRestoration";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
@@ -157,6 +158,7 @@ const EntityTable = <TRow,>({
         elasticColumnKey: actionsColumnKey,
         canMeasure: rows.length > 0,
     });
+    useListScrollRestoration({ anchorRef: tableRef, tableKey, isReady: !isInitialLoading && rows.length > 0 });
 
     // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
     // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti.

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import EntityCardList from "./entity-card-list";
 import EntityTable, { type EntityColumn } from "./entity-table";
@@ -37,7 +38,9 @@ const renderTable = (props: Partial<Parameters<typeof EntityTable<Row>>[0]> = {}
             emptyMessage="Nessun elemento."
             renderRowActions={(row) => <button>Modifica {row.id}</button>}
             {...props}
-        />
+        />,
+        // Il Router serve al ripristino dello scroll, che tiene le posizioni per voce di cronologia.
+        { wrapper: MemoryRouter }
     );
 
 describe("EntityTable: ordinamento dalle intestazioni", () => {

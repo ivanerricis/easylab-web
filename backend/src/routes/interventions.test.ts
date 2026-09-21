@@ -596,7 +596,9 @@ describe("interventions router", () => {
             expect(createIntervention).not.toHaveBeenCalled();
         });
 
-        it("richiede ora inizio e fine per un intervento in sede non solo programmato", async () => {
+        it("non richiede ora inizio e fine a un intervento in sede in lavorazione", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
             const response = await request(buildApp())
                 .post("/api/interventions")
                 .send({
@@ -604,7 +606,21 @@ describe("interventions router", () => {
                     type: "intervento_remoto",
                     status: "in_lavorazione",
                     problem: "Non si accende",
-                    description: "In corso",
+                });
+
+            expect(response.status).not.toBe(400);
+            expect(createIntervention).toHaveBeenCalled();
+        });
+
+        it("richiede ora inizio e fine a un intervento in sede completato", async () => {
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({
+                    ...minimalBody,
+                    type: "intervento_remoto",
+                    status: "completato",
+                    problem: "Non si accende",
+                    description: "Fatto",
                 });
 
             expect(response.status).toBe(400);
@@ -692,13 +708,32 @@ describe("interventions router", () => {
             expect(updateInterventionById).not.toHaveBeenCalled();
         });
 
-        it("richiede la descrizione quando lo stato passa a non 'programmato' e la riga esistente non ce l'ha", async () => {
+        it("richiede la descrizione quando lo stato passa a 'completato' e la riga esistente non ce l'ha", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([{ ...storedIntervention, description: null }] as never);
 
-            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "in_lavorazione" });
+            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "completato" });
 
             expect(response.status).toBe(400);
             expect(updateInterventionById).not.toHaveBeenCalled();
+        });
+
+        it("mette in lavorazione un intervento in sede senza descrizione né orari", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([
+                {
+                    ...storedIntervention,
+                    type: "intervento_sede",
+                    problem: "Non si accende",
+                    description: null,
+                    startTime: null,
+                    endTime: null,
+                },
+            ] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "in_lavorazione" });
+
+            expect(response.status).not.toBe(400);
+            expect(updateInterventionById).toHaveBeenCalled();
         });
 
         it("richiede il problema riscontrato quando il tipo passa a un intervento in sede", async () => {
@@ -710,7 +745,7 @@ describe("interventions router", () => {
             expect(updateInterventionById).not.toHaveBeenCalled();
         });
 
-        it("richiede ora inizio e fine quando un intervento in sede non è più solo programmato", async () => {
+        it("richiede ora inizio e fine quando un intervento in sede diventa completato", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([
                 { ...storedIntervention, type: "intervento_sede", problem: "Non si accende" },
             ] as never);

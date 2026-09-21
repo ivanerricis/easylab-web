@@ -102,8 +102,8 @@ describe("getInterventionValidationError", () => {
         ).toBeNull();
     });
 
-    // Il lavoro è ancora in corso: cosa è stato fatto si scrive alla fine. Gli orari no.
-    it("non chiede la descrizione a un intervento in lavorazione, ma gli orari sì", () => {
+    // Il lavoro è ancora in corso: cosa è stato fatto, e fino a quando, si scrive alla fine.
+    it("non chiede descrizione né orari a un intervento in lavorazione", () => {
         expect(
             getInterventionValidationError({ ...validOnSite, status: "in_lavorazione", description: "" })
         ).toBeNull();
@@ -111,9 +111,14 @@ describe("getInterventionValidationError", () => {
             getInterventionValidationError({ ...validDelivery, status: "in_lavorazione", description: "" })
         ).toBeNull();
         expect(
-            getInterventionValidationError({ ...validOnSite, status: "in_lavorazione", description: "", startTime: "" })
-                ?.field
-        ).toBe("startTime");
+            getInterventionValidationError({
+                ...validOnSite,
+                status: "in_lavorazione",
+                description: "",
+                startTime: "",
+                endTime: "",
+            })
+        ).toBeNull();
     });
 
     it("chiede comunque il problema anche a un intervento programmato", () => {

@@ -25,17 +25,23 @@ nuovo `includeFullText` (vero quando non c'è paginazione, cioè per l'export CS
 riassuntiva di `summaryPrint.ts`) decide se leggere le due colonne per davvero o restituire `null`
 senza leggerle: l'elenco a schermo resta leggero come prima, l'export ora è completo.
 
-## 2026-09-21 — "Assistenza effettuata" facoltativa per gli interventi in lavorazione
+## 2026-09-21 — Interventi: orari e assistenza obbligatori solo a "completato"; via "(facoltativo)"
 
-La descrizione del lavoro svolto (o dei materiali consegnati) era obbligatoria appena lo stato
-lasciava "programmato". Ma "in lavorazione" vuol dire che il lavoro è in corso: cosa è stato fatto
-si sa alla fine, e pretenderlo prima costringeva a scrivere un segnaposto. Ora è obbligatoria solo
-a "completato", così un intervento chiuso ha sempre la sua descrizione. Gli orari restano
-obbligatori già in lavorazione: si segnano quando si comincia.
+Orari (inizio/fine) e descrizione del lavoro svolto (o dei materiali consegnati) erano
+obbligatori appena lo stato lasciava "programmato". Ma "in lavorazione" vuol dire che il lavoro è
+in corso: quando finisce e cosa è stato fatto si sa alla fine, e pretenderlo prima costringeva a
+scrivere segnaposto. Ora sono obbligatori solo a "completato", così un intervento chiuso dice
+sempre cosa è stato fatto e quando.
 
-Stessa regola in due posti, come le altre dell'intervento: `isInterventionDescriptionRequired` in
-`frontend/src/lib/interventions.ts` (validazione ed etichetta "facoltativo" del dialogo) e
-`isDescriptionRequired` in `backend/src/routes/interventions.ts`, che resta l'autorità.
+Una sola regola per lato: `isCompletedInterventionStatus` in `frontend/src/lib/interventions.ts`
+(validazione e asterischi del dialogo) e `isCompletedStatus` in
+`backend/src/routes/interventions.ts`, che resta l'autorità. Il server la applica sia alla
+creazione sia alla modifica (`PUT`), dove la combinazione nasce dal corpo parziale unito alla riga
+esistente: la prima versione di questa modifica aveva toccato solo la creazione.
+
+Nel dialogo l'asterisco rosso compare e sparisce secondo tipo e stato scelti, ed è l'unico segno
+dell'obbligo: le scritte "(facoltativo)" accanto a prezzo, orari, assistenza e note sono state
+tolte perché affollavano il form e dicevano la stessa cosa dell'asterisco assente.
 
 ## 2026-09-21 — Liste: il cambio pagina torna in cima, "Indietro" ritrova la posizione
 

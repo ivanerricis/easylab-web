@@ -241,20 +241,26 @@ describe("CreateInterventionDialog", () => {
         });
     });
 
-    it("segna come facoltativi i campi di un intervento solo programmato", async () => {
+    it("mette l'asterisco a orari e assistenza solo a intervento completato", async () => {
         await renderDialog();
 
         await chooseOption("Tipo intervento", "Intervento da remoto");
 
-        // `\s*`: il calcolo del nome accessibile di jsdom perde lo spazio in testa allo span.
-        expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName(/^Ora inizio\s*\(facoltativa\)$/);
-        expect(screen.getByLabelText(/^Assistenza effettuata/)).toHaveAccessibleName(
-            /^Assistenza effettuata\s*\(facoltativo\)$/
-        );
+        // Nessuna scritta "(facoltativo)": senza obbligo l'etichetta è il solo nome del campo.
+        expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName("Ora inizio");
+        expect(screen.getByLabelText(/^Assistenza effettuata/)).toHaveAccessibleName("Assistenza effettuata");
 
         await chooseOption("Stato", "In lavorazione");
 
+        expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName("Ora inizio");
+        expect(screen.getByLabelText(/^Assistenza effettuata/)).toHaveAccessibleName("Assistenza effettuata");
+
+        await chooseOption("Stato", "Completato");
+
         expect(screen.getByLabelText(/^Ora inizio/)).toHaveAccessibleName("Ora inizio(obbligatorio)");
+        expect(screen.getByLabelText(/^Assistenza effettuata/)).toHaveAccessibleName(
+            "Assistenza effettuata(obbligatorio)"
+        );
     });
 
     /** Tornando a una consegna gli orari già scritti non vanno spediti: non hanno senso. */
@@ -360,13 +366,13 @@ describe("EditInterventionDialog", () => {
         expect(screen.getByRole("alert")).toHaveTextContent("Indica il tipo di assistenza effettuata");
         expect(onSubmit).not.toHaveBeenCalled();
 
-        // Riportato a programmato, l'assistenza torna facoltativa.
-        await chooseOption("Stato", "Programmato");
+        // Riportato in lavorazione, l'assistenza torna facoltativa.
+        await chooseOption("Stato", "In lavorazione");
         await save();
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(
-                expect.objectContaining({ status: "programmato", description: null })
+                expect.objectContaining({ status: "in_lavorazione", description: null })
             );
         });
     });

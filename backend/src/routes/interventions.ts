@@ -88,33 +88,24 @@ const interventionBodySchema = z
     .strict();
 
 /**
- * Un intervento "programmato" è un lavoro che deve ancora essere svolto: l'orario esatto e
- * l'assistenza effettuata sono informazioni che nascono quando lo si fa, non quando lo si
- * mette in agenda. L'orario torna obbligatorio da "in lavorazione", l'assistenza effettuata
- * solo a "completato" (vedi `isDescriptionRequired`): altrimenti un intervento potrebbe
- * risultare completato senza che risulti cosa è stato fatto.
+ * Orari e assistenza effettuata sono i dati del lavoro svolto: nascono mentre lo si fa e si
+ * completano alla fine, quindi sono obbligatori solo a intervento "completato" — né da
+ * "programmato" né da "in lavorazione". A "completato" restano obbligatori, altrimenti un
+ * intervento potrebbe risultare chiuso senza che risulti cosa è stato fatto e quando.
  *
  * Il problema riscontrato non segue questa regola: si conosce già al momento della chiamata
  * del cliente, ed è il motivo per cui l'intervento viene programmato.
  */
-const isScheduledStatus = (status?: (typeof interventionStatuses)[number]) =>
-    (status ?? "programmato") === "programmato";
-
-/**
- * L'assistenza effettuata è obbligatoria solo a intervento completato: "in lavorazione" vuol
- * dire che il lavoro è ancora in corso, e cosa è stato fatto si scrive alla fine. Gli orari
- * invece restano obbligatori già in lavorazione.
- */
-const isDescriptionRequired = (status?: (typeof interventionStatuses)[number]) => status === "completato";
+const isCompletedStatus = (status?: (typeof interventionStatuses)[number]) => status === "completato";
 
 const interventionCreateBodySchema = interventionBodySchema.superRefine((value, ctx) => {
     if (!value.interventionDate) {
         ctx.addIssue({ code: "custom", message: "La data dell'intervento è obbligatoria", path: ["interventionDate"] });
     }
 
-    const scheduled = isScheduledStatus(value.status);
+    const completed = isCompletedStatus(value.status);
 
-    if (isDescriptionRequired(value.status) && !value.description) {
+    if (completed && !value.description) {
         ctx.addIssue({
             code: "custom",
             message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento è completato",
@@ -130,15 +121,15 @@ const interventionCreateBodySchema = interventionBodySchema.superRefine((value, 
         ctx.addIssue({ code: "custom", message: "Il problema riscontrato è obbligatorio", path: ["problem"] });
     }
 
-    if (!scheduled && !value.startTime) {
+    if (completed && !value.startTime) {
         ctx.addIssue({ code: "custom", message: "L'ora di inizio è obbligatoria", path: ["startTime"] });
     }
 
-    if (!scheduled && !value.endTime) {
+    if (completed && !value.endTime) {
         ctx.addIssue({ code: "custom", message: "L'ora di fine è obbligatoria", path: ["endTime"] });
     }
 
-    // Vale anche per un intervento programmato: se gli orari ci sono, devono avere senso.
+    // Vale anche quando non sono obbligatori: se gli orari ci sono, devono avere senso.
     if (value.startTime && value.endTime && value.startTime >= value.endTime) {
         ctx.addIssue({
             code: "custom",
@@ -404,16 +395,16 @@ interventionsRouter.put(
         const nextNote = "note" in req.body ? req.body.note || null : existing.note;
         // Come per il prezzo dei report: la combinazione da validare nasce dall'unione del
         // corpo parziale con la riga esistente, quindi lo schema non può vederla da solo.
-        const scheduled = isScheduledStatus(nextStatus);
+        const completed = isCompletedStatus(nextStatus);
 
         if (!nextInterventionDate) {
             res.status(400).json({ message: "La data dell'intervento è obbligatoria" });
             return;
         }
 
-        if (!scheduled && !nextDescription) {
+        if (completed && !nextDescription) {
             res.status(400).json({
-                message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento non è solo programmato",
+                message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento è completato",
             });
             return;
         }
@@ -425,7 +416,7 @@ interventionsRouter.put(
             return;
         }
 
-        if (isOnSite && !scheduled && (!nextStartTime || !nextEndTime)) {
+        if (isOnSite && completed && (!nextStartTime || !nextEndTime)) {
             res.status(400).json({
                 message: "Per interventi in sede o da remoto sono richiesti ora inizio e ora fine",
             });

@@ -41,23 +41,16 @@ export const interventionDescriptionLabel = (value: InterventionType) =>
     value === "consegna_materiale" ? "Materiali da consegnare" : "Assistenza effettuata";
 
 /**
- * Un intervento ancora solo programmato descrive un lavoro non ancora svolto: l'orario esatto
- * e l'assistenza effettuata sono informazioni che nascono quando lo si fa, non quando lo si
- * mette in agenda. L'orario diventa obbligatorio appena lo stato passa a "in lavorazione";
- * l'assistenza effettuata solo a "completato", vedi `isInterventionDescriptionRequired`.
+ * Orari e assistenza effettuata sono i dati del lavoro svolto: nascono mentre lo si fa e si
+ * completano alla fine, quindi sono obbligatori solo a intervento "completato". Prima lo
+ * diventavano già a "in lavorazione", e chi apriva il lavoro doveva inventarsi un orario di
+ * fine e una descrizione di ciò che non aveva ancora fatto. A "completato" restano
+ * obbligatori: un intervento chiuso deve dire cosa è stato fatto e quando.
  *
  * Il problema riscontrato non segue questa regola: è noto fin dalla chiamata del cliente ed è
  * il motivo per cui l'intervento viene programmato.
  */
-export const isScheduledInterventionStatus = (value: InterventionStatus) => value === "programmato";
-
-/**
- * L'assistenza effettuata (o i materiali consegnati) è obbligatoria solo a intervento
- * completato: mentre è "in lavorazione" il lavoro è ancora in corso e spesso non si sa ancora
- * cosa verrà fatto, quindi il campo resta facoltativo come per un intervento programmato. Gli
- * orari invece restano obbligatori già in lavorazione: si segnano quando si comincia.
- */
-export const isInterventionDescriptionRequired = (value: InterventionStatus) => value === "completato";
+export const isCompletedInterventionStatus = (value: InterventionStatus) => value === "completato";
 
 type InterventionFormValues = {
     type: InterventionType;
@@ -91,10 +84,10 @@ export type InterventionValidationError = {
  * andarci sopra.
  */
 export const getInterventionValidationError = (values: InterventionFormValues): InterventionValidationError | null => {
-    const scheduled = isScheduledInterventionStatus(values.status);
+    const completed = isCompletedInterventionStatus(values.status);
     const isOnSite = isOnSiteInterventionType(values.type);
 
-    if (isInterventionDescriptionRequired(values.status) && values.description.trim() === "") {
+    if (completed && values.description.trim() === "") {
         return {
             field: "description",
             message:
@@ -119,14 +112,14 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
         return { field: "problem", message: "Indica il problema riscontrato" };
     }
 
-    if (!scheduled && (values.startTime.trim() === "" || values.endTime.trim() === "")) {
+    if (completed && (values.startTime.trim() === "" || values.endTime.trim() === "")) {
         return {
             field: values.startTime.trim() === "" ? "startTime" : "endTime",
             message: "Indica l'ora di inizio e di fine assistenza",
         };
     }
 
-    // Vale anche per un intervento programmato: se gli orari sono stati indicati, devono
+    // Vale anche quando non sono obbligatori: se gli orari sono stati indicati, devono
     // avere senso fra loro.
     if (values.startTime !== "" && values.endTime !== "" && values.startTime >= values.endTime) {
         return { field: "endTime", message: "L'ora di fine deve essere successiva all'ora di inizio" };

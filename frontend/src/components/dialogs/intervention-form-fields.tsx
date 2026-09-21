@@ -15,8 +15,7 @@ import {
     interventionStatusOptions,
     interventionTypeOptions,
     isOnSiteInterventionType,
-    isInterventionDescriptionRequired,
-    isScheduledInterventionStatus,
+    isCompletedInterventionStatus,
 } from "@/lib/interventions";
 import { formatPersonName } from "@/lib/people";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
@@ -65,17 +64,14 @@ export const InterventionCollaboratorField = ({
     </div>
 );
 
-/** "(facoltativo)" accanto all'etichetta, dove un campo non è obbligatorio. */
-const OptionalHint = ({ children }: { children: string }) => (
-    <span className="text-base text-muted-foreground"> ({children})</span>
-);
-
 /** L'intera sezione "Intervento": tipo, stato, data, prezzo, pagamento, orari, problema, descrizione, note. */
 export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsProps) => {
     const isOnSite = isOnSiteInterventionType(values.type);
-    // Un intervento ancora da svolgere non ha orari né lavoro da descrivere: i campi
-    // restano compilabili, ma smettono di essere obbligatori e l'etichetta lo dice.
-    const isScheduled = isScheduledInterventionStatus(values.status);
+    // Orari e lavoro svolto si chiedono solo a intervento completato: prima restano
+    // compilabili ma senza asterisco. L'asterisco rosso è l'unico segno dell'obbligo: le
+    // scritte "(facoltativo)" accanto agli altri campi sono state tolte perché affollavano
+    // il form, e dicevano la stessa cosa della sua assenza.
+    const isCompleted = isCompletedInterventionStatus(values.status);
 
     return (
         <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
@@ -143,7 +139,6 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                 <div className="grid gap-1">
                     <Label htmlFor="price" className="text-lg">
                         Prezzo
-                        <OptionalHint>facoltativo</OptionalHint>
                     </Label>
                     <EuroInput
                         {...fieldProps("price", { error: errors.price })}
@@ -185,7 +180,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                             <div key={field} className="grid gap-1">
                                 <Label htmlFor={field} className="text-lg">
                                     {label}
-                                    {isScheduled ? <OptionalHint>facoltativa</OptionalHint> : <RequiredMark />}
+                                    {isCompleted ? <RequiredMark /> : null}
                                 </Label>
                                 <Input
                                     {...fieldProps(field, { error: errors[field] })}
@@ -221,11 +216,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                 <div className="grid gap-1 lg:col-span-2">
                     <Label htmlFor="description" className="text-lg">
                         {interventionDescriptionLabel(values.type)}
-                        {isInterventionDescriptionRequired(values.status) ? (
-                            <RequiredMark />
-                        ) : (
-                            <OptionalHint>facoltativo</OptionalHint>
-                        )}
+                        {isCompleted ? <RequiredMark /> : null}
                     </Label>
                     <Textarea
                         {...fieldProps("description", { error: errors.description })}
@@ -245,7 +236,6 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                 <div className="grid gap-1 lg:col-span-2">
                     <Label htmlFor="note" className="text-lg">
                         Note
-                        <OptionalHint>facoltative</OptionalHint>
                     </Label>
                     <Textarea
                         id="note"

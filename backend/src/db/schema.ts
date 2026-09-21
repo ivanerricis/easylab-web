@@ -92,8 +92,14 @@ export const customerTable = pgTable(
         // 0034_customer_search_unaccent per `immutable_unaccent`, il wrapper IMMUTABLE attorno a
         // `unaccent()` necessario perché quest'ultima è STABLE e non è ammessa in un'espressione
         // di indice.
-        index("customer_first_name_unaccent_trgm_idx").using("gin", sql`immutable_unaccent(${table.firstName}) gin_trgm_ops`),
-        index("customer_last_name_unaccent_trgm_idx").using("gin", sql`immutable_unaccent(${table.lastName}) gin_trgm_ops`),
+        index("customer_first_name_unaccent_trgm_idx").using(
+            "gin",
+            sql`immutable_unaccent(${table.firstName}) gin_trgm_ops`
+        ),
+        index("customer_last_name_unaccent_trgm_idx").using(
+            "gin",
+            sql`immutable_unaccent(${table.lastName}) gin_trgm_ops`
+        ),
         index("customer_city_unaccent_trgm_idx").using("gin", sql`immutable_unaccent(${table.city}) gin_trgm_ops`),
     ]
 );

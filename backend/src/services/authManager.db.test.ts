@@ -93,9 +93,12 @@ describe("getSessionUser: con un database vero", () => {
         const result = await getSessionUser(token);
 
         expect(result).toBeNull();
-        expect(await db.select().from(sessionTable).where(eq(sessionTable.tokenHash, tokenHashOf(token)))).toEqual(
-            []
-        );
+        expect(
+            await db
+                .select()
+                .from(sessionTable)
+                .where(eq(sessionTable.tokenHash, tokenHashOf(token)))
+        ).toEqual([]);
     });
 
     it("un utente disattivato non restituisce l'utente e la sessione viene rimossa", async () => {
@@ -123,7 +126,10 @@ describe("getSessionUser: con un database vero", () => {
 
         await getSessionUser(token);
 
-        const [row] = await db.select().from(sessionTable).where(eq(sessionTable.tokenHash, tokenHashOf(token)));
+        const [row] = await db
+            .select()
+            .from(sessionTable)
+            .where(eq(sessionTable.tokenHash, tokenHashOf(token)));
         expect(row.lastSeenAt.getTime()).toBeGreaterThan(oldLastSeen.getTime());
     });
 
@@ -135,7 +141,10 @@ describe("getSessionUser: con un database vero", () => {
 
         await getSessionUser(token);
 
-        const [row] = await db.select().from(sessionTable).where(eq(sessionTable.tokenHash, tokenHashOf(token)));
+        const [row] = await db
+            .select()
+            .from(sessionTable)
+            .where(eq(sessionTable.tokenHash, tokenHashOf(token)));
         expect(row.lastSeenAt.getTime()).toBe(recentLastSeen.getTime());
     });
 });

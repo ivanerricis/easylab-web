@@ -1,7 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 import { errorHandler } from "../../middleware/errorHandler";
-import { insertCollaborator, insertCustomer, insertDevice, insertIntervention, insertIssue, insertReport } from "../../test/db/fixtures";
+import {
+    insertCollaborator,
+    insertCustomer,
+    insertDevice,
+    insertIntervention,
+    insertIssue,
+    insertReport,
+} from "../../test/db/fixtures";
 import { deleteCollaboratorById } from "./collaborator";
 import { deleteCustomerById } from "./customer";
 import { deleteDeviceById } from "./device";
@@ -72,9 +79,7 @@ describe("eliminare un'anagrafica ancora referenziata da un report", () => {
         const res = await deleteAndTranslate(() => deleteDeviceById(report.deviceId));
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.message).toBe(
-            "Impossibile eliminare il dispositivo: è ancora associato a uno o più report."
-        );
+        expect(res.body.message).toBe("Impossibile eliminare il dispositivo: è ancora associato a uno o più report.");
     });
 
     it("il guasto: 400 con il messaggio sul report", async () => {
@@ -93,9 +98,7 @@ describe("eliminare un'anagrafica ancora referenziata da un report", () => {
         const res = await deleteAndTranslate(() => deleteCollaboratorById(collaborator.id));
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.message).toBe(
-            "Impossibile eliminare il collaboratore: è ancora associato a uno o più report."
-        );
+        expect(res.body.message).toBe("Impossibile eliminare il collaboratore: è ancora associato a uno o più report.");
     });
 });
 
@@ -106,9 +109,7 @@ describe("eliminare un'anagrafica ancora referenziata da un intervento", () => {
         const res = await deleteAndTranslate(() => deleteCustomerById(intervention.customerId));
 
         expect(res.statusCode).toBe(400);
-        expect(res.body.message).toBe(
-            "Impossibile eliminare il cliente: è ancora associato a uno o più interventi."
-        );
+        expect(res.body.message).toBe("Impossibile eliminare il cliente: è ancora associato a uno o più interventi.");
     });
 
     it("il collaboratore: 400 con il messaggio sull'intervento", async () => {

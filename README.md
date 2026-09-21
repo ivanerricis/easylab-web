@@ -1,6 +1,8 @@
 # easylab-web
 
-Applicazione full stack per la gestione di un laboratorio, composta da:
+Applicazione web per la gestione di un laboratorio di riparazione: anagrafica clienti e dispositivi, apertura e tracciamento degli interventi assegnati ai tecnici, segnalazione dei guasti riscontrati e generazione dei report/ricevute in PDF da consegnare al cliente.
+
+Stack:
 - frontend React + Vite
 - backend Node.js + Express
 - database PostgreSQL

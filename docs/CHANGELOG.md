@@ -11,6 +11,19 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Tema scuro: popup "+N altri" del calendario era bianco
+
+Nella dashboard, cliccando "+N altri" su un giorno con più interventi di quanti ne stia la
+cella, react-big-calendar apre un overlay (`.rbc-overlay`) con l'elenco completo. Il CSS della
+libreria gli dà `background-color: #fff` fisso, e `calendar-theme.css` non lo sovrascriveva
+come fa per il resto del calendario: in tema scuro l'overlay restava bianco, unico elemento
+non tematizzato della pagina.
+
+Aggiunte regole per `.rbc-overlay` e `.rbc-overlay-header` in
+`frontend/src/pages/calendar/calendar-theme.css` che usano `--popover`/`--popover-foreground`/
+`--border`, le stesse variabili già usate da `sonner.tsx` per lo stesso tipo di superficie
+flottante.
+
 ## 2026-09-21 — `report_technician`: aggiunti `created_at`/`updated_at`
 
 Una rassegna delle tabelle senza `updated_at` ha trovato `report_technician`: l'unica, fra le

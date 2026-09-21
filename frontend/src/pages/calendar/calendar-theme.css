@@ -71,6 +71,17 @@
     background-color: transparent;
 }
 
+/* Il popup "+N altri" ha sfondo bianco fisso nel CSS della libreria. */
+.rbc-overlay {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+    border-color: var(--border);
+}
+
+.rbc-overlay-header {
+    border-color: var(--border);
+}
+
 .rbc-agenda-view table.rbc-agenda-table {
     color: var(--foreground);
 }

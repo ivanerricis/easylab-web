@@ -44,11 +44,11 @@ dal selettore sopra — lì la misura resta fissata nel componente stesso (`text
 perché `Button` non ha un `md:text-sm` di base con cui competere), comunque un'unica
 definizione e non un override per chiamata.
 
-**Verifica visiva ancora da fare**: questo intervento è stato scritto e verificato con
-`npm run typecheck` e un nuovo grep di `text-lg!` (sceso da 32 occorrenze a zero) da un git
-worktree isolato, senza dev server collegato — la sessione che lo integra in `main` deve
-ancora controllare a schermo tutti i dialoghi elencati sopra, chiaro e scuro, desktop e
-mobile, prima di considerarlo concluso.
+Scritto e verificato con `npm run typecheck` e un nuovo grep di `text-lg!` (sceso da 32
+occorrenze a zero) da un git worktree isolato, senza dev server collegato. **Verifica visiva
+fatta dopo l'integrazione in `main`**: screenshot Playwright del dialogo "Nuovo cliente" (che
+copre tutti i tipi di campo coinvolti) a 1440px chiaro e scuro e 390px chiaro — testo dei campi
+coerentemente grande, nessuna regressione di layout.
 
 ## 2026-09-21 — `EntityTable`: memoizzata la riga per non ridisegnarla a ogni battitura
 
@@ -96,9 +96,10 @@ colonne. L'architettura a doppio render con CSS resta identica; solo il lavoro d
 riga è ora saltabile.
 
 Verificato: `npm run typecheck`, `npx eslint` sui due file e `npm test` (700/700, incluso
-`entity-table.test.tsx`) tutti verdi. **Non ancora verificato dal vivo**: un controllo
-funzionale (digitare nella ricerca, trascinare un bordo di colonna) su una lista grande in
-browser reale resta da fare prima di considerare la modifica conclusa.
+`entity-table.test.tsx`) tutti verdi. **Controllo dal vivo fatto dopo l'integrazione in
+`main`**: su `/clients` con 5000 righe, ricerca testuale filtra correttamente e il
+trascinamento del bordo di una colonna la ridimensiona senza scatti né perdita dei
+gestori — il `ResizeObserver` continua a funzionare come prima.
 
 ## 2026-09-21 — Popup notifiche: pulsante di rimozione sotto il target touch minimo
 

@@ -98,46 +98,74 @@ const interventionBodySchema = z
  */
 const isCompletedStatus = (status?: (typeof interventionStatuses)[number]) => status === "completato";
 
-const interventionCreateBodySchema = interventionBodySchema.superRefine((value, ctx) => {
-    if (!value.interventionDate) {
-        ctx.addIssue({ code: "custom", message: "La data dell'intervento è obbligatoria", path: ["interventionDate"] });
+/** La riga su cui `validateInterventionRow` applica le regole: vedi lì. */
+type InterventionValidationRow = {
+    type: InterventionType;
+    status?: (typeof interventionStatuses)[number];
+    interventionDate?: string | null;
+    description?: string | null;
+    problem?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+};
+
+type InterventionValidationFailure = {
+    field: "interventionDate" | "description" | "problem" | "startTime" | "endTime";
+    message: string;
+};
+
+/**
+ * Le regole di dominio dell'intervento, applicate alla riga *risultante*: per la POST è il corpo
+ * appena arrivato (che per una creazione è già la riga intera); per la PUT è l'unione del corpo
+ * parziale con la riga esistente, calcolata dalla rotta prima di chiamare questa funzione.
+ *
+ * Prima erano scritte due volte — uno `.superRefine()` sullo schema di creazione, una sequenza
+ * di `if` a mano sulla PUT — con la combinazione data/orari-mancanti che diceva due cose diverse
+ * nei due posti. Un'unica funzione, chiamata identica dalle due rotte, rende impossibile che
+ * tornino a dirsi cose diverse. Si ferma alla prima regola violata (come faceva già la PUT):
+ * chi chiama la richiama dopo aver corretto, come per qualunque altro controllo del server.
+ */
+const validateInterventionRow = (row: InterventionValidationRow): InterventionValidationFailure | null => {
+    if (!row.interventionDate) {
+        return { field: "interventionDate", message: "La data dell'intervento è obbligatoria" };
     }
 
-    const completed = isCompletedStatus(value.status);
+    const completed = isCompletedStatus(row.status);
 
-    if (completed && !value.description) {
-        ctx.addIssue({
-            code: "custom",
+    if (completed && !row.description) {
+        return {
+            field: "description",
             message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento è completato",
-            path: ["description"],
-        });
+        };
     }
 
-    if (!onSiteInterventionTypes.has(value.type)) {
-        return;
+    // Il problema riscontrato non segue la stessa regola di orari e lavoro svolto qui sopra: si
+    // conosce già al momento della chiamata del cliente, ed è il motivo per cui l'intervento
+    // viene programmato. Vale solo per gli interventi in sede o da remoto: le consegne
+    // materiale non hanno né problema né orari.
+    if (!onSiteInterventionTypes.has(row.type)) {
+        return null;
     }
 
-    if (!value.problem) {
-        ctx.addIssue({ code: "custom", message: "Il problema riscontrato è obbligatorio", path: ["problem"] });
+    if (!row.problem) {
+        return { field: "problem", message: "Il problema riscontrato è obbligatorio" };
     }
 
-    if (completed && !value.startTime) {
-        ctx.addIssue({ code: "custom", message: "L'ora di inizio è obbligatoria", path: ["startTime"] });
+    if (completed && !row.startTime) {
+        return { field: "startTime", message: "L'ora di inizio è obbligatoria" };
     }
 
-    if (completed && !value.endTime) {
-        ctx.addIssue({ code: "custom", message: "L'ora di fine è obbligatoria", path: ["endTime"] });
+    if (completed && !row.endTime) {
+        return { field: "endTime", message: "L'ora di fine è obbligatoria" };
     }
 
     // Vale anche quando non sono obbligatori: se gli orari ci sono, devono avere senso.
-    if (value.startTime && value.endTime && value.startTime >= value.endTime) {
-        ctx.addIssue({
-            code: "custom",
-            message: "L'ora di fine deve essere successiva all'ora di inizio",
-            path: ["endTime"],
-        });
+    if (row.startTime && row.endTime && row.startTime >= row.endTime) {
+        return { field: "endTime", message: "L'ora di fine deve essere successiva all'ora di inizio" };
     }
-});
+
+    return null;
+};
 
 const interventionUpdateBodySchema = interventionBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required",
@@ -346,8 +374,25 @@ interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req
     res.json(intervention);
 });
 
-interventionsRouter.post("/", validate({ body: interventionCreateBodySchema }), async (req, res) => {
+interventionsRouter.post("/", validate({ body: interventionBodySchema }), async (req, res) => {
     const isOnSite = onSiteInterventionTypes.has(req.body.type);
+
+    // Per una creazione il corpo appena arrivato È la riga risultante: vedi
+    // `validateInterventionRow`, la stessa funzione che la PUT chiama sulla riga unione.
+    const validationFailure = validateInterventionRow({
+        type: req.body.type,
+        status: req.body.status ?? "programmato",
+        interventionDate: req.body.interventionDate ?? null,
+        description: req.body.description || null,
+        problem: isOnSite ? (req.body.problem ?? null) : null,
+        startTime: isOnSite ? (req.body.startTime ?? null) : null,
+        endTime: isOnSite ? (req.body.endTime ?? null) : null,
+    });
+
+    if (validationFailure) {
+        res.status(400).json({ message: validationFailure.message });
+        return;
+    }
 
     const createdIntervention = await createIntervention({
         type: req.body.type,
@@ -393,38 +438,22 @@ interventionsRouter.put(
         const nextStatus = (req.body.status ?? existing.status) as (typeof interventionStatuses)[number];
         const nextDescription = "description" in req.body ? req.body.description || null : existing.description;
         const nextNote = "note" in req.body ? req.body.note || null : existing.note;
-        // Come per il prezzo dei report: la combinazione da validare nasce dall'unione del
-        // corpo parziale con la riga esistente, quindi lo schema non può vederla da solo.
-        const completed = isCompletedStatus(nextStatus);
 
-        if (!nextInterventionDate) {
-            res.status(400).json({ message: "La data dell'intervento è obbligatoria" });
-            return;
-        }
+        // La combinazione da validare nasce dall'unione del corpo parziale con la riga
+        // esistente, appena calcolata qui sopra: `validateInterventionRow` applica le stesse
+        // regole di dominio della POST, sulla riga risultante di questa PUT.
+        const validationFailure = validateInterventionRow({
+            type: nextType,
+            status: nextStatus,
+            interventionDate: nextInterventionDate,
+            description: nextDescription,
+            problem: nextProblem,
+            startTime: nextStartTime,
+            endTime: nextEndTime,
+        });
 
-        if (completed && !nextDescription) {
-            res.status(400).json({
-                message: "La descrizione del lavoro svolto è obbligatoria quando l'intervento è completato",
-            });
-            return;
-        }
-
-        if (isOnSite && !nextProblem) {
-            res.status(400).json({
-                message: "Per interventi in sede o da remoto è richiesto il problema riscontrato",
-            });
-            return;
-        }
-
-        if (isOnSite && completed && (!nextStartTime || !nextEndTime)) {
-            res.status(400).json({
-                message: "Per interventi in sede o da remoto sono richiesti ora inizio e ora fine",
-            });
-            return;
-        }
-
-        if (isOnSite && nextStartTime && nextEndTime && nextStartTime >= nextEndTime) {
-            res.status(400).json({ message: "L'ora di fine deve essere successiva all'ora di inizio" });
+        if (validationFailure) {
+            res.status(400).json({ message: validationFailure.message });
             return;
         }
 

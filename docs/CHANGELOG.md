@@ -11,6 +11,107 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Regole di dominio scritte una volta sola (report e interventi)
+
+**Il problema.** Dal backlog: due regole erano scritte due volte ciascuna, con parole non sempre
+identiche. Sui report, "pagato ⇒ prezzo > 0" stava nello schema zod della POST e a mano nella PUT;
+"chiuso ⇒ collaboratore" a mano in entrambe. Sugli interventi, `interventionCreateBodySchema
+.superRefine()` in creazione e una sequenza di `if` a mano in modifica — che per gli orari mancanti
+dicevano davvero cose diverse: la POST segnalava separatamente "L'ora di inizio è obbligatoria" e
+"L'ora di fine è obbligatoria", la PUT un unico "Per interventi in sede o da remoto sono richiesti
+ora inizio e ora fine". Due copie della stessa regola possono sempre allontanarsi nelle parole, e
+qui l'avevano già fatto.
+
+**Due meccanismi diversi, non uno solo.** Le due metà del backlog chiedevano forme diverse, e sono
+state tenute diverse:
+
+- **Report → due CHECK di riga nel database.** `report_paid_price_check` e
+  `report_closed_collaborator_check` (migration `backend/drizzle/0035_report_domain_checks.sql`,
+  mirrorata in `backend/src/db/schema.ts` per documentazione):
+  ```sql
+  ALTER TABLE "report" ADD CONSTRAINT "report_paid_price_check"
+    CHECK ("payment_method" NOT IN ('cash', 'card') OR "price" > 0);
+  ALTER TABLE "report" ADD CONSTRAINT "report_closed_collaborator_check"
+    CHECK (NOT "closed" OR "collaborator_id" IS NOT NULL);
+  ```
+  Un CHECK di riga è l'unico posto in cui *sia* la POST *sia* la PUT vedono davvero la riga
+  risultante: la PUT valida l'unione di corpo parziale e riga esistente, e uno schema zod non ha
+  modo di vederla. `backend/src/middleware/errorHandler.ts` guadagna un ramo `code === "23514"`
+  (verificato empiricamente contro Postgres: SQLSTATE 23514, `error.constraint` col nome del
+  vincolo) e una mappa `CHECK_MESSAGES`, sullo stesso modello di `UNIQUE_MESSAGES`/`FK_MESSAGES`,
+  che traduce la violazione nello stesso messaggio italiano che le rotte davano prima a mano. La
+  PUT (`backend/src/routes/reports.ts`) non ricalcola più `nextPaymentMethod`/`nextPrice`/
+  `nextClosed`/`nextCollaboratorId` per validarli: manda l'UPDATE e lascia che sia il database a
+  deciderlo. La POST fa lo stesso per "chiuso ⇒ collaboratore".
+
+- **Interventi → una funzione TypeScript condivisa**, non un vincolo del database:
+  `validateInterventionRow` in `backend/src/routes/interventions.ts` prende la "riga risultante"
+  (tipo, stato, data, descrizione, problema, orari) e torna il primo controllo violato o `null`.
+  La POST la chiama sul corpo appena arrivato (che per una creazione È la riga risultante, tolto
+  lo `.superRefine()` dallo schema); la PUT sulle stesse `nextX` che già calcolava. Le due rotte
+  non possono più dirsi cose diverse per la stessa regola, perché è la stessa funzione a deciderlo.
+  Wording unificato sull'ora di inizio/fine: scelto quello più specifico, due messaggi separati
+  (uno per l'ora di inizio, uno per l'ora di fine) invece del messaggio combinato che aveva prima
+  la sola PUT — la PUT ora dice la stessa cosa, nello stesso ordine, che diceva già la POST.
+
+**La decisione sul refine di creazione dei report (da spiegare, non solo applicare).** Lo zod
+`.refine()` di `reportCreateBodySchema` che controllava "pagato ⇒ prezzo > 0" attaccava
+`path: ["price"]` al suo issue — un candidato per evidenziare in linea il campo prezzo nel dialogo
+di creazione. Verificato in `frontend/src/components/dialogs/create/createReportDialog.tsx` e in
+`frontend/src/lib/reportForm.ts` (`toReportCreatePayload`): il dialogo di creazione **non
+raccoglie affatto** metodo di pagamento, prezzo o chiusura — sono campi che esistono solo nel
+dialogo di *modifica* (`editReportDialog.tsx`), che già li valida per conto suo lato client prima
+di mandare la richiesta. Il payload di creazione manda sempre `paymentMethod`/`price` assenti (la
+rotta applica i default `non_paid`/`0`, che non violano mai la regola) e mai `closed`. Il refine
+non aveva quindi nessun campo reale da evidenziare in creazione: rimosso per intero, insieme al
+controllo manuale "chiuso ⇒ collaboratore" della POST — restano entrambi enforced solo dal CHECK
+del database, senza nessuna perdita di UX osservabile. Se in futuro il dialogo di creazione
+dovesse raccogliere questi campi, andrebbe rivalutato: a quel punto un feedback immediato lato
+client (come già fa il dialogo di modifica) tornerebbe utile, in aggiunta — non al posto — del
+CHECK del database.
+
+**Messa in produzione — richiede una verifica manuale prima del deploy.** A differenza della
+migration precedente (puramente additiva), questa aggiunge due vincoli che una riga storica
+potrebbe violare. Il CHECK di Postgres, aggiunto con `ALTER TABLE ... ADD CONSTRAINT`, valida
+*tutte* le righe esistenti al momento in cui viene applicato: se anche una sola riga lo viola,
+l'`ALTER TABLE` fallisce e non applica nulla. Il migrator (`drizzle-orm/node-postgres/migrator`,
+lo stesso usato da `backend/migrate.js` in produzione) applica tutte le migrazioni pendenti dentro
+un'unica transazione (`PgDialect.migrate`, `drizzle-orm/pg-core/dialect.js`): un fallimento fa
+rollback dell'intera transazione, quindi lo schema non resta a metà — né perde né corrompe dati,
+si limita a non applicare la migration.
+
+Prima di distribuire questa migration, **un operatore deve eseguire su produzione**, in sola
+lettura:
+```sql
+SELECT count(*) FROM report WHERE payment_method IN ('cash', 'card') AND price <= 0;
+SELECT count(*) FROM report WHERE closed = true AND collaborator_id IS NULL;
+```
+Sul database di sviluppo (2026-09-21) entrambe le query restituiscono 0 righe, e non dicono niente
+sulla produzione. Se in produzione una delle due restituisce un numero maggiore di zero, le righe
+trovate vanno sistemate a mano (o la regola va discussa di nuovo) **prima** di applicare la
+migration: altrimenti l'aggiornamento del backend si ferma a `node migrate.js` (uscita diversa da
+0), senza intaccare il database esistente, ma anche senza aggiornare l'applicazione finché il
+problema non è risolto. Le stesse due query sono ripetute come commento in testa alla migration
+(`backend/drizzle/0035_report_domain_checks.sql`).
+
+**Verificato.** `backend/src/db/queries/reportWrite.db.test.ts` (nuovo blocco "i due CHECK di
+riga"): un `db.insert` diretto — che non passa da nessuna rotta — che viola ciascuna regola è
+rifiutato da Postgres con `23514` e il nome del vincolo giusto; lo stesso per un `updateReportById`
+che porta la riga risultante a violarla; i casi validi (pagamento in contanti con prezzo positivo,
+report chiuso con collaboratore) restano accettati. `report.db.test.ts`: le fixture con
+`closed: true` preesistenti (liste, statistiche) aggiornate con un collaboratore, dato che ora la
+regola vale anche lì. `errorHandler.test.ts`: i due CHECK sui loro messaggi, più un vincolo CHECK
+non censito sul messaggio generico. `reports.test.ts`: la rotta propaga la violazione mockata come
+400 col messaggio tradotto, per entrambe le regole, su POST e PUT. `interventions.test.ts`: nuovo
+blocco che chiama POST e PUT sulla stessa regola violata e verifica che il messaggio sia
+**identico carattere per carattere** — la prova concreta che la duplicazione è sparita, non solo
+che lo status è lo stesso. Migration applicata sul database di sviluppo:
+`report_paid_price_check`/`report_closed_collaborator_check` confermati con `\d report`, ed
+entrambe le query di verifica sopra restituiscono 0 righe. `npm run test:db` (150 test), `npm test`
+(979 test, 1 skip), `npm run typecheck` e `npm run lint` tutti puliti.
+
+---
+
 ## 2026-09-21 — Ricerca clienti insensibile agli accenti
 
 **Il problema.** La ricerca clienti confronta il testo con `ILIKE`, che ignora

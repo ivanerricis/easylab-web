@@ -779,6 +779,76 @@ describe("interventions router", () => {
         });
     });
 
+    /**
+     * La prova concreta che la duplicazione è sparita: POST e PUT chiamano entrambe
+     * `validateInterventionRow` (vedi ./interventions.ts), quindi per la stessa regola violata
+     * danno lo stesso messaggio, carattere per carattere — non solo lo stesso status. Prima la
+     * POST (`.superRefine()` sullo schema) e la PUT (`if` a mano) potevano dire cose diverse per
+     * lo stesso caso, come infatti facevano per l'ora di inizio/fine mancante (un solo messaggio
+     * combinato sulla PUT, due messaggi separati sulla POST).
+     */
+    describe("POST / e PUT /:id danno lo stesso messaggio per la stessa regola violata", () => {
+        // Riga "completa e in sede": ogni caso qui sotto la modifica solo nel punto che vuole
+        // rompere, così la PUT isola la violazione senza dover ricalcolare il resto a mano.
+        const completeOnSiteExisting = {
+            ...storedIntervention,
+            type: "intervento_sede",
+            status: "completato",
+            problem: "Non si accende",
+            description: "Fatto",
+            startTime: "09:00",
+            endTime: "10:00",
+        };
+
+        const onSiteBase = {
+            type: "intervento_sede",
+            customerId: 1,
+            collaboratorId: 1,
+            interventionDate: "2026-01-10",
+            problem: "Non si accende",
+            status: "completato",
+            description: "Fatto",
+            startTime: "09:00",
+            endTime: "10:00",
+        };
+
+        it.each([
+            [
+                "data dell'intervento mancante",
+                { ...onSiteBase, interventionDate: undefined },
+                { interventionDate: null },
+            ],
+            [
+                "descrizione mancante a completamento",
+                { ...onSiteBase, description: undefined },
+                { description: null },
+            ],
+            [
+                "problema riscontrato mancante su un intervento in sede",
+                { ...onSiteBase, problem: undefined },
+                { problem: null },
+            ],
+            ["ora di inizio mancante a completamento", { ...onSiteBase, startTime: undefined }, { startTime: null }],
+            ["ora di fine mancante a completamento", { ...onSiteBase, endTime: undefined }, { endTime: null }],
+            [
+                "ora di fine non successiva a quella di inizio",
+                { ...onSiteBase, startTime: "10:00", endTime: "09:00" },
+                { startTime: "10:00", endTime: "09:00" },
+            ],
+        ])("%s", async (_label, createBody, updatePatch) => {
+            const createResponse = await request(buildApp()).post("/api/interventions").send(createBody);
+
+            expect(createResponse.status).toBe(400);
+
+            vi.mocked(getInterventionById).mockResolvedValue([completeOnSiteExisting] as never);
+
+            const updateResponse = await request(buildApp()).put("/api/interventions/1").send(updatePatch);
+
+            expect(updateResponse.status).toBe(400);
+            expect(updateResponse.body.message).toBe(createResponse.body.message);
+        });
+    });
+
     describe("DELETE /:id", () => {
         it("elimina un intervento esistente", async () => {
             vi.mocked(deleteInterventionById).mockResolvedValue([storedIntervention] as never);

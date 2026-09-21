@@ -100,6 +100,19 @@ const storedReport = {
     customerId: 1,
 };
 
+/**
+ * Come farebbe Postgres per davvero (vedi migration 0035_report_domain_checks, verificata contro
+ * il database di sviluppo): `code` 23514 e il nome del vincolo violato su `constraint`. Il query
+ * layer qui sotto è mockato, quindi questi test provano che la rotta lascia propagare l'errore a
+ * `errorHandler`, che lo traduce nello stesso messaggio italiano che la rotta dava prima a mano —
+ * non che Postgres si comporti così: quello lo prova `report.db.test.ts`, contro un database vero.
+ */
+const checkViolationError = (constraint: string) =>
+    Object.assign(new Error(`new row for relation "report" violates check constraint "${constraint}"`), {
+        code: "23514",
+        constraint,
+    });
+
 describe("reports router", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -411,23 +424,32 @@ describe("reports router", () => {
             expect(createReport).not.toHaveBeenCalled();
         });
 
-        it("rifiuta di chiudere un report senza indicare un collaboratore", async () => {
+        // Le due regole di dominio (pagato ⇒ prezzo, chiuso ⇒ collaboratore) non sono più
+        // controllate qui: le applica il CHECK del database (migration
+        // 0035_report_domain_checks), e la rotta si limita a lasciar propagare l'errore a
+        // `errorHandler`, che lo traduce. Vedi `checkViolationError` qui sopra.
+        it("propaga la chiusura senza collaboratore come 400 col messaggio tradotto dal CHECK", async () => {
+            vi.mocked(createReport).mockRejectedValue(checkViolationError("report_closed_collaborator_check"));
+
             const response = await request(buildApp())
                 .post("/api/reports")
                 .send({ ...minimalBody, closed: true });
 
             expect(response.status).toBe(400);
             expect(response.body.message).toBe("Per chiudere un report è necessario indicare un collaboratore");
-            expect(createReport).not.toHaveBeenCalled();
         });
 
-        it("rifiuta un pagamento in contanti con prezzo a zero", async () => {
+        it("propaga un pagamento in contanti con prezzo a zero come 400 col messaggio tradotto dal CHECK", async () => {
+            vi.mocked(createReport).mockRejectedValue(checkViolationError("report_paid_price_check"));
+
             const response = await request(buildApp())
                 .post("/api/reports")
                 .send({ ...minimalBody, paymentMethod: "cash", price: 0 });
 
             expect(response.status).toBe(400);
-            expect(createReport).not.toHaveBeenCalled();
+            expect(response.body.message).toBe(
+                "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0"
+            );
         });
 
         it("accetta un pagamento con carta con prezzo maggiore di zero", async () => {
@@ -517,37 +539,48 @@ describe("reports router", () => {
         });
 
         // Il pagamento resta "cash" perché non viene toccato dal corpo: solo il prezzo
-        // arriva a zero, e la combinazione risultante va comunque rifiutata.
-        it("rifiuta un prezzo a zero quando il metodo di pagamento esistente è già 'cash'", async () => {
+        // arriva a zero, e la combinazione risultante va comunque rifiutata. Come per la POST,
+        // il controllo non è più qui: è il CHECK del database (migration
+        // 0035_report_domain_checks) a rifiutare l'UPDATE sulla riga risultante, ed
+        // `errorHandler` traduce l'errore. `checkViolationError` è definita sopra la describe
+        // principale.
+        it("propaga un prezzo a zero col metodo di pagamento esistente già 'cash' come 400 tradotto dal CHECK", async () => {
             vi.mocked(getReportById).mockResolvedValue([
                 { ...storedReport, paymentMethod: "cash", price: 50 },
             ] as never);
+            vi.mocked(updateReportById).mockRejectedValue(checkViolationError("report_paid_price_check"));
 
             const response = await request(buildApp()).put("/api/reports/1").send({ price: 0 });
 
             expect(response.status).toBe(400);
-            expect(updateReportById).not.toHaveBeenCalled();
+            expect(response.body.message).toBe(
+                "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0"
+            );
         });
 
-        it("rifiuta di chiudere un report la cui riga esistente non ha un collaboratore", async () => {
+        it("propaga la chiusura di un report la cui riga esistente non ha un collaboratore come 400 tradotto dal CHECK", async () => {
             vi.mocked(getReportById).mockResolvedValue([{ ...storedReport, collaboratorId: null }] as never);
+            vi.mocked(updateReportById).mockRejectedValue(checkViolationError("report_closed_collaborator_check"));
 
             const response = await request(buildApp()).put("/api/reports/1").send({ closed: true });
 
             expect(response.status).toBe(400);
             expect(response.body.message).toBe("Per chiudere un report è necessario indicare un collaboratore");
-            expect(updateReportById).not.toHaveBeenCalled();
         });
 
-        // `collaboratorId: null` è un valore esplicito ("svuota il campo"), non l'assenza
-        // del campo: deve contare come tale anche se il report resta chiuso da prima.
-        it("rifiuta di svuotare il collaboratore di un report già chiuso", async () => {
+        // `collaboratorId: null` è un valore esplicito ("svuota il campo"), non l'assenza del
+        // campo: deve contare come tale anche se il report resta chiuso da prima. La rotta
+        // manda comunque l'UPDATE (non calcola più a mano la combinazione risultante): è il
+        // CHECK del database a vederla e rifiutarla, perché per Postgres la riga finale ha
+        // `closed = true` e `collaborator_id = NULL`.
+        it("propaga lo svuotamento del collaboratore di un report già chiuso come 400 tradotto dal CHECK", async () => {
             vi.mocked(getReportById).mockResolvedValue([{ ...storedReport, closed: true, collaboratorId: 3 }] as never);
+            vi.mocked(updateReportById).mockRejectedValue(checkViolationError("report_closed_collaborator_check"));
 
             const response = await request(buildApp()).put("/api/reports/1").send({ collaboratorId: null });
 
             expect(response.status).toBe(400);
-            expect(updateReportById).not.toHaveBeenCalled();
+            expect(response.body.message).toBe("Per chiudere un report è necessario indicare un collaboratore");
         });
 
         it("risponde 404 se la riga sparisce fra il controllo e l'aggiornamento", async () => {

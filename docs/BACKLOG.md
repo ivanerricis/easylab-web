@@ -94,10 +94,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
     hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
-  - **`EntityTable` disegna ogni riga due volte** (tabella e scheda mobile, una delle due nascosta
-    via CSS) e senza memo: con "Tutte" (fino a 5000 righe) si sente sulla digitazione nella ricerca
-    e sul trascinamento delle colonne. Con 10-50 righe è irrilevante. Attenzione: il ResizeObserver
-    di `useResizableColumns` presuppone che la tabella sia sempre montata.
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): l'infrastruttura
   e i test di `listReports`/`listInterventions` ci sono dal 2026-09-17 (CHANGELOG); restano le
   altre query, i vincoli e le cancellazioni.

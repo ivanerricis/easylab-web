@@ -50,6 +50,56 @@ worktree isolato, senza dev server collegato — la sessione che lo integra in `
 ancora controllare a schermo tutti i dialoghi elencati sopra, chiaro e scuro, desktop e
 mobile, prima di considerarlo concluso.
 
+## 2026-09-21 — `EntityTable`: memoizzata la riga per non ridisegnarla a ogni battitura
+
+`EntityTable` (`frontend/src/components/entity-table.tsx`) disegna ogni riga due volte — una
+`<table>` e una scheda mobile nascosta via CSS (vedi `EntityCardList`) — e nessuna delle due era
+memoizzata: con "Tutte" (fino a 5000 righe) digitare nel campo di ricerca o trascinare il bordo
+di una colonna ricalcolava tutte le celle di tutte le righe a ogni battitura/pixel, anche quelle
+che il risultato non tocca. Con 10-50 righe (il caso comune) era irrilevante — da qui la voce nel
+backlog qualità.
+
+La causa non era la ricreazione dell'array `rows` (le liste lo sostituiscono solo a un vero
+ricaricamento dei dati, non a ogni tasto), ma il fatto che *l'intero* `EntityTable` si ridisegna
+a ogni render del genitore — battitura nella ricerca, trascinamento di una colonna — e senza
+`memo` React riesegue da capo la funzione di ogni riga, in entrambe le forme.
+
+Estratti `EntityTableRow` (in `entity-table.tsx`) ed `EntityCard` (in `entity-card-list.tsx`),
+avvolti in `React.memo` con un comparatore su misura che guarda solo `row` (più `columns` e, per
+la tabella, `isResizable`): le liste rimpiazzano l'intero array a ogni ricaricamento, quindi una
+riga davvero cambiata arriva sempre con un riferimento nuovo, mentre una riga invariata mantiene
+lo stesso riferimento a ogni battitura o trascinamento — è quello il segnale giusto per saltare
+il render, non l'identità delle funzioni.
+
+Le tre funzioni per riga (`renderRowActions`, `getRowStatusColor`, `onRowOpen`) restano fuori dal
+comparatore di proposito: chi chiama `EntityTable` le passa quasi sempre come closure inline nel
+proprio corpo, quindi diverse a ogni render del chiamante anche quando la riga non c'entra;
+confrontarle avrebbe vanificato il `memo` a ogni battitura. Il loro risultato (`actionsNode`,
+`statusColor`) è comunque ricalcolato con `useMemo(() => ..., [row])` **dentro** il componente di
+riga, non letto da un ref aggiornato in un effetto: un primo tentativo con un ref (aggiornato
+dopo il commit) si è rivelato scorretto — quando una riga passa per la prima volta dallo
+scheletro ai dati veri, la callback viene chiamata in fase di render, prima che l'effetto abbia
+scritto la versione aggiornata, e la riga finiva per usare ancora gli handler validi per righe
+vuote. Scoperto da tre test che fallivano (apertura del dialogo di modifica subito dopo il primo
+caricamento in `simple-entity-page.test.tsx`, `CustomersPage.test.tsx`, `ReportsPage.test.tsx`);
+il `useMemo` sincrono non ha questo ritardo e i 700 test sono tornati verdi.
+
+Aggiustata anche un'allocazione ridondante: le colonne delle schede mobile venivano ricreate con
+un `.filter()` dentro il JSX a ogni render di `EntityTable`, invalidando da sole il `memo` delle
+schede; ora sono un `useMemo` come le colonne della tabella.
+
+**Il vincolo del `ResizeObserver`, intenzionalmente non toccato**: `useResizableColumns.ts` non è
+stato modificato. Il suo `ResizeObserver` presuppone che l'elemento `<table>` sia sempre montato;
+smettere di disegnare la tabella (o la scheda) sotto/sopra un breakpoint invece di nasconderla
+via CSS — la correzione "ovvia" — avrebbe rotto silenziosamente il ridimensionamento delle
+colonne. L'architettura a doppio render con CSS resta identica; solo il lavoro di render per
+riga è ora saltabile.
+
+Verificato: `npm run typecheck`, `npx eslint` sui due file e `npm test` (700/700, incluso
+`entity-table.test.tsx`) tutti verdi. **Non ancora verificato dal vivo**: un controllo
+funzionale (digitare nella ricerca, trascinare un bordo di colonna) su una lista grande in
+browser reale resta da fare prima di considerare la modifica conclusa.
+
 ## 2026-09-21 — Popup notifiche: pulsante di rimozione sotto il target touch minimo
 
 Il pulsante "X" per rimuovere una notifica nel popup campanella (`notifications-menu.tsx`)

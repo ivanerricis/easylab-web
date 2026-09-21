@@ -164,15 +164,19 @@ export const listInterventions = async ({
                 : interventionTable.created_at;
     const orderByClause = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
+    // Vale sia per l'esportazione CSV che per la stampa riassuntiva (`summaryPrint.ts`): nessuna
+    // delle due pagina, quindi entrambe finiscono nel ramo `takeUnpaginated` qui sotto. `problem`
+    // e `note` arrivano a 4000 caratteri: leggerli per davvero solo qui, e non nell'elenco a
+    // schermo, evita di gonfiare ogni pagina della tabella con testo che lì nessuno legge.
+    const includeFullText = page == null || pageSize == null;
+
     const baseQuery = db
         .select({
             id: interventionTable.id,
             type: interventionTable.type,
             description: interventionTable.description,
-            // Nell'elenco a schermo non si vede, ma è una delle colonne dell'esportazione CSV,
-            // che parte proprio da questa query per avere gli stessi filtri della lista. È un
-            // intero: `problem` e `note`, che arrivano a 4000 caratteri, restano invece fuori
-            // per non gonfiare ogni pagina dell'elenco con testo che nessuno legge lì.
+            problem: includeFullText ? interventionTable.problem : sql<string | null>`null`,
+            note: includeFullText ? interventionTable.note : sql<string | null>`null`,
             price: interventionTable.price,
             paid: interventionTable.paid,
             toInvoice: interventionTable.toInvoice,

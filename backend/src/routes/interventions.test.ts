@@ -188,7 +188,9 @@ describe("interventions router", () => {
             interventionDate: "2026-01-15",
             startTime: "09:00",
             endTime: "10:30",
+            problem: "Non si accende",
             description: "Sostituito alimentatore",
+            note: "Cliente da richiamare",
             price: 120,
             paid: true,
             toInvoice: true,
@@ -214,7 +216,9 @@ describe("interventions router", () => {
             });
             expect(response.text).toContain("Intervento in sede");
             expect(response.text).toContain("Completato");
+            expect(response.text).toContain("Non si accende");
             expect(response.text).toContain("Sostituito alimentatore");
+            expect(response.text).toContain("Cliente da richiamare");
             expect(response.text).toContain("Pagato");
             expect(response.text).toContain("Da fatturare");
         });

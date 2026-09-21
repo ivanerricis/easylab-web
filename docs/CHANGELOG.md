@@ -11,6 +11,20 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Esportazione CSV interventi: aggiunte le colonne "Problema" e "Note"
+
+Un controllo di coerenza fra intestazioni ed export ha trovato che il CSV degli interventi
+esportava solo `description` (l'assistenza effettuata), lasciando fuori `problem` (il problema
+riscontrato dal cliente) e `note` (annotazioni libere): dati presenti in scheda intervento ma
+assenti dall'archivio scaricato.
+
+`listInterventions` (`backend/src/db/queries/intervention.ts`) leggeva già solo `description` di
+proposito: `problem` e `note` arrivano a 4000 caratteri, e la stessa query serve anche l'elenco a
+schermo paginato, dove quel testo non si vede mai. La query ora sceglie in base al chiamante — un
+nuovo `includeFullText` (vero quando non c'è paginazione, cioè per l'export CSV e per la stampa
+riassuntiva di `summaryPrint.ts`) decide se leggere le due colonne per davvero o restituire `null`
+senza leggerle: l'elenco a schermo resta leggero come prima, l'export ora è completo.
+
 ## 2026-09-21 — "Assistenza effettuata" facoltativa per gli interventi in lavorazione
 
 La descrizione del lavoro svolto (o dei materiali consegnati) era obbligatoria appena lo stato

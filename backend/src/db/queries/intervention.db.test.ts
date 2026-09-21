@@ -300,7 +300,9 @@ describe("listInterventions: righe e join", () => {
                     id: target.id,
                     type: "intervento_remoto",
                     status: "completato",
+                    problem: null,
                     description: "Configurata la stampante",
+                    note: null,
                     price: 40,
                     paid: true,
                     toInvoice: true,
@@ -316,6 +318,25 @@ describe("listInterventions: righe e join", () => {
                     updatedAt: null,
                 },
             ],
+        });
+    });
+
+    it("senza paginazione legge anche problema e note, per l'esportazione CSV e la stampa riassuntiva", async () => {
+        const target = await insertIntervention({
+            problem: "Non si accende",
+            note: "Cliente da richiamare",
+        });
+
+        const result = await listInterventions({ timeZone });
+
+        if (!Array.isArray(result)) {
+            throw new Error("attesa una lista non paginata");
+        }
+
+        expect(result[0]).toMatchObject({
+            id: target.id,
+            problem: "Non si accende",
+            note: "Cliente da richiamare",
         });
     });
 });

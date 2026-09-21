@@ -242,8 +242,8 @@ const ExportSettingsSection = () => {
 
                 <p className="text-sm text-muted-foreground">
                     Una riga per intervento con cliente e telefono, collaboratore, tipo, stato, data e orari,
-                    descrizione, prezzo e data di creazione. Il periodo filtra la data di creazione, come nell'elenco
-                    interventi.
+                    problema, descrizione e note, prezzo e data di creazione. Il periodo filtra la data di creazione,
+                    come nell'elenco interventi.
                 </p>
             </SettingsCard>
         </SettingsSection>

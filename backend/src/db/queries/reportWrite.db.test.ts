@@ -23,7 +23,13 @@ describe("createReport / updateReportById: il tecnico esterno", () => {
         );
 
         expect(await technicianRowsOf(created.id)).toEqual([
-            { reportId: created.id, technicianId: technician.id, price: 40 },
+            {
+                reportId: created.id,
+                technicianId: technician.id,
+                price: 40,
+                created_at: expect.any(Date),
+                updated_at: null,
+            },
         ]);
     });
 
@@ -35,7 +41,13 @@ describe("createReport / updateReportById: il tecnico esterno", () => {
         await updateReportById(report.id, {}, { technicianId: second.id, price: 25 });
 
         expect(await technicianRowsOf(report.id)).toEqual([
-            { reportId: report.id, technicianId: second.id, price: 25 },
+            {
+                reportId: report.id,
+                technicianId: second.id,
+                price: 25,
+                created_at: expect.any(Date),
+                updated_at: expect.any(Date),
+            },
         ]);
     });
 

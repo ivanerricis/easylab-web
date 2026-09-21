@@ -163,6 +163,7 @@ export const reportTechnicianTable = pgTable(
             .notNull()
             .references(() => technicianTable.id),
         price: integer("price").notNull().default(0),
+        ...timestamps,
     },
     (table) => [
         primaryKey({ columns: [table.reportId] }),

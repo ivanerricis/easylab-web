@@ -11,6 +11,24 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — `report_technician`: aggiunti `created_at`/`updated_at`
+
+Una rassegna delle tabelle senza `updated_at` ha trovato `report_technician`: l'unica, fra le
+tabelle scrivibili più di una volta, senza nessuna colonna di data. Eppure la riga viene
+riscritta — `setReportTechnician` in `backend/src/db/queries/report.ts` fa un
+`insert().onConflictDoUpdate()` quando cambia il tecnico o il compenso di un report — senza
+lasciare traccia di quando.
+
+Aggiunto lo spread `...timestamps` già usato dalle altre tabelle (`backend/src/db/schema.ts`,
+migration `0033_report_technician_timestamps.sql`). Come già noto per `notification`
+(`upsertNotification`), `$onUpdate` non scatta dentro `onConflictDoUpdate`: va impostato a mano,
+quindi il `set` dell'upsert ora include `updated_at: sql\`now()\``.
+
+**Trappola rincontrata:** `npm run db:migrate` ha di nuovo tentato di riapplicare tutta la storia
+dalla `0000` (registro vuoto in `public`, già annotato nella voce del 17/9 "Unicità case-insensitive
+per dispositivi e difetti"). Riapplicato con `node migrate.js` dentro il container `backend_dev`,
+come da nota lì.
+
 ## 2026-09-21 — Esportazione CSV interventi: aggiunte le colonne "Problema" e "Note"
 
 Un controllo di coerenza fra intestazioni ed export ha trovato che il CSV degli interventi

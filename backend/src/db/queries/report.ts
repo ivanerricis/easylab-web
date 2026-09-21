@@ -363,7 +363,7 @@ const setReportTechnician = async (tx: Transaction, reportId: number, technician
     await tx
         .insert(reportTechnicianTable)
         .values({ reportId, ...values })
-        .onConflictDoUpdate({ target: reportTechnicianTable.reportId, set: values });
+        .onConflictDoUpdate({ target: reportTechnicianTable.reportId, set: { ...values, updated_at: sql`now()` } });
 };
 
 export const createReport = (data: NewReport, technician?: ReportTechnicianInput) =>

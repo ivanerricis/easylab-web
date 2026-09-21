@@ -94,9 +94,8 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
     hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
-- [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): l'infrastruttura
-  e i test di `listReports`/`listInterventions` ci sono dal 2026-09-17 (CHANGELOG); restano le
-  altre query, i vincoli e le cancellazioni.
+- [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): fatta per intero
+  il 2026-09-21, tranne la 2FA di `authManager`, ancora provata solo con un `db` finto.
 - Ricerca del cliente scritto a mano: il server non ignora gli accenti, quindi "Nicolo" non trova
   "Nicolò" (vedi `findCustomerByText`). Scegliendo dai suggerimenti il problema non si pone; la
   soluzione completa è l'estensione `unaccent` di Postgres nella ricerca clienti.
@@ -182,22 +181,15 @@ sbagliati). Controllare tutte e tre le intensità, in chiaro e in scuro.
 il servizio Postgres in CI e 61 test su `listReports` e `listInterventions`. Istruzioni nel
 README, "Test e controlli".*
 
-**Cosa resta scoperto.** Le altre query di `backend/src/db/queries/` girano ancora solo contro il
-database finto. Le più utili da coprire, in ordine:
+*Il resto della lista qui sotto è fatto il 2026-09-21 (CHANGELOG): le cancellazioni con chiavi
+esterne, le statistiche della dashboard, le liste delle cinque anagrafiche, e login/sessioni di
+`authManager` (`login`, `getSessionUser`, `deleteSession`, la scadenza e la pulizia).*
 
-- ~~i vincoli che il codice controlla da sé~~: l'unicità senza maiuscole di dispositivi e difetti
-  (compreso "Altro") la garantisce l'indice `lower()` della migration 0031, il controllo a mano
-  è stato tolto il 2026-09-18 e `issue.db.test.ts` prova l'indice; restano da coprire gli altri
-  vincoli, se ne compariranno;
-- **le cancellazioni con chiavi esterne**: cliente, collaboratore, tecnico, dispositivo o difetto
-  ancora usati da un report o da un intervento (cosa risponde Postgres, e cosa ne fa la rotta).
-  Il caso del report con un tecnico esterno, che prima non si eliminava, è coperto da
-  `reportWrite.db.test.ts` dal 2026-09-18;
-- **le statistiche della dashboard** (`getReportStats`, `getInterventionStats`): somme per mese
-  nel fuso del laboratorio;
-- **le liste delle anagrafiche** (clienti, collaboratori, tecnici, dispositivi, difetti): ricerca e
-  paginazione, più semplici di report e interventi ma con la stessa forma;
-- **sessioni e codici di recupero** (`authManager`), oggi provati con un finto `db` a catena.
+**Cosa resta scoperto.** Solo la 2FA di `authManager` — `startTwoFactorSetup`,
+`confirmTwoFactorSetup`, `regenerateRecoveryCodes`, `disableTwoFactor` — gira ancora solo contro il
+`db` finto a catena di `authManager.test.ts`. Lasciata fuori il 2026-09-21 per il tempo che
+richiede tradurre in query reali il contratto di quei test finti (segreto TOTP cifrato, codici di
+recupero monouso, sessioni da invalidare) senza indovinarlo.
 
 Come aggiungerne: un file `*.db.test.ts` accanto alla query, righe create con gli helper di
 `backend/src/test/db/fixtures.ts` (da estendere se serve), tabelle già vuote a ogni test.

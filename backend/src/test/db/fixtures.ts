@@ -7,9 +7,19 @@ import {
     IssueTable,
     reportTable,
     reportTechnicianTable,
+    sessionTable,
     technicianTable,
+    userTable,
 } from "../../db/schema";
-import type { NewCollaborator, NewCustomer, NewIntervention, NewReport, NewTechnician } from "../../db/types";
+import type {
+    NewCollaborator,
+    NewCustomer,
+    NewIntervention,
+    NewReport,
+    NewSession,
+    NewTechnician,
+    NewUser,
+} from "../../db/types";
 
 /**
  * Righe minime per i test sul database: ogni helper riempie i campi obbligatori e lascia al
@@ -78,6 +88,29 @@ export const insertReport = async (values: Partial<NewReport> = {}) => {
 
 export const assignTechnician = async (reportId: number, technicianId: number, price: number) => {
     await db.insert(reportTechnicianTable).values({ reportId, technicianId, price });
+};
+
+/** Un utente: password hash finto, perché i test dell'accesso ne calcolano uno vero a parte. */
+export const insertUser = async (values: Partial<NewUser> = {}) => {
+    const [row] = await db
+        .insert(userTable)
+        .values({ username: `utente${next()}`, passwordHash: "hash-non-usato", ...values })
+        .returning();
+    return row;
+};
+
+/** Una sessione: utente nuovo e scadenza fra un'ora se il test non li passa. */
+export const insertSession = async (values: Partial<NewSession> = {}) => {
+    const [row] = await db
+        .insert(sessionTable)
+        .values({
+            tokenHash: values.tokenHash ?? `hash-sessione-${next()}`,
+            userId: values.userId ?? (await insertUser()).id,
+            expiresAt: values.expiresAt ?? new Date(Date.now() + 60 * 60 * 1000),
+            ...values,
+        })
+        .returning();
+    return row;
 };
 
 /** Un intervento: cliente e collaboratore nuovi se il test non li passa. */

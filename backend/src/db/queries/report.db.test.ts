@@ -8,7 +8,7 @@ import {
     insertReport,
     insertTechnician,
 } from "../../test/db/fixtures";
-import { listReports } from "./report";
+import { getReportStats, listReports } from "./report";
 
 const timeZone = "Europe/Rome";
 
@@ -366,5 +366,57 @@ describe("listReports: righe e join", () => {
                 { id: withoutCollaborator.id, technician: "-" },
             ],
         });
+    });
+});
+
+/**
+ * `getReportStats` raggruppa l'incasso per mese "del laboratorio", non per mese UTC: solo un
+ * database vero, con l'aritmetica sulle date che gira per davvero, può accorgersi se un report
+ * nato a cavallo della mezzanotte locale finisce nel bucket sbagliato. `now` è fissato per non
+ * dipendere dal giorno in cui gira il test: gli ultimi sei mesi arrivano fino a febbraio 2026,
+ * che è anche il mese richiesto di default (l'ultimo della serie).
+ */
+describe("getReportStats: confini del mese nel fuso del laboratorio", () => {
+    const timeZone = "Europe/Rome";
+    const now = new Date("2026-02-15T12:00:00Z");
+
+    it("un report nato a un'ora dalla mezzanotte locale resta nel mese vecchio, uno nato dopo passa al nuovo", async () => {
+        // 23:00 a Roma (UTC+1, fuori dall'ora legale): ancora il 31 gennaio.
+        await insertReport({ closed: true, price: 100, created_at: new Date("2026-01-31T22:00:00Z") });
+        // 00:00 a Roma: già il 1° febbraio, un'ora dopo in UTC.
+        await insertReport({ closed: true, price: 200, created_at: new Date("2026-01-31T23:00:00Z") });
+
+        const stats = await getReportStats(undefined, timeZone, now);
+
+        expect(stats.series.find((entry) => entry.monthKey === "2026-01")?.value).toBe(100);
+        expect(stats.series.find((entry) => entry.monthKey === "2026-02")?.value).toBe(200);
+        expect(stats.monthlyRevenue).toBe(200);
+    });
+
+    it("l'incasso del mese somma il prezzo interno e il compenso del tecnico esterno, il netto lo sottrae", async () => {
+        const technician = await insertTechnician();
+        const withTechnician = await insertReport({
+            closed: true,
+            price: 100,
+            created_at: new Date("2026-02-10T10:00:00Z"),
+        });
+        await assignTechnician(withTechnician.id, technician.id, 30);
+        await insertReport({ closed: true, price: 50, created_at: new Date("2026-02-11T10:00:00Z") });
+
+        const stats = await getReportStats("2026-02", timeZone, now);
+
+        expect(stats.monthlyRevenue).toBe(180);
+        expect(stats.monthlyNetRevenue).toBe(150);
+    });
+
+    it("un report ancora aperto non entra nell'incasso, ma conta fra quelli aperti", async () => {
+        await insertReport({ closed: false, price: 999, created_at: new Date("2026-02-10T10:00:00Z") });
+        await insertReport({ closed: true, price: 40, created_at: new Date("2026-02-10T10:00:00Z") });
+
+        const stats = await getReportStats("2026-02", timeZone, now);
+
+        expect(stats.monthlyRevenue).toBe(40);
+        expect(stats.openCount).toBe(1);
+        expect(stats.closedCount).toBe(1);
     });
 });

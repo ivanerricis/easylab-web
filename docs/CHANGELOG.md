@@ -11,6 +11,75 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Test sul database vero, seconda parte
+
+**Il problema.** La prima parte (2026-09-17) aveva coperto solo `listReports`/`listInterventions`.
+Il resto delle query di `backend/src/db/queries/` e le sessioni di `authManager` giravano ancora
+solo contro il finto `db` a catena, che non può accorgersi di tre categorie di bug: un vincolo del
+database (nome del vincolo, comportamento `ON DELETE`) che non corrisponde più a quello scritto a
+mano nel codice che traduce l'errore; un'espressione SQL vera (conversione di fuso orario,
+sottoquery) sostituita per errore con qualcosa che sembra equivalente ma non lo è; un indice o un
+vincolo di unicità rimosso per sbaglio da una migration.
+
+**Cosa.**
+- **Cancellazioni con chiavi esterne**: cliente, dispositivo e guasto referenziati da un report,
+  cliente e collaboratore referenziati da un intervento. Nessuna delle chiavi coinvolte è in
+  cascata (`ON DELETE no action`, vedi le migration 0000, 0011, 0012): Postgres deve rifiutare la
+  cancellazione con una violazione 23503. Il tecnico esterno su un report (in cascata dalla
+  migration 0032) resta coperto da `reportWrite.db.test.ts` dal 2026-09-18, non rifatto qui.
+  Ogni test di `deleteConstraints.db.test.ts` cattura l'errore vero di Postgres e lo fa passare
+  per il vero `errorHandler`, invece di limitarsi a un `rejects.toThrow()`: un mock del database,
+  come già fa `errorHandler.test.ts`, non può accorgersi se il nome del vincolo generato da una
+  migration diverge da quello scritto a mano nella mappa `FK_MESSAGES` — a quel punto il messaggio
+  tornerebbe quello generico ("Riferimento non valido") invece di quello specifico sul cliente,
+  il dispositivo o il guasto, e nessun test se ne accorgerebbe. Verificato di proposito: con un
+  nome di vincolo sbagliato in `FK_MESSAGES`, il test fallisce con il messaggio generico al posto
+  di quello specifico.
+- **Statistiche della dashboard** (`getReportStats`, `getInterventionStats`): l'incasso mensile si
+  raggruppa nel fuso del laboratorio, non in UTC. `report.db.test.ts` prova un report creato un'ora
+  prima della mezzanotte locale e uno un'ora dopo (23:00 e 00:00 a Roma, stesso giorno UTC): devono
+  finire in due mesi diversi della serie. Verificato di proposito: togliendo la conversione di fuso
+  dall'espressione SQL (`to_char` direttamente su `created_at`, senza `AT TIME ZONE`), i due report
+  finiscono nello stesso mese e il test fallisce — esattamente il tipo di errore che un `db` finto,
+  dove il raggruppamento non gira mai per davvero, non può cogliere. Provati anche la somma di
+  prezzo interno più compenso del tecnico esterno, il netto che lo sottrae, e che un report ancora
+  aperto non entra nell'incasso ma conta fra gli aperti.
+- **Liste delle cinque anagrafiche** (`customer`, `collaborator`, `technician`, `device`, `issue`):
+  ricerca campo per campo, ricerca per id esatto, ordinamento e paginazione — la stessa forma di
+  `report.db.test.ts`, più semplice perché senza join. Nuovi `customer.db.test.ts`,
+  `collaborator.db.test.ts`, `technician.db.test.ts`; `device.db.test.ts` e `issue.db.test.ts`
+  (finora solo l'unicità del nome/della descrizione) estesi con `listDevices`/`listIssues`.
+- **Sessioni di `authManager`** (`authManager.db.test.ts`, nuovo): `login`, `getSessionUser`,
+  `deleteSession`, scadenza. Il caso che un `db` finto non può proprio vedere: `getSessionUser`
+  calcola chi è amministratore con una sottoquery SQL vera
+  (`id = (select min("id") from "user")`), e il test finto in `authManager.test.ts` si limita a
+  mettere in coda un `isAdmin` già pronto — non fa mai girare quella sottoquery. Qui invece sono
+  due utenti veri in tabella, e solo quello con l'id più basso deve risultare amministratore.
+  Verificato di proposito: cambiando `min` in `max` nella sottoquery, il test fallisce.
+  Provate anche una sessione scaduta e un utente disattivato (l'utente torna `null` e la riga
+  viene rimossa davvero dalla tabella) e l'aggiornamento di `lastSeenAt`.
+- Estesi `backend/src/test/db/fixtures.ts` (`insertUser`, `insertSession`) e
+  `backend/src/db/types.ts` (`NewUser`, `NewSession`).
+
+**Cosa resta scoperto, di proposito.** La 2FA di `authManager` (`startTwoFactorSetup`,
+`confirmTwoFactorSetup`, `regenerateRecoveryCodes`, `disableTwoFactor`) resta provata solo con il
+`db` finto: tradurne il contratto in query reali senza indovinarlo avrebbe richiesto più tempo di
+quanto ne restasse in questo giro. Lasciata nel BACKLOG.
+
+**Nessun bug applicativo trovato.** Tutti i test sono passati al primo colpo contro il codice
+esistente. Confidenza controllata alterando di proposito tre punti — la mappa `FK_MESSAGES`, la
+conversione di fuso in `getReportStats`, la sottoquery amministratore in `getSessionUser` — uno
+alla volta, verificando che ciascuna alterazione facesse fallire il test giusto e poi
+ripristinandola: i tre casi sopra.
+
+**Verifica.** `npm run test:db` (139 test, 10 file), `npm run typecheck`, `npm run lint`, `npm test`
+(970 test, il resto della suite, invariato).
+
+**File.** `backend/src/db/queries/{deleteConstraints,customer,collaborator,technician}.db.test.ts`
+(nuovi), `backend/src/db/queries/{device,issue,report,intervention}.db.test.ts` (estesi),
+`backend/src/services/authManager.db.test.ts` (nuovo), `backend/src/test/db/fixtures.ts`,
+`backend/src/db/types.ts`.
+
 ## 2026-09-21 — Rimossa la variabile morta `LAB_LOGO_TEXT`
 
 `LAB_LOGO_TEXT` esisteva in `.env.example`, in `scripts/edit-env.sh` (elenco chiavi, default e

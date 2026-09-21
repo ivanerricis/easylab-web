@@ -14,7 +14,7 @@ const EuroInput = ({ className, ...props }: ComponentProps<typeof Input>) => (
         >
             €
         </span>
-        <Input type="number" min={0} step={1} className={cn("pl-8 text-lg!", className)} {...props} />
+        <Input type="number" min={0} step={1} className={cn("pl-8", className)} {...props} />
     </div>
 );
 

@@ -60,7 +60,11 @@ const DatePickerField = ({
                     aria-describedby={ariaDescribedBy}
                     type="button"
                     variant="outline"
-                    className={cn("w-full justify-start gap-2 text-lg! font-normal", className)}
+                    // Stesso corpo testo degli `Input`/`Textarea` dei dialoghi (vedi
+                    // `CustomDialog`): qui va fissato nel componente perché non è un `Input` e
+                    // quella regola non lo tocca. Nessun `!`: a differenza di `Input`, `Button`
+                    // non ha un `md:text-sm` di base con cui competere.
+                    className={cn("w-full justify-start gap-2 text-lg font-normal", className)}
                 >
                     <CalendarDays className="size-4" />
                     <span className="truncate">{label}</span>

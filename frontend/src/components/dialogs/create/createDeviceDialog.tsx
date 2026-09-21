@@ -85,7 +85,6 @@ const CreateDeviceDialog = ({ open, onOpenChange, onSubmit, mode = "create", ini
                 <FormField id="name" label="Nome dispositivo" required error={nameError}>
                     <Input
                         {...fieldProps("name", { error: nameError, required: true })}
-                        className="text-lg!"
                         placeholder="iPhone 13"
                         value={name}
                         onChange={(event) => {

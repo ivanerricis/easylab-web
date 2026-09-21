@@ -105,7 +105,6 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                     <FormField id="firstName" label="Nome" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}
-                            className="text-lg!"
                             // I dati di un'altra persona: il completamento automatico del browser
                             // proporrebbe qui il nome di chi sta al computer, non quello del
                             // collaboratore che si sta inserendo.
@@ -121,7 +120,6 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                     <FormField id="lastName" label="Cognome">
                         <Input
                             {...fieldProps("lastName")}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="Neri"
                             value={formValues.lastName}
@@ -131,7 +129,6 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                     <FormField id="phoneNumber" label="Telefono">
                         <Input
                             {...fieldProps("phoneNumber")}
-                            className="text-lg!"
                             type="tel"
                             autoComplete="off"
                             placeholder="333 1234567"

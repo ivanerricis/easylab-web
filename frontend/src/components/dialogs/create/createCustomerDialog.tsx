@@ -140,7 +140,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="firstName" label="Nome (Nome azienda)" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="Mario"
                             value={formValues.firstName}
@@ -153,7 +152,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="lastName" label="Cognome">
                         <Input
                             {...fieldProps("lastName")}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="Rossi"
                             value={formValues.lastName}
@@ -163,7 +161,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="phoneNumber" label="Telefono 1" required error={errors.phoneNumber}>
                         <Input
                             {...fieldProps("phoneNumber", { error: errors.phoneNumber, required: true })}
-                            className="text-lg!"
                             type="tel"
                             autoComplete="off"
                             placeholder="333 1234567"
@@ -177,7 +174,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="phoneNumberSecondary" label="Telefono 2">
                         <Input
                             {...fieldProps("phoneNumberSecondary")}
-                            className="text-lg!"
                             type="tel"
                             autoComplete="off"
                             placeholder="333 9876543"
@@ -190,7 +186,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="email" label="Email" error={errors.email}>
                         <Input
                             {...fieldProps("email", { error: errors.email })}
-                            className="text-lg!"
                             type="email"
                             autoComplete="off"
                             placeholder="mario.rossi@email.com"
@@ -204,7 +199,6 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                     <FormField id="city" label="Località">
                         <Input
                             {...fieldProps("city")}
-                            className="text-lg!"
                             autoComplete="off"
                             placeholder="Roma"
                             value={formValues.city}

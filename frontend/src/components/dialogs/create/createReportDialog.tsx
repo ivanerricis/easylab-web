@@ -416,7 +416,6 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         </Label>
                                         <Textarea
                                             {...fieldProps("issueDescription", { error: fieldErrors.issueDescription })}
-                                            className="text-lg!"
                                             placeholder="Descrivi il problema: è quello che il cliente legge sulla ricevuta"
                                             maxLength={255}
                                             value={formValues.issueDescription}
@@ -437,7 +436,6 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         Password sblocco
                                     </Label>
                                     <Input
-                                        className="text-lg!"
                                         id="password"
                                         placeholder="Password dispositivo"
                                         value={formValues.password}
@@ -452,7 +450,6 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         Note
                                     </Label>
                                     <Textarea
-                                        className="text-lg!"
                                         id="notes"
                                         placeholder="Note"
                                         rows={4}

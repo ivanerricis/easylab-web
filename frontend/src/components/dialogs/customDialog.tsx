@@ -105,6 +105,15 @@ const CustomDialog = ({
 
             <DialogContent
                 className={cn(
+                    // Il testo dei campi (`Input`, `Textarea`) è più grande qui che nel resto
+                    // dell'app: deciso una volta sola qui, non più a ogni campo. Prima ogni
+                    // dialogo doveva ricordarsi un `text-lg!` per campo — un campo nuovo che se
+                    // lo dimenticava usciva più piccolo dei suoi vicini. `**:` perché i campi non
+                    // sono figli diretti di `DialogContent`, ma annidati dentro `FormField`,
+                    // `EuroInput` e simili; `!` per vincere `md:text-sm`, che l'`Input` di base
+                    // applica da `md` in su. `Select` non serve: il suo trigger è già `text-lg`
+                    // di suo, senza distinzione fra breakpoint.
+                    "**:data-[slot=input]:text-lg! **:data-[slot=textarea]:text-lg!",
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}

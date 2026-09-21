@@ -11,6 +11,37 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-21 — Dimensione del testo dei campi nei dialoghi centralizzata in `CustomDialog`
+
+Circa 40 campi (`Input`, `Textarea`, più `EuroInput`/`InputWithAdd` che li avvolgono) in 13
+file di dialoghi portavano ciascuno un `className="text-lg!"` a mano, per battere il
+`text-base md:text-sm` di default del primitivo `Input`. Era debito segnato in BACKLOG dal
+2026-09-18: la decisione andava presa una volta sola, non a ogni campo — un campo nuovo che
+dimenticava l'override usciva più piccolo dei suoi vicini nello stesso modulo, un difetto
+silenzioso che nessun typecheck o test avrebbe preso.
+
+Spostata la regola in `CustomDialog` (`frontend/src/components/dialogs/customDialog.tsx`),
+sul `DialogContent` che avvolge ogni dialogo dell'app: `**:data-[slot=input]:text-lg!
+**:data-[slot=textarea]:text-lg!`. Il selettore `**:` (discendenti a qualunque profondità, non
+solo figli diretti) prende i campi ovunque siano annidati — dentro `FormField`, `EuroInput`,
+`InputWithAdd` — via il `data-slot` che `Input`/`Textarea` impostano già di loro; l'`!` serve a
+vincere `md:text-sm`, che altrimenti prende il sopravvento da `md` in su. Il `Select` non
+serviva toccarlo: il suo trigger era già `text-lg` di base, senza distinzione fra breakpoint
+(l'unica occorrenza `text-lg!` su un suo trigger, in `CustomersPage.tsx`, era già ridondante
+prima di questo intervento).
+
+Rimossi tutti e 32 i `text-lg!` ormai ridondanti nei 13 file chiamanti. Unica eccezione:
+`date-picker-field.tsx`, il cui campo è un `Button` (non un `Input`/`Textarea`) e quindi fuori
+dal selettore sopra — lì la misura resta fissata nel componente stesso (`text-lg`, senza `!`
+perché `Button` non ha un `md:text-sm` di base con cui competere), comunque un'unica
+definizione e non un override per chiamata.
+
+**Verifica visiva ancora da fare**: questo intervento è stato scritto e verificato con
+`npm run typecheck` e un nuovo grep di `text-lg!` (sceso da 32 occorrenze a zero) da un git
+worktree isolato, senza dev server collegato — la sessione che lo integra in `main` deve
+ancora controllare a schermo tutti i dialoghi elencati sopra, chiaro e scuro, desktop e
+mobile, prima di considerarlo concluso.
+
 ## 2026-09-21 — Popup notifiche: pulsante di rimozione sotto il target touch minimo
 
 Il pulsante "X" per rimuovere una notifica nel popup campanella (`notifications-menu.tsx`)

@@ -11,6 +11,22 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Paginazione dei log unificata con `sendListResponse`
+
+Terza correzione dalla stessa revisione di qualità: `GET /logs/:dayKey`
+(`routes/settings.ts`) ricostruiva a mano la busta `{items, totalItems, page, pageSize,
+totalPages}` con la stessa identica formula (`Math.max(1, Math.ceil(totalItems /
+pageSize))`) già incarnata in `sendListResponse` (`crudRouter.ts`), usata da tutte le altre
+rotte di lista.
+
+*Perché:* due copie della stessa aritmetica di paginazione potevano divergere silenziosamente
+a un futuro cambio di formula — l'ho trovato perché due dei 4 agenti della revisione l'hanno
+segnalato indipendentemente. Il comportamento non cambia: `page`/`pageSize` in questa rotta
+hanno sempre un valore (default `1`/`50` nella destrutturazione), quindi `sendListResponse`
+esegue sempre lo stesso ramo che prima era scritto a mano. I 4 test esistenti su questa
+risposta (`settings.test.ts`) passano senza modifiche.
+→ [backend/src/routes/settings.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/settings.ts)
+
 ## 2026-09-22 — Due correzioni in più dalla stessa revisione: email e conferma di chiusura
 
 Seguito della revisione di qualità dello stesso giorno: altri 2 degli 8 punti rimasti

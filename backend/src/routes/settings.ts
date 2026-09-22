@@ -2,6 +2,7 @@ import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
 import { requireAdmin } from "../middleware/requireAuth";
 import { assertOwnPassword } from "../services/authManager";
@@ -252,13 +253,7 @@ settingsRouter.get(
         const startIndex = (page - 1) * pageSize;
         const items = filteredEntries.slice(startIndex, startIndex + pageSize);
 
-        res.json({
-            items,
-            totalItems,
-            page,
-            pageSize,
-            totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
-        });
+        sendListResponse(res, { items, totalItems }, page, pageSize);
     }
 );
 

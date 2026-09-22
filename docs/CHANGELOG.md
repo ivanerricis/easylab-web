@@ -11,6 +11,35 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Esportazioni CSV: punto e virgola come separatore, per Excel in italiano
+
+Le tre esportazioni (clienti, report, interventi) separavano i campi con la virgola. Aperto
+con un doppio clic su un Windows in italiano, Excel metteva ogni riga intera nella colonna A:
+divide le colonne con il "separatore di elenco" delle impostazioni internazionali, che in
+italiano è il punto e virgola (la virgola lì separa i decimali). In più un `;` scritto in una
+nota apriva una colonna spuria, e un testo su più righe spezzava il record in due. Ora `toCsv`
+separa con il punto e virgola, e mette tra virgolette i campi che lo contengono al posto di
+quelli con la virgola.
+
+*Perché:* l'esportazione serve ad aprire i dati in Excel, e sul PC del laboratorio Excel è in
+italiano. L'alternativa di dichiarare il separatore nel file, con una prima riga `sep=,`, è
+stata provata e scartata: Excel divide le colonne ma ignora il BOM UTF-8, e gli accenti tornano
+illeggibili (`CittÃ `, `NiccolÃ²`).
+
+**Verifica** con Excel 16 su questo PC (impostazioni it-IT, separatore di elenco `;`), aprendo
+i file via COM con `Local:=True`, cioè come li apre il doppio clic. Prima: una colonna sola
+(due per la nota con il `;`) e il record con l'a-capo diviso su due righe. Dopo: 11 colonne,
+con accenti, virgolette raddoppiate e a-capo nella cella giusta, e i prezzi letti come numeri.
+`csv.test.ts` ha un caso in più per ciascuna regola delle virgolette (il `;` da solo le chiede,
+la virgola no); controllati per mutazione: rimettere la vecchia regex o la vecchia virgola fa
+fallire 2 e 7 test.
+
+Restano due letture di Excel che prima erano nascoste nella colonna A: i telefoni scritti tutti
+attaccati diventano numeri (il fisso perde lo zero iniziale) e "Creato il" esce come testo in
+UTC. Sono nel [BACKLOG](BACKLOG.md).
+→ [backend/src/services/csv.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/csv.ts),
+[backend/src/services/csv.test.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/csv.test.ts)
+
 ## 2026-09-22 — Paginazione dei log unificata con `sendListResponse`
 
 Terza correzione dalla stessa revisione di qualità: `GET /logs/:dayKey`

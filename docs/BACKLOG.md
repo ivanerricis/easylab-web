@@ -51,6 +51,20 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   nome. Rimandato il 2026-09-16 dopo averlo valutato: si fa se in pratica due macchine risultano
   indistinguibili.
 
+- Esportazioni CSV aperte in Excel: telefoni e "Creato il". Da quando il separatore è il punto e
+  virgola (CHANGELOG del 2026-09-22) le colonne si vedono, e con loro due letture di Excel che
+  prima restavano nascoste nella colonna A. Verificate il 2026-09-22 con Excel 16 in italiano:
+  - I telefoni scritti tutti attaccati diventano numeri: il fisso `0612345678` perde lo zero
+    (`612345678`), e con la colonna stretta un cellulare si legge `3,33E+09`. Quelli con uno
+    spazio (`06 12345678`) restano testo. Il CSV non ha un modo pulito per dire "questo è
+    testo": `="0612345678"` funziona, ma è una formula, proprio quello che `neutralizeFormula`
+    in `csv.ts` impedisce di scrivere. La soluzione completa è esportare in `.xlsx`, con celle
+    di tipo testo.
+  - "Creato il" esce come testo ISO in UTC (`2026-09-21T22:30:00.000Z` per un report delle 00:30
+    del 22): per Excel non è una data, e l'ora non è quella del laboratorio. Scritta nel fuso
+    del laboratorio come `2026-09-22 00:30`, Excel la legge come data vera. La data
+    dell'intervento (`2026-09-22`) e gli orari (`10:30:00`) sono già letti come date e ore.
+
 **Prestazioni**
 - Ordinare i report per "Cliente" costa circa 100 ms a pagina (20.000 report), contro i 15-25 ms
   della paginazione semplice o dell'ordine per data. La causa: l'espressione di ordinamento

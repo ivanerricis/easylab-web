@@ -3,9 +3,18 @@ export type CsvColumn<TRow> = {
     value: (row: TRow) => string | number | boolean | Date | null | undefined;
 };
 
+/**
+ * Punto e virgola, non la virgola dello standard: il file lo apre Excel con un doppio clic, e
+ * Excel divide le colonne con il "separatore di elenco" delle impostazioni internazionali di
+ * Windows, che in italiano è `;` (la virgola lì separa i decimali). Con la virgola ogni riga
+ * finiva intera nella colonna A. LibreOffice e Google Fogli il separatore lo chiedono o lo
+ * riconoscono all'importazione, quindi non ci perdono.
+ */
+const separator = ";";
+
 // RFC 4180: un campo va tra virgolette solo se contiene il separatore, virgolette o un
 // a-capo, e le virgolette al suo interno si raddoppiano. Tutto il resto esce così com'è.
-const escapeCsvField = (raw: string): string => (/[",\r\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw);
+const escapeCsvField = (raw: string): string => (/[";\r\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw);
 
 /**
  * Excel e LibreOffice trattano come formula ogni cella che comincia con `=`, `+`, `-` o `@`
@@ -60,5 +69,5 @@ export const toCsv = <TRow>(rows: TRow[], columns: CsvColumn<TRow>[]): string =>
         ...rows.map((row) => columns.map((column) => escapeCsvField(toCsvText(column.value(row))))),
     ];
 
-    return `${byteOrderMark}${lines.map((line) => line.join(",")).join("\r\n")}\r\n`;
+    return `${byteOrderMark}${lines.map((line) => line.join(separator)).join("\r\n")}\r\n`;
 };

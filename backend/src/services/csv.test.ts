@@ -12,21 +12,21 @@ const columns = [
 ];
 
 describe("toCsv", () => {
-    it("scrive intestazione e righe separate da virgola, terminate da CRLF", () => {
+    it("scrive intestazione e righe separate da punto e virgola, terminate da CRLF", () => {
         const csv = toCsv<Row>(
             [{ id: 1, name: "Mario", active: true, note: null, createdAt: new Date("2026-01-01T10:00:00.000Z") }],
             columns
         );
 
-        expect(csv).toBe("﻿ID,Nome,Attivo,Note,Creato il\r\n1,Mario,Sì,,2026-01-01T10:00:00.000Z\r\n");
+        expect(csv).toBe("﻿ID;Nome;Attivo;Note;Creato il\r\n1;Mario;Sì;;2026-01-01T10:00:00.000Z\r\n");
     });
 
-    it("mette tra virgolette i campi con virgola, virgolette o a-capo, raddoppiando le virgolette interne", () => {
+    it("mette tra virgolette i campi con punto e virgola, virgolette o a-capo, raddoppiando le virgolette interne", () => {
         const csv = toCsv<Row>(
             [
                 {
                     id: 2,
-                    name: 'Rossi, "il Mario"\nsecondo',
+                    name: 'Rossi; "il Mario"\nsecondo',
                     active: false,
                     note: null,
                     createdAt: new Date("2026-01-02T00:00:00.000Z"),
@@ -35,8 +35,24 @@ describe("toCsv", () => {
             columns
         );
 
-        expect(csv).toContain('"Rossi, ""il Mario""\nsecondo"');
-        expect(csv).toContain(",No,");
+        expect(csv).toContain('"Rossi; ""il Mario""\nsecondo"');
+        expect(csv).toContain(";No;");
+    });
+
+    /**
+     * Il punto e virgola basta da solo a chiedere le virgolette: senza, Excel spezzerebbe la
+     * cella in due. La virgola invece non è il separatore e resta così com'è.
+     */
+    it.each([
+        ["Rossi; Mario", '"Rossi; Mario"'],
+        ["Rossi, Mario", "Rossi, Mario"],
+    ])("scrive %j come %j", (name, expected) => {
+        const csv = toCsv<Row>(
+            [{ id: 4, name, active: true, note: null, createdAt: new Date("2026-01-04T00:00:00.000Z") }],
+            columns
+        );
+
+        expect(csv.split("\r\n")[1]).toBe(`4;${expected};Sì;;2026-01-04T00:00:00.000Z`);
     });
 
     it("un valore null o undefined diventa una cella vuota", () => {
@@ -45,11 +61,11 @@ describe("toCsv", () => {
             columns
         );
 
-        expect(csv.split("\r\n")[1]).toBe("3,,Sì,,2026-01-03T00:00:00.000Z");
+        expect(csv.split("\r\n")[1]).toBe("3;;Sì;;2026-01-03T00:00:00.000Z");
     });
 
     it("senza righe scrive solo l'intestazione", () => {
-        expect(toCsv<Row>([], columns)).toBe("﻿ID,Nome,Attivo,Note,Creato il\r\n");
+        expect(toCsv<Row>([], columns)).toBe("﻿ID;Nome;Attivo;Note;Creato il\r\n");
     });
     describe("testi che un foglio di calcolo leggerebbe come formula", () => {
         const noteColumn = [{ header: "Note", value: (row: { note: string | number | null }) => row.note }];

@@ -110,8 +110,8 @@ describe("customers router", () => {
         expect(response.headers["content-type"]).toContain("text/csv");
         expect(response.headers["content-disposition"]).toContain("clienti.csv");
         expect(listCustomers).toHaveBeenCalledWith({ search: "mario", unpaginatedLimit: exportRowLimit });
-        expect(response.text).toContain("ID,Nome,Cognome,Email,Telefono,Telefono secondario,Città,Creato il");
-        expect(response.text).toContain("5,Mario,Rossi,mario@example.com,0212345678,,Milano,");
+        expect(response.text).toContain("ID;Nome;Cognome;Email;Telefono;Telefono secondario;Città;Creato il");
+        expect(response.text).toContain("5;Mario;Rossi;mario@example.com;0212345678;;Milano;");
     });
 
     it("risponde 404 quando il cliente non esiste", async () => {

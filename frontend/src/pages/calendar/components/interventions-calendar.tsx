@@ -1,6 +1,7 @@
 import LoadingPage from "@/components/loadingPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { entityPaths } from "@/lib/entityPaths";
 import { getStoredCalendarView, setStoredCalendarView } from "@/lib/calendarView";
 import CreateInterventionDialog, {
     type CreateInterventionSubmitValues,
@@ -218,7 +219,7 @@ const InterventionsCalendar = ({
                     onView={handleViewChange}
                     eventPropGetter={eventPropGetter}
                     components={components}
-                    onSelectEvent={(event) => navigate(`/interventions/${event.id}`)}
+                    onSelectEvent={(event) => navigate(entityPaths.intervention(event.id))}
                     selectable
                     onSelectSlot={handleSelectSlot}
                     onRangeChange={(range) => onRangeChange(toCalendarRange(range))}

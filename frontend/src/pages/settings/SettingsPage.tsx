@@ -1,4 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Building2, Database, FileDown, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
 import BackupSettingsPanel from "@/components/settings/backupSettingsPanel";
@@ -112,6 +113,18 @@ const SettingsPage = () => {
         isSettingsSectionKey(sectionFromUrl) && canOpenSection(sectionFromUrl) ? sectionFromUrl : "theme";
     const visibleSettingsSections = settingsSections.filter((section) => canOpenSection(section.key));
 
+    const sectionContent: Record<SettingsSectionKey, ReactNode> = {
+        theme: <ThemeSettingsSection />,
+        security: <SecuritySettingsSection />,
+        users: <UsersSettingsSection />,
+        company: <CompanySettingsPanel />,
+        email: <EmailSettingsPanel />,
+        export: <ExportSettingsSection />,
+        backup: <BackupSettingsPanel />,
+        update: <UpdateSettingsPanel />,
+        logs: <LogsSettingsPanel />,
+    };
+
     const setActiveSection = (section: SettingsSectionKey) => {
         setSearchParams(
             (prev) => {
@@ -174,25 +187,7 @@ const SettingsPage = () => {
             </aside>
 
             <section className="min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-background/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
-                {activeSection === "theme" ? (
-                    <ThemeSettingsSection />
-                ) : activeSection === "security" ? (
-                    <SecuritySettingsSection />
-                ) : activeSection === "users" && user?.isAdmin ? (
-                    <UsersSettingsSection />
-                ) : activeSection === "company" ? (
-                    <CompanySettingsPanel />
-                ) : activeSection === "email" ? (
-                    <EmailSettingsPanel />
-                ) : activeSection === "export" ? (
-                    <ExportSettingsSection />
-                ) : activeSection === "backup" ? (
-                    <BackupSettingsPanel />
-                ) : activeSection === "update" && user?.isAdmin ? (
-                    <UpdateSettingsPanel />
-                ) : (
-                    <LogsSettingsPanel />
-                )}
+                {sectionContent[activeSection]}
             </section>
         </div>
     );

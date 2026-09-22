@@ -122,6 +122,14 @@ export function formatEuro(value: number | null | undefined) {
     return euroFormatter.format(amount);
 }
 
+/** "AAAA-MM-GG" locale (non UTC): la forma che il backend si aspetta per le date-solo-giorno. */
+export function formatDateISO(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 /**
  * Il tasto che accompagna le scorciatoie, scritto come lo scriverebbe chi sta davanti allo
  * schermo: ⌘ sui Mac, Ctrl altrove. Sta qui perché lo leggono sia la ricerca globale sia

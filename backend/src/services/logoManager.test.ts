@@ -43,7 +43,15 @@ vi.mock("sharp", () => ({
     default: (...args: unknown[]) => sharpFactory(...args),
 }));
 
-import { LogoManagerError, getLogoFile, getLogoStatus, loadPrintableLogo, resetLogo, saveLogo } from "./logoManager";
+import {
+    LogoManagerError,
+    __resetLogoCacheForTests,
+    getLogoFile,
+    getLogoStatus,
+    loadPrintableLogo,
+    resetLogo,
+    saveLogo,
+} from "./logoManager";
 
 const svgMeta = JSON.stringify({
     fileName: "logo.svg",
@@ -68,6 +76,7 @@ const mockLogoFiles = (meta: string | null, logoContent: Buffer) => {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    __resetLogoCacheForTests();
     mkdir.mockResolvedValue(undefined);
     writeFile.mockResolvedValue(undefined);
     readdir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));

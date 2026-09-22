@@ -11,3 +11,7 @@ export const personName = (firstName: SQLWrapper, lastName: SQLWrapper) =>
 /** Come `personName`, ma con "-" al posto del vuoto: la forma delle colonne delle liste. */
 export const personNameOrDash = (firstName: SQLWrapper, lastName: SQLWrapper) =>
     sql<string>`coalesce(${personName(firstName, lastName)}, '-')`;
+
+/** Come `personName`, in JS: per chi ha già la riga in mano e non serve una query. */
+export const personDisplayName = (firstName: string, lastName: string | null | undefined) =>
+    lastName ? `${firstName} ${lastName}` : firstName;

@@ -4,9 +4,9 @@ import {
     buildCustomerSummaryInfoSection,
     dualFieldRow,
     loadLogoDataUrl,
-    pdfStyles,
     sectionBarRow,
     tableLayout,
+    wrapPdfDocument,
 } from "./pdf/shared";
 import {
     formatInterventionStatus,
@@ -375,25 +375,15 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
     const hoursSection = buildTechnicianHoursSection(intervention);
     const notesSection = buildNotesSection(intervention);
 
-    const documentDefinition = {
-        pageSize: "A4",
-        pageMargins: [14, 14, 14, 14],
-        defaultStyle: {
-            font: "Roboto",
-            fontSize: 10,
-            color: "#111111",
-        },
-        content: [
-            buildHeader(intervention, logoDataUrl),
-            buildCustomerSection(intervention),
-            buildActivitySection(intervention),
-            ...(hoursSection ? [hoursSection] : []),
-            ...(notesSection ? [notesSection] : []),
-            buildLegalNoticeSection(),
-            buildSignatureSection(),
-        ],
-        styles: pdfStyles,
-    };
+    const documentDefinition = wrapPdfDocument([
+        buildHeader(intervention, logoDataUrl),
+        buildCustomerSection(intervention),
+        buildActivitySection(intervention),
+        ...(hoursSection ? [hoursSection] : []),
+        ...(notesSection ? [notesSection] : []),
+        buildLegalNoticeSection(),
+        buildSignatureSection(),
+    ]);
 
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 
@@ -403,21 +393,11 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
 export const createCustomerInterventionsPdfBuffer = async (customer: CustomerInterventionsPrintData) => {
     const logoDataUrl = await loadLogoDataUrl();
 
-    const documentDefinition = {
-        pageSize: "A4",
-        pageMargins: [14, 14, 14, 14],
-        defaultStyle: {
-            font: "Roboto",
-            fontSize: 10,
-            color: "#111111",
-        },
-        content: [
-            buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.interventionCount} interventi`),
-            buildCustomerSummaryInfoSection(customer),
-            buildCustomerInterventionsTable(customer.interventions, customer.showCustomerColumn),
-        ],
-        styles: pdfStyles,
-    };
+    const documentDefinition = wrapPdfDocument([
+        buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.interventionCount} interventi`),
+        buildCustomerSummaryInfoSection(customer),
+        buildCustomerInterventionsTable(customer.interventions, customer.showCustomerColumn),
+    ]);
 
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 

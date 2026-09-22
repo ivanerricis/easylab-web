@@ -6,6 +6,7 @@ import {
     listCollaborators,
     updateCollaboratorById,
 } from "../db/queries/collaborator";
+import { personDisplayName } from "../db/queries/personName";
 import { getLabConfig } from "../config/lab";
 import { formatPhoneLabel } from "./formatting";
 import { createCrudRouter } from "./crudRouter";
@@ -41,7 +42,7 @@ const loadCollaboratorPrintContext = async (id: number) => {
 
     return {
         customerId: collaborator.id,
-        customerName: `${collaborator.firstName} ${collaborator.lastName ?? ""}`.trim(),
+        customerName: personDisplayName(collaborator.firstName, collaborator.lastName),
         customerPhone: formatPhoneLabel(collaborator.phoneNumber),
         subjectLabel: "Collaboratore",
         showCustomerColumn: true,

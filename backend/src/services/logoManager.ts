@@ -165,7 +165,7 @@ export type PrintableLogo = { content: Buffer; contentType: "image/png" };
  * `Host` della richiesta, quindi chi chiedeva un PDF decideva quale host il backend avrebbe
  * contattato, e riceveva la risposta incorporata nel PDF.
  */
-export const loadPrintableLogo = async (): Promise<PrintableLogo | null> => {
+const loadPrintableLogoUncached = async (): Promise<PrintableLogo | null> => {
     try {
         const { filePath, mimeType } = await getLogoFile();
         const content = await fs.promises.readFile(filePath);
@@ -179,6 +179,24 @@ export const loadPrintableLogo = async (): Promise<PrintableLogo | null> => {
         console.error("Logo non disponibile per la stampa:", error);
         return null;
     }
+};
+
+// Cache della promise (non solo del valore risolto): la stessa stampa PDF chiama questa
+// funzione più volte in parallelo (vedi `createInterventionPdfBuffer`/`loadLogoDataUrl`), e
+// cachare solo il valore risolto non evitrebbe la doppia lettura/rasterizzazione tra chiamate
+// concorrenti che partono prima che la prima si sia risolta.
+let cachedLogo: Promise<PrintableLogo | null> | null = null;
+
+export const loadPrintableLogo = (): Promise<PrintableLogo | null> => {
+    if (!cachedLogo) {
+        cachedLogo = loadPrintableLogoUncached();
+    }
+    return cachedLogo;
+};
+
+/** Solo per i test: la cache altrimenti sopravvivrebbe fra un `it()` e l'altro dello stesso file. */
+export const __resetLogoCacheForTests = () => {
+    cachedLogo = null;
 };
 
 /**
@@ -232,11 +250,13 @@ export const saveLogo = async (buffer: Buffer) => {
     };
 
     await fs.promises.writeFile(metaFilePath, `${JSON.stringify(meta, null, 2)}\n`, "utf-8");
+    cachedLogo = null;
 
     return getLogoStatus();
 };
 
 export const resetLogo = async () => {
     await clearLogoDir();
+    cachedLogo = null;
     return getLogoStatus();
 };

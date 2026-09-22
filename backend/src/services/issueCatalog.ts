@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { IssueTable } from "../db/schema";
+import { ApiError } from "./apiError";
 
 /**
  * La voce del catalogo difetti che sta per "non rientra in nessuna delle altre".
@@ -20,6 +21,14 @@ export const catchAllIssueDescription = "Altro";
 
 export const isCatchAllIssueDescription = (description: string) =>
     description.trim().toLowerCase() === catchAllIssueDescription.toLowerCase();
+
+export const protectedIssueError = () =>
+    new ApiError(
+        `Il difetto "${catchAllIssueDescription}" non si può eliminare né rinominare: è quello che fa ` +
+            "comparire la casella con cui si descrive il problema sul report, e quel testo è l'unico che " +
+            "finisce sulla ricevuta del cliente.",
+        409
+    );
 
 export const findCatchAllIssue = async () => {
     const rows = await db

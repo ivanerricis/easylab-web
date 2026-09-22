@@ -1,4 +1,5 @@
 import { listInterventions } from "@/lib/api";
+import { entityPaths } from "@/lib/entityPaths";
 import { formatInterventionStatus, formatInterventionTime, getTodayDateString } from "@/lib/interventions";
 import type { AppNotification, NotificationSource } from "./types";
 import type { InterventionDto } from "@/types/dtos";
@@ -27,7 +28,7 @@ export const interventionsNotificationSource: NotificationSource = {
                 title: intervention.customer,
                 description: formatInterventionStatus(intervention.status),
                 meta: intervention.startTime ? formatInterventionTime(intervention.startTime) : undefined,
-                href: `/interventions/${intervention.id}`,
+                href: entityPaths.intervention(intervention.id),
                 resolved: intervention.status === "completato",
             }));
     },

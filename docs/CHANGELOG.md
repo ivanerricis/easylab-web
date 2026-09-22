@@ -11,6 +11,92 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Revisione di qualità su tutto il repository: 7 correzioni
+
+Una revisione di qualità con 8 agenti in parallelo (4 angolazioni — riuso, semplificazione,
+efficienza, altitudine — × backend/frontend) su tutto il codice ha prodotto 15 segnalazioni
+verificate leggendo il codice. Di queste, 7 sono state applicate subito: duplicazioni di
+logica già risolte altrove nel repo, un controllo di dominio che viveva nel posto sbagliato,
+e un piccolo rischio di comportamento silenzioso in una pagina. Nessuna modifica funzionale
+visibile all'utente: cambiano riuso, robustezza e manutenibilità.
+
+- **La protezione della voce "Altro" del catalogo difetti si sposta dalla rotta alla
+  query.** Prima viveva solo in `protectCatchAllIssue` (`routes/issues.ts`), che intercettava
+  PUT/DELETE prima del factory CRUD.
+  *Perché:* chi chiamava `updateIssueById`/`deleteIssueById` direttamente — uno script, una
+  futura rotta — la eliminava o rinominava senza errore: il controllo va dove il dato si
+  scrive, non in un solo punto di ingresso fra i tanti possibili.
+  → [backend/src/db/queries/issue.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/issue.ts),
+  [backend/src/services/issueCatalog.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/issueCatalog.ts),
+  [backend/src/routes/issues.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/issues.ts)
+
+- **Il logo non ha più una cache mancante, né si carica due volte per la stessa
+  richiesta.** `loadPrintableLogo()` non aveva mai una cache, e l'invio email di un
+  intervento la chiamava due volte nella stessa richiesta — una volta esplicita, una dentro
+  `createInterventionPdfBuffer`.
+  *Perché:* per un logo SVG significava rirasterizzare con sharp a ogni stampa/email; ora la
+  promise resta in cache (invalidata da `saveLogo`/`resetLogo`), quindi anche le due chiamate
+  concorrenti nella stessa richiesta la condividono.
+  → [backend/src/services/logoManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/logoManager.ts)
+
+- **Il nome di cliente e collaboratore nell'intestazione del PDF riusa la regola di
+  `personName`.** La concatenazione `` `${firstName} ${lastName ?? ""}`.trim()` `` era
+  ricopiata a mano in `customers.ts` e `collaborators.ts`, mentre `personName.ts` incarna
+  già la stessa regola in SQL per report e interventi.
+  *Perché:* due copie della stessa regola sono due occasioni perché diverga. Aggiunto il
+  gemello JS `personDisplayName`, per chi ha già la riga in mano e non serve una query.
+  → [backend/src/db/queries/personName.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/personName.ts),
+  [backend/src/routes/customers.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/customers.ts),
+  [backend/src/routes/collaborators.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/collaborators.ts)
+
+- **Il wrapper del documento pdfmake non è più ripetuto tre volte.** `pageSize`,
+  `pageMargins`, `defaultStyle`, `styles` erano identici in tre punti fra
+  `interventionPdf.ts` e `reportPdf.ts`, fuori dalla unificazione già fatta in
+  `pdf/shared.ts` per font e stili.
+  *Perché:* è la stessa ragione per cui `pdf/shared.ts` esiste — un cambio a quella forma
+  richiedeva modifiche coordinate in tre punti. Estratto `wrapPdfDocument`; la ricevuta
+  (`buildReceiptDefinition`) resta a parte perché ha bisogno dell'hook di misura.
+  → [backend/src/services/pdf/shared.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/pdf/shared.ts),
+  [backend/src/services/interventionPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionPdf.ts),
+  [backend/src/services/reportPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/reportPdf.ts)
+
+- **Rami morti in Impostazioni che mascheravano un potenziale buco di autorizzazione.**
+  `SettingsPage.tsx` ripeteva `activeSection === "users" && user?.isAdmin`, ma
+  `activeSection` è già vincolato da `canOpenSection` più sopra: per un non-admin non può mai
+  valere `"users"`.
+  *Perché:* il controllo era irraggiungibile oggi, ma se il filtro a monte venisse rimosso
+  per errore, il fallback finale avrebbe mostrato `LogsSettingsPanel` a un non-admin invece
+  di negare l'accesso. Sostituita la catena di ternari con una mappa `chiave → componente`.
+  → [frontend/src/pages/settings/SettingsPage.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/settings/SettingsPage.tsx)
+
+- **I percorsi verso un intervento passano tutti da `entityPaths`.** Le notifiche e il
+  calendario scrivevano `/interventions/${id}` a mano, bypassando l'helper nato apposta per
+  non duplicare i percorsi delle schede (come già capitato con `/clients/`).
+  → [frontend/src/lib/notifications/interventionsSource.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/notifications/interventionsSource.ts),
+  [frontend/src/pages/calendar/components/interventions-calendar.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/pages/calendar/components/interventions-calendar.tsx)
+
+- **La formattazione data → "AAAA-MM-GG" non è più duplicata carattere per carattere.**
+  `getTodayDateString` e il selettore data la ricostruivano ciascuno per conto proprio.
+  Estratta `formatDateISO` in `lib/utils.ts`.
+  → [frontend/src/lib/utils.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/utils.ts),
+  [frontend/src/lib/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/interventions.ts),
+  [frontend/src/components/date-picker-field.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/date-picker-field.tsx)
+
+### Verifiche eseguite
+
+Backend: `typecheck`, `lint`, `npm run test` (982 test) e `npm run test:db` (153 test,
+incluse le nuove verifiche sulla protezione di "Altro" a livello di query) tutti verdi.
+Frontend: `typecheck` e `npm run test` (700 test) verdi.
+
+### Ancora da fare
+
+Altri 8 punti emersi dalla stessa revisione restano da fare: la paginazione duplicata a
+mano in `settings.ts` (`GET /logs/:dayKey`), due rate-limiter a finestra scritti
+indipendentemente (login ed email), `TechnicianPage` che non riusa l'infrastruttura
+condivisa dei report/interventi e ha un filtro di default divergente dalle pagine gemelle,
+due regex email diverse per lo stesso scopo, `preventOutsideClose` non documentato su 4
+dialoghi, 5 dialoghi di creazione quasi identici, e 3 barre filtri copiate a mano.
+
 ## 2026-09-22 — Dialogo scorciatoie: gruppi separati con un bordo
 
 Nel dialogo aperto con "?" (`shortcuts-legend.tsx`), i quattro gruppi ("Ovunque", "Nelle

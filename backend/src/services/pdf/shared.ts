@@ -110,6 +110,26 @@ export const tableLayout = {
     paddingBottom: () => 4,
 };
 
+/**
+ * L'involucro del documento pdfmake comune a tutti i PDF "semplici" (senza l'hook di misura
+ * della ricevuta, che resta a parte in reportPdf.ts): pagina A4, margini, font/colore di
+ * default, stili condivisi.
+ */
+export const wrapPdfDocument = (
+    content: unknown[],
+    pageMargins: [number, number, number, number] = [14, 14, 14, 14]
+) => ({
+    pageSize: "A4" as const,
+    pageMargins,
+    defaultStyle: {
+        font: "Roboto",
+        fontSize: 10,
+        color: "#111111",
+    },
+    content,
+    styles: pdfStyles,
+});
+
 export const sectionBarCell = (title: string, colSpan?: number) => ({
     text: title,
     style: "sectionBar",

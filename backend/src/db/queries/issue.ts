@@ -2,6 +2,7 @@ import { desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../index";
 import { IssueTable } from "../schema";
 import type { NewIssue, UpdateIssue } from "../types";
+import { isCatchAllIssueDescription, protectedIssueError } from "../../services/issueCatalog";
 import { takeUnpaginated } from "./pagination";
 import { containsText, parseIdSearch } from "./search";
 
@@ -46,7 +47,24 @@ export const getIssueById = (id: number) => db.select().from(IssueTable).where(e
 
 export const createIssue = (data: NewIssue) => db.insert(IssueTable).values(data).returning();
 
-export const updateIssueById = (id: number, data: UpdateIssue) =>
-    db.update(IssueTable).set(data).where(eq(IssueTable.id, id)).returning();
+export const updateIssueById = async (id: number, data: UpdateIssue) => {
+    if (typeof data.description === "string") {
+        const [existing] = await getIssueById(id);
+        if (
+            existing &&
+            isCatchAllIssueDescription(existing.description) &&
+            !isCatchAllIssueDescription(data.description)
+        ) {
+            throw protectedIssueError();
+        }
+    }
+    return db.update(IssueTable).set(data).where(eq(IssueTable.id, id)).returning();
+};
 
-export const deleteIssueById = (id: number) => db.delete(IssueTable).where(eq(IssueTable.id, id)).returning();
+export const deleteIssueById = async (id: number) => {
+    const [existing] = await getIssueById(id);
+    if (existing && isCatchAllIssueDescription(existing.description)) {
+        throw protectedIssueError();
+    }
+    return db.delete(IssueTable).where(eq(IssueTable.id, id)).returning();
+};

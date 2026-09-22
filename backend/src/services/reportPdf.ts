@@ -8,6 +8,7 @@ import {
     sectionBarCell,
     sectionBarRow,
     tableLayout,
+    wrapPdfDocument,
 } from "./pdf/shared";
 
 /** Altezza A4 in punti, come la usa pdfmake. */
@@ -630,21 +631,11 @@ export const createReportPdfBuffer = async (report: ReportPrintData) => {
 export const createCustomerReportsPdfBuffer = async (customer: CustomerReportsPrintData) => {
     const logoDataUrl = await loadLogoDataUrl();
 
-    const documentDefinition = {
-        pageSize: "A4",
-        pageMargins: [14, 14, 14, 14],
-        defaultStyle: {
-            font: "Roboto",
-            fontSize: 10,
-            color: "#111111",
-        },
-        content: [
-            buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.reportCount} report`),
-            buildCustomerSummaryInfoSection(customer),
-            buildCustomerReportsTable(customer.reports, customer.showCustomerColumn),
-        ],
-        styles: pdfStyles,
-    };
+    const documentDefinition = wrapPdfDocument([
+        buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.reportCount} report`),
+        buildCustomerSummaryInfoSection(customer),
+        buildCustomerReportsTable(customer.reports, customer.showCustomerColumn),
+    ]);
 
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 

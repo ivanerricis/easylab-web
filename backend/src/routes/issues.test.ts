@@ -4,7 +4,8 @@ import request from "supertest";
 
 // Come negli altri test di rotta: il query layer è mockato, così la CI non ha bisogno di
 // un Postgres. Qui interessa una cosa sola — che la voce generica del catalogo non possa
-// sparire né sdoppiarsi — e quella vive nelle rotte, non nelle query.
+// sdoppiarsi — e quella vive nelle query, non nelle rotte: la protezione contro l'eliminare
+// o rinominare "Altro" è testata in issue.db.test.ts, dove il query layer non è mockato.
 vi.mock("../db/queries/issue", () => ({
     listIssues: vi.fn(),
     getIssueById: vi.fn(),
@@ -25,27 +26,11 @@ const buildApp = () => {
     return app;
 };
 
-const catchAll = { id: 1, description: "Altro", created_at: new Date(), updated_at: null };
 const normale = { id: 2, description: "Batteria non carica", created_at: new Date(), updated_at: null };
 
 describe("protezione della voce generica del catalogo difetti", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    /**
-     * È il caso che conta: senza "Altro" nel catalogo, il dialogo del report non mostra più
-     * la casella con cui si descrive il problema — e non comparirebbe nessun errore, il
-     * programma continuerebbe a funzionare stampando ricevute meno utili.
-     */
-    it('rifiuta di eliminare "Altro" e non arriva alla query di cancellazione', async () => {
-        vi.mocked(getIssueById).mockResolvedValue([catchAll] as never);
-
-        const response = await request(buildApp()).delete("/api/issues/1");
-
-        expect(response.status).toBe(409);
-        expect(response.body.message).toMatch(/non si può eliminare né rinominare/i);
-        expect(deleteIssueById).not.toHaveBeenCalled();
     });
 
     it("lascia eliminare un difetto qualunque", async () => {
@@ -56,15 +41,6 @@ describe("protezione della voce generica del catalogo difetti", () => {
 
         expect(response.status).toBe(200);
         expect(deleteIssueById).toHaveBeenCalledWith(2);
-    });
-
-    it('rifiuta di rinominare "Altro" in qualcos\'altro', async () => {
-        vi.mocked(getIssueById).mockResolvedValue([catchAll] as never);
-
-        const response = await request(buildApp()).put("/api/issues/1").send({ description: "Generico" });
-
-        expect(response.status).toBe(409);
-        expect(updateIssueById).not.toHaveBeenCalled();
     });
 
     /**
@@ -113,9 +89,8 @@ describe("protezione della voce generica del catalogo difetti", () => {
     });
 
     /**
-     * La guardia sta prima della validazione del factory: non deve mangiarsi i 400 che
-     * spettano a un corpo malformato, altrimenti un errore di battitura del client
-     * diventerebbe un 409 incomprensibile.
+     * Un corpo malformato deve restare un 400 della validazione del factory, non finire
+     * confuso con il 409 della protezione della voce generica.
      */
     it("lascia passare alla validazione un corpo senza descrizione", async () => {
         const response = await request(buildApp()).post("/api/issues").send({ nome: "sbagliato" });

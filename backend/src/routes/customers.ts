@@ -6,6 +6,7 @@ import {
     listCustomers,
     updateCustomerById,
 } from "../db/queries/customer";
+import { personDisplayName } from "../db/queries/personName";
 import { getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
@@ -65,7 +66,7 @@ const loadCustomerPrintContext = async (id: number) => {
 
     return {
         customerId: customer.id,
-        customerName: `${customer.firstName} ${customer.lastName ?? ""}`.trim(),
+        customerName: personDisplayName(customer.firstName, customer.lastName),
         customerPhone: formatPhoneLabel(customer.phoneNumber, customer.phoneNumberSecondary),
         customerEmail: customer.email ?? "-",
         ...(await getLabConfig()),

@@ -1,5 +1,5 @@
 import type { InterventionStatus, InterventionType } from "@/types/dtos";
-import { formatYesNo } from "@/lib/utils";
+import { formatDateISO, formatYesNo } from "@/lib/utils";
 import type { StatusColor } from "@/lib/statusColors";
 
 export const interventionTypeOptions: { value: InterventionType; label: string }[] = [
@@ -137,11 +137,4 @@ export const formatPaidStatus = (value: boolean) => (value ? "Pagato" : "Non pag
 
 export const formatToInvoiceStatus = formatYesNo;
 
-export const getTodayDateString = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-};
+export const getTodayDateString = () => formatDateISO(new Date());

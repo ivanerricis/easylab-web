@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { insertIssue } from "../../test/db/fixtures";
-import { createIssue, listIssues, updateIssueById } from "./issue";
+import { createIssue, deleteIssueById, listIssues, updateIssueById } from "./issue";
 
 describe("createIssue: unicità della descrizione", () => {
     it("rifiuta una descrizione duplicata solo per maiuscole/minuscole", async () => {
@@ -29,6 +29,34 @@ describe("createIssue: unicità della descrizione", () => {
         await expect(updateIssueById(other.id, { description: "altro" })).rejects.toMatchObject({
             cause: { code: "23505" },
         });
+    });
+});
+
+describe("protezione della voce generica del catalogo difetti", () => {
+    // Prima la protezione stava nelle rotte (mock del query layer, vedi issues.test.ts); ora
+    // vive qui, quindi va provata contro il database vero, non contro un mock che le farebbe
+    // solo da eco.
+    it('rifiuta di eliminare "Altro"', async () => {
+        const altro = await insertIssue("Altro");
+
+        await expect(deleteIssueById(altro.id)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('rifiuta di rinominare "Altro" in qualcos\'altro', async () => {
+        const altro = await insertIssue("Altro");
+
+        await expect(updateIssueById(altro.id, { description: "Generico" })).rejects.toMatchObject({
+            statusCode: 409,
+        });
+    });
+
+    it("lascia eliminare e rinominare un difetto qualunque", async () => {
+        const normale = await insertIssue("Schermo rotto");
+
+        await expect(updateIssueById(normale.id, { description: "Schermo crepato" })).resolves.toEqual([
+            expect.objectContaining({ description: "Schermo crepato" }),
+        ]);
+        await expect(deleteIssueById(normale.id)).resolves.toEqual([expect.objectContaining({ id: normale.id })]);
     });
 });
 

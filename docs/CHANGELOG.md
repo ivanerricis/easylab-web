@@ -11,6 +11,13 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Commit vuoto per verificare l'aggiornamento reale sulla VM
+
+Nessuna modifica funzionale: solo per dare al server un nuovo commit da scaricare e
+osservare dal vivo il fix dello spinner appena applicato (voce sotto).
+*Perché:* il test automatico prova che la logica è corretta, ma non che il flusso reale sulla
+VM (systemd → git → docker compose build) si comporti come previsto.
+
 ## 2026-09-22 — Corretto lo spinner di aggiornamento bloccato quando il commit non cambia
 
 `updateSettingsPanel.tsx` (il pannello che l'utente guarda mentre l'aggiornamento gira)

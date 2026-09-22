@@ -60,10 +60,7 @@ const ShortcutsLegend = () => {
 
                 <div className="flex flex-col gap-4">
                     {groups.map((group, index) => (
-                        <div
-                            key={group.heading}
-                            className={cn("flex flex-col gap-2", index > 0 && "border-t pt-4")}
-                        >
+                        <div key={group.heading} className={cn("flex flex-col gap-2", index > 0 && "border-t pt-4")}>
                             <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 {group.heading}
                             </p>

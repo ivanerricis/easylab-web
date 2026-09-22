@@ -204,7 +204,6 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 title="Nuovo intervento"
                 description="Inserisci i dati dell'intervento e conferma per salvare."
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-                preventOutsideClose
                 confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
                 confirmIcon={Save}
                 cancelLabel="Annulla"

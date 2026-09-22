@@ -11,6 +11,54 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Due correzioni in più dalla stessa revisione: email e conferma di chiusura
+
+Seguito della revisione di qualità dello stesso giorno: altri 2 degli 8 punti rimasti
+vengono chiusi.
+
+- **Una sola regola per un indirizzo email valido.** `createCustomerDialog.tsx` e
+  `emailSettingsPanel.tsx` avevano ciascuno la propria regex, e quella delle impostazioni
+  email era più permissiva della prima: un indirizzo poteva essere accettato in un form e
+  rifiutato nell'altro.
+  *Perché:* due regole per la stessa cosa sono un modo perché divergano senza che nessuno se
+  ne accorga. Estratta `isValidEmail` in `lib/utils.ts` — la regola più precisa delle due,
+  la stessa che il browser applica a `type="email"` — usata da entrambi.
+  → [frontend/src/lib/utils.ts](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/lib/utils.ts),
+  [frontend/src/components/dialogs/create/createCustomerDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createCustomerDialog.tsx),
+  [frontend/src/components/settings/emailSettingsPanel.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/settings/emailSettingsPanel.tsx)
+
+- **Un clic fuori da un report o un intervento in modifica ora chiede conferma come
+  ovunque altrove, invece di non fare nulla.** I 4 dialoghi di report/intervento
+  (creazione e modifica) passavano `preventOutsideClose` a `CustomDialog`, senza un
+  commento che ne spiegasse il motivo fin dal commit che l'ha introdotto (verificato con
+  `git log -S`): un clic fuori dal dialogo con modifiche non salvate non faceva nulla,
+  mentre Esc e la X — e il clic fuori sulle altre 5 anagrafiche — mostrano la finestra
+  "Modifiche non salvate?" gestita da `isDirty`.
+  *Perché:* un comportamento speciale non documentato su due infrastrutture condivise
+  (`CustomDialog`) è un rischio a prescindere da quanto sembri innocuo; qui, verificata
+  l'assenza di un motivo storico recuperabile, si è scelto di uniformare piuttosto che
+  documentare un'eccezione. Rimosso `preventOutsideClose` dai 4 dialoghi: restano invariati
+  gli altri usi (i dialoghi che mostrano un segreto una sola volta — password generata,
+  codici di recupero, 2FA — e quelli legati a un'operazione in corso — eliminazione,
+  ripristino backup).
+  → [frontend/src/components/dialogs/create/createReportDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createReportDialog.tsx),
+  [frontend/src/components/dialogs/edit/editReportDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/edit/editReportDialog.tsx),
+  [frontend/src/components/dialogs/create/createInterventionDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createInterventionDialog.tsx),
+  [frontend/src/components/dialogs/edit/editInterventionDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/edit/editInterventionDialog.tsx)
+
+### Verifiche eseguite
+
+Frontend: `typecheck` e `npm run test` (700 test) verdi. Nessun test esistente dipendeva
+dal vecchio comportamento di `preventOutsideClose` sui 4 dialoghi (verificato con grep).
+
+### Ancora da fare
+
+Restano 6 degli 8 punti: la paginazione duplicata in `settings.ts`, due rate-limiter
+indipendenti, `TechnicianPage` che non riusa l'infrastruttura condivisa dei
+report/interventi con un filtro di default divergente, 5 dialoghi di creazione quasi
+identici, 3 barre filtri copiate a mano, e `backupManager` (quest'ultimo scartato: costo
+minimo, non da fare).
+
 ## 2026-09-22 — Revisione di qualità su tutto il repository: 7 correzioni
 
 Una revisione di qualità con 8 agenti in parallelo (4 angolazioni — riuso, semplificazione,

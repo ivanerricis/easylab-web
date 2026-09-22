@@ -286,7 +286,6 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             isDirty={isDirty}
             title={reportId ? `Modifica report #${reportId}` : "Modifica report"}
             contentClassName="sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
-            preventOutsideClose
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
             confirmIcon={Save}
             cancelLabel="Annulla"

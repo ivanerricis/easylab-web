@@ -22,8 +22,7 @@ import {
     type EmailSettingsInput,
 } from "@/lib/api";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidEmail } from "@/lib/utils";
 
 const defaultForm: EmailSettingsInput = {
     enabled: false,
@@ -89,7 +88,7 @@ const EmailSettingsPanel = () => {
                 return;
             }
 
-            if (!emailPattern.test(formValues.fromEmail.trim())) {
+            if (!isValidEmail(formValues.fromEmail.trim())) {
                 toast.error("L'email mittente non è valida");
                 return;
             }
@@ -150,7 +149,7 @@ const EmailSettingsPanel = () => {
 
         const fromEmail = formValues.fromEmail.trim();
 
-        if (!fromEmail || !emailPattern.test(fromEmail)) {
+        if (!fromEmail || !isValidEmail(fromEmail)) {
             toast.error("Inserisci un'email mittente valida per testare l'invio");
             return;
         }

@@ -131,6 +131,21 @@ export function formatDateISO(date: Date): string {
 }
 
 /**
+ * La stessa regola che il browser applica a `type="email"` (è l'espressione dello standard
+ * HTML). Con la validazione nativa spenta nei dialoghi (vedi `CustomDialog`), il controllo va
+ * fatto a mano, e l'errore risultante va sotto il campo come gli altri. Prima due punti del
+ * codice (il cliente e le impostazioni email) avevano ciascuno la propria regex, e quella delle
+ * impostazioni email era più permissiva: un indirizzo poteva essere accettato in un form e
+ * rifiutato nell'altro.
+ */
+const emailPattern =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+export function isValidEmail(value: string): boolean {
+    return emailPattern.test(value);
+}
+
+/**
  * Il tasto che accompagna le scorciatoie, scritto come lo scriverebbe chi sta davanti allo
  * schermo: ⌘ sui Mac, Ctrl altrove. Sta qui perché lo leggono sia la ricerca globale sia
  * l'elenco delle scorciatoie, e due copie del controllo avevano già preso strade diverse.

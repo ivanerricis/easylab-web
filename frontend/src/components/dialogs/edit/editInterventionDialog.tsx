@@ -168,7 +168,6 @@ const EditInterventionDialog = ({
             isDirty={isDirty}
             title={interventionId ? `Modifica intervento #${interventionId}` : "Modifica intervento"}
             contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-            preventOutsideClose
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
             confirmIcon={Save}
             cancelLabel="Annulla"

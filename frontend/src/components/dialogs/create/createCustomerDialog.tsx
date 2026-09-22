@@ -3,6 +3,7 @@ import FormField from "@/components/form-field";
 import { fieldProps, hasFormChanged } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api";
+import { isValidEmail } from "@/lib/utils";
 import type { CustomerDto } from "@/types/dtos";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -29,15 +30,6 @@ type Props = {
 };
 
 type FieldErrors = Partial<Record<"firstName" | "phoneNumber" | "email", string>>;
-
-/**
- * La stessa regola che il browser applica a `type="email"` (è l'espressione dello standard
- * HTML). Prima la controllava il browser da sé, con il suo fumetto; con la validazione nativa
- * spenta nei dialoghi (vedi `CustomDialog`) il controllo sta qui, e l'errore va sotto il campo
- * come gli altri.
- */
-const emailPattern =
-    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
 const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [formValues, setFormValues] = useState({
@@ -88,7 +80,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
 
         const email = formValues.email.trim();
 
-        if (email !== "" && !emailPattern.test(email)) {
+        if (email !== "" && !isValidEmail(email)) {
             nextErrors.email = "Indirizzo email non valido";
         }
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Kbd from "@/components/ui/kbd";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
-import { modifierKey } from "@/lib/utils";
+import { cn, modifierKey } from "@/lib/utils";
 
 const groups: { heading: string; rows: { keys: string[]; label: string }[] }[] = [
     {
@@ -59,9 +59,12 @@ const ShortcutsLegend = () => {
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    {groups.map((group) => (
-                        <div key={group.heading} className="flex flex-col gap-2">
-                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {groups.map((group, index) => (
+                        <div
+                            key={group.heading}
+                            className={cn("flex flex-col gap-2", index > 0 && "border-t pt-4")}
+                        >
+                            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 {group.heading}
                             </p>
                             {group.rows.map((row) => (

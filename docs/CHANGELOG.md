@@ -11,6 +11,17 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Dialogo scorciatoie: gruppi separati con un bordo
+
+Nel dialogo aperto con "?" (`shortcuts-legend.tsx`), i quattro gruppi ("Ovunque", "Nelle
+pagine a elenco", "Nella dashboard", "Nelle finestre") avevano solo l'etichetta in maiuscolo
+e uno spazio verticale a distinguerli dalle voci vicine: nello screenshot di verifica si
+leggevano come un unico elenco continuo, non come sezioni. Aggiunto un bordo superiore a ogni
+gruppo tranne il primo (`border-t pt-4`, via `cn`) e resa l'etichetta un po' più marcata
+(`font-semibold` invece di `font-medium`). Verificato visivamente con Playwright, iniettando
+il markup con le classi reali nella pagina di login (il componente non dipende da dati, quindi
+non serve autenticarsi): prima e dopo a confronto, i confini tra gruppi ora si vedono.
+
 ## 2026-09-22 — Avviso di accesso da un dispositivo nuovo
 
 **Il problema.** Il login usa un token di sessione opaco in un cookie `httpOnly`: se qualcuno se

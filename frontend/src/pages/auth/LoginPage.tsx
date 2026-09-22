@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
 
@@ -125,25 +127,49 @@ const LoginPage = () => {
                                 <Label htmlFor="loginCode">
                                     {isUsingRecoveryCode ? "Codice di recupero" : "Codice di verifica"}
                                 </Label>
-                                <Input
-                                    // La `key` forza un input nuovo: le due schermate hanno la
-                                    // stessa struttura, e senza React riuserebbe quello del nome
-                                    // utente — `autoFocus` scatta solo al montaggio. Cambia anche
-                                    // passando al codice di recupero, per riprendere il focus
-                                    // tolto dal clic sul link.
-                                    key={isUsingRecoveryCode ? "recovery" : "totp"}
-                                    ref={codeInputRef}
-                                    id="loginCode"
-                                    // `one-time-code` è ciò che permette a iOS e Android di
-                                    // proporre il codice senza farlo ricopiare a mano.
-                                    autoComplete="one-time-code"
-                                    inputMode={isUsingRecoveryCode ? "text" : "numeric"}
-                                    maxLength={isUsingRecoveryCode ? 9 : 6}
-                                    autoFocus
-                                    className="text-center font-mono text-lg tracking-widest"
-                                    value={code}
-                                    onChange={(event) => setCode(event.target.value)}
-                                />
+                                {isUsingRecoveryCode ? (
+                                    <Input
+                                        // La `key` forza un input nuovo: le due schermate hanno la
+                                        // stessa struttura, e senza React riuserebbe quello del nome
+                                        // utente — `autoFocus` scatta solo al montaggio. Cambia anche
+                                        // passando al codice di recupero, per riprendere il focus
+                                        // tolto dal clic sul link.
+                                        key="recovery"
+                                        ref={codeInputRef}
+                                        id="loginCode"
+                                        // `one-time-code` è ciò che permette a iOS e Android di
+                                        // proporre il codice senza farlo ricopiare a mano.
+                                        autoComplete="one-time-code"
+                                        inputMode="text"
+                                        maxLength={9}
+                                        autoFocus
+                                        className="text-center font-mono text-lg tracking-widest"
+                                        value={code}
+                                        onChange={(event) => setCode(event.target.value)}
+                                    />
+                                ) : (
+                                    <InputOTP
+                                        key="totp"
+                                        ref={codeInputRef}
+                                        id="loginCode"
+                                        autoComplete="one-time-code"
+                                        maxLength={6}
+                                        pattern={REGEXP_ONLY_DIGITS}
+                                        autoFocus
+                                        containerClassName="justify-center"
+                                        value={code}
+                                        onChange={setCode}
+                                    >
+                                        <InputOTPGroup>
+                                            <InputOTPSlot index={0} />
+                                            <InputOTPSlot index={1} />
+                                            <InputOTPSlot index={2} />
+                                            <InputOTPSlot index={3} />
+                                            <InputOTPSlot index={4} />
+                                            <InputOTPSlot index={5} />
+                                        </InputOTPGroup>
+                                    </InputOTP>
+                                )}
                             </div>
 
                             <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>

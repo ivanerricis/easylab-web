@@ -11,6 +11,21 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Codice OTP a due fattori: una casella per cifra
+
+Il campo del codice a 6 cifre (login con 2FA e attivazione della verifica in due passaggi
+nelle impostazioni) ora usa il componente `input-otp` di shadcn/ui invece di un `Input`
+singolo con `maxLength={6}`.
+*Perché:* è il pattern standard per i codici OTP — ogni cifra ha la sua casella, con la
+casella attiva evidenziata, così è chiaro quante cifre mancano senza dover contare i
+caratteri in un campo di testo. Il codice di recupero (9 caratteri alfanumerici) resta un
+`Input` normale: non è un codice a cifre distinte, è più un valore da incollare.
+
+Installato via `npx shadcn add input-otp` (aggiunge la dipendenza `input-otp`): la CLI ha
+anche generato un import rotto (`from "cn"`, un pacchetto npm omonimo ma estraneo, invece di
+`@/lib/utils`) e aggiunto quel pacchetto come dipendenza — corretto a mano, va controllato di
+nuovo se si rilancia la CLI su un altro componente.
+
 ## 2026-09-22 — Email dell'intervento: testo nuovo, risposte al laboratorio
 
 Tre modifiche all'email che accompagna il PDF dell'intervento, decise con il laboratorio.

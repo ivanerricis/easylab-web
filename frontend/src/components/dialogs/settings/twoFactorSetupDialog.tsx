@@ -4,9 +4,11 @@ import CustomDialog from "@/components/dialogs/customDialog";
 import CopyableValue from "@/components/dialogs/settings/copyableValue";
 import { RequiredMark } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { enableTwoFactor, getApiErrorMessage, startTwoFactorSetup } from "@/lib/api";
 import { ShieldCheck } from "lucide-react";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 
 /**
  * Attivazione della verifica in due passaggi, in due schermate dentro lo stesso dialogo:
@@ -145,15 +147,24 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                             Codice di verifica
                             <RequiredMark />
                         </Label>
-                        <Input
+                        <InputOTP
                             id="twoFactorConfirmCode"
                             autoComplete="one-time-code"
-                            inputMode="numeric"
                             maxLength={6}
-                            className="text-center font-mono text-lg tracking-widest"
+                            pattern={REGEXP_ONLY_DIGITS}
+                            containerClassName="justify-center"
                             value={code}
-                            onChange={(event) => setCode(event.target.value)}
-                        />
+                            onChange={setCode}
+                        >
+                            <InputOTPGroup>
+                                <InputOTPSlot index={0} />
+                                <InputOTPSlot index={1} />
+                                <InputOTPSlot index={2} />
+                                <InputOTPSlot index={3} />
+                                <InputOTPSlot index={4} />
+                                <InputOTPSlot index={5} />
+                            </InputOTPGroup>
+                        </InputOTP>
                     </div>
                 </div>
             }

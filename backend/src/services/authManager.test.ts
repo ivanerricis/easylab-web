@@ -148,8 +148,20 @@ vi.mock("./notificationManager", () => ({
     recordNotification: (input: unknown) => recordNotification(input),
 }));
 
+const getCompanySettings = vi.fn<() => Promise<{ name: string; email?: string }>>(() =>
+    Promise.resolve({ name: "Laboratorio" })
+);
+
 vi.mock("./companyManager", () => ({
-    getCompanySettings: vi.fn(() => Promise.resolve({ name: "Laboratorio" })),
+    getCompanySettings: () => getCompanySettings(),
+}));
+
+const isEmailConfigured = vi.fn<() => Promise<boolean>>(() => Promise.resolve(false));
+const sendEmail = vi.fn<(input: unknown) => Promise<void>>(() => Promise.resolve());
+
+vi.mock("./emailManager", () => ({
+    isEmailConfigured: () => isEmailConfigured(),
+    sendEmail: (input: unknown) => sendEmail(input),
 }));
 
 // Il file con la password admin iniziale sta nel vero `data/`: nessun test deve toccarlo.
@@ -234,6 +246,8 @@ beforeEach(() => {
     createTwoFactorChallenge.mockReturnValue("challenge-1");
     getTwoFactorChallengeUserId.mockReturnValue(null);
     registerFailedTwoFactorAttempt.mockReturnValue(true);
+    getCompanySettings.mockResolvedValue({ name: "Laboratorio" });
+    isEmailConfigured.mockResolvedValue(false);
 });
 
 /** Un segreto Base32 valido: `verifyTotp` non è mockato, i codici si calcolano davvero. */
@@ -461,6 +475,73 @@ ${"x".repeat(400)}`
 
         const inserted = dbCalls.find((call) => call.op === "insert" && call.table === sessionTable);
         expect(inserted?.values?.userAgent).toBeNull();
+    });
+
+    const chromeOnWindows =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+
+    describe("avviso di nuovo dispositivo", () => {
+        it("un dispositivo mai visto per l'utente avvisa e si aggiunge a quelli noti", async () => {
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+
+            const updated = dbCalls.find((call) => call.op === "update" && call.table === userTable);
+            expect(JSON.parse(updated?.values?.knownDeviceLabels as string)).toEqual(["Chrome su Windows"]);
+            expect(recordNotification).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dedupeKey: "new-device-login:7:Chrome su Windows",
+                    message: expect.stringContaining('"mario"') as unknown,
+                })
+            );
+        });
+
+        it("un dispositivo già noto non riscrive l'elenco né avvisa di nuovo", async () => {
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: JSON.stringify(["Chrome su Windows"]) })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+
+            expect(dbCalls.some((call) => call.op === "update" && call.table === userTable)).toBe(false);
+            expect(recordNotification).not.toHaveBeenCalled();
+        });
+
+        it("senza un'etichetta riconoscibile non avvisa né scrive niente", async () => {
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4");
+
+            expect(dbCalls.some((call) => call.op === "update" && call.table === userTable)).toBe(false);
+            expect(recordNotification).not.toHaveBeenCalled();
+        });
+
+        it("manda anche l'email al laboratorio, se l'SMTP è configurato e l'indirizzo è impostato", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "titolare@esempio.it" });
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+
+            expect(sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    to: "titolare@esempio.it",
+                    text: expect.stringContaining('"mario"') as unknown,
+                })
+            );
+        });
+
+        it("senza email del laboratorio configurata non tenta l'invio", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+
+            expect(sendEmail).not.toHaveBeenCalled();
+        });
     });
 
     it("è amministratore solo l'utente con l'id più basso", async () => {

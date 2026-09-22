@@ -33,6 +33,7 @@ import {
 } from "./twoFactorChallenge";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { getCompanySettings } from "./companyManager";
+import { isEmailConfigured, sendEmail } from "./emailManager";
 import { recordNotification } from "./notificationManager";
 import { ApiError } from "./apiError";
 
@@ -49,6 +50,12 @@ const sessionCleanupIntervalMs = 60 * 60 * 1000;
  * colonna resta abbastanza precisa per distinguere una sessione viva da una abbandonata.
  */
 const sessionTouchIntervalMs = 5 * 60 * 1000;
+/**
+ * Quante etichette di dispositivo (`describeUserAgent`) tenere per utente prima di scartare le
+ * più vecchie: bastano a coprire i dispositivi reali di una persona (telefono, PC, un eventuale
+ * tablet) nel tempo, senza far crescere la colonna all'infinito.
+ */
+const maxKnownDeviceLabels = 20;
 
 export class AuthManagerError extends ApiError {}
 
@@ -274,6 +281,79 @@ export type LoginResult =
     | { status: "twoFactorRequired"; challengeId: string }
     | { status: "authenticated"; token: string; expiresAt: Date; user: PublicUser };
 
+const parseKnownDeviceLabels = (raw: string | null | undefined): string[] => {
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((label): label is string => typeof label === "string") : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Avvisa (notifica in-app, più l'email del laboratorio se configurata) quando l'accesso arriva
+ * da un dispositivo mai visto prima per questo utente, e lo aggiunge a quelli noti.
+ *
+ * L'etichetta è quella di `describeUserAgent` ("Chrome su Windows"), non l'header grezzo: così
+ * un aggiornamento del browser non genera un avviso a ogni accesso, solo un vero cambio di
+ * browser o sistema operativo. Un'etichetta `null` (header assente o irriconoscibile) non prova
+ * nulla, quindi non genera avvisi né entra fra quelle note — come già fa `session.user_agent`
+ * con lo stesso header (vedi `deviceLabel.ts`).
+ *
+ * Un'unica email del laboratorio, non una per utente (vedi CHANGELOG): il messaggio riporta lo
+ * username, altrimenti chi legge la casella condivisa non saprebbe a chi si riferisce.
+ */
+const notifyIfNewDevice = async (user: UserRow, label: string | null): Promise<void> => {
+    if (!label) {
+        return;
+    }
+
+    const knownLabels = parseKnownDeviceLabels(user.knownDeviceLabels);
+
+    if (knownLabels.includes(label)) {
+        return;
+    }
+
+    await db
+        .update(userTable)
+        .set({ knownDeviceLabels: JSON.stringify([...knownLabels, label].slice(-maxKnownDeviceLabels)) })
+        .where(eq(userTable.id, user.id));
+
+    await recordNotification({
+        dedupeKey: `new-device-login:${user.id}:${label}`,
+        severity: "info",
+        title: "Accesso da un nuovo dispositivo",
+        message: `L'utente "${user.username}" è entrato da un dispositivo mai visto prima (${label}).`,
+        link: "/settings?section=security",
+    });
+
+    // Come le email di avviso dei backup: non deve mai far fallire il login se l'SMTP è giù o
+    // mal configurato, quindi resta un tentativo a parte con il proprio try/catch.
+    try {
+        if (!(await isEmailConfigured())) {
+            return;
+        }
+
+        const company = await getCompanySettings();
+
+        if (!company.email) {
+            return;
+        }
+
+        await sendEmail({
+            to: company.email,
+            subject: `Nuovo accesso - ${company.name}`,
+            text: `L'utente "${user.username}" è entrato da un dispositivo mai visto prima (${label}).`,
+        });
+    } catch (error) {
+        console.error("Invio email di avviso nuovo dispositivo non riuscito:", error);
+    }
+};
+
 /**
  * L'unico punto che scrive in `sessionTable`: i due passi del login ci arrivano da strade
  * diverse ma devono produrre esattamente la stessa sessione, cookie compreso.
@@ -281,6 +361,7 @@ export type LoginResult =
 const createSessionForUser = async (user: UserRow, userAgent?: string | null): Promise<LoginResult> => {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + sessionDurationMs);
+    const sanitizedUserAgent = sanitizeUserAgent(userAgent);
     // Il dispositivo si registra solo qui, all'apertura: l'header può cambiare sotto la stessa
     // sessione (un aggiornamento del browser) e riscriverlo a ogni richiesta significherebbe
     // una scrittura in più per un dato che serve solo a riconoscere chi ha fatto l'accesso.
@@ -288,8 +369,10 @@ const createSessionForUser = async (user: UserRow, userAgent?: string | null): P
         tokenHash: hashSessionToken(token),
         userId: user.id,
         expiresAt,
-        userAgent: sanitizeUserAgent(userAgent),
+        userAgent: sanitizedUserAgent,
     });
+
+    await notifyIfNewDevice(user, describeUserAgent(sanitizedUserAgent));
 
     const adminId = await getAdminUserId();
     return { status: "authenticated", token, expiresAt, user: toPublicUser(user, user.id === adminId) };

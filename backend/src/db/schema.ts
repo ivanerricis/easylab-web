@@ -209,6 +209,14 @@ export const userTable = pgTable("user", {
     totpConfirmedAt: timestamp("totp_confirmed_at"),
     /** Ultimo passo temporale accettato, perché ogni codice entri una volta sola. */
     totpLastStep: integer("totp_last_step"),
+    /**
+     * Etichette (`describeUserAgent`, es. "Chrome su Windows") dei dispositivi già visti per
+     * questo utente, come array JSON. Serve solo a riconoscere un accesso da un dispositivo
+     * mai usato prima e avvisare l'email del laboratorio (vedi `authManager.notifyNewDevice`);
+     * non entra in nessuna decisione di sicurezza, come `session.user_agent` da cui nasce.
+     * NULL equivale ad array vuoto: nessun dispositivo ancora noto.
+     */
+    knownDeviceLabels: text("known_device_labels"),
     ...timestamps,
 });
 

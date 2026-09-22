@@ -11,6 +11,44 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Avviso di accesso da un dispositivo nuovo
+
+**Il problema.** Il login usa un token di sessione opaco in un cookie `httpOnly`: se qualcuno se
+lo procura in chiaro (accesso fisico al dispositivo, malware), può presentarlo da un browser
+completamente diverso finché non scade (7 giorni) o non viene revocato — `getSessionUser`
+(`backend/src/services/authManager.ts`) verifica solo che l'hash corrisponda a una sessione non
+scaduta, senza legarla a un IP o a un dispositivo. Un binding rigido a IP/User-Agent è stato
+scartato: darebbe falsi positivi continui (IP mobile che cambia cella, VPN, un aggiornamento del
+browser), disturbando l'uso normale più di quanto fermi un furto vero.
+
+**La scelta.** Notificare, non bloccare: quando `createSessionForUser` vede, per un utente, un
+`describeUserAgent` (`backend/src/services/deviceLabel.ts`, es. "Chrome su Windows") mai
+registrato prima, registra una notifica in-app e — se l'SMTP è configurato e c'è un indirizzo —
+manda un'email. Deliberatamente l'**etichetta normalizzata**, non l'header grezzo: la stringa
+grezza cambia a ogni aggiornamento del browser (il numero di versione ne fa parte), quindi
+confrontarla avrebbe generato un avviso falso a ogni aggiornamento automatico di Chrome/Edge.
+L'etichetta invece cambia solo se cambia davvero browser o sistema operativo.
+
+**Nessun campo email per utente.** L'email va tutta all'indirizzo già configurato nelle
+Impostazioni aziendali (`company.email`, lo stesso usato per gli avvisi di backup falliti in
+`backupManager.ts`), non a un indirizzo per singolo utente: aggiungere un campo email a `user`
+avrebbe richiesto una migrazione e un flusso di gestione in più per un beneficio marginale in un
+laboratorio con pochi account. Il messaggio riporta lo username, altrimenti chi legge la casella
+condivisa non saprebbe di quale account si tratta.
+
+**Persistenza, non uno stato in memoria.** I dispositivi già noti di un utente stanno in un nuovo
+campo `user.known_device_labels` (array JSON, migrazione
+`backend/drizzle/0036_add_user_known_devices.sql`), non in una mappa in memoria come
+`knownLoginSources` in `loginRateLimit.ts`. Quella mappa può permettersi di dimenticare tutto a
+ogni riavvio perché serve solo ad allentare un limite anti-bruteforce; qui dimenticare i
+dispositivi noti a ogni riavvio (che con l'aggiornamento automatico in produzione può succedere
+spesso) avrebbe ricreato lo stesso problema di falsi positivi che questa funzione vuole evitare,
+mandando un'email "dispositivo nuovo" per un dispositivo in realtà già usato da settimane.
+
+**Cosa non cambia.** Nessun blocco, nessuna richiesta di conferma aggiuntiva al login: è solo un
+segnale in più per accorgersi di un accesso anomalo, che resta affiancato — non sostituito — alla
+revoca delle sessioni già esistente in Impostazioni → Sicurezza.
+
 ## 2026-09-21 — Regole di dominio scritte una volta sola (report e interventi)
 
 **Il problema.** Dal backlog: due regole erano scritte due volte ciascuna, con parole non sempre

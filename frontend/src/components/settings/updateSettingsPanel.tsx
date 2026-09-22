@@ -200,9 +200,14 @@ const UpdateSettingsPanel = () => {
 
                     if (isThisRun && result.state === "success") {
                         setStatus(result);
+                        // `setUpdateBusy(null)` spunta anche l'ultima fase ma lascia l'overlay
+                        // visibile (vedi il commento su BusyGuardState.activeStepKey): il reload
+                        // vero va sbloccato con `setBusy(null)`, altrimenti il beforeunload di
+                        // BusyGuardProvider lo intercetta e il browser chiede conferma.
                         setUpdateBusy(null);
                         toast.success("Aggiornamento completato. Ricarico la pagina...");
                         await sleep(1500);
+                        setBusy(null);
                         window.location.reload();
                         return;
                     }

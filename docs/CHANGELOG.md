@@ -11,6 +11,27 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Il reload di fine aggiornamento restava bloccato dal proprio beforeunload
+
+Screenshot dell'utente dopo un aggiornamento reale sulla VM: tutte e quattro le fasi spuntate,
+spinner ancora acceso, e sopra il dialogo nativo del browser "Ricaricare l'app? Le modifiche
+apportate potrebbero non essere salvate" — lo stesso `window.location.reload()` di fine
+aggiornamento veniva intercettato dal `beforeunload` che `BusyGuardProvider` registra apposta
+per impedire chiusure accidentali durante l'operazione.
+*Perché:* `updateSettingsPanel.tsx` chiamava `setUpdateBusy(null)` per spuntare l'ultima fase,
+ma quella funzione imposta solo `activeStepKey: null` — l'overlay (e quindi il blocco) restava
+un oggetto non nullo. Il `reload()` vero partiva quindi ancora "bloccato": in un browser reale
+il dialogo nativo sospende l'esecuzione dello script proprio dentro `location.reload()`, per
+questo il `finally` che avrebbe ripulito tutto non arrivava mai a girare. Aggiunto un
+`setBusy(null)` esplicito subito prima del reload in entrambi i punti che lo chiamano
+(`updateSettingsPanel.tsx` e `useUpdateWatcher.ts`), e reso `BusyGuardProvider` immune alla
+tempistica di React: il valore che il listener legge ora è uno `useRef` aggiornato in modo
+sincrono da `setBusy` stesso, non più lo stato letto dall'ultimo render effettuato — altrimenti
+lo stesso bug si sarebbe ripresentato ogni volta che `reload()` viene chiamato a ridosso di
+`setBusy(null)`, prima che React avesse il tempo di rieseguire l'effetto. Un test di controllo
+(mock di `reload` che scatena un `beforeunload` reale nell'istante in cui viene invocato, non
+dopo) è stato verificato fallire senza la correzione.
+
 ## 2026-09-22 — Commit vuoto per verificare l'aggiornamento reale sulla VM
 
 Nessuna modifica funzionale: solo per dare al server un nuovo commit da scaricare e

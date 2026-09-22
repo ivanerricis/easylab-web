@@ -168,6 +168,56 @@ describe("UpdateSettingsPanel", () => {
     });
 
     /**
+     * Bug osservato in produzione: a operazione riuscita l'overlay restava visibile (a posta,
+     * per mostrare le spunte) mentre il vero `window.location.reload()` partiva ancora a
+     * `busy` non nullo — il `beforeunload` di BusyGuardProvider lo intercettava, e il browser
+     * mostrava la sua conferma nativa "Ricaricare l'app?" invece di ricaricare da solo.
+     *
+     * Un browser vero ferma l'esecuzione dello script proprio dentro `location.reload()`
+     * finché quella conferma non riceve una risposta: qui non possiamo riprodurre quel blocco
+     * sincrono, ma possiamo controllare la stessa condizione — se il `beforeunload` sarebbe
+     * stato impedito — facendo scattare l'evento reale nell'istante esatto in cui il mock di
+     * `reload` viene chiamato, invece che dopo che tutto (compreso il `finally`) è già finito.
+     */
+    it("non lascia il beforeunload bloccare il reload automatico a fine aggiornamento", async () => {
+        api.runUpdateNow.mockResolvedValue(status);
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Aggiorna adesso" }));
+        await click(within(screen.getByRole("dialog")).getByRole("button", { name: "Aggiorna adesso" }));
+
+        const dispatchBeforeUnload = () => {
+            const event = new Event("beforeunload", { cancelable: true });
+            window.dispatchEvent(event);
+            return event;
+        };
+
+        // Durante l'attesa resta bloccato di proposito: un ricaricamento manuale in questa
+        // finestra interromperebbe l'aggiornamento.
+        expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+        let wasBlockedWhenReloadFired: boolean | null = null;
+        reload.mockImplementation(() => {
+            wasBlockedWhenReloadFired = dispatchBeforeUnload().defaultPrevented;
+        });
+
+        api.getUpdateStatus.mockResolvedValue({
+            ...status,
+            state: "success",
+            currentCommit: "def5678",
+            lastUpdateAt: "2026-09-11T09:00:00.000Z",
+        });
+        await nextPoll();
+
+        // Durante il conto alla rovescia le spunte restano a schermo, ma è ancora bloccato.
+        expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+        await nextPoll(1500);
+        expect(reload).toHaveBeenCalled();
+        expect(wasBlockedWhenReloadFired).toBe(false);
+    });
+
+    /**
      * Bug osservato: quando non c'è niente di nuovo da scaricare (si rilancia l'aggiornamento
      * sulla stessa versione), git reset --hard non cambia currentCommit — e lo spinner restava
      * acceso fino al timeout di 6 minuti perché il pannello riconosceva la fine solo da quel

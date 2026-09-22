@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Circle, CircleCheck, Loader2 } from "lucide-react";
 import { BusyGuardContext, type BusyGuardState } from "@/components/busy-guard-context";
 import { cn } from "@/lib/utils";
@@ -47,23 +47,50 @@ const BusySteps = ({ steps, activeStepKey }: { steps: BusyGuardState["steps"]; a
 };
 
 export const BusyGuardProvider = ({ children }: { children: ReactNode }) => {
-    const [busy, setBusy] = useState<BusyGuardState | null>(null);
+    const [busy, setBusyState] = useState<BusyGuardState | null>(null);
+    // Specchio sincrono di `busy`, aggiornato nello stesso istante in cui viene chiamato
+    // `setBusy` invece che al giro di render successivo. L'aggiornamento e useUpdateWatcher
+    // chiamano `setBusy(null)` e poi `window.location.reload()` sulla riga dopo, senza un
+    // `await` in mezzo: l'effect sotto si accorgerebbe del nuovo `busy` solo al render
+    // successivo, cioè dopo che il reload ha già fatto scattare `beforeunload` — bug osservato,
+    // il ricaricamento veniva bloccato dalla conferma nativa del browser proprio a fine
+    // aggiornamento riuscito.
+    const busyRef = useRef<BusyGuardState | null>(null);
+
+    const setBusy = useCallback(
+        (next: BusyGuardState | null | ((prev: BusyGuardState | null) => BusyGuardState | null)) => {
+            if (typeof next === "function") {
+                setBusyState((prev) => {
+                    const resolved = next(prev);
+                    busyRef.current = resolved;
+                    return resolved;
+                });
+                return;
+            }
+
+            busyRef.current = next;
+            setBusyState(next);
+        },
+        []
+    );
 
     useEffect(() => {
-        if (!busy) {
-            return;
-        }
-
         // Alcune operazioni (aggiornamento, ripristino database) lasciano l'app in uno
         // stato inconsistente se interrotte: evitiamo che l'utente chiuda o ricarichi la scheda.
+        // Registrato una sola volta: legge sempre lo stato più recente da `busyRef`, non c'è
+        // bisogno di ri-agganciarlo a ogni cambio di `busy`.
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!busyRef.current) {
+                return;
+            }
+
             event.preventDefault();
             event.returnValue = "";
         };
 
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-    }, [busy]);
+    }, []);
 
     return (
         <BusyGuardContext.Provider value={{ setBusy }}>

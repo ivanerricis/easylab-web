@@ -11,6 +11,23 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Corretto lo spinner di aggiornamento bloccato quando il commit non cambia
+
+`updateSettingsPanel.tsx` (il pannello che l'utente guarda mentre l'aggiornamento gira)
+riconosceva la fine dell'operazione confrontando `currentCommit` prima e dopo: se
+`git reset --hard origin/main` non spostava HEAD — riapplicando la stessa versione, o
+rilanciando l'aggiornamento senza niente di nuovo da scaricare — il confronto non scattava
+mai, e lo spinner "Aggiornamento in corso..." restava acceso fino al timeout di 6 minuti
+anche se il server aveva già finito in pochi secondi.
+*Perché:* scoperto rilanciando di proposito un aggiornamento "inutile" per riprodurre un
+caso segnalato dall'utente. Il fix confronta `lastUpdateAt` invece del commit:
+`scripts/update-server.sh` scrive una data fresca a ogni fase, a partire dalla primissima
+("running"/"verify"), quindi il confronto scatta anche quando il commit resta lo stesso.
+Lo stesso pattern (`lastCheckedAt`) era già usato per la verifica aggiornamenti pochi righe
+sopra — solo la fine dell'aggiornamento vero e proprio usava ancora il commit. Un test
+riproduce il caso (`ricarica anche quando l'aggiornamento non cambia il commit`), verificato
+fallire senza la correzione prima di applicarla.
+
 ## 2026-09-22 — Codice OTP a due fattori: una casella per cifra
 
 Il campo del codice a 6 cifre (login con 2FA e attivazione della verifica in due passaggi

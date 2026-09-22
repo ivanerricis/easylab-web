@@ -166,7 +166,7 @@ const UpdateSettingsPanel = () => {
         }
 
         setIsConfirmOpen(false);
-        const previousCommit = status?.currentCommit ?? null;
+        const previousLastUpdateAt = status?.lastUpdateAt ?? null;
         setIsUpdating(true);
         setUpdateBusy("verify");
 
@@ -182,13 +182,23 @@ const UpdateSettingsPanel = () => {
                 try {
                     const result = await getUpdateStatus();
 
-                    if (result.state === "failed") {
+                    // Finché lastUpdateAt non cambia, questa è ancora la fotografia di prima di
+                    // aver premuto il pulsante (il trigger non è ancora stato raccolto): un
+                    // "success"/"failed" letto qui sarebbe quello dell'aggiornamento precedente,
+                    // non di questo. scripts/update-server.sh scrive un lastUpdateAt fresco a
+                    // ogni fase, a partire dalla primissima ("running"/"verify"), quindi il
+                    // confronto scatta anche quando il commit non cambia — un "riapplica la
+                    // stessa versione" senza niente da scaricare, dove prima lo spinner restava
+                    // acceso fino al timeout perché si confrontava il commit invece della data.
+                    const isThisRun = result.lastUpdateAt !== previousLastUpdateAt;
+
+                    if (isThisRun && result.state === "failed") {
                         setStatus(result);
                         toast.error(result.lastError ?? "Aggiornamento non riuscito");
                         return;
                     }
 
-                    if (result.state === "success" && result.currentCommit !== previousCommit) {
+                    if (isThisRun && result.state === "success") {
                         setStatus(result);
                         setUpdateBusy(null);
                         toast.success("Aggiornamento completato. Ricarico la pagina...");

@@ -154,7 +154,38 @@ describe("UpdateSettingsPanel", () => {
         await nextPoll();
         expect(reload).not.toHaveBeenCalled();
 
-        api.getUpdateStatus.mockResolvedValue({ ...status, state: "success", currentCommit: "def5678" });
+        api.getUpdateStatus.mockResolvedValue({
+            ...status,
+            state: "success",
+            currentCommit: "def5678",
+            lastUpdateAt: "2026-09-11T09:00:00.000Z",
+        });
+        await nextPoll();
+        expect(toast.success).toHaveBeenCalledWith("Aggiornamento completato. Ricarico la pagina...");
+
+        await nextPoll(1500);
+        expect(reload).toHaveBeenCalled();
+    });
+
+    /**
+     * Bug osservato: quando non c'è niente di nuovo da scaricare (si rilancia l'aggiornamento
+     * sulla stessa versione), git reset --hard non cambia currentCommit — e lo spinner restava
+     * acceso fino al timeout di 6 minuti perché il pannello riconosceva la fine solo da quel
+     * confronto. La fine dell'aggiornamento si vede da lastUpdateAt, non dal commit.
+     */
+    it("ricarica anche quando l'aggiornamento non cambia il commit", async () => {
+        api.runUpdateNow.mockResolvedValue(status);
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Aggiorna adesso" }));
+        await click(within(screen.getByRole("dialog")).getByRole("button", { name: "Aggiorna adesso" }));
+
+        api.getUpdateStatus.mockResolvedValue({
+            ...status,
+            state: "success",
+            currentCommit: status.currentCommit,
+            lastUpdateAt: "2026-09-11T09:00:00.000Z",
+        });
         await nextPoll();
         expect(toast.success).toHaveBeenCalledWith("Aggiornamento completato. Ricarico la pagina...");
 
@@ -189,7 +220,12 @@ describe("UpdateSettingsPanel", () => {
         );
         expect(within(overlay).getByText("Aggiornamento del codice").closest("li")).not.toHaveAttribute("aria-current");
 
-        api.getUpdateStatus.mockResolvedValue({ ...status, state: "success", currentCommit: "def5678" });
+        api.getUpdateStatus.mockResolvedValue({
+            ...status,
+            state: "success",
+            currentCommit: "def5678",
+            lastUpdateAt: "2026-09-11T09:00:00.000Z",
+        });
         await nextPoll();
 
         // Bug osservato: a operazione riuscita l'ultima fase restava segnata come "ancora in
@@ -215,6 +251,7 @@ describe("UpdateSettingsPanel", () => {
             ...status,
             state: "failed",
             lastError: "docker compose build fallito",
+            lastUpdateAt: "2026-09-11T09:00:00.000Z",
         });
         await nextPoll();
 

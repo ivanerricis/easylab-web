@@ -362,11 +362,12 @@ describe("interventions router", () => {
 
             expect(response.status).toBe(200);
             expect(buildInterventionEmail).toHaveBeenCalledWith(
-                expect.objectContaining({ customerName: "Mario Rossi", logoCid: "logo-laboratorio" })
+                expect.objectContaining({ customerName: "Mario Rossi", day: "2026-01-10", logoCid: "logo-laboratorio" })
             );
             expect(sendEmail).toHaveBeenCalledWith(
                 expect.objectContaining({
                     to: "mario.rossi@example.test",
+                    replyTo: "info@easylab.it",
                     subject: "Oggetto",
                     attachments: [
                         expect.objectContaining({
@@ -400,10 +401,53 @@ describe("interventions router", () => {
             const response = await request(buildApp()).post("/api/interventions/1/send-email");
 
             expect(response.status).toBe(200);
-            expect(buildInterventionEmail).toHaveBeenCalledWith(expect.objectContaining({ logoCid: null }));
+            expect(buildInterventionEmail).toHaveBeenCalledWith(
+                expect.objectContaining({ day: "2026-03-05", logoCid: null })
+            );
             const attachments = vi.mocked(sendEmail).mock.calls[0][0].attachments;
             expect(attachments).toHaveLength(1);
             expect(attachments?.[0].filename).toBe("intervento-2026-03-05.pdf");
+        });
+
+        // Le 23:30 UTC del 4 marzo sono le 00:30 del 5 a Roma: il giorno è quello del
+        // laboratorio, uguale nel testo e nel nome dell'allegato.
+        it("senza data intervento prende il giorno di creazione nel fuso del laboratorio", async () => {
+            vi.mocked(getInterventionDetailById).mockResolvedValue([
+                { ...printRow, interventionDate: null, created_at: new Date("2026-03-04T23:30:00Z") },
+            ] as never);
+            vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
+            vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
+            vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
+            vi.mocked(buildInterventionEmail).mockReturnValue({
+                subject: "Oggetto",
+                text: "Testo",
+                html: "<p>Html</p>",
+            } as never);
+            vi.mocked(sendEmail).mockResolvedValue(undefined as never);
+
+            const response = await request(buildApp()).post("/api/interventions/1/send-email");
+
+            expect(response.status).toBe(200);
+            expect(buildInterventionEmail).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-03-05" }));
+            expect(vi.mocked(sendEmail).mock.calls[0][0].attachments?.[0].filename).toBe("intervento-2026-03-05.pdf");
+        });
+
+        it("senza email del laboratorio non imposta un indirizzo di risposta", async () => {
+            vi.mocked(getInterventionDetailById).mockResolvedValue([printRow] as never);
+            vi.mocked(getLabConfig).mockResolvedValue({ ...labConfig, labEmail: "  " } as never);
+            vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
+            vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
+            vi.mocked(buildInterventionEmail).mockReturnValue({
+                subject: "Oggetto",
+                text: "Testo",
+                html: "<p>Html</p>",
+            } as never);
+            vi.mocked(sendEmail).mockResolvedValue(undefined as never);
+
+            const response = await request(buildApp()).post("/api/interventions/1/send-email");
+
+            expect(response.status).toBe(200);
+            expect(vi.mocked(sendEmail).mock.calls[0][0].replyTo).toBeUndefined();
         });
     });
 

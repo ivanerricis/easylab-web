@@ -342,6 +342,14 @@ describe("sendEmail", () => {
         );
     });
 
+    it("passa l'indirizzo di risposta a nodemailer", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedState({ passwordEncrypted: "cifrato:segreta" })));
+
+        await sendEmail({ ...input, replyTo: "info@easylab.it" });
+
+        expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: "info@easylab.it" }));
+    });
+
     // Il `cid` è ciò che distingue un logo incorporato nell'HTML da un allegato scaricabile:
     // deve tradursi nella `contentDisposition` giusta per ogni allegato.
     it("distingue allegati inline (con cid) da allegati normali", async () => {

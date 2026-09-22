@@ -195,6 +195,11 @@ type EmailAttachment = {
 
 export type SendEmailInput = {
     to: string;
+    /**
+     * Dove vanno le risposte, quando non devono tornare al mittente SMTP: l'email al cliente
+     * lo invita a rispondere, e il mittente configurato può non essere la casella del laboratorio.
+     */
+    replyTo?: string;
     subject: string;
     text: string;
     /** Corpo HTML: quando c'e', `text` resta come alternativa per i client che non lo mostrano. */
@@ -226,6 +231,7 @@ export const sendEmail = async (input: SendEmailInput) => {
         await transporter.sendMail({
             from: state.fromName ? `"${state.fromName}" <${state.fromEmail}>` : state.fromEmail,
             to: input.to,
+            replyTo: input.replyTo,
             subject: input.subject,
             text: input.text,
             html: input.html,

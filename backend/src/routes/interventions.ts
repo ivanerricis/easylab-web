@@ -27,8 +27,13 @@ const interventionsRouter = Router();
 // Riferimento che lega l'allegato inline all'`<img src="cid:...">` del corpo HTML.
 const logoContentId = "logo-laboratorio";
 
-/** La data di creazione arriva come `Date`: nel nome del file serve come YYYY-MM-DD. */
-const toIsoDay = (value: Date) => value.toISOString().slice(0, 10);
+/**
+ * La data di creazione arriva come `Date`: per l'email serve il giorno, YYYY-MM-DD ("en-CA"
+ * scrive così), nel fuso del laboratorio. `toISOString` dava quello UTC, e una scheda aperta
+ * alle 00:30 di Roma finiva nel nome del file con il giorno prima.
+ */
+const toIsoDay = (value: Date, timeZone: string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
 
 const interventionTypes = ["consegna_materiale", "intervento_sede", "intervento_remoto"] as const;
 type InterventionType = (typeof interventionTypes)[number];
@@ -258,10 +263,10 @@ const loadInterventionPrintContext = async (id: number) => {
         labAddress,
         labPhone,
         type: intervention.type as InterventionType,
-        // Date grezze, per il nome del file allegato: le etichette formattate sono per
-        // gli occhi del cliente, non per un nome di file.
-        interventionDate: intervention.interventionDate,
-        createdAt: intervention.created_at,
+        // Il giorno dell'email, come YYYY-MM-DD: quello dell'intervento o, se non è pianificato,
+        // quello di apertura della scheda. Uno solo per testo e nome dell'allegato, così non
+        // possono dire due giorni diversi.
+        emailDay: intervention.interventionDate ?? toIsoDay(intervention.created_at, timeZone),
         pdfData: {
             id: intervention.id,
             labName,
@@ -335,20 +340,22 @@ interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema })
         labAddress: context.labAddress,
         labPhone: context.labPhone,
         type: context.type,
-        interventionDateLabel: context.pdfData.interventionDateLabel,
-        createdAtLabel: context.pdfData.createdAtLabel,
+        day: context.emailDay,
         logoCid: logo ? logoContentId : null,
     });
 
     await sendEmail({
         to: context.customerEmail,
+        // Il testo invita a rispondere: la risposta deve arrivare al laboratorio, anche quando
+        // il mittente SMTP è un'altra casella. Senza email del laboratorio si torna al mittente.
+        replyTo: context.labEmail.trim() || undefined,
         subject: email.subject,
         text: email.text,
         html: email.html,
         attachments: [
             {
                 // Il cliente archivia il PDF per data, non per numero di pratica.
-                filename: `intervento-${context.interventionDate ?? toIsoDay(context.createdAt)}.pdf`,
+                filename: `intervento-${context.emailDay}.pdf`,
                 content: pdfBuffer,
                 contentType: "application/pdf",
             },

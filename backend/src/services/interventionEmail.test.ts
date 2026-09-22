@@ -1,9 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// Le etichette dei tipi arrivano da `interventionLabels`, un modulo senza dipendenze: prima
-// stavano in `interventionPdf` e andavano mockate per non caricare pdfmake in questo test.
-// Adesso si usa quello vero, e l'etichetta attesa è quella che vedrà davvero il cliente.
-
 import { buildInterventionEmail, type InterventionEmailData } from "./interventionEmail";
 
 const baseData = (overrides: Partial<InterventionEmailData> = {}): InterventionEmailData => ({
@@ -13,33 +8,79 @@ const baseData = (overrides: Partial<InterventionEmailData> = {}): InterventionE
     labAddress: "Via Roma 1",
     labPhone: "011 1234567",
     type: "intervento_sede",
-    interventionDateLabel: "10/09/2026",
-    createdAtLabel: "01/09/2026",
+    day: "2026-09-10",
     logoCid: null,
     ...overrides,
 });
+
+const countOccurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 beforeEach(() => {
     vi.clearAllMocks();
 });
 
 describe("buildInterventionEmail", () => {
-    it("usa la data dell'intervento nell'oggetto quando è pianificata", () => {
-        const { subject } = buildInterventionEmail(baseData());
+    // Il testo approvato dal laboratorio il 2026-09-22, per intero: cambiarlo deve essere una
+    // scelta, non l'effetto collaterale di un'altra modifica.
+    it("scrive il testo approvato, parola per parola", () => {
+        const { subject, text } = buildInterventionEmail(baseData());
 
-        expect(subject).toBe("Riepilogo intervento del 10/09/2026 - Laboratorio EasyLab");
+        expect(subject).toBe("Riepilogo intervento del 10 settembre 2026 - Laboratorio EasyLab");
+        expect(text).toBe(
+            [
+                "Gentile Mario Rossi,",
+                "in allegato trova il riepilogo dell'intervento in sede del 10 settembre 2026, con il dettaglio del lavoro svolto. Le consigliamo di conservarlo.",
+                "Per qualsiasi domanda può rispondere a questa email o contattarci ai recapiti qui sotto.",
+                "Grazie per la fiducia.",
+                "Cordiali saluti,\nLaboratorio EasyLab",
+                "Via Roma 1\n011 1234567\ninfo@easylab.it",
+            ].join("\n\n")
+        );
     });
 
-    // Un intervento senza data pianificata (es. consegna materiale) non ha comunque un buco
-    // nell'email: si ripiega sulla data di apertura della scheda.
-    it("ripiega sulla data di apertura quando l'intervento non è pianificato", () => {
-        const { subject, text, html } = buildInterventionEmail(
-            baseData({ interventionDateLabel: null, createdAtLabel: "01/09/2026" })
-        );
+    it.each([
+        ["consegna_materiale", "Riepilogo consegna del", "della consegna di materiale", "di quanto consegnato"],
+        ["intervento_sede", "Riepilogo intervento del", "dell'intervento in sede", "del lavoro svolto"],
+        ["intervento_remoto", "Riepilogo intervento del", "dell'intervento da remoto", "del lavoro svolto"],
+    ] as const)("per il tipo %s nomina la pratica in oggetto, testo e html", (type, subjectStart, summary, detail) => {
+        const { subject, text, html } = buildInterventionEmail(baseData({ type }));
 
-        expect(subject).toContain("01/09/2026");
-        expect(text).toContain("01/09/2026");
-        expect(html).toContain("01/09/2026");
+        expect(subject.startsWith(subjectStart)).toBe(true);
+        expect(text).toContain(`il riepilogo ${summary} del 10 settembre 2026, con il dettaglio ${detail}.`);
+        expect(html).toContain(
+            `il riepilogo ${summary} del <strong>10 settembre 2026</strong>, con il dettaglio ${detail}.`
+        );
+    });
+
+    // Il giorno arriva senza fuso: letto come ora locale, a Roma la mezzanotte del primo
+    // gennaio sarebbe ancora il 31 dicembre in UTC. Come per `formatDayLabel`, il fuso del
+    // processo lo cambia `companyManager` a server avviato, dopo l'import di questo modulo.
+    it.each(["Europe/Rome", "America/New_York", "Pacific/Kiritimati"])(
+        "scrive per esteso il giorno ricevuto senza spostarlo, anche con il processo in %s",
+        (timeZone) => {
+            const previous = process.env.TZ;
+            process.env.TZ = timeZone;
+            try {
+                expect(buildInterventionEmail(baseData({ day: "2027-01-01" })).subject).toContain("1 gennaio 2027");
+                expect(buildInterventionEmail(baseData({ day: "2026-12-31" })).subject).toContain("31 dicembre 2026");
+            } finally {
+                if (previous === undefined) {
+                    delete process.env.TZ;
+                } else {
+                    process.env.TZ = previous;
+                }
+            }
+        }
+    );
+
+    // Prima la data compariva in oggetto, prima frase e in un riquadro "Data / Tipo".
+    it("nel corpo scrive la data una volta sola, senza il riquadro Data / Tipo", () => {
+        const { text, html } = buildInterventionEmail(baseData());
+
+        expect(countOccurrences(text, "10 settembre 2026")).toBe(1);
+        expect(countOccurrences(html, "10 settembre 2026")).toBe(1);
+        expect(text).not.toContain("Tipo:");
+        expect(html).not.toContain(">Tipo<");
     });
 
     it("non menziona mai un identificativo interno, solo la data", () => {
@@ -50,13 +91,6 @@ describe("buildInterventionEmail", () => {
         // pattern) non contengano mai un riferimento tipo "intervento #123".
         expect(subject).not.toMatch(/#\d+/);
         expect(text).not.toMatch(/#\d+/);
-    });
-
-    it("riporta l'etichetta italiana del tipo in testo e html", () => {
-        const { text, html } = buildInterventionEmail(baseData({ type: "consegna_materiale" }));
-
-        expect(text).toContain("Consegna materiale");
-        expect(html).toContain("Consegna materiale");
     });
 
     it("include il logo incorporato via cid solo quando disponibile", () => {
@@ -72,7 +106,7 @@ describe("buildInterventionEmail", () => {
             baseData({ labAddress: "", labPhone: "   ", labEmail: "info@easylab.it" })
         );
 
-        expect(text).toContain("info@easylab.it");
+        expect(text.endsWith("Laboratorio EasyLab\n\ninfo@easylab.it")).toBe(true);
         expect(html).toContain("info@easylab.it");
     });
 
@@ -93,13 +127,5 @@ describe("buildInterventionEmail", () => {
         expect(html).toContain("&lt;script&gt;");
         expect(html).toContain("&amp;");
         expect(text).toContain(`Mario <script>alert("x")</script> & Rossi`);
-    });
-
-    it("il testo semplice contiene i dati essenziali senza markup", () => {
-        const { text } = buildInterventionEmail(baseData());
-
-        expect(text).toContain("Gentile Mario Rossi");
-        expect(text).toContain("Laboratorio EasyLab");
-        expect(text).not.toContain("<");
     });
 });

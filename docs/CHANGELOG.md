@@ -11,6 +11,40 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-22 — Email dell'intervento: testo nuovo, risposte al laboratorio
+
+Tre modifiche all'email che accompagna il PDF dell'intervento, decise con il laboratorio.
+
+- **Testo riscritto.** Via "come da accordi", che dava per scontato un accordo che non sempre
+  c'è. Tipo e data stanno nella prima frase ("il riepilogo dell'intervento in sede del 22
+  settembre 2026, con il dettaglio del lavoro svolto"), e sparisce il riquadro "Data / Tipo"
+  dell'HTML, che ripeteva la data per la terza volta dopo oggetto e prima frase. La data è per
+  esteso ("22 settembre 2026", non "22 set 2026") perché sta dentro una frase, e per le
+  consegne di materiale oggetto e frase parlano di consegna. In tutto è più corta: sul telefono
+  sta in una schermata.
+  *Perché:* è il testo che il cliente legge davvero. Resta lo stesso in ogni stato
+  dell'intervento, anche solo programmato: l'ha scelto il laboratorio, e il commento del
+  modulo lo dice perché nessuno lo "corregga". Un test lo fissa parola per parola, così
+  cambiarlo resta una scelta e non l'effetto collaterale di un'altra modifica.
+- **Le risposte del cliente arrivano al laboratorio.** L'email invita a rispondere, ma senza
+  `Reply-To` la risposta tornava al mittente SMTP di Impostazioni → Email, che può essere una
+  casella diversa da quella del laboratorio scritta in fondo. Ora `sendEmail` accetta
+  `replyTo`, e la rotta lo imposta sull'email del laboratorio quando c'è.
+- **Un solo giorno per testo e allegato.** Per un intervento senza data, il nome del PDF
+  allegato usava il giorno di creazione in UTC (`toISOString`) e il testo quello nel fuso del
+  laboratorio: una scheda aperta alle 00:30 di Roma diceva il 21 nel file e il 22 nell'email.
+  Ora la rotta calcola il giorno una volta sola, nel fuso del laboratorio, e lo usa per
+  entrambi.
+
+**Verifica:** test sul testo intero, sui tre tipi, sul giorno che non slitta quando cambia il
+fuso del processo, sul giorno di creazione a cavallo della mezzanotte e su `replyTo` presente e
+assente; controllati per mutazione (5 mutazioni, tutte prese). Il messaggio MIME costruito da
+nodemailer, senza inviarlo, porta `Reply-To: info@…`; l'HTML è stato guardato in Edge a 900 e
+390 px di larghezza.
+→ [backend/src/services/interventionEmail.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionEmail.ts),
+[backend/src/services/emailManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/emailManager.ts),
+[backend/src/routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts)
+
 ## 2026-09-22 — Esportazioni CSV: punto e virgola come separatore, per Excel in italiano
 
 Le tre esportazioni (clienti, report, interventi) separavano i campi con la virgola. Aperto

@@ -345,7 +345,7 @@ describe("listReports: righe e join", () => {
         const customer = await insertCustomer({
             firstName: "Anna",
             lastName: "Rossi",
-            phoneNumber: null,
+            phoneNumber: "011 222",
             phoneNumberSecondary: "02 555",
         });
         const device = await insertDevice("iPhone 12");
@@ -368,7 +368,7 @@ describe("listReports: righe e join", () => {
                 {
                     id: withCollaborator.id,
                     customer: "Anna Rossi",
-                    customerPhone: "02 555",
+                    customerPhone: "011 222",
                     device: "iPhone 12",
                     issue: "Schermo rotto",
                     collaborator: "Luca Verdi",

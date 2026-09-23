@@ -39,6 +39,33 @@ const actionLabelRules: { method: string; match: string | RegExp; label: string 
     { method: "GET", match: /^\/api\/settings\/backup\/download\/.+$/, label: "download backup" },
     { method: "GET", match: /^\/api\/settings\/logs\/\d{4}-\d{2}-\d{2}\/download$/, label: "download log azioni" },
     { method: "POST", match: "/api/settings/backup/key", label: "esportazione chiave di backup" },
+    // Gli export CSV e i resoconti PDF sono GET, quindi restavano fuori dal registro come
+    // qualunque altra consultazione — invisibili, non solo con l'etichetta generica. L'export
+    // dei report porta con sé la colonna Password dei dispositivi (vedi BACKLOG), quindi è
+    // proprio il tipo di scarico che vale la pena tracciare.
+    { method: "GET", match: "/api/reports/export.csv", label: "esportazione CSV report" },
+    { method: "GET", match: "/api/interventions/export.csv", label: "esportazione CSV interventi" },
+    { method: "GET", match: "/api/customers/export.csv", label: "esportazione CSV clienti" },
+    {
+        method: "GET",
+        match: /^\/api\/customers\/\d+\/reports\/print$/,
+        label: "stampa resoconto report cliente",
+    },
+    {
+        method: "GET",
+        match: /^\/api\/customers\/\d+\/interventions\/print$/,
+        label: "stampa resoconto interventi cliente",
+    },
+    {
+        method: "GET",
+        match: /^\/api\/collaborators\/\d+\/reports\/print$/,
+        label: "stampa resoconto report collaboratore",
+    },
+    {
+        method: "GET",
+        match: /^\/api\/collaborators\/\d+\/interventions\/print$/,
+        label: "stampa resoconto interventi collaboratore",
+    },
 ];
 
 const findActionLabel = (method: string, normalizedPath: string): string | null => {

@@ -1,14 +1,8 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import { z, type ZodType } from "zod";
+import type { ZodType } from "zod";
 
-// zod 4 include la localizzazione italiana dei messaggi predefiniti (tipo mancante, formato
-// non valido, lunghezza fuori range...): senza impostarla qui, `message` sotto sarebbe sempre
-// in inglese per qualunque schema che non definisce un messaggio custom. Il punto ideale
-// sarebbe l'avvio dell'app (src/app.ts o src/index.ts), prima di qualunque schema — ma quei
-// file non sono di questo agente in questa modifica: chiamarlo qui, al caricamento di questo
-// modulo, funziona comunque perché `validate` gira solo a richiesta ricevuta, ben dopo che
-// ogni file di rotte (che importa `validate`) è stato caricato.
-z.config(z.locales.it());
+// La localizzazione italiana di zod (`z.config(z.locales.it())`) è impostata una volta sola
+// in app.ts, prima di qualunque rotta: qui sotto i messaggi di zod arrivano già in italiano.
 
 type ValidationSchemas = {
     params?: ZodType;

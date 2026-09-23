@@ -23,36 +23,24 @@ const customerBodySchemaBase = z.object({
     email: z.string().trim().email().max(255).nullable().optional(),
     firstName: z.string().trim().min(1).max(255),
     lastName: z.string().trim().min(1).max(255).nullable().optional(),
-    phoneNumber: z.string().trim().min(1).max(20).nullable().optional(),
+    // Obbligatorio come `firstName`, non "almeno uno dei due telefoni": il secondo resta
+    // sempre facoltativo. Prima la regola era un `.refine()` sul corpo della richiesta, non
+    // sulla riga risultante — una PUT che toccava solo `phoneNumberSecondary` poteva essere
+    // rifiutata anche con il primo già salvato. Qui, come campo del tipo base, la stessa
+    // trappola non può più capitare: su create è richiesto perché non è `.optional()`, su
+    // update (`.partial()`) lo diventa "se presente deve essere valido", proprio come
+    // `firstName`. Vedi anche il vincolo `NOT NULL` nella migration
+    // 0038_customer_phone_not_null.
+    phoneNumber: z.string().trim().min(1).max(20),
     phoneNumberSecondary: z.string().trim().min(1).max(20).nullable().optional(),
     city: z.string().trim().min(1).max(255).nullable().optional(),
 });
 
-const customerCreateBodySchema = customerBodySchemaBase
-    .refine((value) => value.phoneNumber != null || value.phoneNumberSecondary != null, {
-        message: "È necessario specificare almeno un numero di telefono",
-        path: ["phoneNumber"],
-    })
-    .strict();
+const customerCreateBodySchema = customerBodySchemaBase.strict();
 
-const customerUpdateBodySchema = customerBodySchemaBase
-    .partial()
-    .refine(
-        (value) => {
-            if (!("phoneNumber" in value) && !("phoneNumberSecondary" in value)) {
-                return true;
-            }
-
-            return value.phoneNumber != null || value.phoneNumberSecondary != null;
-        },
-        {
-            message: "È necessario specificare almeno un numero di telefono",
-            path: ["phoneNumber"],
-        }
-    )
-    .refine((value) => Object.keys(value).length > 0, {
-        message: "È necessario specificare almeno un campo",
-    });
+const customerUpdateBodySchema = customerBodySchemaBase.partial().refine((value) => Object.keys(value).length > 0, {
+    message: "È necessario specificare almeno un campo",
+});
 
 // Intestazione condivisa dai due resoconti PDF del cliente (report e interventi).
 const loadCustomerPrintContext = async (id: number) => {

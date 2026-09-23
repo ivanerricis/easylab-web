@@ -94,12 +94,21 @@ describe("InputWithAdd", () => {
         expect(screen.getByRole("textbox")).toHaveValue("Tastiera");
     });
 
-    it("senza onCreate l'ultima voce dice 'Usa' e non crea nulla", async () => {
+    /**
+     * Nessun chiamante oggi passa `options` senza `onCreate` (i due usi senza `onSearch`,
+     * dispositivi e difetti, lo passano sempre): il pulsante mostra sempre "Crea ...". Il
+     * controllo `onCreate` in `handleCreate` resta comunque, a difesa di un chiamante futuro
+     * che lo dimentichi — non deve mai lanciare, deve solo chiudere il menu senza creare nulla.
+     */
+    it("senza onCreate il pulsante di creazione non lancia, e chiude il menu senza creare nulla", async () => {
         render(<Harness options={issues} />);
 
         await userEvent.type(screen.getByRole("textbox"), "Tastiera");
 
-        expect(screen.getByRole("button", { name: 'Usa "Tastiera"' })).toBeInTheDocument();
+        const createButton = screen.getByRole("button", { name: 'Crea "Tastiera"' });
+        await userEvent.click(createButton);
+
+        expect(createButton).not.toBeInTheDocument();
     });
 
     it("con onSearch chiede i risultati al server dopo la pausa e non propone di crearne", async () => {

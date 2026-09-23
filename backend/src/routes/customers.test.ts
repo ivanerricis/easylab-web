@@ -143,9 +143,9 @@ describe("customers router", () => {
         expect(createCustomer).not.toHaveBeenCalled();
     });
 
-    // Un cliente senza nessun recapito telefonico non è raggiungibile: la scheda cliente
-    // si basa sull'avere almeno un numero, non è solo un vincolo di comodo del form.
-    it("rifiuta la creazione senza nessun numero di telefono", async () => {
+    // Il primo numero è obbligatorio come il nome: un cliente senza va contattato per forza.
+    // Il secondo resta sempre facoltativo (non verificato qui: vedi i test sull'update).
+    it("rifiuta la creazione senza il primo numero di telefono", async () => {
         const response = await request(buildApp()).post("/api/customers").send({ firstName: "Mario" });
 
         expect(response.status).toBe(400);
@@ -177,15 +177,25 @@ describe("customers router", () => {
         expect(updateCustomerById).not.toHaveBeenCalled();
     });
 
-    // Stesso vincolo della creazione, ma sull'update va ricontrollato esplicitamente:
-    // qui i campi sono opzionali, quindi azzerare entrambi i numeri passerebbe altrimenti.
-    it("rifiuta un update che azzera entrambi i numeri di telefono", async () => {
-        const response = await request(buildApp())
-            .put("/api/customers/5")
-            .send({ phoneNumber: null, phoneNumberSecondary: null });
+    it("rifiuta un update che azzera il primo numero di telefono", async () => {
+        const response = await request(buildApp()).put("/api/customers/5").send({ phoneNumber: null });
 
         expect(response.status).toBe(400);
         expect(updateCustomerById).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Prima la regola era "almeno uno dei due", verificata sul corpo *parziale* della
+     * richiesta: una PUT che toccava solo il secondo numero veniva rifiutata anche con il
+     * primo già salvato. Ora il secondo è sempre facoltativo, quindi questa PUT passa.
+     */
+    it("accetta un update che tocca solo il secondo numero di telefono, anche per azzerarlo", async () => {
+        vi.mocked(updateCustomerById).mockResolvedValue([customer] as never);
+
+        const response = await request(buildApp()).put("/api/customers/5").send({ phoneNumberSecondary: null });
+
+        expect(response.status).toBe(200);
+        expect(updateCustomerById).toHaveBeenCalledWith(5, { phoneNumberSecondary: null });
     });
 
     it("risponde 404 sull'update di un id inesistente", async () => {

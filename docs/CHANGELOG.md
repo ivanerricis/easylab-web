@@ -11,6 +11,120 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-23 — I due vincoli sui dati rimasti dalla revisione
+
+Gli ultimi 2 degli 8 punti rimasti dalla revisione del giorno stesso (colonne delle tabelle
+resta l'unico ancora fuori, vedi BACKLOG). Entrambi vincoli di riga sul database, non solo
+regole applicative: prima di scriverli, un conteggio in sola lettura sui dati reali di
+produzione (nessuna riga li avrebbe violati, sia in sviluppo sia in produzione), come già fatto
+per `0035_report_domain_checks.sql`.
+
+- **La data dell'intervento è ora `NOT NULL`.** Era già obbligatoria a ogni scrittura, senza
+  eccezioni, da `validateInterventionRow` (dal 2026-09-21): il database non lo sapeva, e tre
+  punti gestivano "e se mancasse?" per un caso che l'app non permette più da giorni. Tolti: l'
+  `OR` della query del calendario (un confronto diretto copre di nuovo l'indice), il ripiego
+  sulla data di creazione nell'email dell'intervento (funzione `toIsoDay` rimossa, non serviva
+  più a nient'altro) e nel PDF della ricevuta (`interventionDateLabel` non è più nullable, e con
+  esso anche `createdAtLabel`, mai più letto su quel documento). Due test sul database vero
+  descrivevano proprio il caso "senza data": riscritti per il caso che resta, quello con data.
+  → [backend/src/db/schema.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/schema.ts),
+  [backend/src/db/queries/intervention.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/queries/intervention.ts),
+  [backend/src/routes/interventions.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/interventions.ts),
+  [backend/src/services/interventionPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionPdf.ts),
+  [backend/drizzle/0037_intervention_date_not_null.sql](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0037_intervention_date_not_null.sql)
+- **Il primo telefono del cliente è ora obbligatorio, il secondo resta facoltativo** — non più
+  "almeno uno dei due". La regola precedente era già sbagliata di suo, non solo da spostare sul
+  database: era un `.refine()` sul corpo *parziale* della richiesta, non sulla riga risultante,
+  quindi una PUT che toccava solo il secondo telefono poteva essere rifiutata anche con il primo
+  già salvato (mai capitato in pratica, perché il frontend manda sempre entrambi i campi). La
+  correzione allinea anche il dialogo del cliente, dove "Telefono 1" ha sempre avuto l'asterisco
+  di obbligatorio mentre il controllo scritto in JS era "almeno uno dei due": un disallineamento
+  fra interfaccia e comportamento, non solo un dettaglio del server.
+  → [backend/src/db/schema.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/db/schema.ts),
+  [backend/src/routes/customers.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/customers.ts),
+  [frontend/src/components/dialogs/create/createCustomerDialog.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/dialogs/create/createCustomerDialog.tsx),
+  [backend/drizzle/0038_customer_phone_not_null.sql](https://github.com/ivanerricis/easylab-web/blob/main/backend/drizzle/0038_customer_phone_not_null.sql)
+
+### Da sapere per la messa in produzione
+
+Due migration, verificate a vuoto su produzione (0 righe interessate in entrambi i casi, il
+2026-09-23): `0037_intervention_date_not_null.sql` e `0038_customer_phone_not_null.sql`. Non
+generate con `drizzle-kit` (il suo snapshot in `drizzle/meta/` è disallineato da tempo, risale a
+prima di gran parte delle tabelle attuali): scritte a mano seguendo lo stile di `0035`, con lo
+stesso avviso di controllare i dati prima di distribuire.
+
+### Verifiche
+
+Backend: typecheck, lint, 1011 test unitari, 158 sul database vero (`npm run test:db`, contro
+le due migration già applicate). Frontend: typecheck, lint, 737 test. Prova end-to-end contro il
+backend reale: creazione senza telefono rifiutata, con solo il primo accettata, una PUT che
+tocca solo il secondo telefono accettata (il difetto descritto sopra, confermato risolto), una
+PUT che azzera il primo rifiutata.
+
+---
+
+## 2026-09-23 — Seguito della revisione, e due richieste dirette
+
+Completati 2 degli 8 punti rimasti dalla revisione del giorno stesso (colonne delle tabelle e i
+due vincoli sui dati, completati in un secondo momento — vedi la voce più recente qui sopra),
+più due richieste dirette sulla ricevuta di intervento e sull'email di accesso. Fatto con 2
+agenti Sonnet in parallelo, uno per punto, su file distinti.
+
+- **Export CSV e resoconti PDF ora nel registro azioni.** Erano GET senza un'etichetta dedicata,
+  quindi restavano invisibili come qualunque consultazione — non solo con l'etichetta sbagliata,
+  proprio fuori dal registro. Sette voci nuove: i tre export CSV (report, interventi, clienti —
+  quello dei report porta con sé la colonna Password) e le quattro stampe dei resoconti di
+  cliente e collaboratore. Non fatto il rifacimento generale (`auditAs` per rotta) restato in
+  BACKLOG: sono 13 voci su 67 rotte, e non si erano disallineate di nuovo dopo la correzione
+  dell'export della chiave di backup.
+  → [backend/src/middleware/userActionLogger.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/userActionLogger.ts)
+- **Tolto il ramo morto di `InputWithAdd`.** Il pulsante di creazione diceva "Usa ..." quando
+  mancava `onCreate`, ma nessun chiamante passa `options` senza passare anche `onCreate`: il ramo
+  non si raggiungeva mai. Il controllo a runtime in `handleCreate` resta, a difesa di un
+  chiamante futuro che lo dimentichi.
+  → [frontend/src/components/inputWithAdd.tsx](https://github.com/ivanerricis/easylab-web/blob/main/frontend/src/components/inputWithAdd.tsx)
+- **La localizzazione italiana di zod si imposta una volta sola, all'avvio.**
+  `z.config(z.locales.it())` viveva in `routes/validation.ts` per necessità pratica (il modulo
+  di rotte più comodo al momento); spostata in `app.ts`, prima di qualunque rotta — è una
+  configurazione globale di zod, non qualcosa che riguarda solo la validazione delle richieste.
+  → [backend/src/app.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/app.ts),
+  [backend/src/routes/validation.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/validation.ts)
+- **Corretto un commento superato in `authManager.ts`.** Sopra `deleteUser` diceva che eventuali
+  FK senza cascade verso `user` avrebbero fatto fallire la query "invitando l'admin a
+  disabilitare l'account" — un messaggio che non esiste più in `errorHandler.ts`. Verificato:
+  le uniche due FK verso `user` (sessioni, codici di recupero 2FA) sono già in cascata da tempo.
+  → [backend/src/services/authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts)
+- **Tolto lo stato dalla ricevuta di intervento.** La sezione REPORT ATTIVITÀ mostrava "Stato"
+  (es. "Completato") accanto a "Tipologia": su un documento che il cliente firma in quel momento
+  per chiudere l'intervento, lo stato è implicito nell'atto stesso della firma. Resta nel
+  RESOCONTO INTERVENTI (il riepilogo di più interventi per una scheda cliente/collaboratore),
+  dove è ancora informazione utile. "Tipologia" ora occupa da sola la riga, con lo stesso schema
+  già usato da "Prezzo"/"Da fatturare" quando uno dei due manca. Verificato anche sul PDF vero,
+  non solo nel test: nessuna cella vuota residua.
+  → [backend/src/services/interventionPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionPdf.ts)
+- **L'email di nuovo dispositivo nomina l'applicazione.** Diceva solo "Nuovo accesso -
+  FutureOffice": chi riceve la notifica sulla casella del laboratorio può avere altri sistemi
+  con avvisi identici nella forma, senza modo di distinguerli a colpo d'occhio. Ora l'oggetto è
+  "Nuovo accesso a EasyLab - FutureOffice" e il corpo nomina esplicitamente "EasyLab, il
+  gestionale di FutureOffice" — la prima volta che il nome tecnico del progetto compare in un
+  testo rivolto all'utente.
+  → [backend/src/services/authManager.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/authManager.ts)
+
+### Trovato per strada, da decidere
+
+Sulla ricevuta di intervento, il nome del collaboratore compare due volte con etichette diverse
+sullo stesso valore: "Collaboratore" nella sezione CLIENTE e "Tecnico" in ORE TECNICI. Le due
+sezioni hanno scopi diversi (chi è coinvolto / dettaglio delle ore), quindi non tolto senza
+deciderlo insieme.
+
+### Verifiche
+
+Backend: typecheck, lint, 1012 test unitari (0 falliti, 1 skip preesistente). Frontend:
+typecheck, 736 test. Prettier sui soli file toccati. PDF di un intervento reale scaricato e
+letto per verificare il layout, non solo il test.
+
+---
+
 ## 2026-09-23 — Revisione di qualità in profondità: 13 difetti e 9 pulizie
 
 Terza revisione dell'intero codice, dopo quelle del 2026-09-18 e 2026-09-22: le stesse quattro

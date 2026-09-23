@@ -294,7 +294,6 @@ describe("interventions router", () => {
                     customerEmail: "mario.rossi@example.test",
                     collaboratorName: "Luigi Bianchi",
                     interventionDateLabel: "10 gen 2026",
-                    createdAtLabel: "1 gen 2026",
                     problem: "Non si accende",
                     description: "Sostituito alimentatore",
                     note: "Cliente da richiamare",
@@ -384,53 +383,9 @@ describe("interventions router", () => {
             );
         });
 
-        it("senza data intervento e senza logo usa la data di creazione e non allega il logo", async () => {
-            vi.mocked(getInterventionDetailById).mockResolvedValue([
-                { ...printRow, interventionDate: null, created_at: new Date("2026-03-05T12:00:00Z") },
-            ] as never);
-            vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
-            vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
-            vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
-            vi.mocked(buildInterventionEmail).mockReturnValue({
-                subject: "Oggetto",
-                text: "Testo",
-                html: "<p>Html</p>",
-            } as never);
-            vi.mocked(sendEmail).mockResolvedValue(undefined as never);
-
-            const response = await request(buildApp()).post("/api/interventions/1/send-email");
-
-            expect(response.status).toBe(200);
-            expect(buildInterventionEmail).toHaveBeenCalledWith(
-                expect.objectContaining({ day: "2026-03-05", logoCid: null })
-            );
-            const attachments = vi.mocked(sendEmail).mock.calls[0][0].attachments;
-            expect(attachments).toHaveLength(1);
-            expect(attachments?.[0].filename).toBe("intervento-2026-03-05.pdf");
-        });
-
-        // Le 23:30 UTC del 4 marzo sono le 00:30 del 5 a Roma: il giorno è quello del
-        // laboratorio, uguale nel testo e nel nome dell'allegato.
-        it("senza data intervento prende il giorno di creazione nel fuso del laboratorio", async () => {
-            vi.mocked(getInterventionDetailById).mockResolvedValue([
-                { ...printRow, interventionDate: null, created_at: new Date("2026-03-04T23:30:00Z") },
-            ] as never);
-            vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
-            vi.mocked(createInterventionPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
-            vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
-            vi.mocked(buildInterventionEmail).mockReturnValue({
-                subject: "Oggetto",
-                text: "Testo",
-                html: "<p>Html</p>",
-            } as never);
-            vi.mocked(sendEmail).mockResolvedValue(undefined as never);
-
-            const response = await request(buildApp()).post("/api/interventions/1/send-email");
-
-            expect(response.status).toBe(200);
-            expect(buildInterventionEmail).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-03-05" }));
-            expect(vi.mocked(sendEmail).mock.calls[0][0].attachments?.[0].filename).toBe("intervento-2026-03-05.pdf");
-        });
+        // Le due varianti "senza data intervento" che stavano qui sono state rimosse: dalla
+        // migration 0037_intervention_date_not_null quello scenario non può più capitare
+        // (vedi CHANGELOG del 2026-09-23).
 
         it("senza email del laboratorio non imposta un indirizzo di risposta", async () => {
             vi.mocked(getInterventionDetailById).mockResolvedValue([printRow] as never);

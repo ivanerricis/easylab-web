@@ -72,10 +72,11 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
             nextErrors.firstName = "Il nome non può essere vuoto";
         }
 
-        if (formValues.phoneNumber.trim() === "" && formValues.phoneNumberSecondary.trim() === "") {
-            // La regola riguarda due campi insieme, quindi il messaggio va sul primo dei due:
-            // è quello su cui si posa il focus e quello che di norma si compila.
-            nextErrors.phoneNumber = "Serve almeno un numero di telefono, il primo o il secondo";
+        if (formValues.phoneNumber.trim() === "") {
+            // Solo il primo telefono è obbligatorio, come già dice l'etichetta "Telefono 1" con
+            // l'asterisco: prima il controllo qui era "almeno uno dei due", disallineato da
+            // quell'etichetta e dalla regola vera del server (vedi CHANGELOG 2026-09-23).
+            nextErrors.phoneNumber = "Il numero di telefono è obbligatorio";
         }
 
         const email = formValues.email.trim();

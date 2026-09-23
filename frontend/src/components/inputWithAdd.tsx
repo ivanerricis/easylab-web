@@ -210,11 +210,13 @@ const InputWithAdd = ({
                             disabled={isCreating}
                         >
                             <Plus className="size-5" />
-                            {isCreating
-                                ? "Creazione..."
-                                : onCreate
-                                  ? `Crea "${value.trim()}"`
-                                  : `Usa "${value.trim()}"`}
+                            {/* `canCreate` è vero solo senza `onSearch`, e i due usi senza
+                                `onSearch` (dispositivi, difetti) passano sempre `onCreate`:
+                                non c'è un chiamante che arrivi qui senza. Il ramo "Usa ..."
+                                per quel caso non serviva a niente. `onCreate` resta comunque
+                                facoltativo nel tipo, e `handleCreate` lo ricontrolla prima di
+                                chiamarlo, a difesa di un chiamante futuro che lo dimentichi. */}
+                            {isCreating ? "Creazione..." : `Crea "${value.trim()}"`}
                         </Button>
                     ) : null}
                 </div>

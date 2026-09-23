@@ -1,0 +1,23 @@
+-- Il primo telefono del cliente è obbligatorio (va contattato per forza), il secondo resta
+-- facoltativo. Prima la regola era scritta solo in `routes/customers.ts` come "almeno uno dei
+-- due", verificata sul corpo *parziale* della richiesta invece che sulla riga risultante: una
+-- PUT che toccava solo il secondo telefono poteva essere rifiutata anche con il primo già
+-- salvato. Un vincolo qui applica la regola vera, sulla riga vera, a qualunque scrittura —
+-- comprese quelle dirette che non passano dalla rotta. Vale solo per il cliente: collaboratore
+-- e tecnico condividono lo stesso campo `phoneNumber` (schema.ts, `userFields`) ma restano con
+-- il telefono facoltativo. Vedi CHANGELOG del 2026-09-23.
+--
+-- ATTENZIONE PRIMA DI ESEGUIRE QUESTA MIGRAZIONE IN PRODUZIONE: un database con dati storici
+-- precedenti a questa regola, o ripristinato da un vecchio backup, potrebbe avere clienti senza
+-- il primo telefono ma con il secondo. Se ne esiste anche uno solo, l'ALTER TABLE fallisce e la
+-- migrazione va in rollback (il migrator applica tutte le migrazioni pendenti in un'unica
+-- transazione), quindi il database resta nello stato di prima, senza corruzione né perdita di
+-- dati. Prima di distribuire, un operatore deve eseguire su produzione, in sola lettura:
+--
+--   SELECT count(*) FROM customer WHERE phone_number IS NULL;
+--
+-- Verificato il 2026-09-23: 0 righe, sia su sviluppo sia in produzione. Se in futuro la query
+-- restituisce un numero maggiore di zero, le righe trovate vanno sistemate a mano (per esempio
+-- spostando il secondo telefono nel primo, se il primo manca) prima di applicare questa
+-- migrazione.
+ALTER TABLE "customer" ALTER COLUMN "phone_number" SET NOT NULL;

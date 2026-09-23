@@ -159,6 +159,64 @@ describe("userActionLogger", () => {
         expect(appendUserActionLog).not.toHaveBeenCalled();
     });
 
+    /**
+     * Prima gli export CSV e i resoconti PDF non finivano nel registro: sono GET senza
+     * un'etichetta dedicata, e "non registra le GET senza un'etichetta dedicata" qui sopra
+     * vale anche per loro. L'export dei report porta con sé la colonna Password.
+     */
+    it("registra l'export CSV dei report con la sua etichetta", async () => {
+        const res = createResponse(200, {});
+
+        userActionLogger(
+            createRequest("GET", "/api/reports/export.csv", { username: "mario" }),
+            res,
+            vi.fn() as NextFunction
+        );
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(appendUserActionLog).toHaveBeenCalledOnce();
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=esportazione CSV report");
+    });
+
+    it("registra l'export CSV di interventi e clienti con la loro etichetta", async () => {
+        const interventionsRes = createResponse(200);
+        userActionLogger(
+            createRequest("GET", "/api/interventions/export.csv"),
+            interventionsRes,
+            vi.fn() as NextFunction
+        );
+        interventionsRes.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=esportazione CSV interventi");
+
+        const customersRes = createResponse(200);
+        userActionLogger(createRequest("GET", "/api/customers/export.csv"), customersRes, vi.fn() as NextFunction);
+        customersRes.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[1][0]).toContain("action=esportazione CSV clienti");
+    });
+
+    it("registra la stampa dei resoconti PDF di cliente e collaboratore con la loro etichetta", async () => {
+        const cases: [string, string][] = [
+            ["/api/customers/7/reports/print", "stampa resoconto report cliente"],
+            ["/api/customers/7/interventions/print", "stampa resoconto interventi cliente"],
+            ["/api/collaborators/3/reports/print", "stampa resoconto report collaboratore"],
+            ["/api/collaborators/3/interventions/print", "stampa resoconto interventi collaboratore"],
+        ];
+
+        for (const [url, label] of cases) {
+            const res = createResponse(200);
+            userActionLogger(createRequest("GET", url), res, vi.fn() as NextFunction);
+            res.emit("finish");
+            await flushMicrotasks();
+
+            expect(vi.mocked(appendUserActionLog).mock.calls.at(-1)?.[0]).toContain(`action=${label}`);
+        }
+    });
+
     it("usa etichette dedicate per login e logout invece del verbo generico", async () => {
         const loginRes = createResponse(200);
         userActionLogger(createRequest("POST", "/api/auth/login"), loginRes, vi.fn() as NextFunction);

@@ -36,6 +36,7 @@ describe("CreateCustomerDialog", () => {
 
         await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
         await userEvent.type(screen.getByLabelText("Cognome"), "Rossi");
+        await userEvent.type(screen.getByLabelText(/Telefono 1/), "333");
         await userEvent.type(screen.getByLabelText("Telefono 2"), "06 123456");
         await userEvent.type(screen.getByLabelText("Email"), "mario@example.com");
         await userEvent.type(screen.getByLabelText("Località"), "Roma");
@@ -45,7 +46,7 @@ describe("CreateCustomerDialog", () => {
             expect(onSubmit).toHaveBeenCalledWith({
                 firstName: "Mario",
                 lastName: "Rossi",
-                phoneNumber: "",
+                phoneNumber: "333",
                 phoneNumberSecondary: "06 123456",
                 email: "mario@example.com",
                 city: "Roma",
@@ -55,19 +56,34 @@ describe("CreateCustomerDialog", () => {
         expect(toastSuccess).toHaveBeenCalledWith("Cliente creato con successo");
     });
 
-    /** Un cliente che non si può richiamare è inutile al banco: basta uno dei due numeri. */
-    it("pretende il nome e almeno un telefono, segnalandoli insieme", async () => {
+    /** Un cliente che non si può richiamare è inutile al banco: il primo telefono è
+     *  obbligatorio come il nome, il secondo resta facoltativo. */
+    it("pretende il nome e il primo telefono, segnalandoli insieme", async () => {
         const onSubmit = vi.fn();
         renderWithProviders(<CreateCustomerDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await save();
 
         const alerts = screen.getAllByRole("alert").map((alert) => alert.textContent);
-        expect(alerts).toEqual([
-            "Il nome non può essere vuoto",
-            "Serve almeno un numero di telefono, il primo o il secondo",
-        ]);
+        expect(alerts).toEqual(["Il nome non può essere vuoto", "Il numero di telefono è obbligatorio"]);
         expect(screen.getByLabelText(/^Nome/)).toHaveFocus();
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Prima la regola era "almeno uno dei due": compilare solo il secondo bastava a passare.
+     * Ora il primo è sempre obbligatorio, il secondo non lo sostituisce.
+     */
+    it("non basta compilare solo il secondo telefono", async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(<CreateCustomerDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
+        await userEvent.type(screen.getByLabelText("Telefono 2"), "06 123456");
+        await save();
+
+        expect(screen.getByRole("alert")).toHaveTextContent("Il numero di telefono è obbligatorio");
+        expect(screen.getByLabelText(/Telefono 1/)).toHaveFocus();
         expect(onSubmit).not.toHaveBeenCalled();
     });
 

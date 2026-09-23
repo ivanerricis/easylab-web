@@ -1,0 +1,22 @@
+-- La data dell'intervento è già obbligatoria a ogni scrittura, senza eccezioni, da
+-- `validateInterventionRow` (routes/interventions.ts, dalla revisione del 2026-09-21): un
+-- vincolo qui rende impossibile che una scrittura che aggira quella funzione (uno script, una
+-- futura rotta) lasci una riga senza data. Tre punti che oggi gestiscono "e se mancasse?" si
+-- semplificano di conseguenza: la query del calendario (un OR senza indice per quel caso),
+-- l'email dell'intervento e il PDF (entrambi con un ripiego sulla data di creazione). Vedi
+-- CHANGELOG del 2026-09-23.
+--
+-- ATTENZIONE PRIMA DI ESEGUIRE QUESTA MIGRAZIONE IN PRODUZIONE: un database con dati storici
+-- precedenti alla regola del 2026-09-21, o ripristinato da un backup di allora, potrebbe avere
+-- righe senza data. Se ne esiste anche una sola, l'ALTER TABLE fallisce e la migrazione va in
+-- rollback (il migrator applica tutte le migrazioni pendenti in un'unica transazione:
+-- drizzle-orm/pg-core/dialect.js, PgDialect.migrate), quindi il database resta nello stato di
+-- prima, senza corruzione né perdita di dati. Prima di distribuire, un operatore deve eseguire
+-- su produzione, in sola lettura:
+--
+--   SELECT count(*) FROM intervention WHERE intervention_date IS NULL;
+--
+-- Verificato il 2026-09-23: 0 righe, sia su sviluppo sia in produzione. Se in futuro la query
+-- restituisce un numero maggiore di zero, le righe trovate vanno sistemate a mano (o il vincolo
+-- va discusso di nuovo) prima di applicare questa migrazione.
+ALTER TABLE "intervention" ALTER COLUMN "intervention_date" SET NOT NULL;

@@ -151,28 +151,22 @@ describe("listInterventions: filtri", () => {
     it("filtra per giorno dell'intervento", async () => {
         const target = await insertIntervention({ interventionDate: "2026-06-10" });
         await insertIntervention({ interventionDate: "2026-06-11" });
-        await insertIntervention({ interventionDate: null });
 
         expect(await findIds({ scheduledDate: "2026-06-10" })).toEqual([target.id]);
     });
 
     /**
-     * L'intervallo del calendario. Gli interventi senza data (quelli nati prima della colonna)
-     * vi compaiono nel giorno di creazione, letto nel fuso del laboratorio.
+     * L'intervallo del calendario. Dalla migration 0037_intervention_date_not_null la data non
+     * può più mancare: il caso "senza data, sul giorno di creazione" che questo test copriva
+     * prima non può più capitare (vedi CHANGELOG del 2026-09-23).
      */
-    it("filtra per intervallo del calendario, con gli interventi senza data sul giorno di creazione", async () => {
+    it("filtra per intervallo del calendario", async () => {
         const inside = await insertIntervention({ interventionDate: "2026-06-10" });
         const firstDay = await insertIntervention({ interventionDate: "2026-06-01" });
         const lastDay = await insertIntervention({ interventionDate: "2026-06-30" });
         await insertIntervention({ interventionDate: "2026-07-01" });
-        // Senza data, creato alle 00:30 del 1° giugno a Roma (22:30 UTC del 31 maggio, ora legale).
-        const undatedInside = await insertIntervention({
-            interventionDate: null,
-            created_at: new Date("2026-05-31T22:30:00Z"),
-        });
-        // Senza data, creato alle 23:30 del 31 maggio a Roma.
-        await insertIntervention({ interventionDate: null, created_at: new Date("2026-05-31T21:30:00Z") });
-        // Con data dentro l'intervallo ma creato fuori: conta la data dell'intervento.
+        // Con data dentro l'intervallo ma creato fuori: conta la data dell'intervento, non
+        // quella di creazione.
         const datedCreatedOutside = await insertIntervention({
             interventionDate: "2026-06-15",
             created_at: new Date("2026-01-01T10:00:00Z"),
@@ -182,7 +176,6 @@ describe("listInterventions: filtri", () => {
             inside.id,
             firstDay.id,
             lastDay.id,
-            undatedInside.id,
             datedCreatedOutside.id,
         ]);
     });
@@ -275,7 +268,7 @@ describe("listInterventions: righe e join", () => {
         const customer = await insertCustomer({
             firstName: "Anna",
             lastName: "Rossi",
-            phoneNumber: null,
+            phoneNumber: "011 222",
             phoneNumberSecondary: "02 555",
         });
         const collaborator = await insertCollaborator({ firstName: "Luca", lastName: "Verdi" });
@@ -312,7 +305,7 @@ describe("listInterventions: righe e join", () => {
                     customerId: customer.id,
                     collaboratorId: collaborator.id,
                     customer: "Anna Rossi",
-                    customerPhone: "02 555",
+                    customerPhone: "011 222",
                     collaborator: "Luca Verdi",
                     createdAt: target.created_at,
                     updatedAt: null,

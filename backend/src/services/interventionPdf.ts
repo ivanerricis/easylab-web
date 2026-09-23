@@ -38,10 +38,10 @@ export type InterventionPrintData = {
     price: number | null;
     /** Segnato "da fatturare": in stampa compare solo quando è vero. */
     toInvoice: boolean;
-    interventionDateLabel: string | null;
+    /** Obbligatoria dalla migration 0037_intervention_date_not_null: mai più null. */
+    interventionDateLabel: string;
     startTime: string | null;
     endTime: string | null;
-    createdAtLabel: string;
 };
 
 export type CustomerInterventionSummaryItem = {
@@ -169,18 +169,18 @@ const buildActivitySection = (intervention: InterventionPrintData) => ({
         widths: [90, "*", 90, "*"],
         body: [
             sectionBarRow("REPORT ATTIVITÀ", 4),
-            dualFieldRow(
-                "Codice",
-                `#${intervention.id}`,
-                "Data",
-                intervention.interventionDateLabel ?? intervention.createdAtLabel
-            ),
-            dualFieldRow(
-                "Tipologia",
-                formatInterventionType(intervention.type),
-                "Stato",
-                formatInterventionStatus(intervention.status)
-            ),
+            dualFieldRow("Codice", `#${intervention.id}`, "Data", intervention.interventionDateLabel),
+            // Lo stato non compare qui: chi firma questa ricevuta sta chiudendo l'intervento in
+            // quel momento, quindi lo stato è implicito nell'atto stesso della firma (a
+            // differenza del RESOCONTO INTERVENTI più sotto, che riepiloga interventi diversi e
+            // dove lo stato resta un'informazione utile). "Tipologia" resta sola sulla riga,
+            // come già fa "Prezzo"/"Da fatturare" quando uno dei due manca.
+            [
+                { text: "Tipologia", style: "label" },
+                { text: formatInterventionType(intervention.type), style: "value", colSpan: 3 },
+                {},
+                {},
+            ],
             ...buildPriceRows(intervention),
             // Il problema riscontrato esiste solo per gli interventi in sede o da remoto.
             ...(intervention.problem
@@ -207,9 +207,7 @@ const buildTechnicianHoursSection = (intervention: InterventionPrintData) => {
         return null;
     }
 
-    const scheduleLabel = intervention.interventionDateLabel
-        ? `${intervention.interventionDateLabel} ${formatTime(intervention.startTime)} - ${formatTime(intervention.endTime)}`
-        : "-";
+    const scheduleLabel = `${intervention.interventionDateLabel} ${formatTime(intervention.startTime)} - ${formatTime(intervention.endTime)}`;
     const hoursWorked = formatHoursWorked(intervention.startTime, intervention.endTime);
 
     return {

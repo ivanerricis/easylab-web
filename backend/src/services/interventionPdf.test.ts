@@ -24,6 +24,7 @@ vi.mock("./pdf/shared", async (importOriginal) => {
 });
 
 import { pdfStyles } from "./pdf/shared";
+import { formatInterventionType } from "./interventionLabels";
 import {
     createCustomerInterventionsPdfBuffer,
     createInterventionPdfBuffer,
@@ -60,7 +61,6 @@ const buildIntervention = (overrides: Partial<InterventionPrintData> = {}): Inte
     interventionDateLabel: "10/09/2026",
     startTime: "09:00",
     endTime: "11:30",
-    createdAtLabel: "10/09/2026",
     ...overrides,
 });
 
@@ -215,6 +215,25 @@ describe("createInterventionPdfBuffer", () => {
             "Da fatturare",
             "Sì",
         ]);
+    });
+
+    it('non mostra "Stato" nella ricevuta: chi firma sta chiudendo l\'intervento in quel momento, lo stato è implicito', async () => {
+        const doc = await captureInterventionDoc(buildIntervention({ status: "completato" }));
+        const activitySection = (doc.content as { table: { body: { text?: string }[][] } }[])[2];
+        const rows = activitySection.table.body;
+
+        expect(rows.some((row) => row.some((cell) => cell.text === "Stato"))).toBe(false);
+        // "Tipologia" resta da sola sulla riga, sull'intera larghezza rimasta (colSpan: 3).
+        const tipologiaRow = rows.find((row) => row.some((cell) => cell.text === "Tipologia"));
+        expect(tipologiaRow?.map((cell) => cell.text)).toEqual([
+            "Tipologia",
+            formatInterventionType(buildIntervention().type),
+            undefined,
+            undefined,
+        ]);
+        expect((tipologiaRow?.[1] as { colSpan?: number }).colSpan).toBe(3);
+        // Lo stato "Completato" non deve comparire da nessuna parte in questo documento.
+        expect(JSON.stringify(doc)).not.toContain("Completato");
     });
 });
 

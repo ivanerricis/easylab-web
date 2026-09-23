@@ -367,8 +367,8 @@ const sendNewDeviceEmail = async (user: UserRow, label: string): Promise<void> =
 
     await sendEmail({
         to: company.email,
-        subject: `Nuovo accesso - ${company.name}`,
-        text: `L'utente "${user.username}" è entrato da un dispositivo mai visto prima (${label}).`,
+        subject: `Nuovo accesso a EasyLab - ${company.name}`,
+        text: `L'utente "${user.username}" è entrato in EasyLab, il gestionale di ${company.name}, da un dispositivo mai visto prima (${label}).`,
     });
 };
 
@@ -659,9 +659,8 @@ export const setUserActive = async (userId: number, active: boolean): Promise<Pu
 export const deleteUser = async (userId: number): Promise<void> => {
     await requireUserById(userId);
 
-    // Eventuali FK verso questa tabella senza cascade fanno fallire la query con un
-    // vincolo di integrità: l'errore viene tradotto in un messaggio leggibile dal
-    // middleware globale, invitando l'admin a disabilitare l'account invece di eliminarlo.
+    // Le due FK verso questa tabella (sessioni, codici di recupero 2FA) sono in cascata:
+    // se ne vanno con l'utente, senza bisogno di un messaggio dedicato in errorHandler.ts.
     await db.delete(userTable).where(eq(userTable.id, userId));
 };
 

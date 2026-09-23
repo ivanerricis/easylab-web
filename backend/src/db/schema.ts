@@ -96,6 +96,11 @@ export const customerTable = pgTable(
     {
         id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
         ...userFields,
+        // Ridefinito dopo lo spread: solo per il cliente il primo telefono è obbligatorio (va
+        // contattato per forza), non per collaboratore e tecnico, che condividono `userFields`
+        // con la versione facoltativa. Il secondo resta sempre facoltativo. Vedi CHANGELOG
+        // 2026-09-23.
+        phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
         phoneNumberSecondary: varchar("phone_number_secondary", { length: 20 }),
         email: varchar("email", { length: 255 }),
         city: varchar("city", { length: 255 }),
@@ -351,7 +356,11 @@ export const interventionTable = pgTable(
          */
         toInvoice: boolean("to_invoice").notNull().default(false),
         status: varchar("status", { length: 20 }).$type<InterventionStatus>().notNull().default("programmato"),
-        interventionDate: date("intervention_date"),
+        // Obbligatoria a ogni scrittura da `validateInterventionRow` (routes/interventions.ts),
+        // per ogni tipo e stato, senza eccezioni: dichiararlo qui rende impossibile che una
+        // scrittura che aggira quella funzione (uno script, una rotta futura) lasci una riga
+        // senza data. Vedi CHANGELOG 2026-09-23.
+        interventionDate: date("intervention_date").notNull(),
         startTime: time("start_time"),
         endTime: time("end_time"),
         ...timestamps,

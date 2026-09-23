@@ -16,7 +16,7 @@ import { createInterventionPdfBuffer } from "../services/interventionPdf";
 import { formatInterventionStatus, formatInterventionType } from "../services/interventionLabels";
 import { loadPrintableLogo } from "../services/logoManager";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
-import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
+import { formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
 import { toCsv } from "../services/csv";
@@ -27,14 +27,6 @@ const interventionsRouter = Router();
 
 // Riferimento che lega l'allegato inline all'`<img src="cid:...">` del corpo HTML.
 const logoContentId = "logo-laboratorio";
-
-/**
- * La data di creazione arriva come `Date`: per l'email serve il giorno, YYYY-MM-DD ("en-CA"
- * scrive così), nel fuso del laboratorio. `toISOString` dava quello UTC, e una scheda aperta
- * alle 00:30 di Roma finiva nel nome del file con il giorno prima.
- */
-const toIsoDay = (value: Date, timeZone: string) =>
-    new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
 
 // Le due liste (valori ammessi di `type` e `status`) vivono una sola volta in `db/schema.ts`,
 // insieme al tipo della colonna: prima erano riscritte identiche qui, in
@@ -251,7 +243,7 @@ const loadInterventionPrintContext = async (id: number) => {
 
     const customerName = intervention.customerName ?? "";
     const collaboratorName = intervention.collaboratorName ?? "";
-    const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
+    const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(intervention.customerPhoneNumber, intervention.customerPhoneSecondary);
 
     return {
@@ -262,10 +254,10 @@ const loadInterventionPrintContext = async (id: number) => {
         labAddress,
         labPhone,
         type: intervention.type,
-        // Il giorno dell'email, come YYYY-MM-DD: quello dell'intervento o, se non è pianificato,
-        // quello di apertura della scheda. Uno solo per testo e nome dell'allegato, così non
-        // possono dire due giorni diversi.
-        emailDay: intervention.interventionDate ?? toIsoDay(intervention.created_at, timeZone),
+        // Il giorno dell'email, come YYYY-MM-DD: sempre quello dell'intervento, obbligatorio
+        // dalla migration 0037_intervention_date_not_null. Uno solo per testo e nome
+        // dell'allegato, così non possono dire due giorni diversi.
+        emailDay: intervention.interventionDate,
         pdfData: {
             id: intervention.id,
             labName,
@@ -283,10 +275,9 @@ const loadInterventionPrintContext = async (id: number) => {
             note: intervention.note,
             price: intervention.price,
             toInvoice: intervention.toInvoice,
-            interventionDateLabel: intervention.interventionDate ? formatDayLabel(intervention.interventionDate) : null,
+            interventionDateLabel: formatDayLabel(intervention.interventionDate),
             startTime: intervention.startTime,
             endTime: intervention.endTime,
-            createdAtLabel: formatDateLabel(intervention.created_at, timeZone),
         },
     };
 };

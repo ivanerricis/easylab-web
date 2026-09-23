@@ -7,6 +7,7 @@
  * test (`app.test.ts`), che non può importare un modulo che occupa la porta 3000 appena caricato.
  */
 import express from "express";
+import { z } from "zod";
 import cors from "cors";
 import compression from "compression";
 import cookieParser from "cookie-parser";
@@ -33,6 +34,13 @@ import settingsRouter from "./routes/settings";
 import { getLogoFile } from "./services/logoManager";
 import { requestLogger } from "./middleware/requestLogger";
 import { parseAllowedOrigins, requireSameOrigin } from "./middleware/requireSameOrigin";
+
+// zod 4 include la localizzazione italiana dei messaggi predefiniti (tipo mancante, formato
+// non valido, lunghezza fuori range...): senza, `validate` (routes/validation.ts) darebbe
+// sempre messaggi in inglese per qualunque schema senza un messaggio custom. Qui, prima di
+// qualunque rotta, invece che nel modulo di `validate` stesso: è una configurazione globale
+// di zod, non qualcosa che riguarda solo la validazione delle richieste.
+z.config(z.locales.it());
 
 const app = express();
 

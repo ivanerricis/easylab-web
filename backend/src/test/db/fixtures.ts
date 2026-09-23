@@ -41,7 +41,7 @@ const next = () => {
 export const insertCustomer = async (values: Partial<NewCustomer> = {}) => {
     const [row] = await db
         .insert(customerTable)
-        .values({ firstName: `Cliente${next()}`, ...values })
+        .values({ firstName: `Cliente${next()}`, phoneNumber: `000${next()}`, ...values })
         .returning();
     return row;
 };
@@ -119,6 +119,7 @@ export const insertIntervention = async (values: Partial<NewIntervention> = {}) 
         .insert(interventionTable)
         .values({
             type: "intervento_sede",
+            interventionDate: "2026-01-01",
             customerId: values.customerId ?? (await insertCustomer()).id,
             collaboratorId: values.collaboratorId ?? (await insertCollaborator()).id,
             ...values,

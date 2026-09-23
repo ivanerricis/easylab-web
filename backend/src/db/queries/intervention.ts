@@ -12,7 +12,7 @@ import type { NewIntervention, UpdateIntervention } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { personName, personNameOrDash } from "./personName";
 import { containsText, parseIdSearch } from "./search";
-import { onLocalDays, toLocalTimestamp } from "./timeZone";
+import { onLocalDays } from "./timeZone";
 
 type InterventionSortBy = "createdAt" | "interventionDate" | "customer" | "status";
 
@@ -111,12 +111,12 @@ export const listInterventions = async ({
     /**
      * Intervallo sulla data dell'intervento, per il calendario.
      *
-     * Il ramo sui record senza data non è teorico: quelli creati prima dell'introduzione di
-     * `intervention_date` ne sono privi, e il calendario li colloca sulla data di creazione
-     * (`useCalendarInterventions.toCalendarEvent`). Filtrare qui solo sulla prima colonna li
-     * farebbe sparire dal calendario invece di limitarsi a non caricarli fuori intervallo.
-     * Scritto come OR di due condizioni e non come `coalesce(...)`: un'espressione calcolata
-     * non sarebbe coperta dagli indici, mentre così il pianificatore può usarli entrambi.
+     * Prima c'era anche un ramo per i record senza data (collocati sulla data di creazione, come
+     * fa ancora `useCalendarInterventions.toCalendarEvent` per gli eventuali dati vecchi già in
+     * pagina), scritto come OR di due condizioni invece che come `coalesce(...)` perché un'
+     * espressione calcolata non sarebbe stata coperta dagli indici. Dalla migration
+     * 0037_intervention_date_not_null la colonna non può più essere NULL, quindi qui basta un
+     * confronto diretto: il pianificatore usa l'indice su `intervention_date` senza altro.
      */
     const scheduledRangeBounds =
         scheduledFrom && scheduledTo
@@ -133,17 +133,7 @@ export const listInterventions = async ({
               ? sql`${column} >= ${scheduledRangeBounds.from}`
               : sql`${column} <= ${scheduledRangeBounds?.to}`;
     const scheduledRangeCondition = scheduledRangeBounds
-        ? or(
-              and(
-                  sql`${interventionTable.interventionDate} IS NOT NULL`,
-                  inScheduledRange(interventionTable.interventionDate)
-              ),
-              and(
-                  sql`${interventionTable.interventionDate} IS NULL`,
-                  // Il giorno di creazione nel fuso del laboratorio, come i filtri qui sopra.
-                  inScheduledRange(sql`(${toLocalTimestamp(interventionTable.created_at, timeZone)})::date`)
-              )
-          )
+        ? inScheduledRange(interventionTable.interventionDate)
         : undefined;
     const customerCondition = customerId ? eq(interventionTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(interventionTable.collaboratorId, collaboratorId) : undefined;

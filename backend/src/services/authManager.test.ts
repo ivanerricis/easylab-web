@@ -533,10 +533,18 @@ ${"x".repeat(400)}`
             await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
             await flushMicrotasks();
 
+            // L'oggetto e il testo devono nominare EasyLab, non solo il laboratorio: chi
+            // riceve l'email potrebbe avere altri sistemi con notifiche simili (vedi CHANGELOG).
             expect(sendEmail).toHaveBeenCalledWith(
                 expect.objectContaining({
                     to: "titolare@esempio.it",
+                    subject: "Nuovo accesso a EasyLab - Laboratorio",
                     text: expect.stringContaining('"mario"') as unknown,
+                })
+            );
+            expect(sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    text: expect.stringContaining("EasyLab, il gestionale di Laboratorio") as unknown,
                 })
             );
         });

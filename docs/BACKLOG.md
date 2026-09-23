@@ -119,35 +119,26 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     Interfaccia). E le stesse colonne dei report sono copiate in quattro array (lista, schede di
     cliente, collaboratore e tecnico), quelle degli interventi in tre. La strada: definizioni per
     chiave in `report-columns.tsx` e `intervention-columns.tsx`, da cui ogni tabella sceglie.
-  - **La data dell'intervento è obbligatoria per la rotta ma la colonna accetta NULL**
-    (`schema.ts`). Le righe vecchie senza data sono gestite in tre punti: un `OR` nel
-    calendario che nessun indice copre, un ripiego nell'email e uno nel PDF. La strada: una
-    migration che riempie la data dal giorno di `created_at` nel fuso del laboratorio, poi
-    `NOT NULL`, e via i tre ripieghi. Rimandata perché tocca dati di produzione.
-  - **"Almeno un telefono" è una regola zod sul corpo della PUT del cliente**, non sulla riga
-    risultante: una PUT con il solo `phoneNumberSecondary: null` viene rifiutata anche se
-    `phoneNumber` è salvato. Oggi non capita perché il frontend manda sempre tutti e due. La
-    strada è la stessa dei report (migration 0035): un CHECK sulla tabella e una voce in
-    `CHECK_MESSAGES`, dopo aver verificato che i dati esistenti lo rispettino.
   - **Le etichette del registro azioni stanno in una tabella di percorsi separata dalle
     rotte** (`userActionLogger.ts`), da tenere allineata a mano: si era già disallineata
-    (l'export della chiave, corretto). La strada: ogni rotta dichiara la sua etichetta (un
-    middleware `auditAs("...")`). Da decidere insieme: **gli export CSV e i resoconti PDF non
-    finiscono nel registro**, compreso l'export dei report con la colonna Password (vedi la voce
-    "Password del dispositivo in chiaro" in Interfaccia).
-  - **Il giorno "AAAA-MM-GG" nel fuso del laboratorio è ricostruito a mano due volte**
-    (`toIsoDay` in `routes/interventions.ts`, e `backupState.ts`). Un `localDayKey(date,
-    timeZone)` accanto a `currentMonthKey`, da fare insieme alla voce `process.env.TZ` qui sopra.
+    (l'export della chiave, corretto). La strada per unificarla resta un middleware
+    `auditAs("...")` dichiarato da ogni rotta, rimandata: sono solo 13 voci su 67 rotte, e non
+    si sono disallineate di nuovo dopo la correzione. Il buco che contava — **export CSV e
+    resoconti PDF invisibili nel registro**, compreso l'export dei report con la colonna
+    Password (vedi "Password del dispositivo in chiaro" in Interfaccia) — è stato colmato il
+    2026-09-23 con sette voci dedicate, senza il rifacimento generale.
+  - **Il giorno "AAAA-MM-GG" nel fuso del laboratorio è ricostruito a mano** in
+    `backupState.ts` (l'altra copia, in `routes/interventions.ts`, è sparita il 2026-09-23
+    insieme al ripiego che la usava, vedi CHANGELOG). Un `localDayKey(date, timeZone)` accanto a
+    `currentMonthKey`, da fare insieme alla voce `process.env.TZ` qui sopra.
   - **Le cinque preferenze d'aspetto** (accento, intensità, raggio, densità, dimensione del
     testo) hanno ciascuna le sue `getStored*`/`setStored*`/`apply*` in `lib/theme.ts`, quindici
     funzioni che cambiano solo per chiave e attributo, più cinque handler uguali in
     `themeSettingsSection.tsx`. Candidata a una mappa unica; rimandata perché è codice stabile
     che funziona.
-  - Piccole: in `inputWithAdd.tsx` il ramo "Usa …" (senza `onCreate`) non si raggiunge più;
-    `z.config(z.locales.it())` sta in `routes/validation.ts`, ma il posto più leggibile è
-    l'avvio dell'app; in `authManager.ts` il commento sopra `deleteUser` parla di chiavi esterne
-    senza cascade e di un messaggio che non esistono più; il clic fuori da `CustomDialog` non ha
-    un test automatico, perché jsdom non simula un vero clic fuori da un dialogo Radix.
+  - Piccola: il clic fuori da `CustomDialog` non ha un test automatico, perché jsdom non simula
+    un vero clic fuori da un dialogo Radix (verificato a mano nel browser, vedi CHANGELOG del
+    2026-09-23).
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): fatta per intero
   il 2026-09-21, tranne la 2FA di `authManager`, ancora provata solo con un `db` finto.
 

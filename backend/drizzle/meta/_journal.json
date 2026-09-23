@@ -260,6 +260,20 @@
       "when": 1776370013000,
       "tag": "0036_add_user_known_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1776370014000,
+      "tag": "0037_intervention_date_not_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1776370015000,
+      "tag": "0038_customer_phone_not_null",
+      "breakpoints": true
     }
   ]
 }

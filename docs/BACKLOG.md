@@ -102,10 +102,9 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Le cinque liste delle anagrafiche** (`db/queries/{customer,collaborator,technician,device,issue}.ts`)
     hanno lo stesso scheletro di una trentina di righe, e l'ordinamento è incoerente (i difetti per
     data di creazione, gli altri per nome). Candidata a un `listSearchable(table, colonne, ordine)`.
-- Rimasti aperti dalla revisione di qualità del 2026-09-22 (quattro punti, finora solo nel
-  CHANGELOG di quel giorno):
-  - Due rate-limiter a finestra scritti ciascuno per conto suo (login e verifica 2FA, con lo
-    stesso `prune`): candidati a un limitatore unico.
+- Rimasti aperti dalla revisione di qualità del 2026-09-22 (finora solo nel CHANGELOG di quel
+  giorno). I tre limitatori a finestra (login, 2FA, invio email) sono stati unificati il
+  2026-09-23 — vedi CHANGELOG — restano:
   - `TechnicianPage` non riusa l'infrastruttura delle schede di cliente e collaboratore
     (`useReportsAndInterventionsOf`, `reports-interventions-tabs`), e ha un filtro predefinito
     diverso dalle pagine gemelle.

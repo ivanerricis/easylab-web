@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { pruneExpiring } from "./expiringMap";
 
 /**
  * Lo stato "password giusta, manca il codice" fra i due passi del login.
@@ -32,29 +33,8 @@ type Challenge = { userId: number; expiresAt: number; attempts: number };
 
 const challengesById = new Map<string, Challenge>();
 
-/**
- * Scarta i challenge scaduti e, se ancora non bastasse, quelli che scadono per primi:
- * sacrificare i più vicini alla scadenza è preferibile a sacrificare quelli appena creati,
- * che appartengono a chi sta digitando il codice proprio adesso.
- */
-const prune = (now: number): void => {
-    for (const [id, challenge] of challengesById) {
-        if (challenge.expiresAt <= now) {
-            challengesById.delete(id);
-        }
-    }
-
-    if (challengesById.size < twoFactorChallengeMaxEntries) {
-        return;
-    }
-
-    const excess = challengesById.size - twoFactorChallengeMaxEntries + 1;
-    const oldestFirst = [...challengesById.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt);
-
-    for (const [id] of oldestFirst.slice(0, excess)) {
-        challengesById.delete(id);
-    }
-};
+const prune = (now: number): void =>
+    pruneExpiring(challengesById, twoFactorChallengeMaxEntries, now, (challenge) => challenge.expiresAt);
 
 /**
  * L'id viaggia nel corpo della risposta, non in un cookie: non è una sessione, e non deve

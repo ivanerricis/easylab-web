@@ -11,6 +11,44 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-23 — Un solo limitatore a finestra per login, 2FA ed email
+
+Tre mappe in memoria — tentativi di login (`loginRateLimit.ts`), challenge del secondo fattore
+(`twoFactorChallenge.ts`), invii email ai clienti (`emailSendRateLimit.ts`) — avevano ciascuna
+la propria funzione `prune()`, identica salvo il nome del campo con la scadenza: scarta le voci
+già scadute e, se la mappa resta oltre il tetto, le voci non scadute più vicine alla scadenza.
+La stessa politica scritta tre volte, senza nulla che garantisse restassero identiche a un
+cambio futuro.
+
+*Perché:* è lo stesso rischio già chiuso per il registro azioni (l'export della chiave di
+backup registrato con il metodo sbagliato, 2026-09-23) — una regola duplicata può divergere in
+silenzio, senza che niente lo segnali. Estratta `pruneExpiring` in un nuovo
+`services/expiringMap.ts`, condivisa dai tre file: ciascuno mantiene la propria `Map` e il
+proprio tipo di voce, ma la potatura vive in un punto solo.
+
+Per strada, `emailSendRateLimit.ts` aveva una versione più debole delle altre due: scartava le
+voci scadute, ma non aveva la seconda fase (sacrificare le più vicine alla scadenza) se la
+mappa restava piena senza voci scadute — sotto scansione con utenti sempre diversi, in teoria
+poteva crescere oltre il tetto dichiarato. Con `pruneExpiring` ha ora la stessa garanzia degli
+altri due. `maxTrackedUsers` è stata esportata (`emailSendMaxTrackedUsers`), come già per gli
+analoghi tetti degli altri due file.
+
+Comportamento esterno invariato: stesse finestre, stessi tetti, stessi messaggi. `knownLoginSources`
+(gli indirizzi già usati con successo, in `loginRateLimit.ts`) resta fuori: è una politica LRU
+per reinserimento, non a scadenza, un caso diverso da questo.
+
+→ [backend/src/services/expiringMap.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/expiringMap.ts),
+[backend/src/services/loginRateLimit.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/loginRateLimit.ts),
+[backend/src/services/twoFactorChallenge.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/twoFactorChallenge.ts),
+[backend/src/services/emailSendRateLimit.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/emailSendRateLimit.ts)
+
+### Verifiche
+
+Typecheck, lint, 1021 test (10 in più: il nuovo modulo condiviso, e la copertura sulla seconda
+fase di potatura che a `emailSendRateLimit.ts` mancava).
+
+---
+
 ## 2026-09-23 — Firma del tecnico, numero di pagina e totale nel PDF degli interventi
 
 Tre aggiunte alla stampa degli interventi, decise dopo una revisione informale di cosa manca

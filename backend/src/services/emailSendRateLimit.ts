@@ -9,25 +9,26 @@
  *
  * In memoria, come i limiti del login: a un riavvio si riparte da zero, ed è accettabile.
  */
+import { pruneExpiring } from "./expiringMap";
+
 export const emailSendWindowMs = 60 * 60 * 1000;
 export const emailSendMaxPerWindow = 30;
-const maxTrackedUsers = 10_000;
+export const emailSendMaxTrackedUsers = 10_000;
 
 type Window = { count: number; resetAt: number };
 
 const windowsByUser = new Map<string, Window>();
+
+const prune = (now: number): void =>
+    pruneExpiring(windowsByUser, emailSendMaxTrackedUsers, now, (window) => window.resetAt);
 
 /** Registra un invio e dice se era ammesso: false quando il tetto della finestra è già pieno. */
 export const consumeEmailSendSlot = (userKey: string, now = Date.now()): boolean => {
     const current = windowsByUser.get(userKey);
 
     if (!current || current.resetAt <= now) {
-        if (windowsByUser.size >= maxTrackedUsers) {
-            for (const [key, window] of windowsByUser) {
-                if (window.resetAt <= now) {
-                    windowsByUser.delete(key);
-                }
-            }
+        if (windowsByUser.size >= emailSendMaxTrackedUsers) {
+            prune(now);
         }
 
         windowsByUser.set(userKey, { count: 1, resetAt: now + emailSendWindowMs });

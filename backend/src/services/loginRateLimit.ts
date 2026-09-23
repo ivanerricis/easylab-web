@@ -14,6 +14,7 @@
  * connessione attiva, e la logica di scadenza/pulizia sta in un posto solo.
  */
 import net from "node:net";
+import { pruneExpiring } from "./expiringMap";
 
 /**
  * Espande un IPv6 negli otto gruppi esadecimali, risolvendo `::` e un IPv4 finale
@@ -101,29 +102,8 @@ type Attempt = { count: number; resetAt: number };
 
 const attemptsByKey = new Map<string, Attempt>();
 
-/**
- * Scarta le entry scadute e, se ancora non bastasse, quelle che scadono per prime.
- * Sacrificare le più vicine alla scadenza è preferibile a sacrificare quelle appena
- * create: sono le meno informative rimaste.
- */
-const prune = (now: number): void => {
-    for (const [key, entry] of attemptsByKey) {
-        if (entry.resetAt <= now) {
-            attemptsByKey.delete(key);
-        }
-    }
-
-    if (attemptsByKey.size < loginRateLimitMaxEntries) {
-        return;
-    }
-
-    const excess = attemptsByKey.size - loginRateLimitMaxEntries + 1;
-    const oldestFirst = [...attemptsByKey.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
-
-    for (const [key] of oldestFirst.slice(0, excess)) {
-        attemptsByKey.delete(key);
-    }
-};
+const prune = (now: number): void =>
+    pruneExpiring(attemptsByKey, loginRateLimitMaxEntries, now, (entry) => entry.resetAt);
 
 const hasReachedLimit = (key: string, maxAttempts: number, now: number): boolean => {
     const entry = attemptsByKey.get(key);

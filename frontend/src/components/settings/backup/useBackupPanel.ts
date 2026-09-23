@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/use-auth";
 import { useBusyGuard } from "@/components/use-busy-guard";
-import type { SettingsRunStatus } from "@/components/settings/settingsUi";
 import {
     getApiErrorMessage,
     getBackupDumpDownloadUrl,
@@ -17,6 +16,7 @@ import {
     testSmbConnection,
     updateBackupSettings,
     type BackupDumpFileDto,
+    type BackupSettingsDto,
     type BackupSettingsInput,
 } from "@/lib/api";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
@@ -41,6 +41,38 @@ const defaultForm: BackupSettingsInput = {
     smbPassword: "",
 };
 
+// La cartella è solo da mostrare: è quella montata dal compose, il server non la fa scegliere.
+const defaultOutputDir = "backups";
+
+/**
+ * I campi modificabili del form, letti dal DTO intero che arriva dal server: come
+ * `updateSettingsPanel.tsx` fa con `status`, ma lì il pannello è di sola lettura e qui c'è
+ * anche un form da modificare, quindi serve la proiezione sui soli campi che il form scrive
+ * (più `smbPassword`, che il server non restituisce mai).
+ *
+ * Prima questa stessa conversione era scritta due volte, identica, in `loadSettings` e
+ * `handleSave`; e le 16 informazioni di sola lettura (`lastRunAt`, `smbLastStatus`, ...)
+ * erano altrettanti `useState` riassegnati con un sottoinsieme diverso di setter in ognuno
+ * dei quattro punti che ricevono il DTO intero dal server (caricamento, salvataggio,
+ * esecuzione del dump, ripristino) — tanto che `lastRunOrigin` non veniva mai ripreso da
+ * nessuno dei quattro.
+ */
+const toFormValues = (settings: BackupSettingsDto): BackupSettingsInput => ({
+    autoEnabled: settings.autoEnabled,
+    frequencyDays: settings.frequencyDays,
+    runAt: settings.runAt,
+    maxBackupsToKeep: settings.maxBackupsToKeep,
+    notifyEmailOnFailure: settings.notifyEmailOnFailure,
+    smbEnabled: settings.smbEnabled,
+    smbHost: settings.smbHost,
+    smbShare: settings.smbShare,
+    smbPath: settings.smbPath,
+    smbDomain: settings.smbDomain,
+    smbPort: settings.smbPort,
+    smbUsername: settings.smbUsername,
+    smbPassword: "",
+});
+
 /**
  * Tutto lo stato e le azioni del pannello backup. Sta in un hook separato dalle schede
  * che lo mostrano perché il pannello ha una ventina di variabili di stato condivise fra
@@ -56,19 +88,12 @@ export const useBackupPanel = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isRunningBackup, setIsRunningBackup] = useState(false);
     const [formValues, setFormValues] = useState<BackupSettingsInput>(defaultForm);
-    const [savedValues, setSavedValues] = useState<BackupSettingsInput>(defaultForm);
-    const [lastRunAt, setLastRunAt] = useState<string | null>(null);
-    const [lastRunStatus, setLastRunStatus] = useState<SettingsRunStatus>("idle");
-    const [lastError, setLastError] = useState<string | null>(null);
-    const [nextRunAt, setNextRunAt] = useState<string | null>(null);
-    const [lastDumpPath, setLastDumpPath] = useState<string | null>(null);
-    const [emailConfigured, setEmailConfigured] = useState(false);
+    // L'ultimo DTO arrivato dal server: unica fonte sia dei campi di sola lettura (stato
+    // dell'ultima esecuzione, del NAS, del ripristino...) sia di `savedValues`, con cui si
+    // confronta il form per `isDirty`. `null` finché non è ancora arrivato nulla.
+    const [settings, setSettings] = useState<BackupSettingsDto | null>(null);
     const [dumpFiles, setDumpFiles] = useState<BackupDumpFileDto[]>([]);
     const [isLoadingDumps, setIsLoadingDumps] = useState(false);
-    const [smbPasswordSet, setSmbPasswordSet] = useState(false);
-    const [smbLastRunAt, setSmbLastRunAt] = useState<string | null>(null);
-    const [smbLastStatus, setSmbLastStatus] = useState<SettingsRunStatus>("idle");
-    const [smbLastError, setSmbLastError] = useState<string | null>(null);
     const [isTestingSmb, setIsTestingSmb] = useState(false);
 
     const [restoreUploadFile, setRestoreUploadFile] = useState<File | null>(null);
@@ -76,60 +101,23 @@ export const useBackupPanel = () => {
     const [isRestoring, setIsRestoring] = useState(false);
     const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null);
     const [restoreConfirmText, setRestoreConfirmText] = useState("");
-    const [lastRestoreAt, setLastRestoreAt] = useState<string | null>(null);
-    const [lastRestoreStatus, setLastRestoreStatus] = useState<SettingsRunStatus>("idle");
-    const [lastRestoreError, setLastRestoreError] = useState<string | null>(null);
-    const [lastRestoreFileName, setLastRestoreFileName] = useState<string | null>(null);
-    const [secretsToReconfigure, setSecretsToReconfigure] = useState<string[]>([]);
     const [restoreBackupKeyInput, setRestoreBackupKeyInput] = useState("");
     const [restorePassword, setRestorePassword] = useState("");
-    // Solo da mostrare: la cartella è quella montata dal compose, il server non la fa scegliere.
-    const [outputDir, setOutputDir] = useState("backups");
     const [backupKey, setBackupKey] = useState<string | null>(null);
     const [isLoadingBackupKey, setIsLoadingBackupKey] = useState(false);
     const [isBackupKeyDialogOpen, setIsBackupKeyDialogOpen] = useState(false);
     const [backupKeyPassword, setBackupKeyPassword] = useState("");
 
+    const savedValues = settings ? toFormValues(settings) : defaultForm;
     const isDirty = isSettingsFormDirty(formValues, savedValues, ["smbPassword"]);
 
     const loadSettings = async () => {
         setIsLoading(true);
 
         try {
-            const settings = await getBackupSettings();
-            const nextValues: BackupSettingsInput = {
-                autoEnabled: settings.autoEnabled,
-                frequencyDays: settings.frequencyDays,
-                runAt: settings.runAt,
-                maxBackupsToKeep: settings.maxBackupsToKeep,
-                notifyEmailOnFailure: settings.notifyEmailOnFailure,
-                smbEnabled: settings.smbEnabled,
-                smbHost: settings.smbHost,
-                smbShare: settings.smbShare,
-                smbPath: settings.smbPath,
-                smbDomain: settings.smbDomain,
-                smbPort: settings.smbPort,
-                smbUsername: settings.smbUsername,
-                smbPassword: "",
-            };
-            setFormValues(nextValues);
-            setSavedValues(nextValues);
-            setOutputDir(settings.outputDir);
-            setLastRunAt(settings.lastRunAt);
-            setLastRunStatus(settings.lastRunStatus);
-            setLastError(settings.lastError);
-            setNextRunAt(settings.nextRunAt);
-            setLastDumpPath(settings.lastDumpPath);
-            setEmailConfigured(settings.emailConfigured);
-            setSmbPasswordSet(settings.smbPasswordSet);
-            setSmbLastRunAt(settings.smbLastRunAt);
-            setSmbLastStatus(settings.smbLastStatus);
-            setSmbLastError(settings.smbLastError);
-            setLastRestoreAt(settings.lastRestoreAt);
-            setLastRestoreStatus(settings.lastRestoreStatus);
-            setLastRestoreError(settings.lastRestoreError);
-            setLastRestoreFileName(settings.lastRestoreFileName);
-            setSecretsToReconfigure(settings.restoreSecretsToReconfigure);
+            const result = await getBackupSettings();
+            setSettings(result);
+            setFormValues(toFormValues(result));
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile caricare le impostazioni backup"));
         } finally {
@@ -177,7 +165,7 @@ export const useBackupPanel = () => {
             return;
         }
 
-        if (formValues.notifyEmailOnFailure && !emailConfigured) {
+        if (formValues.notifyEmailOnFailure && !settings?.emailConfigured) {
             toast.error("Configura prima l'invio email nelle impostazioni per attivare questo avviso");
             return;
         }
@@ -188,7 +176,7 @@ export const useBackupPanel = () => {
                 return;
             }
 
-            if (!smbPasswordSet && !formValues.smbPassword?.trim()) {
+            if (!settings?.smbPasswordSet && !formValues.smbPassword?.trim()) {
                 toast.error("Specifica una password per la connessione al NAS");
                 return;
             }
@@ -201,7 +189,7 @@ export const useBackupPanel = () => {
 
         try {
             setIsSaving(true);
-            const settings = await updateBackupSettings({
+            const result = await updateBackupSettings({
                 ...formValues,
                 smbHost: formValues.smbHost.trim(),
                 smbShare: formValues.smbShare.trim(),
@@ -210,37 +198,12 @@ export const useBackupPanel = () => {
                 smbUsername: formValues.smbUsername.trim(),
             });
 
-            setLastRunAt(settings.lastRunAt);
-            setLastRunStatus(settings.lastRunStatus);
-            setLastError(settings.lastError);
-            setNextRunAt(settings.nextRunAt);
-            setLastDumpPath(settings.lastDumpPath);
-            setEmailConfigured(settings.emailConfigured);
-            setSmbPasswordSet(settings.smbPasswordSet);
-            setSmbLastRunAt(settings.smbLastRunAt);
-            setSmbLastStatus(settings.smbLastStatus);
-            setSmbLastError(settings.smbLastError);
-            const nextSavedValues: BackupSettingsInput = {
-                autoEnabled: settings.autoEnabled,
-                frequencyDays: settings.frequencyDays,
-                runAt: settings.runAt,
-                maxBackupsToKeep: settings.maxBackupsToKeep,
-                notifyEmailOnFailure: settings.notifyEmailOnFailure,
-                smbEnabled: settings.smbEnabled,
-                smbHost: settings.smbHost,
-                smbShare: settings.smbShare,
-                smbPath: settings.smbPath,
-                smbDomain: settings.smbDomain,
-                smbPort: settings.smbPort,
-                smbUsername: settings.smbUsername,
-                smbPassword: "",
-            };
+            setSettings(result);
             // Il form prende i valori salvati, non resta com'era: quelli inviati sono ripuliti
             // dagli spazi, e un " nas.local " rimasto nel campo contro il "nas.local" salvato
             // lasciava il form "modificato" (e Salva attivo) subito dopo il salvataggio.
             // Come in `CompanySettingsPanel`.
-            setFormValues(nextSavedValues);
-            setSavedValues(nextSavedValues);
+            setFormValues(toFormValues(result));
             toast.success("Impostazioni backup salvate");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare le impostazioni backup"));
@@ -304,14 +267,7 @@ export const useBackupPanel = () => {
             });
 
             const result = await runBackupNow();
-            setLastRunAt(result.lastRunAt);
-            setLastRunStatus(result.lastRunStatus);
-            setLastError(result.lastError);
-            setNextRunAt(result.nextRunAt);
-            setLastDumpPath(result.lastDumpPath);
-            setSmbLastRunAt(result.smbLastRunAt);
-            setSmbLastStatus(result.smbLastStatus);
-            setSmbLastError(result.smbLastError);
+            setSettings(result);
 
             if (result.smbEnabled && result.smbLastStatus === "failed") {
                 toast.warning(result.message, { richColors: true });
@@ -421,11 +377,7 @@ export const useBackupPanel = () => {
                           backupKeyOverride
                       );
 
-            setLastRestoreAt(result.lastRestoreAt);
-            setLastRestoreStatus(result.lastRestoreStatus);
-            setLastRestoreError(result.lastRestoreError);
-            setLastRestoreFileName(result.lastRestoreFileName);
-            setSecretsToReconfigure(result.restoreSecretsToReconfigure);
+            setSettings(result);
 
             if (result.restoreSecretsToReconfigure.length > 0) {
                 toast.warning(result.message, { richColors: true });
@@ -467,20 +419,20 @@ export const useBackupPanel = () => {
         formValues,
         setFormValues,
         isDirty,
-        outputDir,
-        lastRunAt,
-        lastRunStatus,
-        lastError,
-        nextRunAt,
-        lastDumpPath,
-        emailConfigured,
+        outputDir: settings?.outputDir ?? defaultOutputDir,
+        lastRunAt: settings?.lastRunAt ?? null,
+        lastRunStatus: settings?.lastRunStatus ?? "idle",
+        lastError: settings?.lastError ?? null,
+        nextRunAt: settings?.nextRunAt ?? null,
+        lastDumpPath: settings?.lastDumpPath ?? null,
+        emailConfigured: settings?.emailConfigured ?? false,
         dumpFiles,
         isLoadingDumps,
         totalDumpsSize,
-        smbPasswordSet,
-        smbLastRunAt,
-        smbLastStatus,
-        smbLastError,
+        smbPasswordSet: settings?.smbPasswordSet ?? false,
+        smbLastRunAt: settings?.smbLastRunAt ?? null,
+        smbLastStatus: settings?.smbLastStatus ?? "idle",
+        smbLastError: settings?.smbLastError ?? null,
         isTestingSmb,
         restoreUploadFile,
         resetSchemaOnRestore,
@@ -489,11 +441,11 @@ export const useBackupPanel = () => {
         pendingRestore,
         restoreConfirmText,
         setRestoreConfirmText,
-        lastRestoreAt,
-        lastRestoreStatus,
-        lastRestoreError,
-        lastRestoreFileName,
-        secretsToReconfigure,
+        lastRestoreAt: settings?.lastRestoreAt ?? null,
+        lastRestoreStatus: settings?.lastRestoreStatus ?? "idle",
+        lastRestoreError: settings?.lastRestoreError ?? null,
+        lastRestoreFileName: settings?.lastRestoreFileName ?? null,
+        secretsToReconfigure: settings?.restoreSecretsToReconfigure ?? [],
         restoreBackupKeyInput,
         setRestoreBackupKeyInput,
         restorePassword,

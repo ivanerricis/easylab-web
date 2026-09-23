@@ -15,6 +15,12 @@ vi.mock("../db/queries/report", () => ({
     getReportStats: vi.fn(),
 }));
 
+// La regola D5 ("Altro" ⇒ descrizione non vuota) guarda l'etichetta del difetto scelto: la
+// rotta la legge con `getIssueById`, mockata qui come le altre query.
+vi.mock("../db/queries/issue", () => ({
+    getIssueById: vi.fn(),
+}));
+
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
     getAppTimeZone: vi.fn(async () => "Europe/Rome"),
@@ -33,6 +39,7 @@ import {
     listReports,
     updateReportById,
 } from "../db/queries/report";
+import { getIssueById } from "../db/queries/issue";
 import { getLabConfig } from "../config/lab";
 import { createReportPdfBuffer } from "../services/reportPdf";
 import reportsRouter from "./reports";
@@ -66,6 +73,9 @@ const printReportRow = {
     issueDescription: "Schermo incrinato sull'angolo",
     serviceDescription: "Sostituito display",
     issueName: "Schermo rotto",
+    // Il problema come lo calcola ormai la query (`issueTextExpr` in `db/queries/report.ts`):
+    // la rotta si limita a passarlo al PDF, non lo ricalcola più in JS.
+    issueText: "Schermo incrinato sull'angolo",
     dataBackup: true,
     charger: false,
     alerted: true,
@@ -76,6 +86,9 @@ const printReportRow = {
     customerPhoneSecondary: null,
     deviceName: "iPhone 12",
     technicianPrice: 20,
+    // Stessa cosa per il totale (`totalPriceExpr`): prima la rotta faceva
+    // `report.price + Number(report.technicianPrice)`.
+    totalPrice: 70,
 };
 
 // Riga così come la restituisce `getReportById`/`updateReportById`: colonne grezze della
@@ -116,6 +129,9 @@ const checkViolationError = (constraint: string) =>
 describe("reports router", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Difetto qualunque, non "Altro": i test che non riguardano la regola D5 non devono
+        // preoccuparsi di mockare anche questo. I test di quella regola sovrascrivono.
+        vi.mocked(getIssueById).mockResolvedValue([{ id: 1, description: "Schermo rotto" }] as never);
     });
 
     describe("GET /", () => {
@@ -177,10 +193,14 @@ describe("reports router", () => {
             issue: "Schermo rotto",
             issueDescription: "Schermo incrinato",
             serviceDescription: "Sostituito display",
-            technician: "-",
-            internalPrice: 50,
-            technicianPrice: 0,
-            totalPrice: 50,
+            // Il collaboratore che ha in carico il report e il tecnico esterno vero: prima
+            // questa riga simulava `technician: "-"` (il campo si chiamava così ma era il
+            // collaboratore) e un `internalPrice` duplicato di `price` — vedi D4 nel CHANGELOG.
+            collaborator: "Luigi Bianchi",
+            technicianName: "Enzo Tecnico",
+            price: 50,
+            technicianPrice: 20,
+            totalPrice: 70,
             paymentMethod: "cash",
             closed: true,
             note: "Richiamare",
@@ -189,7 +209,7 @@ describe("reports router", () => {
             updatedAt: null,
         };
 
-        it("esporta con i filtri passati e le etichette italiane del pagamento", async () => {
+        it("esporta con i filtri passati, le colonne di collaboratore/tecnico e le etichette italiane del pagamento", async () => {
             vi.mocked(listReports).mockResolvedValue([exportReportRow] as never);
 
             const response = await request(buildApp()).get(
@@ -207,6 +227,22 @@ describe("reports router", () => {
             });
             expect(response.text).toContain("Metodo di pagamento");
             expect(response.text).toContain("Contanti");
+
+            // Colonne per nome, non solo per contenuto: verifica anche l'ordine, così un
+            // futuro riordino delle colonne farebbe fallire il test invece di passare per caso.
+            const [headerLine, dataLine] = response.text.trim().split("\r\n");
+            const withoutBom = headerLine.charCodeAt(0) === 0xfeff ? headerLine.slice(1) : headerLine;
+            const headers = withoutBom.split(";");
+            const values = dataLine.split(";");
+            const columnValue = (header: string) => values[headers.indexOf(header)];
+
+            expect(columnValue("Collaboratore")).toBe("Luigi Bianchi");
+            expect(columnValue("Tecnico esterno")).toBe("Enzo Tecnico");
+            // "Prezzo interno" legge `price` direttamente, non più un `internalPrice`
+            // duplicato: prezzo interno, compenso tecnico e totale restano tre colonne distinte.
+            expect(columnValue("Prezzo interno")).toBe("50");
+            expect(columnValue("Compenso tecnico")).toBe("20");
+            expect(columnValue("Prezzo totale")).toBe("70");
         });
 
         it("senza filtri la visibilità di default è 'all', a differenza della lista paginata", async () => {
@@ -280,11 +316,11 @@ describe("reports router", () => {
             const response = await request(buildApp()).get("/api/reports/999/print");
 
             expect(response.status).toBe(404);
-            expect(response.body.message).toBe("Report not found");
+            expect(response.body.message).toBe("Report non trovato");
             expect(createReportPdfBuffer).not.toHaveBeenCalled();
         });
 
-        it("somma il compenso del tecnico al prezzo interno e usa il problema scritto a mano", async () => {
+        it("passa al PDF il problema e il totale così come li calcola la query", async () => {
             vi.mocked(getReportDetailById).mockResolvedValue([printReportRow] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createReportPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
@@ -309,9 +345,19 @@ describe("reports router", () => {
             );
         });
 
-        it("usa l'etichetta del difetto quando manca il problema scritto a mano", async () => {
+        // La regola "problema scritto a mano se c'è, altrimenti l'etichetta del difetto" ormai
+        // è SQL (`issueTextExpr` in `db/queries/report.ts`, coperta da `report.db.test.ts`
+        // contro un database vero): qui si prova solo che la rotta passa `issueText` al PDF
+        // senza ricalcolarlo, qualunque valore la query gli dia.
+        it("passa al PDF l'etichetta del difetto quando la query non ha un problema scritto a mano", async () => {
             vi.mocked(getReportDetailById).mockResolvedValue([
-                { ...printReportRow, issueDescription: null, technicianPrice: 0 },
+                {
+                    ...printReportRow,
+                    issueDescription: null,
+                    issueText: "Schermo rotto",
+                    technicianPrice: 0,
+                    totalPrice: 50,
+                },
             ] as never);
             vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
             vi.mocked(createReportPdfBuffer).mockResolvedValue(Buffer.from("pdf-bytes") as never);
@@ -347,7 +393,7 @@ describe("reports router", () => {
             const response = await request(buildApp()).get("/api/reports/999");
 
             expect(response.status).toBe(404);
-            expect(response.body.message).toBe("Report not found");
+            expect(response.body.message).toBe("Report non trovato");
         });
 
         /**
@@ -399,6 +445,41 @@ describe("reports router", () => {
                 expect.objectContaining({ paymentMethod: "non_paid", price: 0 }),
                 undefined
             );
+        });
+
+        // D5: il difetto catch-all "Altro" (vedi `issueCatalog.ts`) richiede una descrizione
+        // scritta a mano, altrimenti la ricevuta e il resoconto mostrerebbero solo l'etichetta
+        // "Altro", che da sola non dice niente. Il `beforeEach` mocka `getIssueById` con un
+        // difetto qualunque; questi test lo sovrascrivono con quello catch-all.
+        it("rifiuta il difetto 'Altro' senza descrizione del problema", async () => {
+            vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, issueId: 9 });
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toBe('Con il difetto "Altro" va descritto il problema');
+            expect(createReport).not.toHaveBeenCalled();
+        });
+
+        it("accetta il difetto 'Altro' con una descrizione del problema", async () => {
+            vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+            vi.mocked(createReport).mockResolvedValue([storedReport] as never);
+
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, issueId: 9, issueDescription: "Non si accende più" });
+
+            expect(response.status).toBe(201);
+        });
+
+        it("non applica la regola del catch-all a un difetto qualunque", async () => {
+            vi.mocked(createReport).mockResolvedValue([storedReport] as never);
+
+            const response = await request(buildApp()).post("/api/reports").send(minimalBody);
+
+            expect(response.status).toBe(201);
         });
 
         it("crea il report e il suo tecnico esterno in un colpo solo", async () => {
@@ -491,6 +572,9 @@ describe("reports router", () => {
             const response = await request(buildApp()).put("/api/reports/1").send({});
 
             expect(response.status).toBe(400);
+            // Stesso testo delle altre anagrafiche (D6, BE-B): prima qui c'era l'inglese
+            // "At least one field is required".
+            expect(response.body.message).toBe("È necessario specificare almeno un campo");
             expect(updateReportById).not.toHaveBeenCalled();
         });
 
@@ -510,6 +594,58 @@ describe("reports router", () => {
 
             expect(response.status).toBe(200);
             expect(updateReportById).toHaveBeenCalledWith(1, { note: "Richiamare" }, undefined);
+        });
+
+        // D5, sulla riga *risultante* della PUT (unione del corpo parziale con quella esistente,
+        // letta da `getReportById`): stesso messaggio della POST, stessa funzione di validazione.
+        describe("difetto catch-all 'Altro'", () => {
+            it("rifiuta il passaggio ad 'Altro' se la riga esistente non ha già una descrizione", async () => {
+                vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+                vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+
+                const response = await request(buildApp()).put("/api/reports/1").send({ issueId: 9 });
+
+                expect(response.status).toBe(400);
+                expect(response.body.message).toBe('Con il difetto "Altro" va descritto il problema');
+                expect(updateReportById).not.toHaveBeenCalled();
+            });
+
+            it("accetta il passaggio ad 'Altro' se il corpo porta anche la descrizione", async () => {
+                vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+                vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+                vi.mocked(updateReportById).mockResolvedValue([storedReport] as never);
+
+                const response = await request(buildApp())
+                    .put("/api/reports/1")
+                    .send({ issueId: 9, issueDescription: "Non carica più" });
+
+                expect(response.status).toBe(200);
+            });
+
+            it("rifiuta lo svuotamento della descrizione se il difetto esistente è già 'Altro'", async () => {
+                vi.mocked(getReportById).mockResolvedValue([
+                    { ...storedReport, issueId: 9, issueDescription: "Non si accende" },
+                ] as never);
+                vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+
+                const response = await request(buildApp()).put("/api/reports/1").send({ issueDescription: null });
+
+                expect(response.status).toBe(400);
+                expect(response.body.message).toBe('Con il difetto "Altro" va descritto il problema');
+                expect(updateReportById).not.toHaveBeenCalled();
+            });
+
+            it("non tocca la descrizione se il corpo non la cambia e il difetto resta 'Altro'", async () => {
+                vi.mocked(getReportById).mockResolvedValue([
+                    { ...storedReport, issueId: 9, issueDescription: "Non si accende" },
+                ] as never);
+                vi.mocked(getIssueById).mockResolvedValue([{ id: 9, description: "Altro" }] as never);
+                vi.mocked(updateReportById).mockResolvedValue([storedReport] as never);
+
+                const response = await request(buildApp()).put("/api/reports/1").send({ note: "Richiamare" });
+
+                expect(response.status).toBe(200);
+            });
         });
 
         /**

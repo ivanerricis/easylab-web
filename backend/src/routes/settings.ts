@@ -136,7 +136,17 @@ const emailSettingsSchema = z
         username: z.string().trim().max(255),
         password: z.string().max(512).optional(),
         fromName: z.string().trim().max(255),
-        fromEmail: z.string().trim().max(255),
+        // Stringa vuota ammessa (impostazioni non ancora compilate); se non vuota deve essere
+        // un'email valida secondo .email() di zod, la stessa regola usata da "Invia prova"
+        // (emailTestSchema qui sotto) e da routes/customers.ts: prima una regex permissiva qui
+        // e .email() là potevano dare esiti diversi sullo stesso indirizzo.
+        fromEmail: z
+            .string()
+            .trim()
+            .max(255)
+            .refine((value) => value === "" || z.string().email().safeParse(value).success, {
+                message: "L'email mittente non è valida",
+            }),
     })
     .strict();
 

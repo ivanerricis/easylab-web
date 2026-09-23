@@ -11,6 +11,160 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-23 — Revisione di qualità in profondità: 13 difetti e 9 pulizie
+
+Terza revisione dell'intero codice, dopo quelle del 2026-09-18 e 2026-09-22: le stesse quattro
+angolazioni (riuso, semplificazione, efficienza, altitudine) su backend e frontend, ma con la
+consegna di scendere sotto quanto già trovato. Stavolta sono usciti soprattutto difetti veri,
+ciascuno ricontrollato sul codice prima di correggerlo. Tutto quello che è stato valutato e
+rimandato è nel BACKLOG con la stessa data. Nessuna migration.
+
+### Difetti
+
+- **Una sessione scaduta o revocata non riportava al login.** Il client axios non aveva
+  interceptor e `AuthProvider` legge l'utente solo al montaggio: dopo i 7 giorni, o dopo una
+  revoca da Sicurezza, l'app restava "dentro" e ogni azione mostrava solo il toast "Sessione
+  scaduta o non valida"; si usciva ricaricando a mano. Ora un 401 fuori da `/auth/` (dove login,
+  verifica 2FA e `/auth/me` hanno 401 legittimi) azzera l'utente tramite un handler registrato da
+  `AuthProvider`, e `RequireAuth` porta al login con la pagina di partenza. Nessun toast in più.
+  → `frontend/src/lib/api/client.ts`, `frontend/src/components/auth-provider.tsx`
+- **"Network Error" in inglese quando cade la linea.** Segnalato dall'utente, da mobile.
+  `getApiErrorMessage` ripiegava su `error.message` di axios ogni volta che il server non dava un
+  messaggio: "Network Error" senza rete, "timeout of … exceeded", "Request failed with status
+  code 502" per le pagine d'errore HTML di Cloudflare. Ora: senza risposta "Connessione al server
+  non riuscita. Controlla la rete e riprova.", per il timeout "Il server non ha risposto in
+  tempo. Riprova.", per una risposta senza messaggio il testo del contesto del chiamante. Il testo
+  di axios non arriva più all'utente. → `frontend/src/lib/api/errors.ts`
+- **Il login da un dispositivo nuovo poteva fallire per colpa dell'SMTP.** Il login aspettava
+  l'email di avviso, e il trasporto non aveva timeout (default di nodemailer: 2 minuti per
+  connettersi, 10 per il socket): con il server di posta irraggiungibile Cloudflare chiudeva a
+  ~100 s con un 524, a sessione già creata ma senza cookie. L'email ora parte senza essere attesa
+  (la notifica in app sì, è una scrittura nel database), e `buildTransporter` ha timeout
+  espliciti (10 s connessione e saluto, 15 s socket). Per lo stesso motivo l'avviso di backup
+  fallito non tiene più il lock del dump durante l'invio.
+  → `backend/src/services/authManager.ts`, `emailManager.ts`, `backupManager.ts`
+- **Un salvataggio rifiutato delle impostazioni backup restava in memoria.**
+  `updateBackupSettings` scriveva i campi sull'oggetto in cache di `jsonSettingsStore` prima delle
+  validazioni che rispondono 400: lo scheduler leggeva comunque la configurazione rifiutata. È lo
+  stesso difetto corretto in `updateEmailSettings` il 2026-09-18: ora si costruisce `next`, si
+  valida, poi si salva. → `backend/src/services/backupManager.ts`
+- **Nel CSV dei report, "Tecnico esterno" conteneva il collaboratore.** In `listReports` il campo
+  `technician` era in realtà il nome del collaboratore, e `internalPrice` un doppione di `price`.
+  Ora `collaborator`, `technicianName` (il tecnico esterno vero, dal join) e `price`; il CSV ha
+  sia "Collaboratore" sia "Tecnico esterno". → `backend/src/db/queries/report.ts`,
+  `backend/src/routes/reports.ts`, `frontend/src/types/dtos.ts`, `frontend/src/lib/api/reports.ts`
+- **Il resoconto PDF di cliente e collaboratore stampava "Altro" invece del problema.** La regola
+  "la descrizione scritta se c'è, altrimenti l'etichetta del difetto" esisteva solo nella rotta
+  della ricevuta. Ora è un'espressione SQL unica (`issueTextExpr`, campo `issueText`) usata da
+  ricevuta e resoconto. E la regola "con il difetto «Altro» va descritto il problema", che
+  stava solo nei due dialoghi, ora la applica anche il server in POST e PUT (sulla riga risultante
+  dall'unione con quella salvata), con lo stesso messaggio dei dialoghi.
+  → `backend/src/db/queries/report.ts`, `backend/src/routes/reports.ts`, `backend/src/routes/summaryPrint.ts`
+- **I messaggi di validazione non arrivavano mai all'utente.** `validate` rispondeva sempre
+  "Validation error", e il frontend mostra solo `message`. Ora `message` è il primo messaggio di
+  zod, con la localizzazione italiana di zod 4 (`z.config(z.locales.it())`); tradotti anche i
+  messaggi scritti a mano rimasti in inglese e i 404 ("Report non trovato", "Cliente non
+  trovato", …). → `backend/src/routes/validation.ts`, `crudRouter.ts` e le rotte delle anagrafiche
+- **L'export della chiave di backup finiva nel registro come "creato".** La regola di
+  `userActionLogger` era dichiarata per `GET`, ma la rotta è `POST`. Le altre regole sono state
+  ricontrollate contro le rotte: nessun'altra divergenza. → `backend/src/middleware/userActionLogger.ts`
+- **Una scheda "non trovato" restava tale aprendo un altro record.** Nessuna delle 5 schede
+  azzerava `isNotFound` al cambio di id: dopo un report inesistente, anche il successivo aperto
+  dalla ricerca globale o dalle notifiche risultava "non trovato". Ora le schede di report,
+  intervento, cliente, collaboratore e tecnico usano un solo `useEntityDetail`, che azzera lo
+  stato a ogni id, scarta le risposte superate e tratta allo stesso modo gli errori: le schede di
+  cliente, collaboratore e tecnico, su un errore diverso dal 404, ora tornano all'elenco come
+  già facevano report e intervento, invece di restare vuote.
+  → `frontend/src/hooks/useEntityDetail.ts` e le 5 pagine di dettaglio
+- **Eliminando l'unica riga dell'ultima pagina si restava su una pagina vuota**, e con una sola
+  pagina l'impaginazione spariva: nessun modo di tornare indietro. `usePaginatedRows` accetta ora
+  `page` e `onPageOutOfRange`, facoltativi, e riporta la pagina entro i limiti; collegato in tutte
+  le liste con pagina. → `frontend/src/hooks/usePaginatedRows.ts` e chiamanti
+- **Il registro azioni mostrava righe vecchie con una ricerca veloce.** Il pannello gestiva la
+  lista a mano, senza la guardia sulle risposte superate: ora usa `usePaginatedRows`, che le
+  scarta e annulla la richiesta superata. → `frontend/src/components/settings/logsSettingsPanel.tsx`
+- **Il dialogo di modifica ricaricava tutto a metà salvataggio.** L'effetto di caricamento di
+  report e intervento dipendeva da `onOpenChange`, che le pagine passano come freccia nuova a
+  ogni render: durante il salvataggio la lista si ricaricava, il dialogo ripartiva da capo
+  (circa 10 richieste in più per un report) e il modulo sfarfallava. Ora `onOpenChange` è letto con
+  `useEffectEvent`, e la risposta di un record aperto prima non sovrascrive quella del record
+  aperto dopo. → `frontend/src/components/dialogs/edit/editReportDialog.tsx`, `editInterventionDialog.tsx`
+- **"Si" senza accento** su ricevute e resoconti dei report. → `backend/src/services/reportLabels.ts`
+
+### Pulizie
+
+- **Tipo, stato dell'intervento e metodo di pagamento dichiarati una volta.** `schema.ts`
+  esportava le liste ma nessuno le importava: erano riscritte in cinque file, con circa otto cast
+  `as`. Ora le colonne sono `varchar(...).$type<...>()` (cambia solo il tipo TypeScript, non l'SQL)
+  e rotte, etichette e query importano le liste. Un valore nuovo si aggiunge in un punto.
+- **Il totale del report viene dal server.** `getReportDetailById` restituisce `totalPrice` con
+  la stessa espressione di `listReports`, e né la rotta della ricevuta né `ReportPage` lo
+  ricalcolano più; la pagina tratta il tecnico come campo singolo, senza l'array `technicians`
+  rimasto dal modello a più tecnici.
+- **Formattazione dei PDF.** `formatEuro` era duplicata e creava un `Intl.NumberFormat` a ogni
+  riga: misurati 0,25–0,35 ms l'una, cioè 240–500 ms di server bloccato su un resoconto da 2000
+  righe. Ora un solo formattatore in `pdf/shared.ts`, e le etichette dei report in
+  `reportLabels.ts`, sul modello di `interventionLabels.ts`.
+- **Una sola regola per l'email anche nel backend**: via la regex permissiva di `emailManager`,
+  ovunque `.email()` di zod. Prima un mittente come `a..b@x.it` passava "Salva" ed era poi
+  rifiutato da "Invia prova". Il frontend l'aveva già unificata il 2026-09-22.
+- **Doppio clic sulle celle interattive delle tabelle.** Le celle cliccabili dovevano ricordarsi
+  uno `stopPropagation`, e il pulsante "Altro" non lo faceva: un doppio clic apriva il popover e
+  intanto navigava. Ora la riga ignora il doppio clic nato dentro `a`, `button`, `input` o
+  `[role=button]`, e gli `stopPropagation` sono spariti. → `frontend/src/components/entity-table.tsx`
+- **Riusi nel frontend:** `TableActionButton` al posto dei pulsanti con tooltip scritti a mano
+  (il "Torna indietro" era identico in cinque schede); `formatYesNo`, `formatPaidStatus` e le
+  opzioni di stato condivise dove erano riscritti; `formatDate` accetta una `Date` e il
+  selettore data non crea più un formattatore a ogni render; `open={target != null}` al posto
+  delle coppie "aperto + bersaglio" dei dialoghi; tolte da `CustomDialog` le prop mai usate
+  (`trigger`, `defaultOpen`) e `onPointerDownOutside`, ridondante con `onInteractOutside`, che
+  Radix chiama sullo stesso evento.
+- **Pannello backup:** un solo stato con il DTO al posto di 16 `useState` che ne copiavano i
+  campi, riassegnati a mano in quattro punti, ciascuno un sottoinsieme diverso.
+- **Ricerca clienti nei dialoghi di creazione:** scelto un suggerimento non parte più una
+  ricerca inutile con l'etichetta completa, e la ricerca superata viene annullata, non solo
+  ignorata.
+- **Backend, piccole:** `authManager` usa `requireUserById` invece di quattro copie, e
+  `setUserActive` fa un solo `UPDATE … RETURNING`; la POST degli interventi costruisce una sola
+  riga normalizzata, prima scritta due volte. La `SELECT` preliminare della PUT dei report resta,
+  perché ora serve alla regola su "Altro".
+
+### Scartato, e perché
+
+- **Le schede di cliente e collaboratore caricano anche la tab nascosta:** una richiesta
+  paginata in più per scheda, pochi millisecondi, e in cambio il cambio di tab è istantaneo.
+- **Costi misurati e irrilevanti:** il polling dello stato dell'aggiornamento (meno di 1 ms a
+  giro), `requireAuth` (una query per richiesta, l'UPDATE ogni 5 minuti), il logo servito senza
+  cache, il valore del context di `BusyGuardProvider`, il calendario caricato come chunk
+  separato dentro una pagina già caricata a parte.
+
+### Da sapere per la messa in produzione
+
+Nessuna migration. Backend e frontend vanno aggiornati insieme, come fa già l'aggiornamento
+automatico: la lista dei report cambia due campi (`technician` → `collaborator`, via
+`internalPrice`). Il CSV dei report ha una colonna in più, "Collaboratore". Le risposte 400
+hanno ora un messaggio leggibile in italiano, al posto di "Validation error".
+
+### Verifiche
+
+Backend: typecheck, lint, 1008 test unitari, 158 sul database vero (`npm run test:db`). Frontend:
+typecheck, lint, 736 test. Prettier sui soli file toccati. Controllo nel browser con Playwright,
+come admin, a 1440 e 390 px:
+- la scheda report con il totale dal server (37 € + 65 € = 102,00 €);
+- un report inesistente, poi un altro aperto senza ricaricare: niente più "non trovato";
+- le schede di cliente, collaboratore, tecnico e intervento;
+- `?page=99999` riportato all'ultima pagina (637);
+- il doppio clic sulla cella del difetto, che non apre la scheda, mentre sulla cella di testo sì;
+- il dialogo di modifica: una sola serie di richieste all'apertura; clic fuori che chiude a
+  modulo pulito e chiede conferma a modulo modificato;
+- la dashboard, i pannelli Backup e Log, e una ricerca veloce nel registro (una sola richiesta);
+- senza rete, il toast "Connessione al server non riuscita…".
+
+Per D1: una sessione temporanea di prova revocata dal database con l'app aperta; la pagina è
+tornata a `/login` da sola, al primo controllo periodico, senza toast.
+
+---
+
 ## 2026-09-22 — Il reload di fine aggiornamento restava bloccato dal proprio beforeunload
 
 Screenshot dell'utente dopo un aggiornamento reale sulla VM: tutte e quattro le fasi spuntate,

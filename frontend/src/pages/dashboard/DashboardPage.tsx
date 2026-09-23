@@ -31,7 +31,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import TableActionButton from "@/components/table-action-button";
 import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 const InterventionsCalendar = lazy(() => import("@/pages/calendar/components/interventions-calendar"));
@@ -368,20 +368,15 @@ const DashboardPage = () => {
 
                         <div className="grid gap-3">
                             <div className="flex items-center justify-between gap-2">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            onClick={handlePreviousRevenueMonth}
-                                            aria-label="Mese precedente"
-                                        >
-                                            <ChevronLeft className="size-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Mese precedente</TooltipContent>
-                                </Tooltip>
+                                <TableActionButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={handlePreviousRevenueMonth}
+                                    aria-label="Mese precedente"
+                                >
+                                    <ChevronLeft className="size-4" />
+                                </TableActionButton>
 
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">{formatEuro(monthlyRevenue)}</div>
@@ -416,21 +411,16 @@ const DashboardPage = () => {
                                     </div>
                                 </div>
 
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            onClick={handleNextRevenueMonth}
-                                            disabled={isCurrentRevenueMonth}
-                                            aria-label="Mese successivo"
-                                        >
-                                            <ChevronRight className="size-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Mese successivo</TooltipContent>
-                                </Tooltip>
+                                <TableActionButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={handleNextRevenueMonth}
+                                    disabled={isCurrentRevenueMonth}
+                                    aria-label="Mese successivo"
+                                >
+                                    <ChevronRight className="size-4" />
+                                </TableActionButton>
                             </div>
 
                             <div className="flex h-36 items-end gap-2 border-b border-border">

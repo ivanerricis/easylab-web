@@ -9,11 +9,11 @@ const deviceCreateBodySchema = z
     .strict();
 
 const deviceUpdateBodySchema = deviceCreateBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field is required",
+    message: "È necessario specificare almeno un campo",
 });
 
 const devicesRouter = createCrudRouter({
-    notFoundMessage: "Device not found",
+    notFoundMessage: "Dispositivo non trovato",
     createBodySchema: deviceCreateBodySchema,
     updateBodySchema: deviceUpdateBodySchema,
     queries: {

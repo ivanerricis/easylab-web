@@ -14,6 +14,12 @@ vi.mock("@/lib/api", () => ({
     verifyTwoFactorLogin: (...args: unknown[]) => verifyTwoFactorLogin(...args),
 }));
 
+const setUnauthorizedHandler = vi.fn();
+
+vi.mock("@/lib/api/client", () => ({
+    setUnauthorizedHandler: (...args: unknown[]) => setUnauthorizedHandler(...args),
+}));
+
 import { AuthProvider } from "./auth-provider";
 import type { AuthProviderState } from "./auth-provider-context";
 import { useAuth } from "./use-auth";
@@ -127,5 +133,43 @@ describe("AuthProvider", () => {
         });
 
         expect(screen.getByText("anonimo")).toBeInTheDocument();
+    });
+
+    /**
+     * `client.ts` chiama questo handler su un 401 fuori da `/auth/` (sessione scaduta o
+     * revocata da Sicurezza): deve bastargli ad azzerare l'utente, che è ciò che poi porta
+     * `RequireAuth` al login. Senza questa registrazione l'interceptor non ha nessuno da
+     * avvisare, ed è esattamente il difetto che D1 corregge.
+     */
+    it("registra in client.ts un handler che azzera l'utente", async () => {
+        getMe.mockResolvedValue(user);
+        await renderProvider();
+
+        expect(screen.getByText("mario")).toBeInTheDocument();
+        expect(setUnauthorizedHandler).toHaveBeenCalledWith(expect.any(Function));
+
+        const handler = setUnauthorizedHandler.mock.calls.at(-1)?.[0] as () => void;
+
+        await act(async () => {
+            handler();
+        });
+
+        expect(screen.getByText("anonimo")).toBeInTheDocument();
+    });
+
+    it("toglie l'handler allo smontaggio", async () => {
+        getMe.mockResolvedValue(user);
+        const { unmount } = render(
+            <AuthProvider>
+                <Probe />
+            </AuthProvider>
+        );
+        await waitFor(() => {
+            expect(screen.queryByText("caricamento")).not.toBeInTheDocument();
+        });
+
+        unmount();
+
+        expect(setUnauthorizedHandler).toHaveBeenLastCalledWith(null);
     });
 });

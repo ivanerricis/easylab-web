@@ -15,7 +15,6 @@ const rawReport = {
     id: 1,
     customer: "Mario Rossi",
     price: "120.50",
-    internalPrice: "20",
     technicianPrice: 0,
     totalPrice: "140.50",
 };
@@ -31,7 +30,6 @@ describe("api report", () => {
         const [report] = await listReports();
 
         expect(report.price).toBe(120.5);
-        expect(report.internalPrice).toBe(20);
         expect(report.technicianPrice).toBe(0);
         expect(report.totalPrice).toBe(140.5);
     });

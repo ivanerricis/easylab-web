@@ -703,6 +703,9 @@ describe("interventions router", () => {
             const response = await request(buildApp()).put("/api/interventions/1").send({});
 
             expect(response.status).toBe(400);
+            // Stesso testo delle altre anagrafiche (D6, BE-B): prima qui c'era l'inglese
+            // "At least one field is required".
+            expect(response.body.message).toBe("È necessario specificare almeno un campo");
             expect(updateInterventionById).not.toHaveBeenCalled();
         });
 

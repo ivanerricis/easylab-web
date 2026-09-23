@@ -56,6 +56,10 @@ export const useReportsAndInterventionsOf = ({
         queryKey: [ownerId, reportsPage, reportsPageSize, visibilityFilter],
         errorMessage: `Impossibile caricare i report ${ownerLabel}`,
         initialLoading: false,
+        // D11: l'unica riga dell'ultima pagina eliminata non deve lasciare la tabella vuota
+        // su una pagina che non esiste più.
+        page: reportsPage,
+        onPageOutOfRange: setReportsPage,
     });
 
     const interventions = usePaginatedRows<InterventionDto>({
@@ -70,6 +74,8 @@ export const useReportsAndInterventionsOf = ({
         queryKey: [ownerId, interventionsPage, interventionsPageSize, interventionStatusFilter],
         errorMessage: `Impossibile caricare gli interventi ${ownerLabel}`,
         initialLoading: false,
+        page: interventionsPage,
+        onPageOutOfRange: setInterventionsPage,
     });
 
     return {

@@ -332,13 +332,16 @@ describe("listReports: righe e join", () => {
         expect(result).toMatchObject({
             totalItems: 2,
             items: [
-                { id: withTechnician.id, internalPrice: 50, technicianPrice: 35, totalPrice: 85 },
-                { id: withoutTechnician.id, internalPrice: 20, technicianPrice: 0, totalPrice: 20 },
+                { id: withTechnician.id, price: 50, technicianPrice: 35, totalPrice: 85 },
+                { id: withoutTechnician.id, price: 20, technicianPrice: 0, totalPrice: 20 },
             ],
         });
     });
 
-    it("compone i campi mostrati dalle tabelle collegate", async () => {
+    // D4: `technician` si chiamava così ma leggeva sempre il collaboratore, mai il tecnico
+    // esterno vero. Ora `collaborator` è il collaboratore e `technicianName` (nullable) è il
+    // tecnico esterno, dal join su `technicianTable` — vedi il contratto nel CHANGELOG.
+    it("compone i campi mostrati dalle tabelle collegate, incluso il vero tecnico esterno", async () => {
         const customer = await insertCustomer({
             firstName: "Anna",
             lastName: "Rossi",
@@ -348,6 +351,7 @@ describe("listReports: righe e join", () => {
         const device = await insertDevice("iPhone 12");
         const issue = await insertIssue("Schermo rotto");
         const collaborator = await insertCollaborator({ firstName: "Luca", lastName: "Verdi" });
+        const technician = await insertTechnician({ firstName: "Enzo", lastName: "Neri" });
         const withCollaborator = await insertReport({
             customerId: customer.id,
             deviceId: device.id,
@@ -355,6 +359,7 @@ describe("listReports: righe e join", () => {
             collaboratorId: collaborator.id,
         });
         const withoutCollaborator = await insertReport({ customerId: customer.id, collaboratorId: null });
+        await assignTechnician(withCollaborator.id, technician.id, 15);
 
         const result = await listReports({ page: 1, pageSize: 10, sortOrder: "asc", timeZone });
 
@@ -366,9 +371,33 @@ describe("listReports: righe e join", () => {
                     customerPhone: "02 555",
                     device: "iPhone 12",
                     issue: "Schermo rotto",
-                    technician: "Luca Verdi",
+                    collaborator: "Luca Verdi",
+                    technicianName: "Enzo Neri",
                 },
-                { id: withoutCollaborator.id, technician: "-" },
+                { id: withoutCollaborator.id, collaborator: "-", technicianName: null },
+            ],
+        });
+    });
+
+    /**
+     * D5: la stessa espressione SQL (`issueTextExpr`) che serve la ricevuta in
+     * `getReportDetailById`, qui vista da `listReports` (il resoconto in `summaryPrint.ts`):
+     * la descrizione scritta a mano se c'è, altrimenti l'etichetta del difetto dal catalogo.
+     */
+    it("issueText: la descrizione scritta a mano se c'è, altrimenti l'etichetta del difetto", async () => {
+        const issue = await insertIssue("Altro");
+        const withDescription = await insertReport({ issueId: issue.id, issueDescription: "Non si accende" });
+        const withoutDescription = await insertReport({ issueId: issue.id, issueDescription: null });
+        // Anche una descrizione fatta solo di spazi conta come vuota, come lato client.
+        const blankDescription = await insertReport({ issueId: issue.id, issueDescription: "   " });
+
+        const result = await listReports({ page: 1, pageSize: 10, sortOrder: "asc", timeZone });
+
+        expect(result).toMatchObject({
+            items: [
+                { id: withDescription.id, issueText: "Non si accende" },
+                { id: withoutDescription.id, issueText: "Altro" },
+                { id: blankDescription.id, issueText: "Altro" },
             ],
         });
     });

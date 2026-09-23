@@ -18,6 +18,26 @@ import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from
 
 type ReportSortBy = "createdAt" | "customer";
 
+/**
+ * Il prezzo interno più il compenso del tecnico esterno (0 se non ce l'ha). A livello di modulo,
+ * e non più ricreata a ogni chiamata di `listReports`: `getReportDetailById` la usa allo stesso
+ * modo per `totalPrice`, e prima quest'ultimo veniva ricalcolato in JS dalla rotta
+ * (`report.price + Number(report.technicianPrice)`), una copia della stessa somma che qui è già
+ * in SQL.
+ */
+const totalPriceExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
+
+/**
+ * Il problema del report: la descrizione scritta a mano se c'è, altrimenti l'etichetta del
+ * difetto dal catalogo. Prima questa regola viveva solo in JS nella rotta della ricevuta
+ * (`report.issueDescription?.trim() || report.issueName`): il resoconto PDF (`summaryPrint.ts`)
+ * stampava invece sempre l'etichetta del catalogo, anche quando c'era una descrizione più
+ * precisa (tipicamente col difetto "Altro", dove l'etichetta da sola non dice niente). Un'unica
+ * espressione SQL, usata sia da `listReports` (il resoconto) sia da `getReportDetailById` (la
+ * ricevuta), rende impossibile che le due tornino a dire cose diverse.
+ */
+const issueTextExpr = sql<string>`coalesce(nullif(trim(${reportTable.issueDescription}), ''), ${IssueTable.description})`;
+
 type ListReportsParams = {
     page?: number;
     pageSize?: number;
@@ -144,7 +164,6 @@ export const listReports = async ({
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const customerSortExpr = personNameOrDash(customerTable.firstName, customerTable.lastName);
-    const totalPriceExpr = sql<number>`(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0))`;
     const sortColumn = sortBy === "customer" ? customerSortExpr : reportTable.created_at;
     const orderByClause = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
 
@@ -170,9 +189,15 @@ export const listReports = async ({
             >`coalesce(${customerTable.phoneNumber}, ${customerTable.phoneNumberSecondary})`,
             device: deviceTable.name,
             issue: IssueTable.description,
-            technician: personNameOrDash(collaboratorTable.firstName, collaboratorTable.lastName),
-            internalPrice: reportTable.price,
+            issueText: issueTextExpr,
+            // Il collaboratore che ha in carico il report (non il tecnico esterno: vedi
+            // `technicianName` qui sotto). Si chiamava `technician`, ma la colonna che legge è
+            // sempre stata quella del collaboratore — vedi D4 nel CHANGELOG.
+            collaborator: personNameOrDash(collaboratorTable.firstName, collaboratorTable.lastName),
             technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
+            // Il vero tecnico esterno, dal join su `technicianTable` qui sotto: `null` se il
+            // report non ne ha uno assegnato.
+            technicianName: personName(technicianTable.firstName, technicianTable.lastName),
             totalPrice: sql<number>`${totalPriceExpr}::int`,
             closed: reportTable.closed,
             createdAt: reportTable.created_at,
@@ -194,7 +219,9 @@ export const listReports = async ({
          * Se un giorno tornassero più tecnici per report, la primary key tornerebbe
          * composta e questo join andrebbe rifatto sottoquery con `sum(price)`.
          */
-        .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id));
+        .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id))
+        // Solo per il nome: al più una riga, per lo stesso motivo del join qui sopra.
+        .leftJoin(technicianTable, eq(technicianTable.id, reportTechnicianTable.technicianId));
 
     if (page == null || pageSize == null) {
         return takeUnpaginated(baseQuery.where(whereClause).orderBy(orderByClause), "reports", unpaginatedLimit);
@@ -328,6 +355,10 @@ export const getReportDetailById = (id: number) =>
             technicianId: reportTechnicianTable.technicianId,
             technicianPrice: sql<number>`coalesce(${reportTechnicianTable.price}, 0)::int`,
             technicianName: personName(technicianTable.firstName, technicianTable.lastName),
+            // Stessa espressione di `listReports`: la scheda del report (`GET /api/reports/:id`)
+            // la espone al frontend invece di lasciargliela ricalcolare (vedi CHANGELOG).
+            totalPrice: sql<number>`${totalPriceExpr}::int`,
+            issueText: issueTextExpr,
         })
         .from(reportTable)
         .innerJoin(customerTable, eq(customerTable.id, reportTable.customerId))

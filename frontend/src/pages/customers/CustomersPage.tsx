@@ -42,7 +42,6 @@ const CustomersPage = () => {
     const navigate = useNavigate();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     usePageShortcut("n", () => setIsCreateDialogOpen(true));
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     // Ricerca, ordinamento e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const sortOption = readEnumParam(searchParams, listUrlParams.sort, sortOptionValues, DEFAULT_CUSTOMER_SORT_OPTION);
@@ -50,7 +49,8 @@ const CustomersPage = () => {
     const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
         updateParams({ [listUrlParams.search]: value })
     );
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    // Un solo stato per dialogo + bersaglio: `open={customerToEdit != null}` basta da solo,
+    // niente booleano separato da tenere allineato.
     const [customerToEdit, setCustomerToEdit] = useState<CustomerDto | null>(null);
     const [customerToDelete, setCustomerToDelete] = useState<CustomerDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -64,6 +64,7 @@ const CustomersPage = () => {
             sortOption,
             currentPage,
             pageSize,
+            onPageOutOfRange: setCurrentPage,
         });
 
     const handleSortOptionChange = (value: CustomerSortOption) =>
@@ -87,7 +88,6 @@ const CustomersPage = () => {
 
     const handleOpenDeleteDialog = (customer: CustomerDto) => {
         setCustomerToDelete(customer);
-        setIsDeleteDialogOpen(true);
     };
 
     const handleOpenEditDialog = (id: number) => {
@@ -99,7 +99,6 @@ const CustomersPage = () => {
         }
 
         setCustomerToEdit(customer);
-        setIsEditDialogOpen(true);
     };
 
     const handleEditCustomer = async (values: CustomerSubmitValues) => {
@@ -142,7 +141,6 @@ const CustomersPage = () => {
             setIsDeleting(true);
             await deleteCustomer(customerToDelete.id);
             toast.success("Cliente eliminato con successo");
-            setIsDeleteDialogOpen(false);
             setCustomerToDelete(null);
             await loadCustomers();
         } catch (error) {
@@ -170,11 +168,10 @@ const CustomersPage = () => {
                 />
             )}
 
-            {isEditDialogOpen && (
+            {customerToEdit && (
                 <CreateCustomerDialog
-                    open={isEditDialogOpen}
+                    open={customerToEdit != null}
                     onOpenChange={(open) => {
-                        setIsEditDialogOpen(open);
                         if (!open) {
                             setCustomerToEdit(null);
                         }
@@ -212,11 +209,10 @@ const CustomersPage = () => {
                 }
             />
 
-            {isDeleteDialogOpen && (
+            {customerToDelete && (
                 <ConfirmDeleteDialog
-                    open={isDeleteDialogOpen}
+                    open={customerToDelete != null}
                     onOpenChange={(open) => {
-                        setIsDeleteDialogOpen(open);
                         if (!open) {
                             setCustomerToDelete(null);
                         }

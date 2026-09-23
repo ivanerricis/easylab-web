@@ -163,7 +163,7 @@ describe("CreateReportDialog", () => {
             charger: true,
             dataBackup: false,
         });
-        expect(listCustomers).toHaveBeenCalledWith({ pageSize: 8, search: "mario" });
+        expect(listCustomers).toHaveBeenCalledWith({ pageSize: 8, search: "mario", signal: expect.any(AbortSignal) });
         // L'avviso di creazione lo dà la pagina, con il numero e le azioni (`showCreatedToast`).
         expect(toastSuccess).not.toHaveBeenCalled();
     });
@@ -209,6 +209,42 @@ describe("CreateReportDialog", () => {
             expect(onSubmit).toHaveBeenCalled();
         });
         expect(onSubmit.mock.calls[0][0]).toMatchObject({ customer: "Anna - 081", customerId: 77 });
+    });
+
+    /**
+     * Q10: il cliente arriva già risolto dalla sua scheda, con l'intera etichetta ("Anna - 081")
+     * già scritta nella casella: prima, dopo la pausa di battitura, partiva comunque una ricerca
+     * inutile con quel testo, perché il campo non sapeva che il valore era già stato scelto.
+     */
+    it("non cerca il cliente già passato dalla sua scheda", async () => {
+        renderWithProviders(
+            <CreateReportDialog
+                open
+                onOpenChange={() => {}}
+                onSubmit={vi.fn()}
+                initialCustomer={{
+                    id: 77,
+                    firstName: "Anna",
+                    lastName: null,
+                    phoneNumber: "081",
+                    phoneNumberSecondary: null,
+                    email: null,
+                    city: null,
+                    createdAt: "2026-01-01T00:00:00.000Z",
+                    updatedAt: null,
+                }}
+            />
+        );
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Anna - 081");
+
+        // Più della pausa di battitura (250ms) di `InputWithAdd`: se una ricerca fosse partita,
+        // a questo punto sarebbe già stata chiamata.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+
+        expect(listCustomers).not.toHaveBeenCalled();
     });
 
     /**

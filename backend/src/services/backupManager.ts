@@ -73,45 +73,48 @@ export type BackupSettingsInput = Pick<
 
 export const updateBackupSettings = async (input: BackupSettingsInput) => {
     const current = await loadState();
+    // Un oggetto nuovo, non la cache modificata sul posto: `loadState` restituisce sempre lo
+    // stesso oggetto in cache, quindi scrivere i campi direttamente su `current` (come faceva
+    // prima) rendeva visibile allo scheduler un salvataggio ancora da validare, anche se le
+    // verifiche qui sotto lo rifiutavano con un 400 (stesso bug corretto in
+    // `updateEmailSettings` il 2026-09-18).
+    const next: BackupSettingsState = {
+        ...current,
+        autoEnabled: input.autoEnabled,
+        frequencyDays: input.frequencyDays,
+        runAt: input.runAt,
+        outputDir: getConfiguredOutputDir(),
+        maxBackupsToKeep: input.maxBackupsToKeep,
+        notifyEmailOnFailure: input.notifyEmailOnFailure,
+        smbEnabled: input.smbEnabled,
+        smbHost: input.smbHost.trim(),
+        smbShare: input.smbShare.trim(),
+        smbPath: input.smbPath.trim(),
+        smbDomain: input.smbDomain.trim(),
+        smbPort: input.smbPort,
+        smbUsername: input.smbUsername.trim(),
+        smbPasswordEncrypted: input.smbPassword ? await encryptSecret(input.smbPassword) : current.smbPasswordEncrypted,
+    };
 
-    current.autoEnabled = input.autoEnabled;
-    current.frequencyDays = input.frequencyDays;
-    current.runAt = input.runAt;
-    current.outputDir = getConfiguredOutputDir();
-    current.maxBackupsToKeep = input.maxBackupsToKeep;
-    current.notifyEmailOnFailure = input.notifyEmailOnFailure;
-
-    current.smbEnabled = input.smbEnabled;
-    current.smbHost = input.smbHost.trim();
-    current.smbShare = input.smbShare.trim();
-    current.smbPath = input.smbPath.trim();
-    current.smbDomain = input.smbDomain.trim();
-    current.smbPort = input.smbPort;
-    current.smbUsername = input.smbUsername.trim();
-
-    if (input.smbPassword) {
-        current.smbPasswordEncrypted = await encryptSecret(input.smbPassword);
-    }
-
-    if (current.smbEnabled && (!current.smbHost || !current.smbShare || !current.smbUsername)) {
+    if (next.smbEnabled && (!next.smbHost || !next.smbShare || !next.smbUsername)) {
         throw new BackupManagerError("Per abilitare la destinazione NAS specifica host, condivisione e utente", 400);
     }
 
-    if (current.smbEnabled && !current.smbPasswordEncrypted) {
+    if (next.smbEnabled && !next.smbPasswordEncrypted) {
         throw new BackupManagerError("Specifica una password per la connessione al NAS", 400);
     }
 
-    if (current.notifyEmailOnFailure && !(await isEmailConfigured())) {
+    if (next.notifyEmailOnFailure && !(await isEmailConfigured())) {
         throw new BackupManagerError(
             "Per abilitare l'avviso email configura prima l'invio email nelle impostazioni",
             400
         );
     }
 
-    setNextRunIfNeeded(current, new Date());
-    await persistState(current);
+    setNextRunIfNeeded(next, new Date());
+    await persistState(next);
 
-    return await toPublicState(current);
+    return await toPublicState(next);
 };
 
 /** Da chiamare dopo un cambio del fuso del laboratorio: vedi `moveNextRunToNewTimeZone`. */
@@ -166,8 +169,13 @@ const notifyAutoBackupFailure = async (
         severity: "warning",
     });
 
+    // Volutamente senza await: questa funzione gira dentro il blocco try/finally che tiene il
+    // lock del dump (vedi `runBackupNow`), e l'invio SMTP può metterci diversi secondi. Aspettarlo
+    // qui significava tenere il lock — quindi bloccare qualunque altro dump o ripristino — per
+    // tutta la sua durata. `sendBackupFailureEmail` ha già il proprio try/catch, quindi un
+    // eventuale errore non genera una promise rifiutata senza gestore.
     if (notifyEmailOnFailure) {
-        await sendBackupFailureEmail(title, message);
+        void sendBackupFailureEmail(title, message);
     }
 };
 

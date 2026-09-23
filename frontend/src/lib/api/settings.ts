@@ -167,6 +167,12 @@ export type ListLogEntriesParams = {
     page?: number;
     pageSize?: number;
     search?: string;
+    /**
+     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
+     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
+     * Lo fornisce `usePaginatedRows`.
+     */
+    signal?: AbortSignal;
 };
 
 export const listLogEntries = async (dayKey: string, params: ListLogEntriesParams = {}) =>
@@ -177,6 +183,7 @@ export const listLogEntries = async (dayKey: string, params: ListLogEntriesParam
                 pageSize: params.pageSize ?? 50,
                 search: params.search?.trim() || undefined,
             },
+            signal: params.signal,
         })
     ).data;
 

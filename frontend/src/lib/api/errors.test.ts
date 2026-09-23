@@ -24,10 +24,31 @@ describe("getApiErrorMessage", () => {
         expect(getApiErrorMessage(error, "Fallback")).toBe("Cliente già esistente");
     });
 
-    it("ricade sul messaggio di axios se la risposta non ne contiene uno", () => {
-        const error = buildAxiosError({});
+    /**
+     * D13: una risposta c'è (es. un 502/524 di Cloudflare a corpo HTML, senza JSON), ma senza
+     * un `message` leggibile: meglio il fallback scritto per quel punto dell'app che il testo
+     * generico di axios ("Request failed with status code 502"), mai mostrato all'utente.
+     */
+    it("con una risposta ma senza messaggio usa il fallback, mai il testo di axios", () => {
+        const error = buildAxiosError({}, 502);
 
-        expect(getApiErrorMessage(error, "Fallback")).toBe("Request failed");
+        expect(getApiErrorMessage(error, "Fallback")).toBe("Fallback");
+    });
+
+    it("senza risposta (rete assente) dà un messaggio italiano sulla connessione", () => {
+        const config = { headers: new AxiosHeaders() };
+        const error = new AxiosError("Network Error", "ERR_NETWORK", config, null, undefined);
+
+        expect(getApiErrorMessage(error, "Fallback")).toBe(
+            "Connessione al server non riuscita. Controlla la rete e riprova."
+        );
+    });
+
+    it("con un timeout dà un messaggio italiano dedicato", () => {
+        const config = { headers: new AxiosHeaders() };
+        const timeout = new AxiosError("timeout of 5000ms exceeded", "ECONNABORTED", config, null, undefined);
+
+        expect(getApiErrorMessage(timeout, "Fallback")).toBe("Il server non ha risposto in tempo. Riprova.");
     });
 
     it("usa il messaggio di un Error generico", () => {

@@ -1,8 +1,35 @@
 import axios from "axios";
 
+/**
+ * D13: prima, quando il server non aveva dato un `message`, il testo inglese di axios finiva
+ * dritto nel toast — "Network Error" con la rete assente, "timeout of 5000ms exceeded" con un
+ * timeout, "Request failed with status code 502" con un 502/524 di Cloudflare a corpo HTML
+ * (senza JSON, quindi senza `message`). `error.message` di axios non è mai testo per l'utente:
+ * o c'è un messaggio del server in italiano, o tocca a questa funzione scegliere cosa dire, mai
+ * ad axios.
+ */
 export const getApiErrorMessage = (error: unknown, fallbackMessage = "Operazione non riuscita") => {
     if (axios.isAxiosError<{ message?: string }>(error)) {
-        return error.response?.data?.message ?? error.message ?? fallbackMessage;
+        const serverMessage = error.response?.data?.message;
+
+        if (typeof serverMessage === "string" && serverMessage.trim() !== "") {
+            return serverMessage;
+        }
+
+        if (!error.response) {
+            // Nessuna risposta: rete assente, server irraggiungibile, o il timeout della
+            // richiesta (codice `ECONNABORTED` nelle versioni di axios in uso, `ETIMEDOUT` in
+            // altre). Le richieste annullate (`ERR_CANCELED`, es. da `AbortController`) passano
+            // di qui anche loro, ma chi le annulla controlla già `signal.aborted` prima di
+            // chiamare questa funzione e non arriva a mostrarne il testo.
+            return error.code === "ECONNABORTED" || error.code === "ETIMEDOUT"
+                ? "Il server non ha risposto in tempo. Riprova."
+                : "Connessione al server non riuscita. Controlla la rete e riprova.";
+        }
+
+        // C'è una risposta ma senza un messaggio leggibile: meglio il fallback scritto per
+        // quel punto dell'app che il testo generico di axios.
+        return fallbackMessage;
     }
 
     if (error instanceof Error) {

@@ -236,13 +236,15 @@ describe("createReportPdfBuffer", () => {
     });
 
     it("valorizza il riquadro AVVISATO solo quando il report lo segnala, senza toccare le altre spunte", async () => {
-        // dataBackup e charger restano false in entrambi i casi: l'unico "Si" possibile
+        // dataBackup e charger restano false in entrambi i casi: l'unico "Sì" possibile
         // nel documento e' quello del riquadro AVVISATO, che compare una sola volta
         // (non e' duplicato come le altre sezioni stampate due volte sul foglio).
+        // Accentato (`formatYesNo` di reportLabels.ts): prima questo file scriveva "Si" senza
+        // accento, unico fra i generatori di PDF/CSV del progetto a farlo (vedi Q3 nel CHANGELOG).
         const nonAvvisato = JSON.stringify(await captureFinalReportDoc(buildReport({ alerted: false })));
         const avvisato = JSON.stringify(await captureFinalReportDoc(buildReport({ alerted: true })));
 
-        const countSi = (json: string) => (json.match(/"text":"Si"/g) ?? []).length;
+        const countSi = (json: string) => (json.match(/"text":"Sì"/g) ?? []).length;
 
         expect(countSi(nonAvvisato)).toBe(0);
         expect(countSi(avvisato)).toBe(1);

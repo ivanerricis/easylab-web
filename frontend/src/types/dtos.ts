@@ -19,8 +19,11 @@ export type ReportDto = {
     customerPhone: string | null;
     device: string;
     issue: string;
-    technician: string;
-    internalPrice: number;
+    /** Il collaboratore che ha portato il report: prima il campo si chiamava (a torto)
+     * "technician", nome rimasto da quando il laboratorio non distingueva le due figure. */
+    collaborator: string;
+    /** Il tecnico esterno a cui è affidato il report, se c'è: `null` se non ne ha uno. */
+    technicianName: string | null;
     technicianPrice: number;
     totalPrice: number;
     closed: boolean;

@@ -170,6 +170,13 @@ describe("CreateInterventionDialog", () => {
         });
 
         expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Anna Verdi - 081");
+
+        // Q10: prima, dopo la pausa di battitura (250ms), partiva comunque una ricerca inutile
+        // con l'etichetta già scritta, perché il campo non sapeva che il valore era già stato
+        // scelto. Più della pausa: se una ricerca fosse partita sarebbe già stata chiamata.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        expect(listCustomers).not.toHaveBeenCalled();
+
         await chooseOption(/^Collaboratore/, "Luca Bianchi");
         await save();
 

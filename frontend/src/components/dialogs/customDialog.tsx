@@ -1,24 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "../ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import type { LucideIcon } from "lucide-react";
 
 type Props = Readonly<{
     content?: ReactNode;
-    trigger?: ReactNode;
     contentClassName?: string;
 
     open?: boolean;
-    defaultOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
 
     title?: ReactNode;
@@ -63,9 +53,7 @@ type Props = Readonly<{
 
 const CustomDialog = ({
     content,
-    trigger,
     open,
-    defaultOpen,
     onOpenChange,
     title,
     description,
@@ -100,9 +88,7 @@ const CustomDialog = ({
     };
 
     return (
-        <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={handleOpenChange}>
-            {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className={cn(
                     // Il testo dei campi (`Input`, `Textarea`) è più grande qui che nel resto
@@ -117,11 +103,14 @@ const CustomDialog = ({
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}
-                onPointerDownOutside={(event) => {
-                    if (preventOutsideClose) {
-                        event.preventDefault();
-                    }
-                }}
+                // Copre anche il clic fuori: Radix chiama `onInteractOutside` pure per quello,
+                // subito dopo `onPointerDownOutside`, sullo stesso evento (vedi
+                // `usePointerDownOutside` in `@radix-ui/react-dismissable-layer`), quindi un
+                // secondo gestore solo per quel caso ripeteva la stessa regola di
+                // `preventOutsideClose` con lo stesso risultato. Verificato leggendo il
+                // sorgente della libreria, non con un test: jsdom non simula un vero clic fuori
+                // dal dialogo (nemmeno un `<Dialog.Root>` Radix nudo lo smette in test), quindi
+                // qui non c'è un modo affidabile di provarlo automaticamente.
                 onInteractOutside={(event) => {
                     if (preventOutsideClose) {
                         event.preventDefault();

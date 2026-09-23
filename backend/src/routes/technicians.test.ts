@@ -40,7 +40,7 @@ describe("technicians router", () => {
         const response = await request(buildApp()).get("/api/technicians/999");
 
         expect(response.status).toBe(404);
-        expect(response.body.message).toBe("Technician not found");
+        expect(response.body.message).toBe("Tecnico non trovato");
     });
 
     it("crea un tecnico e risponde 201", async () => {

@@ -23,6 +23,18 @@ const buildApp = () => {
         res.status(201).json(req.body);
     });
 
+    app.post(
+        "/customers",
+        validate({
+            body: z
+                .object({ phone: z.string().nullable().optional() })
+                .refine((value) => value.phone != null, { message: "È necessario specificare almeno un campo" }),
+        }),
+        (req, res) => {
+            res.status(201).json(req.body);
+        }
+    );
+
     return app;
 };
 
@@ -35,11 +47,17 @@ describe("validate", () => {
         expect(response.body).toEqual({ params: { id: 42 }, query: { page: 3 } });
     });
 
-    it("risponde 400 elencando la sezione non valida", async () => {
+    it("risponde 400 elencando la sezione non valida, con il primo messaggio di zod in italiano", async () => {
         const response = await request(buildApp()).get("/items/-1");
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toBe("Validation error");
+        // Il testo esatto arriva dalla localizzazione italiana di zod (z.locales.it()), impostata
+        // da questo modulo: qui basta verificare che non sia più il generico "Validation error"
+        // (mai mostrato all'utente, vedi frontend/src/lib/api/errors.ts) e che sia lo stesso
+        // messaggio che zod produce per lo schema dei parametri.
+        const expectedMessage = z.object({ id: z.coerce.number().int().positive() }).safeParse({ id: -1 }).error!
+            .issues[0].message;
+        expect(response.body.message).toBe(expectedMessage);
         expect(response.body.errors).toHaveProperty("params");
         expect(response.body.errors).not.toHaveProperty("query");
     });
@@ -56,5 +74,12 @@ describe("validate", () => {
 
         expect(response.status).toBe(400);
         expect(response.body.errors).toHaveProperty("body");
+    });
+
+    it("usa il messaggio custom di un refine così com'è, senza passare dalla localizzazione", async () => {
+        const response = await request(buildApp()).post("/customers").send({});
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toBe("È necessario specificare almeno un campo");
     });
 });

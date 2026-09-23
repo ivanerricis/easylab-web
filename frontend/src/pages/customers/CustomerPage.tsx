@@ -4,6 +4,7 @@ import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
+import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
@@ -11,6 +12,7 @@ import CreateInterventionDialog, {
     type CreateInterventionSubmitValues,
 } from "@/components/dialogs/create/createInterventionDialog";
 import DetailDeleteButton from "@/components/detail-delete-button";
+import TableActionButton from "@/components/table-action-button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,13 +27,10 @@ import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/di
 import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     createIntervention,
     createReport,
     deleteCustomer,
-    getApiErrorMessage,
-    getApiErrorStatus,
     getCustomer,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
@@ -40,11 +39,9 @@ import {
     updateCustomer,
 } from "@/lib/api";
 import { formatDateTime, openPrintWindow } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { ArrowLeft, ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
-import type { CustomerDto } from "@/types/dtos";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
 import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
@@ -72,13 +69,24 @@ const CustomerPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams();
+    // Serve anche a chi non aspetta il cliente (i filtri delle due liste, sotto): loro non
+    // sanno cosa farsene di un id non valido, ma in quel caso la pagina mostra comunque
+    // "non trovato" prima di arrivare a renderizzarle.
     const customerId = Number(id);
     const activeTab: ReportsInterventionsTab = location.pathname.endsWith("/interventions")
         ? "interventions"
         : "reports";
 
-    const [isCustomerLoading, setIsCustomerLoading] = useState(true);
-    const [customer, setCustomer] = useState<CustomerDto | null>(null);
+    const {
+        data: customer,
+        isLoading: isCustomerLoading,
+        isNotFound,
+        reload: reloadCustomer,
+        setData: setCustomer,
+    } = useEntityDetail(id, getCustomer, {
+        backTo: "/clients",
+        errorMessage: "Impossibile caricare il cliente",
+    });
     const customerName = customer ? formatPersonName(customer) : "Cliente";
     useDocumentTitle(activeTab === "interventions" ? `Interventi di ${customerName}` : customerName);
 
@@ -87,10 +95,6 @@ const CustomerPage = () => {
     const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
     const [isCreateInterventionDialogOpen, setIsCreateInterventionDialogOpen] = useState(false);
 
-    const hasValidCustomerId = useMemo(() => Number.isInteger(customerId) && customerId > 0, [customerId]);
-
-    // Vedi lo stesso stato in `ReportPage`: un cliente che non esiste si mostra come tale.
-    const [isNotFound, setIsNotFound] = useState(false);
     const handleBack = useGoBack("/clients");
 
     const handleTabChange = (value: ReportsInterventionsTab) => {
@@ -126,19 +130,6 @@ const CustomerPage = () => {
     });
     const { reload: reloadReports } = lists.reports;
     const { reload: reloadInterventions } = lists.interventions;
-
-    const loadCustomer = useCallback(async () => {
-        try {
-            setCustomer(await getCustomer(customerId));
-        } catch (error) {
-            if (getApiErrorStatus(error) === 404) {
-                setIsNotFound(true);
-                return;
-            }
-
-            toast.error(getApiErrorMessage(error, "Impossibile caricare il cliente"));
-        }
-    }, [customerId]);
 
     // Prima i dati si potevano cambiare solo dall'elenco clienti: dalla scheda bisognava
     // tornare indietro, ritrovare il cliente e aprire lì il dialogo. Il nome nell'intestazione
@@ -179,30 +170,10 @@ const CustomerPage = () => {
     };
 
     const handleRefresh = useCallback(async () => {
-        await Promise.all([loadCustomer(), reloadReports(), reloadInterventions()]);
-    }, [loadCustomer, reloadInterventions, reloadReports]);
+        await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions()]);
+    }, [reloadCustomer, reloadInterventions, reloadReports]);
 
-    // Senza `navigate` fra le dipendenze: cambia identità a ogni cambio di indirizzo, e
-    // cambiare tab cambia l'indirizzo, quindi ogni cambio di tab ricaricava il cliente e
-    // copriva la pagina con lo spinner per un istante.
-    useEffect(() => {
-        if (!hasValidCustomerId) {
-            return;
-        }
-
-        // I dati del cliente sono l'intestazione e il riquadro in alto: è l'unica cosa che si
-        // aspetta prima di disegnare la pagina. Le liste si caricano da sole, con lo scheletro.
-        void (async () => {
-            setIsCustomerLoading(true);
-            try {
-                await loadCustomer();
-            } finally {
-                setIsCustomerLoading(false);
-            }
-        })();
-    }, [hasValidCustomerId, loadCustomer]);
-
-    if (!hasValidCustomerId || isNotFound) {
+    if (isNotFound) {
         return (
             <NotFoundState
                 title="Cliente non trovato"
@@ -253,14 +224,9 @@ const CustomerPage = () => {
             {/* Con sei azioni i pulsanti non stanno accanto al nome su un telefono: `flex-wrap`
                 li manda sotto, allineati a destra, solo quando serve. */}
             <div className="flex flex-wrap items-center gap-2">
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
-                            <ArrowLeft className="size-6" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Torna indietro</TooltipContent>
-                </Tooltip>
+                <TableActionButton size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
+                    <ArrowLeft className="size-6" />
+                </TableActionButton>
                 <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{customerName}</h1>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -293,30 +259,20 @@ const CustomerPage = () => {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                onClick={() => setIsEditDialogOpen(true)}
-                                aria-label="Modifica cliente"
-                            >
-                                <Pencil className="size-5" />
-                                <span className="hidden text-lg lg:inline">Modifica</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Modifica cliente</TooltipContent>
-                    </Tooltip>
+                    <TableActionButton
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setIsEditDialogOpen(true)}
+                        aria-label="Modifica cliente"
+                    >
+                        <Pencil className="size-5" />
+                        <span className="hidden text-lg lg:inline">Modifica</span>
+                    </TableActionButton>
 
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
-                                <Printer className="size-5" />
-                                <span className="hidden text-lg lg:inline">Stampa</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{printTitle}</TooltipContent>
-                    </Tooltip>
+                    <TableActionButton size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
+                        <Printer className="size-5" />
+                        <span className="hidden text-lg lg:inline">Stampa</span>
+                    </TableActionButton>
 
                     <DetailDeleteButton
                         label="Elimina cliente"

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn, formatDateISO } from "@/lib/utils";
+import { cn, formatDate, formatDateISO } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
 
 type Props = {
@@ -40,9 +40,7 @@ const DatePickerField = ({
     className,
 }: Props) => {
     const selectedDate = parseDateValue(value);
-    const label = selectedDate
-        ? new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(selectedDate)
-        : placeholder;
+    const label = selectedDate ? formatDate(selectedDate) : placeholder;
 
     return (
         <Popover>

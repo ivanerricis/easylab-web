@@ -1,7 +1,13 @@
 import { and, asc, desc, eq, getTableColumns, inArray, or, sql, type SQL } from "drizzle-orm";
 import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
-import { collaboratorTable, customerTable, interventionTable } from "../schema";
+import {
+    collaboratorTable,
+    customerTable,
+    interventionTable,
+    type InterventionStatus,
+    type InterventionType,
+} from "../schema";
 import type { NewIntervention, UpdateIntervention } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { personName, personNameOrDash } from "./personName";
@@ -14,8 +20,8 @@ type ListInterventionsParams = {
     page?: number;
     pageSize?: number;
     search?: string;
-    status?: "all" | "programmato" | "in_lavorazione" | "completato";
-    type?: "all" | "consegna_materiale" | "intervento_sede" | "intervento_remoto";
+    status?: "all" | InterventionStatus;
+    type?: "all" | InterventionType;
     dateFrom?: string;
     dateTo?: string;
     scheduledDate?: string;

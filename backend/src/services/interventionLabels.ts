@@ -8,8 +8,10 @@
  * PDF, email e CSV.
  */
 
-export type InterventionType = "consegna_materiale" | "intervento_sede" | "intervento_remoto";
-export type InterventionStatus = "programmato" | "in_lavorazione" | "completato";
+// Ri-esportati e non ridichiarati: le due liste vivono una sola volta in `schema.ts` (vedi lì
+// il perché), insieme alla colonna che le usa come `$type`. Prima erano riscritte identiche qui.
+import type { InterventionType, InterventionStatus } from "../db/schema";
+export type { InterventionType, InterventionStatus } from "../db/schema";
 
 export const formatInterventionType = (value: InterventionType) => {
     if (value === "consegna_materiale") {

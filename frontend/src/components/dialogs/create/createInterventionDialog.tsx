@@ -135,8 +135,8 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         void loadCollaborators();
     }, [open, initialDate, initialCustomerId, initialCustomerOption]);
 
-    const searchCustomers = useCallback(async (query: string) => {
-        const customers = await listCustomers({ pageSize: 8, search: query || undefined });
+    const searchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
+        const customers = await listCustomers({ pageSize: 8, search: query || undefined, signal });
         const options = customers.items.map((customer) => ({
             id: customer.id,
             label: formatCustomerOption(
@@ -232,6 +232,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                             inputClassName="rounded-r-none"
                                             value={formValues.customer}
                                             onSearch={searchCustomers}
+                                            isSelectedOption={customerIdByOption[formValues.customer] != null}
                                             onChange={(customer) => handleChange({ customer })}
                                             required
                                         />

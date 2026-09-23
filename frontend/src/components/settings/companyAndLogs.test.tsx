@@ -206,7 +206,12 @@ describe("LogsSettingsPanel", () => {
         const row = (await within(await screen.findByRole("table")).findByText("POST /api/reports")).closest("tr");
         expect(row).toHaveTextContent("10.0.0.5");
         expect(row).toHaveTextContent("mario");
-        expect(api.listLogEntries).toHaveBeenCalledWith("2026-09-11", { page: 1, pageSize: 10, search: "" });
+        expect(api.listLogEntries).toHaveBeenCalledWith("2026-09-11", {
+            page: 1,
+            pageSize: 10,
+            search: "",
+            signal: expect.any(AbortSignal),
+        });
     });
 
     it("scarica il log del giorno selezionato", async () => {

@@ -17,6 +17,12 @@ type UseSearchableRowsParams<TRow> = {
     pageSize: number;
     /** Messaggio mostrato se la richiesta fallisce. */
     errorMessage: string;
+    /**
+     * Chiamato con l'ultima pagina valida quando `currentPage` supera `totalPages` della
+     * risposta (l'unica riga di quella pagina è stata eliminata, o un filtro ha ridotto i
+     * risultati). Facoltativo: senza, resta il comportamento di prima. Vedi `usePaginatedRows`.
+     */
+    onPageOutOfRange?: (lastPage: number) => void;
 };
 
 /**
@@ -35,10 +41,13 @@ export const useSearchableRows = <TRow>({
     currentPage,
     pageSize,
     errorMessage,
+    onPageOutOfRange,
 }: UseSearchableRowsParams<TRow>) => {
     return usePaginatedRows<TRow>({
         fetchRows: (signal) => fetchRows({ page: currentPage, pageSize, search: searchText, signal }),
         queryKey: [currentPage, pageSize, searchText],
         errorMessage,
+        page: currentPage,
+        onPageOutOfRange,
     });
 };

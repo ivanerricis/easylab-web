@@ -11,7 +11,7 @@ import { getApiErrorMessage, getReport, listCollaborators, listDevices, listIssu
 import { isCatchAllIssue } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
-import { startTransition, useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import EuroInput from "@/components/euro-input";
@@ -120,6 +120,13 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
     const [savedFormValues, setSavedFormValues] = useState<typeof formValues | null>(null);
     const isDirty = loadedReportId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
 
+    // Letto come evento e non come dipendenza: le pagine passano una freccia scritta al volo,
+    // diversa a ogni loro render (es. durante `onSubmit`, quando ricaricano la lista). Con
+    // `onOpenChange` fra le dipendenze quel render riavviava il caricamento da capo — report già
+    // pronto compreso, ≈10 richieste in più — e il modulo tornava per un istante allo stato di
+    // caricamento. Vedi lo stesso uso in `hooks/useListUrlState.ts` e `hooks/usePageShortcut.ts`.
+    const notifyOpenChange = useEffectEvent((nextOpen: boolean) => onOpenChange(nextOpen));
+
     useEffect(() => {
         if (!open || !reportId) {
             return;
@@ -129,6 +136,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             setErrors({});
             setLoadedReportId(null);
         });
+
+        // Annulla l'applicazione della risposta se il report richiesto cambia (o il dialogo si
+        // chiude) prima che arrivi: senza, la risposta di un report aperto in precedenza poteva
+        // sovrascrivere quella del report aperto subito dopo.
+        let cancelled = false;
 
         const loadData = async () => {
             setIsLoading(true);
@@ -142,6 +154,10 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                     listCollaborators(),
                     listTechnicians(),
                 ]);
+
+                if (cancelled) {
+                    return;
+                }
 
                 setDevices(devicesData);
                 setIssues(issuesData);
@@ -169,17 +185,26 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 setSavedFormValues(loadedFormValues);
                 setLoadedReportId(report.id);
             } catch (error) {
+                if (cancelled) {
+                    return;
+                }
                 toast.error(getApiErrorMessage(error, "Impossibile caricare i dati del report"));
-                onOpenChange(false);
+                notifyOpenChange(false);
             } finally {
-                setIsLoading(false);
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             }
         };
 
         startTransition(() => {
             void loadData();
         });
-    }, [open, reportId, onOpenChange]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, reportId]);
 
     // Il problema in chiaro esiste solo con "Altro": è lì che l'etichetta del catalogo non
     // dice niente a chi legge la ricevuta. Vedi lib/issues.ts.

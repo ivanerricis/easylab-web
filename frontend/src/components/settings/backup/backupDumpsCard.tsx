@@ -1,9 +1,8 @@
 import { Download, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SettingsCard } from "@/components/settings/settingsUi";
 import RefreshButton from "@/components/refresh-button";
+import TableActionButton from "@/components/table-action-button";
 import { formatDateTime, formatFileSize } from "@/lib/utils";
 import type { BackupPanel } from "./useBackupPanel";
 
@@ -51,41 +50,31 @@ const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
                                 <TableCell>{formatFileSize(dump.sizeBytes)}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon"
-                                                    onClick={() => panel.handleDownloadDump(dump.fileName)}
-                                                    aria-label={`Scarica ${dump.fileName}`}
-                                                >
-                                                    <Download className="size-4" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Scarica</TooltipContent>
-                                        </Tooltip>
+                                        <TableActionButton
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => panel.handleDownloadDump(dump.fileName)}
+                                            aria-label={`Scarica ${dump.fileName}`}
+                                        >
+                                            <Download className="size-4" />
+                                        </TableActionButton>
 
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="destructive"
-                                                    size="icon"
-                                                    disabled={panel.isRestoring}
-                                                    onClick={() =>
-                                                        panel.openRestoreConfirm({
-                                                            type: "existing",
-                                                            fileName: dump.fileName,
-                                                        })
-                                                    }
-                                                    aria-label={`Ripristina ${dump.fileName}`}
-                                                >
-                                                    <RotateCcw className="size-4" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Ripristina questo dump</TooltipContent>
-                                        </Tooltip>
+                                        <TableActionButton
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            disabled={panel.isRestoring}
+                                            onClick={() =>
+                                                panel.openRestoreConfirm({
+                                                    type: "existing",
+                                                    fileName: dump.fileName,
+                                                })
+                                            }
+                                            aria-label={`Ripristina ${dump.fileName}`}
+                                        >
+                                            <RotateCcw className="size-4" />
+                                        </TableActionButton>
                                     </div>
                                 </TableCell>
                             </TableRow>

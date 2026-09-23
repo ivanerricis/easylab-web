@@ -38,7 +38,7 @@ const actionLabelRules: { method: string; match: string | RegExp; label: string 
     { method: "GET", match: /^\/api\/interventions\/\d+\/print$/, label: "download ricevuta intervento" },
     { method: "GET", match: /^\/api\/settings\/backup\/download\/.+$/, label: "download backup" },
     { method: "GET", match: /^\/api\/settings\/logs\/\d{4}-\d{2}-\d{2}\/download$/, label: "download log azioni" },
-    { method: "GET", match: "/api/settings/backup/key", label: "esportazione chiave di backup" },
+    { method: "POST", match: "/api/settings/backup/key", label: "esportazione chiave di backup" },
 ];
 
 const findActionLabel = (method: string, normalizedPath: string): string | null => {

@@ -21,6 +21,7 @@ import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter"
 import { validate } from "./validation";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
+import { interventionStatuses, interventionTypes, type InterventionStatus, type InterventionType } from "../db/schema";
 
 const interventionsRouter = Router();
 
@@ -35,11 +36,10 @@ const logoContentId = "logo-laboratorio";
 const toIsoDay = (value: Date, timeZone: string) =>
     new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
 
-const interventionTypes = ["consegna_materiale", "intervento_sede", "intervento_remoto"] as const;
-type InterventionType = (typeof interventionTypes)[number];
+// Le due liste (valori ammessi di `type` e `status`) vivono una sola volta in `db/schema.ts`,
+// insieme al tipo della colonna: prima erano riscritte identiche qui, in
+// `services/interventionLabels.ts`, `db/queries/intervention.ts` e `routes/summaryPrint.ts`.
 const onSiteInterventionTypes = new Set<InterventionType>(["intervento_sede", "intervento_remoto"]);
-
-const interventionStatuses = ["programmato", "in_lavorazione", "completato"] as const;
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -101,12 +101,12 @@ const interventionBodySchema = z
  * Il problema riscontrato non segue questa regola: si conosce già al momento della chiamata
  * del cliente, ed è il motivo per cui l'intervento viene programmato.
  */
-const isCompletedStatus = (status?: (typeof interventionStatuses)[number]) => status === "completato";
+const isCompletedStatus = (status?: InterventionStatus) => status === "completato";
 
 /** La riga su cui `validateInterventionRow` applica le regole: vedi lì. */
 type InterventionValidationRow = {
     type: InterventionType;
-    status?: (typeof interventionStatuses)[number];
+    status?: InterventionStatus;
     interventionDate?: string | null;
     description?: string | null;
     problem?: string | null;
@@ -173,7 +173,7 @@ const validateInterventionRow = (row: InterventionValidationRow): InterventionVa
 };
 
 const interventionUpdateBodySchema = interventionBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field is required",
+    message: "È necessario specificare almeno un campo",
 });
 
 interventionsRouter.get("/", validate({ query: interventionListQuerySchema }), async (req, res) => {
@@ -214,11 +214,10 @@ interventionsRouter.get("/export.csv", validate({ query: interventionExportQuery
         { header: "Cliente", value: (intervention) => intervention.customer },
         { header: "Telefono cliente", value: (intervention) => intervention.customerPhone },
         { header: "Collaboratore", value: (intervention) => intervention.collaborator },
-        { header: "Tipo", value: (intervention) => formatInterventionType(intervention.type as InterventionType) },
+        { header: "Tipo", value: (intervention) => formatInterventionType(intervention.type) },
         {
             header: "Stato",
-            value: (intervention) =>
-                formatInterventionStatus(intervention.status as (typeof interventionStatuses)[number]),
+            value: (intervention) => formatInterventionStatus(intervention.status),
         },
         { header: "Data intervento", value: (intervention) => intervention.interventionDate },
         { header: "Ora inizio", value: (intervention) => intervention.startTime },
@@ -262,7 +261,7 @@ const loadInterventionPrintContext = async (id: number) => {
         labEmail,
         labAddress,
         labPhone,
-        type: intervention.type as InterventionType,
+        type: intervention.type,
         // Il giorno dell'email, come YYYY-MM-DD: quello dell'intervento o, se non è pianificato,
         // quello di apertura della scheda. Uno solo per testo e nome dell'allegato, così non
         // possono dire due giorni diversi.
@@ -277,8 +276,8 @@ const loadInterventionPrintContext = async (id: number) => {
             customerPhone: customerPhoneLabel,
             customerEmail: intervention.customerEmail?.trim() || "-",
             collaboratorName,
-            type: intervention.type as InterventionType,
-            status: intervention.status as (typeof interventionStatuses)[number],
+            type: intervention.type,
+            status: intervention.status,
             description: intervention.description,
             problem: intervention.problem,
             note: intervention.note,
@@ -384,24 +383,14 @@ interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req
 interventionsRouter.post("/", validate({ body: interventionBodySchema }), async (req, res) => {
     const isOnSite = onSiteInterventionTypes.has(req.body.type);
 
-    // Per una creazione il corpo appena arrivato È la riga risultante: vedi
-    // `validateInterventionRow`, la stessa funzione che la PUT chiama sulla riga unione.
-    const validationFailure = validateInterventionRow({
-        type: req.body.type,
-        status: req.body.status ?? "programmato",
-        interventionDate: req.body.interventionDate ?? null,
-        description: req.body.description || null,
-        problem: isOnSite ? (req.body.problem ?? null) : null,
-        startTime: isOnSite ? (req.body.startTime ?? null) : null,
-        endTime: isOnSite ? (req.body.endTime ?? null) : null,
-    });
-
-    if (validationFailure) {
-        res.status(400).json({ message: validationFailure.message });
-        return;
-    }
-
-    const createdIntervention = await createIntervention({
+    /**
+     * Un'unica riga normalizzata, non una per la validazione e una per la scrittura: prima
+     * `isOnSite ? (x ?? null) : null`, `description || null` e il default dello stato erano
+     * calcolati due volte identici, col rischio che una modifica futura li disallineasse.
+     * Per una creazione il corpo appena arrivato È la riga risultante: vedi
+     * `validateInterventionRow`, la stessa funzione che la PUT chiama sulla riga unione.
+     */
+    const normalizedIntervention = {
         type: req.body.type,
         // Stringa vuota e campo assente sono la stessa cosa: "non ancora compilato" si
         // scrive NULL, come per `problem`.
@@ -417,7 +406,16 @@ interventionsRouter.post("/", validate({ body: interventionBodySchema }), async 
         interventionDate: req.body.interventionDate ?? null,
         startTime: isOnSite ? (req.body.startTime ?? null) : null,
         endTime: isOnSite ? (req.body.endTime ?? null) : null,
-    });
+    };
+
+    const validationFailure = validateInterventionRow(normalizedIntervention);
+
+    if (validationFailure) {
+        res.status(400).json({ message: validationFailure.message });
+        return;
+    }
+
+    const createdIntervention = await createIntervention(normalizedIntervention);
 
     res.status(201).json(createdIntervention[0]);
 });
@@ -435,14 +433,14 @@ interventionsRouter.put(
         }
 
         const existing = existingRows[0];
-        const nextType = (req.body.type ?? existing.type) as InterventionType;
+        const nextType: InterventionType = req.body.type ?? existing.type;
         const isOnSite = onSiteInterventionTypes.has(nextType);
         const nextInterventionDate =
             "interventionDate" in req.body ? (req.body.interventionDate ?? null) : existing.interventionDate;
         const nextStartTime = "startTime" in req.body ? (req.body.startTime ?? null) : existing.startTime;
         const nextEndTime = "endTime" in req.body ? (req.body.endTime ?? null) : existing.endTime;
         const nextProblem = "problem" in req.body ? (req.body.problem ?? null) : existing.problem;
-        const nextStatus = (req.body.status ?? existing.status) as (typeof interventionStatuses)[number];
+        const nextStatus: InterventionStatus = req.body.status ?? existing.status;
         const nextDescription = "description" in req.body ? req.body.description || null : existing.description;
         const nextNote = "note" in req.body ? req.body.note || null : existing.note;
 

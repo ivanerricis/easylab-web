@@ -44,10 +44,10 @@ const ReportsPage = () => {
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     usePageShortcut("n", () => setIsCreateDialogOpen(true));
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [reportIdToEdit, setReportIdToEdit] = useState<number | null>(null);
-    const [reportCustomerNameToEdit, setReportCustomerNameToEdit] = useState("");
+    // Un solo stato per dialogo + bersaglio, invece di un booleano più uno o due stati
+    // separati che ogni `onOpenChange` doveva azzerare insieme: `open={reportToEdit != null}`
+    // basta da solo a dire se il dialogo è aperto.
+    const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
     const [reportToDelete, setReportToDelete] = useState<ReportDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
@@ -71,6 +71,7 @@ const ReportsPage = () => {
             dateTo,
             currentPage,
             pageSize,
+            onPageOutOfRange: setCurrentPage,
         });
 
     const handleSortOptionChange = (value: ReportSortOption) =>
@@ -102,7 +103,6 @@ const ReportsPage = () => {
 
     const handleOpenDeleteDialog = (report: ReportDto) => {
         setReportToDelete(report);
-        setIsDeleteDialogOpen(true);
     };
 
     const handleOpenReport = (id: number) => {
@@ -115,9 +115,7 @@ const ReportsPage = () => {
 
     const handleOpenEditDialog = (id: number) => {
         const report = reportRows.find((row) => row.id === id);
-        setReportIdToEdit(id);
-        setReportCustomerNameToEdit(report?.customer ?? "");
-        setIsEditDialogOpen(true);
+        setReportToEdit(report ?? null);
     };
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
@@ -137,7 +135,6 @@ const ReportsPage = () => {
             setIsDeleting(true);
             await deleteReport(reportToDelete.id);
             toast.success("Report eliminato con successo");
-            setIsDeleteDialogOpen(false);
             setReportToDelete(null);
             await loadReports();
         } catch (error) {
@@ -171,23 +168,20 @@ const ReportsPage = () => {
                 />
 
                 <EditReportDialog
-                    open={isEditDialogOpen}
-                    reportId={reportIdToEdit}
-                    customerName={reportCustomerNameToEdit}
+                    open={reportToEdit != null}
+                    reportId={reportToEdit?.id ?? null}
+                    customerName={reportToEdit?.customer ?? ""}
                     onOpenChange={(open) => {
-                        setIsEditDialogOpen(open);
                         if (!open) {
-                            setReportIdToEdit(null);
-                            setReportCustomerNameToEdit("");
+                            setReportToEdit(null);
                         }
                     }}
                     onSubmit={handleEditReport}
                 />
 
                 <ConfirmDeleteDialog
-                    open={isDeleteDialogOpen}
+                    open={reportToDelete != null}
                     onOpenChange={(open) => {
-                        setIsDeleteDialogOpen(open);
                         if (!open) {
                             setReportToDelete(null);
                         }

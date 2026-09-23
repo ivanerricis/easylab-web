@@ -23,7 +23,7 @@ const collaboratorCreateBodySchema = z
 const collaboratorUpdateBodySchema = collaboratorCreateBodySchema
     .partial()
     .refine((value) => Object.keys(value).length > 0, {
-        message: "At least one field is required",
+        message: "È necessario specificare almeno un campo",
     });
 
 /**
@@ -51,7 +51,7 @@ const loadCollaboratorPrintContext = async (id: number) => {
 };
 
 const collaboratorsRouter = createCrudRouter({
-    notFoundMessage: "Collaborator not found",
+    notFoundMessage: "Collaboratore non trovato",
     createBodySchema: collaboratorCreateBodySchema,
     updateBodySchema: collaboratorUpdateBodySchema,
     queries: {
@@ -64,7 +64,7 @@ const collaboratorsRouter = createCrudRouter({
     extraRoutes: (router) => {
         registerSummaryPrintRoutes(router, {
             filePrefix: "collaborator",
-            notFoundMessage: "Collaborator not found",
+            notFoundMessage: "Collaboratore non trovato",
             loadContext: loadCollaboratorPrintContext,
             filterFor: (id) => ({ collaboratorId: id }),
         });

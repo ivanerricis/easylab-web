@@ -233,6 +233,13 @@ const buildUser = (overrides: Record<string, unknown> = {}) => ({
 /** L'id più basso, che è ciò che rende amministratore un utente: nessun campo "ruolo". */
 const queueAdminIdLookup = (adminId: number) => queueRows("select", userTable, [{ id: adminId }]);
 
+/**
+ * L'email di avviso nuovo dispositivo parte senza `await` (D2, vedi CHANGELOG): per osservarne
+ * gli effetti nei test bisogna lasciare girare la coda dei microtask dopo che `login`/
+ * `completeTwoFactorLogin` si sono già risolti, non basta l'`await` sulla funzione principale.
+ */
+const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
+
 beforeEach(() => {
     dbCalls.length = 0;
     queuedRows.clear();
@@ -524,6 +531,7 @@ ${"x".repeat(400)}`
             queueAdminIdLookup(1);
 
             await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+            await flushMicrotasks();
 
             expect(sendEmail).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -539,8 +547,29 @@ ${"x".repeat(400)}`
             queueAdminIdLookup(1);
 
             await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+            await flushMicrotasks();
 
             expect(sendEmail).not.toHaveBeenCalled();
+        });
+
+        /**
+         * D2: prima il login attendeva anche l'invio della mail (`await sendEmail` dentro
+         * `notifyIfNewDevice`, a sua volta atteso da `createSessionForUser`). Con l'SMTP
+         * irraggiungibile — e senza i timeout aggiunti a `buildTransporter`, fino a 2 minuti di
+         * default — la sessione nasceva ma il cookie non arrivava mai in tempo al browser, dietro
+         * un Cloudflare Tunnel che chiude a ~100s con un 524. Qui la mail non si risolve mai: se
+         * il login la stesse ancora aspettando, questo test non finirebbe.
+         */
+        it("il login si conclude anche se l'invio della mail di avviso resta appeso", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "titolare@esempio.it" });
+            sendEmail.mockImplementation(() => new Promise(() => {}));
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            const result = await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+
+            expect(result.status).toBe("authenticated");
         });
     });
 
@@ -1350,8 +1379,9 @@ describe("gestione utenti", () => {
     });
 
     describe("setUserActive", () => {
+        // Una sola query (UPDATE ... RETURNING) invece di SELECT + UPDATE: niente più riga da
+        // accodare per una SELECT che non parte più.
         it("disattivare chiude subito le sessioni già aperte", async () => {
-            queueRows("select", userTable, [buildUser()]);
             queueRows("update", userTable, [buildUser({ active: false })]);
             queueAdminIdLookup(1);
 
@@ -1362,7 +1392,6 @@ describe("gestione utenti", () => {
         });
 
         it("riattivare non tocca le sessioni", async () => {
-            queueRows("select", userTable, [buildUser({ active: false })]);
             queueRows("update", userTable, [buildUser({ active: true })]);
             queueAdminIdLookup(1);
 
@@ -1372,12 +1401,14 @@ describe("gestione utenti", () => {
             expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
         });
 
-        it("risponde 404 per un utente che non esiste", async () => {
-            queueRows("select", userTable, []);
+        // Con la SELECT tolta, il 404 lo scopre il RETURNING vuoto dell'UPDATE: qui a non
+        // succedere è la conseguenza (nessuna sessione toccata), non più "nessun UPDATE".
+        it("risponde 404 per un utente che non esiste, senza toccare le sessioni", async () => {
+            queueRows("update", userTable, []);
 
             await expect(setUserActive(99, false)).rejects.toMatchObject({ statusCode: 404 });
 
-            expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+            expect(dbCalls.some((call) => call.op === "delete")).toBe(false);
         });
     });
 

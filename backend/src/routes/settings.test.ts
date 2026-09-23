@@ -663,6 +663,32 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(updateEmailSettings).not.toHaveBeenCalled();
     });
 
+    /**
+     * Q4: prima il mittente delle impostazioni email non aveva nessun controllo di formato qui
+     * (lo faceva solo `updateEmailSettings` con una regex permissiva), mentre "Invia prova"
+     * (emailTestSchema, sotto) già usava `.email()` di zod. Un indirizzo poteva quindi passare
+     * da "Salva" ed essere rifiutato da "Invia prova".
+     */
+    it("rifiuta un mittente non valido nelle impostazioni email, come già fa 'Invia prova'", async () => {
+        const response = await request(buildApp(true))
+            .put("/api/settings/email")
+            .send({ ...emailBody, fromEmail: "non-una-mail" });
+
+        expect(response.status).toBe(400);
+        expect(updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    it("accetta un mittente vuoto nelle impostazioni email (non ancora compilate)", async () => {
+        vi.mocked(updateEmailSettings).mockResolvedValue({} as never);
+
+        const response = await request(buildApp(true))
+            .put("/api/settings/email")
+            .send({ ...emailBody, fromEmail: "" });
+
+        expect(response.status).toBe(200);
+        expect(updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ fromEmail: "" }));
+    });
+
     it("la mail di prova conferma l'indirizzo a cui è partita", async () => {
         vi.mocked(testEmailConnection).mockResolvedValue(undefined as never);
 

@@ -10,17 +10,19 @@ import {
     updateReportById,
     type ReportTechnicianInput,
 } from "../db/queries/report";
+import { getIssueById } from "../db/queries/issue";
 import { createReportPdfBuffer } from "../services/reportPdf";
+import { formatReportPaymentMethod } from "../services/reportLabels";
+import { isCatchAllIssueDescription } from "../services/issueCatalog";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
 import { formatDateLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
+import { reportPaymentMethods } from "../db/schema";
 
 const reportsRouter = Router();
-const reportPaymentMethods = ["non_paid", "cash", "card"] as const;
-type ReportPaymentMethod = (typeof reportPaymentMethods)[number];
 
 const reportSortFields = ["createdAt", "customer"] as const;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -93,7 +95,7 @@ const reportCreateBodySchema = reportBodySchema.refine(
 const reportUpdateBodySchema = reportBodySchema
     .partial()
     .refine((value) => Object.keys(value).length > 0, {
-        message: "At least one field is required",
+        message: "È necessario specificare almeno un campo",
     })
     .refine(technicianPriceNeedsTechnician.check, technicianPriceNeedsTechnician.message);
 
@@ -132,12 +134,6 @@ reportsRouter.get("/", validate({ query: reportListQuerySchema }), async (req, r
 // tutto ciò che passa il filtro, mai una sola pagina.
 const reportExportQuerySchema = reportListQuerySchema.omit({ page: true, pageSize: true });
 
-const reportPaymentMethodLabels: Record<ReportPaymentMethod, string> = {
-    non_paid: "Non pagato",
-    cash: "Contanti",
-    card: "Carta",
-};
-
 reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), async (req, res) => {
     const query = req.query as unknown as z.infer<typeof reportExportQuerySchema>;
 
@@ -157,13 +153,17 @@ reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), a
         { header: "Difetto", value: (report) => report.issue },
         { header: "Descrizione problema", value: (report) => report.issueDescription },
         { header: "Intervento", value: (report) => report.serviceDescription },
-        { header: "Tecnico esterno", value: (report) => report.technician },
-        { header: "Prezzo interno", value: (report) => report.internalPrice },
+        // Il collaboratore che ha in carico il report e il tecnico esterno vero (prima questa
+        // colonna leggeva `technician`, che nonostante il nome era il collaboratore: vedi D4
+        // nel CHANGELOG). `technicianName` è null quando il report non ha un tecnico esterno.
+        { header: "Collaboratore", value: (report) => report.collaborator },
+        { header: "Tecnico esterno", value: (report) => report.technicianName },
+        { header: "Prezzo interno", value: (report) => report.price },
         { header: "Compenso tecnico", value: (report) => report.technicianPrice },
         { header: "Prezzo totale", value: (report) => report.totalPrice },
         {
             header: "Metodo di pagamento",
-            value: (report) => reportPaymentMethodLabels[report.paymentMethod as ReportPaymentMethod],
+            value: (report) => formatReportPaymentMethod(report.paymentMethod),
         },
         { header: "Chiuso", value: (report) => report.closed },
         { header: "Note", value: (report) => report.note },
@@ -196,13 +196,12 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
     const [report] = await getReportDetailById(id);
 
     if (!report) {
-        res.status(404).json({ message: "Report not found" });
+        res.status(404).json({ message: "Report non trovato" });
         return;
     }
 
     const { labName, labEmail, labAddress, labPhone, timeZone } = await getLabConfig();
     const customerPhoneLabel = formatPhoneLabel(report.customerPhoneNumber, report.customerPhoneSecondary);
-    const totalPrice = report.price + Number(report.technicianPrice);
 
     const pdfBuffer = await createReportPdfBuffer({
         id: report.id,
@@ -215,18 +214,19 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         deviceName: report.deviceName,
         /**
          * Sulla ricevuta va scritto il problema, non l'etichetta con cui il laboratorio lo
-         * archivia. Il testo scritto a mano esiste solo con il difetto "Altro", dove
-         * l'etichetta non direbbe niente a chi legge; per tutti gli altri difetti vale
-         * l'etichetta stessa, che è già una descrizione.
+         * archivia. `issueText` (calcolata da `getReportDetailById`, la stessa espressione SQL
+         * che usa il resoconto in `summaryPrint.ts`) è il testo scritto a mano se c'è —
+         * esiste solo con il difetto "Altro", dove l'etichetta non direbbe niente a chi legge —
+         * altrimenti l'etichetta stessa, che per tutti gli altri difetti è già una descrizione.
          */
-        issueDescription: report.issueDescription?.trim() || report.issueName,
+        issueDescription: report.issueText,
         serviceDescription: report.serviceDescription,
         note: report.note ?? "-",
         password: report.password ?? "-",
         dataBackup: report.dataBackup,
         charger: report.charger,
         alerted: report.alerted,
-        totalPrice,
+        totalPrice: report.totalPrice,
         createdAtLabel: formatDateLabel(report.created_at, timeZone),
     });
 
@@ -241,17 +241,46 @@ reportsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res)
     const [report] = await getReportDetailById(id);
 
     if (!report) {
-        res.status(404).json({ message: "Report not found" });
+        res.status(404).json({ message: "Report non trovato" });
         return;
     }
 
     res.json(report);
 });
 
+/**
+ * "Altro" (vedi `issueCatalog.ts`) è la voce del catalogo che fa comparire, nel dialogo del
+ * report, la casella dove il problema si scrive a mano: se il difetto scelto è quello e la
+ * descrizione manca, il report finirebbe con un problema che sulla ricevuta e nel resoconto
+ * mostrerebbe solo l'etichetta "Altro", che da sola non dice niente. Il dialogo di creazione
+ * già lo impedisce lato client (`createReportDialog.tsx`, stesso messaggio) ma la regola va
+ * ripetuta qui: è l'unico posto che vede davvero la riga *risultante* — per la POST il corpo
+ * appena arrivato, per la PUT l'unione con quella esistente (calcolata dalla rotta prima di
+ * chiamare questa funzione, come per `validateInterventionRow` in `interventions.ts`).
+ */
+const catchAllIssueDescriptionMessage = 'Con il difetto "Altro" va descritto il problema';
+
+const validateIssueDescription = async (issueId: number, issueDescription: string | null | undefined) => {
+    const [issue] = await getIssueById(issueId);
+
+    if (!issue || !isCatchAllIssueDescription(issue.description) || issueDescription?.trim()) {
+        return null;
+    }
+
+    return catchAllIssueDescriptionMessage;
+};
+
 reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, res) => {
     const { report, technician } = splitTechnician(req.body as z.infer<typeof reportCreateBodySchema>);
     const paymentMethod = report.paymentMethod ?? "non_paid";
     const price = report.price ?? 0;
+
+    const issueDescriptionError = await validateIssueDescription(report.issueId, report.issueDescription);
+
+    if (issueDescriptionError) {
+        res.status(400).json({ message: issueDescriptionError });
+        return;
+    }
 
     // Il CHECK di riga sul database (migration 0035_report_domain_checks) fa rifiutare a
     // Postgres sia questa sia la PUT qui sotto: vedi il commento su `reportCreateBodySchema`.
@@ -265,11 +294,26 @@ reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateB
     const existingReport = await getReportById(id);
 
     if (existingReport.length === 0) {
-        res.status(404).json({ message: "Report not found" });
+        res.status(404).json({ message: "Report non trovato" });
         return;
     }
 
     const { report, technician } = splitTechnician(req.body as z.infer<typeof reportUpdateBodySchema>);
+
+    // La riga risultante (unione di questo corpo parziale con quella esistente, appena letta
+    // qui sopra) è quella su cui vale la regola "Altro" ⇒ descrizione non vuota: senza la riga
+    // esistente non sapremmo con quale difetto o quale descrizione confrontarci quando la PUT
+    // ne cambia solo uno dei due. È anche il motivo per cui questa SELECT preliminare resta
+    // (vedi il resoconto finale dell'agente).
+    const nextIssueId = report.issueId ?? existingReport[0].issueId;
+    const nextIssueDescription =
+        "issueDescription" in report ? report.issueDescription : existingReport[0].issueDescription;
+    const issueDescriptionError = await validateIssueDescription(nextIssueId, nextIssueDescription);
+
+    if (issueDescriptionError) {
+        res.status(400).json({ message: issueDescriptionError });
+        return;
+    }
 
     // Prezzo/pagamento e chiusura/collaboratore non si controllano più qui a mano: la riga
     // risultante (l'unione di questo corpo parziale con quella esistente) è quella che Postgres
@@ -279,7 +323,7 @@ reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateB
     const updatedReport = await updateReportById(id, report, technician);
 
     if (updatedReport.length === 0) {
-        res.status(404).json({ message: "Report not found" });
+        res.status(404).json({ message: "Report non trovato" });
         return;
     }
 
@@ -291,7 +335,7 @@ reportsRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, r
     const deletedReport = await deleteReportById(id);
 
     if (deletedReport.length === 0) {
-        res.status(404).json({ message: "Report not found" });
+        res.status(404).json({ message: "Report non trovato" });
         return;
     }
 

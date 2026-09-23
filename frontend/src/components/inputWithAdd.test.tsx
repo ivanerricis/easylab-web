@@ -116,8 +116,52 @@ describe("InputWithAdd", () => {
         });
 
         expect(onSearch).toHaveBeenCalledTimes(1);
-        expect(onSearch).toHaveBeenCalledWith("mar");
+        expect(onSearch).toHaveBeenCalledWith("mar", expect.any(AbortSignal));
         expect(suggestionNames()).toEqual(["Mario Rossi - 333"]);
+    });
+
+    /**
+     * Q10: scelto un suggerimento, `value` diventa l'etichetta intera ("Mario Rossi - 333...")
+     * e prima, dopo 250ms, partiva comunque una ricerca inutile con quel testo — la stessa cosa
+     * succedeva aprendo un dialogo con il cliente già scelto in partenza. `isSelectedOption`
+     * dice al campo che il testo attuale non è (più) da cercare.
+     */
+    it("con isSelectedOption non cerca: il valore è già un'opzione scelta, non testo da cercare", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const onSearch = vi.fn().mockResolvedValue(["Mario Rossi - 333"]);
+        render(<Harness onSearch={onSearch} isSelectedOption initialValue="Mario Rossi - 333" />);
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(250);
+        });
+
+        expect(onSearch).not.toHaveBeenCalled();
+    });
+
+    it("annulla la ricerca superata invece di limitarsi a scartarne la risposta", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const onSearch = vi.fn().mockImplementation((_query: string, signal: AbortSignal) => {
+            return new Promise((_resolve, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("annullata")));
+            });
+        });
+        render(<Harness onSearch={onSearch} />);
+
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        await user.type(screen.getByRole("textbox"), "ma");
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(250);
+        });
+        expect(onSearch).toHaveBeenCalledTimes(1);
+        const firstSignal = onSearch.mock.calls[0][1] as AbortSignal;
+        expect(firstSignal.aborted).toBe(false);
+
+        await user.type(screen.getByRole("textbox"), "rio");
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(250);
+        });
+
+        expect(firstSignal.aborted).toBe(true);
     });
 
     it("chiude i suggerimenti quando il campo perde il focus", async () => {

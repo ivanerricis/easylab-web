@@ -10,7 +10,15 @@ import type { BackupSettingsState } from "./backupState";
  */
 let state: BackupSettingsState;
 
-const persistState = vi.fn<(value: BackupSettingsState) => Promise<void>>(() => Promise.resolve());
+// Come il vero `store.save` (jsonSettingsStore.ts): scrive e aggiorna la cache allo stesso
+// oggetto passato. Da quando `updateBackupSettings` costruisce un `next` nuovo invece di
+// mutare `current` sul posto (D3, vedi CHANGELOG), `state` qui non è più lo stesso riferimento
+// modificato "in place": bisogna che persistState lo rimpiazzi, o le asserzioni sotto
+// continuerebbero a leggere lo stato di prima anche quando il salvataggio è andato a buon fine.
+const persistState = vi.fn<(value: BackupSettingsState) => Promise<void>>((value) => {
+    state = value;
+    return Promise.resolve();
+});
 
 vi.mock("./backupState", async () => {
     const actual = await vi.importActual<typeof import("./backupState")>("./backupState");
@@ -356,6 +364,23 @@ describe("updateBackupSettings", () => {
         await updateBackupSettings({ ...input, autoEnabled: false });
         expect(state.nextRunAt).toBeNull();
     });
+
+    /**
+     * D3: prima `updateBackupSettings` scriveva ogni campo direttamente sull'oggetto in cache
+     * di `loadState` e validava solo dopo. Un salvataggio respinto con 400 lasciava comunque i
+     * valori (mai passati da `persistState`, quindi mai scritti su disco) visibili in memoria:
+     * lo scheduler del backup automatico li avrebbe letti al giro successivo.
+     */
+    it("un 400 non modifica lo stato in memoria: resta quello di prima, non quello rifiutato", async () => {
+        const before = { ...state };
+
+        await expect(
+            updateBackupSettings({ ...input, smbEnabled: true, smbHost: "nas", smbShare: "  ", smbUsername: "u" })
+        ).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(state).toEqual(before);
+        expect(persistState).not.toHaveBeenCalled();
+    });
 });
 
 describe("runBackupNow", () => {
@@ -465,6 +490,31 @@ describe("runBackupNow", () => {
 
             expect(consoleError).toHaveBeenCalledWith("Invio email di avviso backup non riuscito:", expect.any(Error));
             consoleError.mockRestore();
+        });
+
+        /**
+         * D2: prima l'invio della mail di avviso era atteso dentro il try/catch che il
+         * try/finally del lock avvolge, quindi un SMTP lento (o irraggiungibile, coi timeout di
+         * emailManager.ts) teneva il lock del dump per tutta l'attesa. Ora l'invio parte senza
+         * await: qui la mail resta appesa apposta (non viene mai risolta prima delle asserzioni)
+         * eppure il lock si libera comunque, e un secondo dump può partire subito.
+         */
+        it("il lock si libera senza aspettare l'invio della mail di avviso", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            let resolveEmail!: () => void;
+            sendEmail.mockImplementationOnce(
+                () =>
+                    new Promise<void>((resolve) => {
+                        resolveEmail = resolve;
+                    })
+            );
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            createBackupArchive.mockResolvedValueOnce(undefined);
+            await expect(runBackupNow("manual")).resolves.toMatchObject({ lastRunStatus: "success" });
+
+            resolveEmail();
         });
     });
 

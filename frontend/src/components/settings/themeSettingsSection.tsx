@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsActions, SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/use-theme";
+import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import {
     applyCornerRadius,
     applyFontSize,
@@ -41,11 +42,15 @@ type ModeOption = {
     icon: typeof Sun;
 };
 
-const rowIntensityPreviewRows = [
-    { statusColor: "red", label: "Programmato" },
-    { statusColor: "yellow", label: "In lavorazione" },
-    { statusColor: "green", label: "Completato" },
-];
+/**
+ * Le tre righe d'anteprima riusano gli stati e i colori degli interventi (`lib/interventions.ts`)
+ * invece di riscriverli: erano una copia identica, e una modifica a colori o etichette lì non
+ * si sarebbe vista qui.
+ */
+const rowIntensityPreviewRows = interventionStatusOptions.map((option) => ({
+    statusColor: interventionStatusColor[option.value],
+    label: option.label,
+}));
 
 const modeOptions: ModeOption[] = [
     { value: "light", label: "Chiaro", description: "Interfaccia luminosa e pulita.", icon: Sun },

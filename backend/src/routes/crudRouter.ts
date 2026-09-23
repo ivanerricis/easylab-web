@@ -68,7 +68,7 @@ type CrudQueries<TRow, TCreate, TUpdate> = {
 };
 
 type CreateCrudRouterOptions<TRow, TCreate, TUpdate> = {
-    /** Messaggio 404, già nella lingua attesa dal client. */
+    /** Messaggio 404 mostrato all'utente: va scritto in italiano, non tradotto altrove. */
     notFoundMessage: string;
     queries: CrudQueries<TRow, TCreate, TUpdate>;
     createBodySchema: ZodType;

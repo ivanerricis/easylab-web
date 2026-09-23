@@ -4,9 +4,7 @@ import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import CreateTechnicianDialog, {
     type TechnicianSubmitValues,
@@ -14,24 +12,16 @@ import CreateTechnicianDialog, {
 import { formatPersonName, toTechnicianPayload } from "@/lib/people";
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import TablePagination from "@/components/table-pagination";
-import {
-    deleteTechnician,
-    getApiErrorMessage,
-    getApiErrorStatus,
-    getTechnician,
-    listReports,
-    updateReport,
-    updateTechnician,
-} from "@/lib/api";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { deleteTechnician, getTechnician, listReports, updateReport, updateTechnician } from "@/lib/api";
+import { useCallback, useState } from "react";
 import { ArrowLeft, ListFilter, Pencil } from "lucide-react";
-import type { ReportDto, TechnicianDto } from "@/types/dtos";
+import type { ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
 import OpenEntityButton from "@/components/open-entity-button";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
+import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
@@ -57,20 +47,26 @@ import FilterSelect from "@/components/filters/filter-select";
 const TechnicianPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    // Serve anche alla lista dei report sotto (`technicianId`), indipendentemente dal
+    // caricamento del tecnico: vedi lo stesso commento in `CustomerPage`.
     const technicianId = Number(id);
-    const [isTechnicianLoading, setIsTechnicianLoading] = useState(true);
-    const [technician, setTechnician] = useState<TechnicianDto | null>(null);
+    const {
+        data: technician,
+        isLoading: isTechnicianLoading,
+        isNotFound,
+        reload: reloadTechnician,
+        setData: setTechnician,
+    } = useEntityDetail(id, getTechnician, {
+        backTo: "/technicians",
+        errorMessage: "Impossibile caricare il tecnico",
+    });
     const technicianName = technician ? formatPersonName(technician) : "Tecnico";
     useDocumentTitle(technicianName);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isEditTechnicianDialogOpen, setIsEditTechnicianDialogOpen] = useState(false);
+    // Un solo stato per dialogo + bersaglio: `open={reportToEdit != null}` basta da solo.
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
 
-    const hasValidTechnicianId = useMemo(() => Number.isInteger(technicianId) && technicianId > 0, [technicianId]);
-
-    // Vedi lo stesso stato in `ReportPage`: un tecnico che non esiste si mostra come tale.
-    const [isNotFound, setIsNotFound] = useState(false);
     const handleBack = useGoBack("/technicians");
 
     const handleOpenReport = (reportId: number) => {
@@ -79,7 +75,6 @@ const TechnicianPage = () => {
 
     const handleOpenEditDialog = (report: ReportDto) => {
         setReportToEdit(report);
-        setIsEditDialogOpen(true);
     };
 
     const [pageSize, setPageSize] = useTableRowsPerPage("technician-reports");
@@ -101,6 +96,10 @@ const TechnicianPage = () => {
         queryKey: [technicianId, currentPage, pageSize, visibilityFilter],
         errorMessage: "Impossibile caricare i report del tecnico",
         initialLoading: false,
+        // D11: l'unica riga dell'ultima pagina eliminata (o un cambio di filtro) non deve
+        // lasciare la tabella vuota su una pagina che non esiste più.
+        page: currentPage,
+        onPageOutOfRange: setCurrentPage,
     });
 
     const handleEditReport = async (values: EditReportSubmitValues) => {
@@ -109,46 +108,17 @@ const TechnicianPage = () => {
         await reloadReports();
     };
 
-    const loadTechnician = useCallback(async () => {
-        try {
-            setTechnician(await getTechnician(technicianId));
-        } catch (error) {
-            if (getApiErrorStatus(error) === 404) {
-                setIsNotFound(true);
-                return;
-            }
-
-            toast.error(getApiErrorMessage(error, "Impossibile caricare il tecnico"));
-        }
-    }, [technicianId]);
-
     // Come nella scheda del cliente: il nome e il riquadro si aggiornano con il tecnico che
-    // il server restituisce.
+    // il server restituisce, senza un secondo giro di rete.
     const handleEditTechnician = async (values: TechnicianSubmitValues) => {
         setTechnician(await updateTechnician(technicianId, toTechnicianPayload(values)));
     };
 
     const handleRefresh = useCallback(async () => {
-        await Promise.all([loadTechnician(), reloadReports()]);
-    }, [loadTechnician, reloadReports]);
+        await Promise.all([reloadTechnician(), reloadReports()]);
+    }, [reloadTechnician, reloadReports]);
 
-    useEffect(() => {
-        if (!hasValidTechnicianId) {
-            return;
-        }
-
-        // Si aspettano solo i dati del tecnico, che sono l'intestazione: la lista si carica da sé.
-        void (async () => {
-            setIsTechnicianLoading(true);
-            try {
-                await loadTechnician();
-            } finally {
-                setIsTechnicianLoading(false);
-            }
-        })();
-    }, [hasValidTechnicianId, loadTechnician]);
-
-    if (!hasValidTechnicianId || isNotFound) {
+    if (isNotFound) {
         return (
             <NotFoundState
                 title="Tecnico non trovato"
@@ -166,14 +136,9 @@ const TechnicianPage = () => {
     return (
         <div className="flex h-full min-h-0 w-full flex-col gap-4">
             <div className="flex items-center gap-2">
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
-                            <ArrowLeft className="size-6" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Torna indietro</TooltipContent>
-                </Tooltip>
+                <TableActionButton size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
+                    <ArrowLeft className="size-6" />
+                </TableActionButton>
                 <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{technicianName}</h1>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -183,20 +148,15 @@ const TechnicianPage = () => {
                         label="Aggiorna i dati del tecnico"
                     />
 
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                onClick={() => setIsEditTechnicianDialogOpen(true)}
-                                aria-label="Modifica tecnico"
-                            >
-                                <Pencil className="size-5" />
-                                <span className="hidden text-lg lg:inline">Modifica</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Modifica tecnico</TooltipContent>
-                    </Tooltip>
+                    <TableActionButton
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setIsEditTechnicianDialogOpen(true)}
+                        aria-label="Modifica tecnico"
+                    >
+                        <Pencil className="size-5" />
+                        <span className="hidden text-lg lg:inline">Modifica</span>
+                    </TableActionButton>
 
                     <DetailDeleteButton
                         label="Elimina tecnico"
@@ -292,11 +252,10 @@ const TechnicianPage = () => {
             </div>
 
             <EditReportDialog
-                open={isEditDialogOpen}
+                open={reportToEdit != null}
                 reportId={reportToEdit?.id ?? null}
                 customerName={reportToEdit?.customer ?? ""}
                 onOpenChange={(open) => {
-                    setIsEditDialogOpen(open);
                     if (!open) {
                         setReportToEdit(null);
                     }

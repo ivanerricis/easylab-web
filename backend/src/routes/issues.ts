@@ -9,11 +9,11 @@ const issueCreateBodySchema = z
     .strict();
 
 const issueUpdateBodySchema = issueCreateBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
-    message: "At least one field is required",
+    message: "È necessario specificare almeno un campo",
 });
 
 const issuesRouter = createCrudRouter({
-    notFoundMessage: "Issue not found",
+    notFoundMessage: "Difetto non trovato",
     createBodySchema: issueCreateBodySchema,
     updateBodySchema: issueUpdateBodySchema,
     queries: {

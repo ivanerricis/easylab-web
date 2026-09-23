@@ -122,6 +122,9 @@ const report = {
     alerted: true,
     closed: false,
     price: 80,
+    // Calcolato dal server con la stessa espressione di `listReports` (Q2): la pagina non
+    // lo ricalcola più da sé sommando prezzo e compenso tecnico.
+    totalPrice: 105,
     paymentMethod: "card",
     created_at: "2026-09-01T10:00:00.000Z",
     updated_at: null,
@@ -181,8 +184,8 @@ describe("ReportPage", () => {
         expect(screen.getByText("Paolo")).toBeInTheDocument();
     });
 
-    /** Il totale è prezzo interno più tecnici: è la cifra che il cliente paga. */
-    it("somma il prezzo interno e quello del tecnico nel totale", async () => {
+    /** Il totale (prezzo interno più tecnico) arriva già calcolato dal server: vedi Q2. */
+    it("mostra il totale calcolato dal server", async () => {
         await renderPage();
 
         const euro = (text: string) => text.replace(/\s/g, " ");
@@ -191,7 +194,7 @@ describe("ReportPage", () => {
     });
 
     it("senza tecnico lo dice invece di mostrare una tabella vuota", async () => {
-        api.getReport.mockResolvedValue({ ...report, technicianId: null, technicianPrice: 0 });
+        api.getReport.mockResolvedValue({ ...report, technicianId: null, technicianPrice: 0, totalPrice: 80 });
         await renderPage();
 
         expect(screen.getByText("Nessun tecnico associato a questo report.")).toBeInTheDocument();

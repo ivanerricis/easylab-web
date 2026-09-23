@@ -120,7 +120,7 @@ describe("customers router", () => {
         const response = await request(buildApp()).get("/api/customers/999");
 
         expect(response.status).toBe(404);
-        expect(response.body.message).toBe("Customer not found");
+        expect(response.body.message).toBe("Cliente non trovato");
     });
 
     it("crea un cliente e risponde 201", async () => {
@@ -253,6 +253,10 @@ describe("customers router", () => {
                     createdAt: new Date("2026-01-15"),
                     device: "iPhone 12",
                     issue: "Schermo rotto",
+                    // Il problema come lo calcola ormai `listReports` (`issueTextExpr`): la
+                    // descrizione scritta a mano se c'è, altrimenti l'etichetta del difetto.
+                    // Qui non c'è una descrizione, quindi coincide con l'etichetta.
+                    issueText: "Schermo rotto",
                     closed: true,
                     alerted: false,
                     paymentMethod: "cash",

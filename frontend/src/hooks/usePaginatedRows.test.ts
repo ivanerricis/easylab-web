@@ -261,4 +261,77 @@ describe("usePaginatedRows", () => {
 
         expect(toastError).not.toHaveBeenCalled();
     });
+
+    describe("onPageOutOfRange", () => {
+        /**
+         * Il difetto che questa opzione corregge (D11): eliminare l'unica riga dell'ultima
+         * pagina lascia la tabella vuota su una pagina che non esiste più, e con
+         * `totalPages <= 1` l'impaginazione sparisce — da lì non si torna indietro da soli.
+         */
+        it("avvisa con l'ultima pagina valida quando quella richiesta la supera", async () => {
+            const fetchRows = vi.fn().mockResolvedValue({
+                items: [],
+                totalItems: 8,
+                page: 3,
+                pageSize: 4,
+                totalPages: 2,
+            });
+            const onPageOutOfRange = vi.fn();
+
+            renderHook(() =>
+                usePaginatedRows<Row>({
+                    fetchRows,
+                    queryKey: [3],
+                    errorMessage: "Errore",
+                    page: 3,
+                    onPageOutOfRange,
+                })
+            );
+
+            await waitFor(() => {
+                expect(onPageOutOfRange).toHaveBeenCalledWith(2);
+            });
+        });
+
+        it("non avvisa quando la pagina richiesta è ancora valida", async () => {
+            const fetchRows = vi.fn().mockResolvedValue(buildResponse([{ id: 1, name: "Mario" }]));
+            const onPageOutOfRange = vi.fn();
+
+            const { result } = renderHook(() =>
+                usePaginatedRows<Row>({
+                    fetchRows,
+                    queryKey: [1],
+                    errorMessage: "Errore",
+                    page: 1,
+                    onPageOutOfRange,
+                })
+            );
+
+            await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+            expect(onPageOutOfRange).not.toHaveBeenCalled();
+        });
+
+        it("resta retrocompatibile: senza `page` non guarda mai `totalPages`", async () => {
+            const fetchRows = vi.fn().mockResolvedValue({
+                items: [],
+                totalItems: 8,
+                page: 3,
+                pageSize: 4,
+                totalPages: 2,
+            });
+
+            const { result } = renderHook(() =>
+                usePaginatedRows<Row>({
+                    fetchRows,
+                    queryKey: [],
+                    errorMessage: "Errore",
+                })
+            );
+
+            await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+            expect(result.current.totalPages).toBe(2);
+        });
+    });
 });

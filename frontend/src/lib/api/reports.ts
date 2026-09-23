@@ -3,9 +3,8 @@ import type { PaymentMethod } from "@/types/dtos";
 import type { PaginatedResponse } from "./client";
 import type { ReportDto } from "@/types/dtos";
 
-type RawReportDto = Omit<ReportDto, "price" | "internalPrice" | "technicianPrice" | "totalPrice"> & {
+type RawReportDto = Omit<ReportDto, "price" | "technicianPrice" | "totalPrice"> & {
     price: number | string;
-    internalPrice: number | string;
     technicianPrice: number | string;
     totalPrice: number | string;
 };
@@ -13,7 +12,6 @@ type RawReportDto = Omit<ReportDto, "price" | "internalPrice" | "technicianPrice
 const normalizeReportDto = (report: RawReportDto): ReportDto => ({
     ...report,
     price: Number(report.price),
-    internalPrice: Number(report.internalPrice),
     technicianPrice: Number(report.technicianPrice),
     totalPrice: Number(report.totalPrice),
 });
@@ -137,6 +135,11 @@ export type ReportDetailDto = ReportEntityDto & {
     deviceName: string;
     issueName: string;
     collaboratorName: string | null;
+    /**
+     * Prezzo interno più compenso tecnico, calcolato dal server con la stessa espressione di
+     * `listReports` (Q2): la scheda non lo ricalcola più da sé.
+     */
+    totalPrice: number;
 };
 
 export const getReport = async (id: number) => (await api.get<ReportDetailDto>(`/reports/${id}`)).data;

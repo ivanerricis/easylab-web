@@ -158,6 +158,16 @@ const getAdminUserId = async (): Promise<number | null> => {
 };
 
 /**
+ * `toPublicUser` più la ricerca dell'id admin, che serve a ogni chiamante che costruisce la
+ * risposta per un singolo utente: era ripetuta identica in ognuno di quei punti. `listUsers`
+ * resta a parte perché cerca l'id admin una sola volta per l'intera pagina, non per riga.
+ */
+const buildPublicUser = async (user: Parameters<typeof toPublicUser>[0]): Promise<PublicUser> => {
+    const adminId = await getAdminUserId();
+    return toPublicUser(user, user.id === adminId);
+};
+
+/**
  * Il file con la password generata al primo avvio serve solo finché l'admin non la sostituisce:
  * dopo è una credenziale in chiaro, per giunta scaduta, lasciata sul disco a tempo
  * indeterminato. Un errore qui non deve far fallire né l'avvio né il cambio password.
@@ -306,6 +316,12 @@ const parseKnownDeviceLabels = (raw: string | null | undefined): string[] => {
  *
  * Un'unica email del laboratorio, non una per utente (vedi CHANGELOG): il messaggio riporta lo
  * username, altrimenti chi legge la casella condivisa non saprebbe a chi si riferisce.
+ *
+ * L'aggiornamento della colonna e la notifica in app restano attesi: sono scritture nel nostro
+ * database, quasi istantanee. L'email no: anche con i timeout di `buildTransporter`
+ * (emailManager.ts) può metterci diversi secondi, e login e creazione della sessione devono
+ * restare separati dalla sorte dell'SMTP, altrimenti un server irraggiungibile lascia la
+ * sessione creata ma il cookie mai arrivato al browser (vedi CHANGELOG).
  */
 const notifyIfNewDevice = async (user: UserRow, label: string | null): Promise<void> => {
     if (!label) {
@@ -331,27 +347,29 @@ const notifyIfNewDevice = async (user: UserRow, label: string | null): Promise<v
         link: "/settings?section=security",
     });
 
-    // Come le email di avviso dei backup: non deve mai far fallire il login se l'SMTP è giù o
-    // mal configurato, quindi resta un tentativo a parte con il proprio try/catch.
-    try {
-        if (!(await isEmailConfigured())) {
-            return;
-        }
-
-        const company = await getCompanySettings();
-
-        if (!company.email) {
-            return;
-        }
-
-        await sendEmail({
-            to: company.email,
-            subject: `Nuovo accesso - ${company.name}`,
-            text: `L'utente "${user.username}" è entrato da un dispositivo mai visto prima (${label}).`,
-        });
-    } catch (error) {
+    // Volutamente senza await: il login non deve aspettare l'SMTP. L'errore, se c'è, resta solo
+    // nei log, come per le email di avviso dei backup.
+    void sendNewDeviceEmail(user, label).catch((error) => {
         console.error("Invio email di avviso nuovo dispositivo non riuscito:", error);
+    });
+};
+
+const sendNewDeviceEmail = async (user: UserRow, label: string): Promise<void> => {
+    if (!(await isEmailConfigured())) {
+        return;
     }
+
+    const company = await getCompanySettings();
+
+    if (!company.email) {
+        return;
+    }
+
+    await sendEmail({
+        to: company.email,
+        subject: `Nuovo accesso - ${company.name}`,
+        text: `L'utente "${user.username}" è entrato da un dispositivo mai visto prima (${label}).`,
+    });
 };
 
 /**
@@ -374,8 +392,7 @@ const createSessionForUser = async (user: UserRow, userAgent?: string | null): P
 
     await notifyIfNewDevice(user, describeUserAgent(sanitizedUserAgent));
 
-    const adminId = await getAdminUserId();
-    return { status: "authenticated", token, expiresAt, user: toPublicUser(user, user.id === adminId) };
+    return { status: "authenticated", token, expiresAt, user: await buildPublicUser(user) };
 };
 
 export const login = async (
@@ -604,16 +621,11 @@ export const createUser = async (username: string) => {
     const passwordHash = await hashPassword(password);
     const [user] = await db.insert(userTable).values({ username, passwordHash, mustChangePassword: true }).returning();
 
-    const adminId = await getAdminUserId();
-    return { user: toPublicUser(user, user.id === adminId), generatedPassword: password };
+    return { user: await buildPublicUser(user), generatedPassword: password };
 };
 
 export const regeneratePassword = async (userId: number) => {
-    const rows = await db.select().from(userTable).where(eq(userTable.id, userId)).limit(1);
-    const user = rows[0];
-    if (!user) {
-        throw new AuthManagerError("Utente non trovato", 404);
-    }
+    const user = await requireUserById(userId);
 
     const password = generateCompliantPassword();
     const passwordHash = await hashPassword(password);
@@ -622,36 +634,30 @@ export const regeneratePassword = async (userId: number) => {
     // (incluso un eventuale ladro di sessione) deve rifare il login con quella nuova.
     await deleteAllSessionsForUser(userId);
 
-    const adminId = await getAdminUserId();
     return {
-        user: { ...toPublicUser(user, user.id === adminId), mustChangePassword: true },
+        user: { ...(await buildPublicUser(user)), mustChangePassword: true },
         generatedPassword: password,
     };
 };
 
 export const setUserActive = async (userId: number, active: boolean): Promise<PublicUser> => {
-    const rows = await db.select().from(userTable).where(eq(userTable.id, userId)).limit(1);
-    const user = rows[0];
-    if (!user) {
+    // Un'unica query invece di SELECT + UPDATE: il RETURNING dice da solo se la riga c'era.
+    const [updated] = await db.update(userTable).set({ active }).where(eq(userTable.id, userId)).returning();
+
+    if (!updated) {
         throw new AuthManagerError("Utente non trovato", 404);
     }
-
-    const [updated] = await db.update(userTable).set({ active }).where(eq(userTable.id, userId)).returning();
 
     if (!active) {
         // Disattivare l'account deve invalidare subito eventuali sessioni già aperte.
         await deleteAllSessionsForUser(userId);
     }
 
-    const adminId = await getAdminUserId();
-    return toPublicUser(updated, updated.id === adminId);
+    return buildPublicUser(updated);
 };
 
 export const deleteUser = async (userId: number): Promise<void> => {
-    const rows = await db.select({ id: userTable.id }).from(userTable).where(eq(userTable.id, userId)).limit(1);
-    if (rows.length === 0) {
-        throw new AuthManagerError("Utente non trovato", 404);
-    }
+    await requireUserById(userId);
 
     // Eventuali FK verso questa tabella senza cascade fanno fallire la query con un
     // vincolo di integrità: l'errore viene tradotto in un messaggio leggibile dal
@@ -665,11 +671,7 @@ export const changeOwnPassword = async (
     newPassword: string,
     currentSessionToken: string
 ): Promise<void> => {
-    const rows = await db.select().from(userTable).where(eq(userTable.id, userId)).limit(1);
-    const user = rows[0];
-    if (!user) {
-        throw new AuthManagerError("Utente non trovato", 404);
-    }
+    const user = await requireUserById(userId);
 
     await assertCurrentPassword(user, currentPassword, "La password attuale non è corretta");
 
@@ -1076,8 +1078,7 @@ export const adminDisableTwoFactor = async (userId: number): Promise<PublicUser>
     // aperte da qualche parte non sono più fidate.
     await deleteAllSessionsForUser(userId);
 
-    const adminId = await getAdminUserId();
-    return toPublicUser({ ...user, totpConfirmedAt: null }, user.id === adminId);
+    return buildPublicUser({ ...user, totpConfirmedAt: null });
 };
 
 /**

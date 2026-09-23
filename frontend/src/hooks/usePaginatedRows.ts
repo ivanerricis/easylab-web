@@ -19,6 +19,19 @@ type UsePaginatedRowsOptions<TRow> = {
     errorMessage: string;
     /** Alcune pagine partono senza skeleton perché montano già con dei filtri. */
     initialLoading?: boolean;
+    /**
+     * La pagina richiesta, se il chiamante la tiene fuori da questo hook (nell'indirizzo, o
+     * in uno stato suo). Facoltativa: senza, l'hook si comporta come prima e non guarda
+     * mai `totalPages`.
+     *
+     * Con `onPageOutOfRange` permette di correggere da sé una pagina che non esiste più —
+     * l'unica riga dell'ultima pagina eliminata, o un filtro che ha ridotto i risultati —
+     * invece di restare su una tabella vuota con l'impaginazione sparita (`totalPages <= 1`
+     * la nasconde, quindi da lì non si torna indietro).
+     */
+    page?: number;
+    /** Chiamato con l'ultima pagina valida quando `page` supera `totalPages` della risposta. */
+    onPageOutOfRange?: (lastPage: number) => void;
 };
 
 export const usePaginatedRows = <TRow>({
@@ -26,6 +39,8 @@ export const usePaginatedRows = <TRow>({
     queryKey,
     errorMessage,
     initialLoading = true,
+    page,
+    onPageOutOfRange,
 }: UsePaginatedRowsOptions<TRow>) => {
     const [rows, setRows] = useState<TRow[]>([]);
     const [totalItems, setTotalItems] = useState(0);
@@ -37,12 +52,16 @@ export const usePaginatedRows = <TRow>({
 
     const fetchRowsRef = useRef(fetchRows);
     const errorMessageRef = useRef(errorMessage);
+    const pageRef = useRef(page);
+    const onPageOutOfRangeRef = useRef(onPageOutOfRange);
 
     // Dichiarato prima dell'effetto di caricamento così la ref è già aggiornata
     // quando quest'ultimo parte.
     useEffect(() => {
         fetchRowsRef.current = fetchRows;
         errorMessageRef.current = errorMessage;
+        pageRef.current = page;
+        onPageOutOfRangeRef.current = onPageOutOfRange;
     });
 
     // Identifica la richiesta più recente: le risposte che arrivano dopo essere
@@ -86,6 +105,16 @@ export const usePaginatedRows = <TRow>({
             setRows(response.items);
             setTotalItems(response.totalItems);
             setTotalPages(response.totalPages);
+
+            // La pagina chiesta non esiste più (`totalPages` è sempre almeno 1: vedi
+            // `crudRouter.ts`): l'ultima riga della pagina è stata eliminata, o un filtro ha
+            // ridotto i risultati. Il chiamante corregge la pagina, il che cambia la sua
+            // `queryKey` e fa ripartire da sé un nuovo caricamento — qui non si rilancia
+            // `reload` direttamente, altrimenti userebbe ancora la pagina vecchia.
+            const requestedPage = pageRef.current;
+            if (requestedPage != null && requestedPage > response.totalPages) {
+                onPageOutOfRangeRef.current?.(response.totalPages);
+            }
         } catch (error) {
             // `signal.aborted` va controllato a parte e non basta l'id: la richiesta
             // annullata allo smontaggio *è* ancora la più recente, quindi senza questo

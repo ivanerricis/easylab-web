@@ -130,6 +130,35 @@ describe("userActionLogger", () => {
         expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=download ricevuta report");
     });
 
+    /**
+     * D7: la regola era registrata per GET, ma la rotta (routes/settings.ts) è una POST: non
+     * scattava mai, e l'esportazione della chiave finiva nel registro come il generico "creato
+     * /api/settings/backup/key" invece che con l'etichetta dedicata.
+     */
+    it("registra l'esportazione della chiave di backup con la sua etichetta, sulla POST reale della rotta", async () => {
+        const res = createResponse(200, {});
+
+        userActionLogger(
+            createRequest("POST", "/api/settings/backup/key", { username: "mario" }),
+            res,
+            vi.fn() as NextFunction
+        );
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(appendUserActionLog).toHaveBeenCalledOnce();
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=esportazione chiave di backup");
+    });
+
+    it("una GET sulla stessa rotta non scatterebbe più (non è la rotta reale)", () => {
+        const res = createResponse(200);
+
+        userActionLogger(createRequest("GET", "/api/settings/backup/key"), res, vi.fn() as NextFunction);
+        res.emit("finish");
+
+        expect(appendUserActionLog).not.toHaveBeenCalled();
+    });
+
     it("usa etichette dedicate per login e logout invece del verbo generico", async () => {
         const loginRes = createResponse(200);
         userActionLogger(createRequest("POST", "/api/auth/login"), loginRes, vi.fn() as NextFunction);

@@ -217,6 +217,18 @@ describe("updateEmailSettings", () => {
         ).rejects.toMatchObject({ statusCode: 400 });
     });
 
+    /**
+     * Q4: prima "Salva" (qui) validava il mittente con una regex permissiva, mentre "Invia
+     * prova" (routes/settings.ts, emailTestSchema) e routes/customers.ts usavano `.email()` di
+     * zod. Un indirizzo come questo passava di qua ed era rifiutato di là. Ora entrambi usano
+     * `.email()` di zod, quindi anche qui va rifiutato.
+     */
+    it("rifiuta un mittente con punti consecutivi, come fa già .email() di zod altrove", async () => {
+        await expect(
+            updateEmailSettings(enableInput({ fromEmail: "a..b@x.it", password: "segreta" }))
+        ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
     it("rifiuta l'abilitazione senza nessuna password, né nuova né già salvata", async () => {
         readFile.mockResolvedValue(JSON.stringify(storedState({ enabled: false, passwordEncrypted: null })));
 
@@ -287,6 +299,26 @@ describe("testEmailConnection", () => {
                 subject: expect.stringContaining("test"),
             })
         );
+    });
+
+    /**
+     * D2: senza tetti espliciti nodemailer usa i suoi default (2 minuti per la connessione, 10
+     * per il socket). Con un SMTP irraggiungibile, un invio innescato dal login (vedi
+     * authManager.ts, notifyIfNewDevice) restava appeso ben oltre i ~100s con cui Cloudflare
+     * Tunnel chiude la richiesta con un 524.
+     */
+    it("passa al transporter tetti di tempo più stretti dei default di nodemailer", async () => {
+        await testEmailConnection(config);
+
+        const [passedConfig] = createTransport.mock.calls.at(-1) as [
+            { connectionTimeout: number; greetingTimeout: number; socketTimeout: number },
+        ];
+        expect(passedConfig.connectionTimeout).toBeGreaterThan(0);
+        expect(passedConfig.connectionTimeout).toBeLessThanOrEqual(15_000);
+        expect(passedConfig.greetingTimeout).toBeGreaterThan(0);
+        expect(passedConfig.greetingTimeout).toBeLessThanOrEqual(15_000);
+        expect(passedConfig.socketTimeout).toBeGreaterThan(0);
+        expect(passedConfig.socketTimeout).toBeLessThanOrEqual(15_000);
     });
 
     it("usa solo l'indirizzo quando manca il nome mittente", async () => {

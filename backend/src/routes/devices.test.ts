@@ -78,7 +78,7 @@ describe("devices router", () => {
         const response = await request(buildApp()).get("/api/devices/999");
 
         expect(response.status).toBe(404);
-        expect(response.body.message).toBe("Device not found");
+        expect(response.body.message).toBe("Dispositivo non trovato");
     });
 
     it("crea un dispositivo e risponde 201", async () => {

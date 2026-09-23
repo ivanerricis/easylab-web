@@ -13,6 +13,8 @@ type UseInterventionsRowsParams = {
     dateTo?: string;
     currentPage: number;
     pageSize: number;
+    /** Chiamato con l'ultima pagina valida quando `currentPage` la supera. Vedi `usePaginatedRows`. */
+    onPageOutOfRange?: (lastPage: number) => void;
 };
 
 export const useInterventionsRows = ({
@@ -24,6 +26,7 @@ export const useInterventionsRows = ({
     dateTo,
     currentPage,
     pageSize,
+    onPageOutOfRange,
 }: UseInterventionsRowsParams) => {
     const [sortBy, sortOrder] = sortOption.split(":") as [
         "createdAt" | "interventionDate" | "customer" | "status",
@@ -47,6 +50,8 @@ export const useInterventionsRows = ({
             queryKey: [currentPage, pageSize, searchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo],
             errorMessage: "Impossibile caricare gli interventi",
             initialLoading: false,
+            page: currentPage,
+            onPageOutOfRange,
         });
 
     return {

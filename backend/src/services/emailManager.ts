@@ -1,9 +1,8 @@
 import nodemailer from "nodemailer";
+import { z } from "zod";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { ApiError } from "./apiError";
 import { createJsonSettingsStore } from "./jsonSettingsStore";
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type EmailSettingsState = {
     enabled: boolean;
@@ -135,7 +134,10 @@ export const updateEmailSettings = async (input: EmailSettingsInput) => {
             throw new EmailManagerError("Per abilitare l'invio email specifica host, utente ed email mittente", 400);
         }
 
-        if (!emailPattern.test(next.fromEmail)) {
+        // La stessa regola usata da "Invia prova" (routes/settings.ts, emailTestSchema) e dai
+        // clienti (routes/customers.ts): con la regex permissiva di prima un mittente accettato
+        // qui da "Salva" poteva essere rifiutato lì da "Invia prova".
+        if (!z.string().email().safeParse(next.fromEmail).success) {
             throw new EmailManagerError("L'email mittente non è valida", 400);
         }
 
@@ -149,6 +151,14 @@ export const updateEmailSettings = async (input: EmailSettingsInput) => {
     return toPublicState(next);
 };
 
+// Senza questi tetti nodemailer usa i suoi default (2 minuti per la connessione, 10 per il
+// socket): con un SMTP irraggiungibile un invio innescato dal login (vedi `notifyIfNewDevice`
+// in authManager.ts) resta appeso ben oltre i ~100s con cui Cloudflare Tunnel chiude la
+// richiesta con un 524, lasciando la sessione già creata ma senza cookie in risposta.
+const emailConnectionTimeoutMs = 10_000;
+const emailGreetingTimeoutMs = 10_000;
+const emailSocketTimeoutMs = 15_000;
+
 const buildTransporter = (config: EmailConnectionConfig) =>
     nodemailer.createTransport({
         host: config.host,
@@ -159,6 +169,9 @@ const buildTransporter = (config: EmailConnectionConfig) =>
         // password della casella compresa. Così invece la connessione si interrompe. Il
         // certificato resta verificato, perché `rejectUnauthorized` vale true di default.
         requireTLS: !config.secure,
+        connectionTimeout: emailConnectionTimeoutMs,
+        greetingTimeout: emailGreetingTimeoutMs,
+        socketTimeout: emailSocketTimeoutMs,
         auth: {
             user: config.username,
             pass: config.password,

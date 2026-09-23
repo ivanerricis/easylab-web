@@ -105,14 +105,14 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
 }: SimpleEntityPageProps<TRow, TValues>) => {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     usePageShortcut("n", () => setIsCreateDialogOpen(true));
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     // Ricerca e pagina stanno nell'indirizzo, come nelle altre liste: vedi `useListUrlState`.
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const committedSearchText = searchParams.get(listUrlParams.search) ?? "";
     const [searchText, setSearchText] = useUrlSearchText(committedSearchText, (value) =>
         updateParams({ [listUrlParams.search]: value })
     );
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    // Il dialogo è aperto se e solo se c'è una riga bersaglio: un booleano a parte poteva
+    // disallinearsi da essa (aperto ma senza riga, o viceversa), come succedeva prima.
     const [rowToEdit, setRowToEdit] = useState<TRow | null>(null);
     const [rowToDelete, setRowToDelete] = useState<TRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -124,6 +124,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             currentPage,
             pageSize,
             errorMessage: loadErrorMessage,
+            onPageOutOfRange: setCurrentPage,
         }
     );
 
@@ -152,7 +153,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
         }
 
         setRowToEdit(row);
-        setIsEditDialogOpen(true);
     };
 
     const handleEdit = async (values: TValues) => {
@@ -166,7 +166,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
 
     const handleOpenDeleteDialog = (row: TRow) => {
         setRowToDelete(row);
-        setIsDeleteDialogOpen(true);
     };
 
     const handleDelete = async () => {
@@ -178,7 +177,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             setIsDeleting(true);
             await onDelete(rowToDelete);
             toast.success(deleteSuccessMessage);
-            setIsDeleteDialogOpen(false);
             setRowToDelete(null);
             await reload();
         } catch (error) {
@@ -199,9 +197,8 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onSubmit={handleCreate} />
 
             <Dialog
-                open={isEditDialogOpen}
+                open={rowToEdit != null}
                 onOpenChange={(open) => {
-                    setIsEditDialogOpen(open);
                     if (!open) {
                         setRowToEdit(null);
                     }
@@ -212,9 +209,8 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             />
 
             <ConfirmDeleteDialog
-                open={isDeleteDialogOpen}
+                open={rowToDelete != null}
                 onOpenChange={(open) => {
-                    setIsDeleteDialogOpen(open);
                     if (!open) {
                         setRowToDelete(null);
                     }

@@ -3,6 +3,7 @@ import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
+    formatEuro,
     loadLogoDataUrl,
     sectionBarRow,
     tableLayout,
@@ -72,14 +73,6 @@ export type CustomerInterventionsPrintData = {
 };
 
 const formatTime = (value: string | null) => (value ? value.slice(0, 5) : "-");
-
-const formatEuro = (value: number) =>
-    new Intl.NumberFormat("it-IT", {
-        style: "currency",
-        currency: "EUR",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
 
 const descriptionLabel = (type: InterventionType) =>
     type === "consegna_materiale" ? "Materiali consegnati" : "Assistenza effettuata";

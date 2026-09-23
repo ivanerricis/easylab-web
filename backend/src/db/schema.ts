@@ -32,6 +32,16 @@ const userFields = {
     phoneNumber: varchar("phone_number", { length: 20 }),
 };
 
+/**
+ * I metodi di pagamento del report: prima riscritti identici in `routes/reports.ts`,
+ * `services/reportPdf.ts` e `routes/summaryPrint.ts`, ciascuno con il proprio cast `as` per
+ * far tornare il tipo `string` di questa colonna a un'unione letterale. `$type` qui sotto
+ * cambia solo il tipo TS della colonna (nessun vincolo SQL in più: resta un `varchar`), cosí
+ * chi legge `reportTable.paymentMethod` da una query ottiene già l'unione, senza cast.
+ */
+export const reportPaymentMethods = ["non_paid", "cash", "card"] as const;
+export type ReportPaymentMethod = (typeof reportPaymentMethods)[number];
+
 export const reportTable = pgTable(
     "report",
     {
@@ -44,7 +54,10 @@ export const reportTable = pgTable(
         charger: boolean("charger").notNull().default(false),
         alerted: boolean("alerted").notNull().default(false),
         closed: boolean("closed").notNull().default(false),
-        paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("non_paid"),
+        paymentMethod: varchar("payment_method", { length: 20 })
+            .$type<ReportPaymentMethod>()
+            .notNull()
+            .default("non_paid"),
         price: integer("price").notNull().default(0),
         ...timestamps,
         deviceId: integer("device_id")
@@ -295,14 +308,22 @@ export const notificationTable = pgTable(
     (table) => [index("notification_last_occurred_at_idx").on(table.lastOccurredAt)]
 );
 
+/**
+ * Come `reportPaymentMethods` qui sopra: tipo e stato dell'intervento erano riscritti identici
+ * in `routes/interventions.ts`, `services/interventionLabels.ts`, `db/queries/intervention.ts`
+ * e `routes/summaryPrint.ts`, con un cast `as` a ogni punto in cui la colonna (tipizzata
+ * `string` senza `$type`) doveva tornare a essere l'unione letterale.
+ */
 export const interventionTypes = ["consegna_materiale", "intervento_sede", "intervento_remoto"] as const;
 export const interventionStatuses = ["programmato", "in_lavorazione", "completato"] as const;
+export type InterventionType = (typeof interventionTypes)[number];
+export type InterventionStatus = (typeof interventionStatuses)[number];
 
 export const interventionTable = pgTable(
     "intervention",
     {
         id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-        type: varchar("type", { length: 30 }).notNull(),
+        type: varchar("type", { length: 30 }).$type<InterventionType>().notNull(),
         /**
          * L'assistenza effettuata, o i materiali consegnati. Resta NULL finché l'intervento
          * è solo programmato: è un'informazione che nasce quando il lavoro viene svolto.
@@ -329,7 +350,7 @@ export const interventionTable = pgTable(
          * stato incassato. La gran parte del lavoro non si fattura, quindi il default è `false`.
          */
         toInvoice: boolean("to_invoice").notNull().default(false),
-        status: varchar("status", { length: 20 }).notNull().default("programmato"),
+        status: varchar("status", { length: 20 }).$type<InterventionStatus>().notNull().default("programmato"),
         interventionDate: date("intervention_date"),
         startTime: time("start_time"),
         endTime: time("end_time"),

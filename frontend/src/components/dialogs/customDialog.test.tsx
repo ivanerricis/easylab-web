@@ -49,3 +49,14 @@ describe("CustomDialog: Ctrl+Invio", () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Il clic fuori non ha un test qui: né su `CustomDialog` né su un `<Dialog.Root>` Radix nudo
+ * (provato a parte) jsdom smette il dialogo con un `pointerdown` simulato, quindi non c'è un
+ * modo affidabile di automatizzarlo in questa suite. Il codice tolto (`onPointerDownOutside`)
+ * era ridondante con `onInteractOutside`, che Radix chiama comunque anche per il clic fuori —
+ * verificato leggendo il sorgente di `@radix-ui/react-dismissable-layer` (vedi il commento in
+ * `customDialog.tsx`), non con un test automatico. Il resto del flusso "Modifiche non salvate"
+ * (Esc, la X, Annulla) è comunque coperto in `entityDialogs.test.tsx`, e passa dallo stesso
+ * `handleOpenChange` che gestirebbe anche il clic fuori.
+ */

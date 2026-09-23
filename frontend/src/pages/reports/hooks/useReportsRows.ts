@@ -12,6 +12,8 @@ type UseReportsRowsParams = {
     dateTo?: string;
     currentPage: number;
     pageSize: number;
+    /** Chiamato con l'ultima pagina valida quando `currentPage` la supera. Vedi `usePaginatedRows`. */
+    onPageOutOfRange?: (lastPage: number) => void;
 };
 
 export const useReportsRows = ({
@@ -22,6 +24,7 @@ export const useReportsRows = ({
     dateTo,
     currentPage,
     pageSize,
+    onPageOutOfRange,
 }: UseReportsRowsParams) => {
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer", "asc" | "desc"];
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
@@ -41,6 +44,8 @@ export const useReportsRows = ({
             queryKey: [currentPage, pageSize, searchText, visibilityFilter, sortOption, dateFrom, dateTo],
             errorMessage: "Impossibile caricare i report",
             initialLoading: false,
+            page: currentPage,
+            onPageOutOfRange,
         });
 
     return {

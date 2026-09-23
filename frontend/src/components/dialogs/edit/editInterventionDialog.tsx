@@ -16,7 +16,7 @@ import {
     type InterventionFormState,
 } from "@/lib/interventionForm";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -81,6 +81,13 @@ const EditInterventionDialog = ({
         });
     };
 
+    // Letto come evento e non come dipendenza: le pagine passano una freccia scritta al volo,
+    // diversa a ogni loro render (es. durante `onSubmit`, quando ricaricano la lista). Con
+    // `onOpenChange` fra le dipendenze quel render riavviava il caricamento da capo —
+    // intervento già pronto compreso — e il modulo tornava per un istante allo stato di
+    // caricamento. Vedi lo stesso uso in `hooks/useListUrlState.ts` e `hooks/usePageShortcut.ts`.
+    const notifyOpenChange = useEffectEvent((nextOpen: boolean) => onOpenChange(nextOpen));
+
     useEffect(() => {
         if (!open || !interventionId) {
             return;
@@ -91,6 +98,11 @@ const EditInterventionDialog = ({
             setLoadedInterventionId(null);
         });
 
+        // Annulla l'applicazione della risposta se l'intervento richiesto cambia (o il dialogo
+        // si chiude) prima che arrivi: senza, la risposta di un intervento aperto in precedenza
+        // poteva sovrascrivere quella dell'intervento aperto subito dopo.
+        let cancelled = false;
+
         const loadData = async () => {
             setIsLoading(true);
             try {
@@ -98,6 +110,10 @@ const EditInterventionDialog = ({
                     getIntervention(interventionId),
                     listCollaborators(),
                 ]);
+
+                if (cancelled) {
+                    return;
+                }
 
                 setCollaborators(collaboratorsData);
                 const loadedFormValues: InterventionFormState = {
@@ -118,17 +134,26 @@ const EditInterventionDialog = ({
                 setSavedFormValues(loadedFormValues);
                 setLoadedInterventionId(intervention.id);
             } catch (error) {
+                if (cancelled) {
+                    return;
+                }
                 toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dell'intervento"));
-                onOpenChange(false);
+                notifyOpenChange(false);
             } finally {
-                setIsLoading(false);
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             }
         };
 
         startTransition(() => {
             void loadData();
         });
-    }, [open, interventionId, onOpenChange]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, interventionId]);
 
     const handleConfirm = async () => {
         if (!interventionId || isSubmitting || isLoading) {

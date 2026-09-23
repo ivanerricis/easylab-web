@@ -83,10 +83,14 @@ export const registerSummaryPrintRoutes = (router: Router, options: SummaryPrint
                 createdAtLabel: formatDateLabel(report.createdAt, context.timeZone),
                 customerName: report.customer,
                 deviceName: report.device,
-                issueDescription: report.issue,
+                // Il problema, non l'etichetta del catalogo: stessa espressione SQL della
+                // ricevuta (`routes/reports.ts`), da `listReports`. Prima qui c'era sempre
+                // `report.issue`, l'etichetta, anche quando esisteva una descrizione scritta
+                // a mano più precisa (vedi D5 nel CHANGELOG).
+                issueDescription: report.issueText,
                 closed: report.closed,
                 alerted: report.alerted,
-                paymentMethod: report.paymentMethod as "non_paid" | "cash" | "card",
+                paymentMethod: report.paymentMethod,
                 totalPrice: report.totalPrice,
             })),
         });
@@ -115,8 +119,8 @@ export const registerSummaryPrintRoutes = (router: Router, options: SummaryPrint
                 id: intervention.id,
                 createdAtLabel: formatDateLabel(intervention.createdAt, context.timeZone),
                 customerName: intervention.customer,
-                type: intervention.type as "consegna_materiale" | "intervento_sede" | "intervento_remoto",
-                status: intervention.status as "programmato" | "in_lavorazione" | "completato",
+                type: intervention.type,
+                status: intervention.status,
                 description: intervention.description,
                 scheduleLabel: formatScheduleLabel(
                     intervention.interventionDate,

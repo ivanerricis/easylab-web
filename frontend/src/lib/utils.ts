@@ -40,12 +40,12 @@ const euroFormatter = new Intl.NumberFormat("it-IT", {
     maximumFractionDigits: 2,
 });
 
-const formatDateWith = (formatter: Intl.DateTimeFormat, value: string | null | undefined) => {
+const formatDateWith = (formatter: Intl.DateTimeFormat, value: string | Date | null | undefined) => {
     if (!value) {
         return "-";
     }
 
-    const date = new Date(value);
+    const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) {
         return "-";
     }
@@ -53,11 +53,16 @@ const formatDateWith = (formatter: Intl.DateTimeFormat, value: string | null | u
     return formatter.format(date);
 };
 
-export function formatDateTime(value: string | null | undefined) {
+export function formatDateTime(value: string | Date | null | undefined) {
     return formatDateWith(dateTimeFormatter, value);
 }
 
-export function formatDate(value: string | null | undefined) {
+/**
+ * Accetta anche una `Date` già in mano (non solo la stringa ISO che arriva dal server): serve a
+ * `DatePickerField`, che ha la `Date` scelta nel calendario e prima costruiva un
+ * `Intl.DateTimeFormat` identico a ogni render solo per non convertirla in stringa.
+ */
+export function formatDate(value: string | Date | null | undefined) {
     return formatDateWith(dateFormatter, value);
 }
 

@@ -147,8 +147,8 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
         }
     }, [open, initialFormValues, initialCustomerId, initialCustomerOption]);
 
-    const searchCustomers = useCallback(async (query: string) => {
-        const customers = await listCustomers({ pageSize: 8, search: query || undefined });
+    const searchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
+        const customers = await listCustomers({ pageSize: 8, search: query || undefined, signal });
         const options = customers.items.map((customer) => ({
             id: customer.id,
             label: formatCustomerOption(
@@ -283,6 +283,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                             inputClassName="rounded-r-none"
                                             value={formValues.customer}
                                             onSearch={searchCustomers}
+                                            isSelectedOption={customerIdByOption[formValues.customer] != null}
                                             onChange={(value: string) => {
                                                 setFormValues((prev) => ({ ...prev, customer: value }));
                                                 setFieldErrors((prev) => ({ ...prev, client: undefined }));

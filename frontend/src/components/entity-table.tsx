@@ -172,11 +172,28 @@ const EntityTableRowImpl = <TRow,>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const actionsNode = useMemo(() => renderRowActions(row), [row]);
 
+    // I punti interattivi della riga (link, pulsanti, la cella delle azioni) gestiscono già da
+    // sé il proprio doppio click: qui basta ignorarlo invece di fermarlo con `stopPropagation`
+    // in ognuno di essi. Prima solo alcuni lo facevano — `customer-link.tsx` e la cella delle
+    // azioni, ma non `hover-detail-cell.tsx` — e un doppio click su un bottone rimasto scoperto
+    // (es. "Altro" nella colonna del difetto) apriva il suo popover *e* la scheda insieme.
+    const handleRowDoubleClick = onRowOpen
+        ? (event: React.MouseEvent<HTMLTableRowElement>) => {
+              const target = event.target;
+
+              if (target instanceof HTMLElement && target.closest("a, button, input, [role=button]")) {
+                  return;
+              }
+
+              onRowOpen(row);
+          }
+        : undefined;
+
     return (
         <TableRow
             data-status-color={statusColor}
             className={onRowOpen ? "cursor-pointer select-none" : undefined}
-            onDoubleClick={onRowOpen ? () => onRowOpen(row) : undefined}
+            onDoubleClick={handleRowDoubleClick}
         >
             {columns.map((column) => (
                 <TableCell
@@ -189,15 +206,7 @@ const EntityTableRowImpl = <TRow,>({
                     )}
                 >
                     {column.key === actionsColumnKey ? (
-                        // I pulsanti di riga sono l'unico punto interattivo della riga: fermare
-                        // qui il doppio click evita che un click ripetuto su un'azione apra
-                        // anche la scheda.
-                        <div
-                            className="flex items-center justify-end gap-2"
-                            onDoubleClick={(event) => event.stopPropagation()}
-                        >
-                            {actionsNode}
-                        </div>
+                        <div className="flex items-center justify-end gap-2">{actionsNode}</div>
                     ) : (
                         column.render(row)
                     )}

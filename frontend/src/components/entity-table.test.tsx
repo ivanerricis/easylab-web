@@ -170,6 +170,28 @@ describe("EntityTable", () => {
         expect(onRowOpen).not.toHaveBeenCalled();
     });
 
+    /**
+     * Q5: `HoverDetailCell` (usato per "Altro" nelle colonne di difetto/tipo) è un `<button>`
+     * dentro una colonna qualunque, non nella cella delle azioni: prima solo la cella delle
+     * azioni e `CustomerLink` fermavano il doppio click con `stopPropagation`, e un doppio
+     * click su un bottone come questo apriva sia il suo popover sia la scheda della riga. La
+     * correzione riconosce qualunque punto interattivo dal `target`, non da dove sta nella riga.
+     */
+    it("non apre la riga dal doppio click su un bottone dentro una colonna qualunque", () => {
+        const onRowOpen = vi.fn();
+        const columnsWithButton: EntityColumn<Row>[] = columns.map((column) =>
+            column.key === "email"
+                ? { ...column, render: (row) => <button type="button">Altro: {row.email}</button> }
+                : column
+        );
+        renderTable({ columns: columnsWithButton, onRowOpen });
+        const table = screen.getByRole("table");
+
+        fireEvent.doubleClick(within(table).getByRole("button", { name: /Altro: mario/ }));
+
+        expect(onRowOpen).not.toHaveBeenCalled();
+    });
+
     it("colora le righe secondo lo stato", () => {
         renderTable({ getRowStatusColor: (row) => (row.status === "Aperto" ? "red" : "green") });
         const [, first, second] = within(screen.getByRole("table")).getAllByRole("row");

@@ -106,4 +106,56 @@ describe("hook delle righe delle pagine", () => {
             expect.objectContaining({ visibility: "open", sortBy: "customer", sortOrder: "asc" })
         );
     });
+
+    // D11: i tre hook inoltrano `onPageOutOfRange` a `usePaginatedRows`, che lo chiama con
+    // l'ultima pagina valida quando quella richiesta la supera (riga eliminata, filtro che
+    // riduce i risultati). Facoltativo, quindi retrocompatibile con chi non lo passa: vedi
+    // i tre test sopra.
+    it("i tre hook avvisano con l'ultima pagina valida quando quella richiesta la supera", async () => {
+        const outOfRange = { items: [], totalItems: 8, page: 3, pageSize: 10, totalPages: 2 };
+        listCustomers.mockResolvedValue(outOfRange);
+        listInterventions.mockResolvedValue(outOfRange);
+        listReports.mockResolvedValue(outOfRange);
+
+        const onCustomersPageOutOfRange = vi.fn();
+        const onInterventionsPageOutOfRange = vi.fn();
+        const onReportsPageOutOfRange = vi.fn();
+
+        renderHook(() =>
+            useCustomersRows({
+                searchText: "",
+                sortOption: "name:asc",
+                currentPage: 3,
+                pageSize: 10,
+                onPageOutOfRange: onCustomersPageOutOfRange,
+            })
+        );
+        renderHook(() =>
+            useInterventionsRows({
+                searchText: "",
+                statusFilter: "all",
+                typeFilter: "all",
+                sortOption: "createdAt:desc",
+                currentPage: 3,
+                pageSize: 10,
+                onPageOutOfRange: onInterventionsPageOutOfRange,
+            })
+        );
+        renderHook(() =>
+            useReportsRows({
+                searchText: "",
+                visibilityFilter: "all",
+                sortOption: "createdAt:desc",
+                currentPage: 3,
+                pageSize: 10,
+                onPageOutOfRange: onReportsPageOutOfRange,
+            })
+        );
+
+        await waitFor(() => {
+            expect(onCustomersPageOutOfRange).toHaveBeenCalledWith(2);
+            expect(onInterventionsPageOutOfRange).toHaveBeenCalledWith(2);
+            expect(onReportsPageOutOfRange).toHaveBeenCalledWith(2);
+        });
+    });
 });

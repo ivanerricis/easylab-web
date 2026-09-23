@@ -30,7 +30,7 @@ const customerBodySchemaBase = z.object({
 
 const customerCreateBodySchema = customerBodySchemaBase
     .refine((value) => value.phoneNumber != null || value.phoneNumberSecondary != null, {
-        message: "At least one phone number is required",
+        message: "È necessario specificare almeno un numero di telefono",
         path: ["phoneNumber"],
     })
     .strict();
@@ -46,12 +46,12 @@ const customerUpdateBodySchema = customerBodySchemaBase
             return value.phoneNumber != null || value.phoneNumberSecondary != null;
         },
         {
-            message: "At least one phone number is required",
+            message: "È necessario specificare almeno un numero di telefono",
             path: ["phoneNumber"],
         }
     )
     .refine((value) => Object.keys(value).length > 0, {
-        message: "At least one field is required",
+        message: "È necessario specificare almeno un campo",
     });
 
 // Intestazione condivisa dai due resoconti PDF del cliente (report e interventi).
@@ -74,7 +74,7 @@ const loadCustomerPrintContext = async (id: number) => {
 };
 
 const customersRouter = createCrudRouter({
-    notFoundMessage: "Customer not found",
+    notFoundMessage: "Cliente non trovato",
     createBodySchema: customerCreateBodySchema,
     updateBodySchema: customerUpdateBodySchema,
     queries: {
@@ -111,7 +111,7 @@ const customersRouter = createCrudRouter({
 
         registerSummaryPrintRoutes(router, {
             filePrefix: "customer",
-            notFoundMessage: "Customer not found",
+            notFoundMessage: "Cliente non trovato",
             loadContext: loadCustomerPrintContext,
             filterFor: (id) => ({ customerId: id }),
         });

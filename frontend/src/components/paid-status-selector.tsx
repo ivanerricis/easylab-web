@@ -1,4 +1,5 @@
 import OptionSelector, { type SelectorOption } from "@/components/option-selector";
+import { formatPaidStatus } from "@/lib/interventions";
 import { Ban, CircleCheck } from "lucide-react";
 
 type Props = {
@@ -11,12 +12,12 @@ type Props = {
 const paidStatusOptions: SelectorOption<boolean>[] = [
     {
         value: false,
-        label: "Non pagato",
+        label: formatPaidStatus(false),
         icon: Ban,
     },
     {
         value: true,
-        label: "Pagato",
+        label: formatPaidStatus(true),
         icon: CircleCheck,
     },
 ];

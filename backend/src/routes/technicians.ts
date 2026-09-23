@@ -20,11 +20,11 @@ const technicianCreateBodySchema = z
 const technicianUpdateBodySchema = technicianCreateBodySchema
     .partial()
     .refine((value) => Object.keys(value).length > 0, {
-        message: "At least one field is required",
+        message: "È necessario specificare almeno un campo",
     });
 
 const techniciansRouter = createCrudRouter({
-    notFoundMessage: "Technician not found",
+    notFoundMessage: "Tecnico non trovato",
     createBodySchema: technicianCreateBodySchema,
     updateBodySchema: technicianUpdateBodySchema,
     queries: {

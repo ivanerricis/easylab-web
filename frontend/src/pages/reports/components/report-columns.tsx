@@ -1,7 +1,7 @@
 import CustomerLink from "@/components/customer-link";
 import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
-import { formatDateTime, formatEuro } from "@/lib/utils";
+import { formatDateTime, formatEuro, formatYesNo } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
 import { formatReportStatus } from "@/lib/reports";
 
@@ -59,12 +59,12 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "dataBackup",
         header: "Backup dati",
-        render: (row) => (row.dataBackup ? "Sì" : "No"),
+        render: (row) => formatYesNo(row.dataBackup),
     },
     {
         key: "charger",
         header: "Alimentatore",
-        render: (row) => (row.charger ? "Sì" : "No"),
+        render: (row) => formatYesNo(row.charger),
     },
     {
         key: "totalPrice",

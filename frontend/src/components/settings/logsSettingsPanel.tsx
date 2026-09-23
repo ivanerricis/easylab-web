@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import SearchInput from "@/components/search-input";
 import TablePagination from "@/components/table-pagination";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import {
@@ -22,22 +23,18 @@ import {
     type LogEntryDto,
     type LogFileDto,
 } from "@/lib/api";
-import { cn, formatDateTime, formatFileSize } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 
 const minRetentionDays = 1;
 const maxRetentionDays = 90;
 
-const formatDayKey = (dayKey: string) => formatDateTime(`${dayKey}T00:00:00.000Z`).split(",")[0]?.trim() ?? dayKey;
+const formatDayKey = (dayKey: string) => formatDate(`${dayKey}T00:00:00.000Z`);
 
 const LogsSettingsPanel = () => {
     const [pageSize, setPageSize] = useTableRowsPerPage("logs");
     const [logFiles, setLogFiles] = useState<LogFileDto[]>([]);
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
     const [selectedDayKey, setSelectedDayKey] = useState<string>("");
-    const [entries, setEntries] = useState<LogEntryDto[]>([]);
-    const [totalItems, setTotalItems] = useState(0);
-    const [totalPages, setTotalPages] = useState(1);
-    const [isLoadingEntries, setIsLoadingEntries] = useState(false);
     const [searchText, setSearchText] = useState("");
     const debouncedSearchText = useDebouncedValue(searchText);
     const { currentPage, setCurrentPage } = useTablePagination({
@@ -100,43 +97,31 @@ const LogsSettingsPanel = () => {
         }
     }, []);
 
-    const loadEntries = useCallback(async () => {
-        if (!selectedDayKey) {
-            setEntries([]);
-            setTotalItems(0);
-            setTotalPages(1);
-            return;
-        }
-
-        setIsLoadingEntries(true);
-
-        try {
-            const result = await listLogEntries(selectedDayKey, {
-                page: currentPage,
-                pageSize,
-                search: debouncedSearchText,
-            });
-            setEntries(result.items);
-            setTotalItems(result.totalItems);
-            setTotalPages(result.totalPages);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare il log selezionato"));
-        } finally {
-            setIsLoadingEntries(false);
-        }
-    }, [selectedDayKey, currentPage, pageSize, debouncedSearchText]);
+    // Nessuna guardia manuale contro le risposte superate: la fornisce `usePaginatedRows`,
+    // che oltretutto annulla per davvero la richiesta scavalcata (`signal`) invece di
+    // limitarsi a scartarne la risposta. Prima una ricerca o un cambio di pagina veloci
+    // potevano far arrivare per ultima la risposta più vecchia, sovrascrivendo la tabella
+    // con risultati non più validi.
+    const {
+        rows: entries,
+        totalItems,
+        totalPages,
+        isLoading: isLoadingEntries,
+        reload: reloadEntries,
+    } = usePaginatedRows<LogEntryDto>({
+        fetchRows: (signal) =>
+            selectedDayKey
+                ? listLogEntries(selectedDayKey, { page: currentPage, pageSize, search: debouncedSearchText, signal })
+                : Promise.resolve({ items: [], totalItems: 0, totalPages: 1, page: currentPage, pageSize }),
+        queryKey: [selectedDayKey, currentPage, pageSize, debouncedSearchText],
+        errorMessage: "Impossibile caricare il log selezionato",
+    });
 
     useEffect(() => {
         startTransition(() => {
             void loadLogFiles();
         });
     }, [loadLogFiles]);
-
-    useEffect(() => {
-        startTransition(() => {
-            void loadEntries();
-        });
-    }, [loadEntries]);
 
     const handleDownload = () => {
         if (!selectedDayKey) {
@@ -148,7 +133,7 @@ const LogsSettingsPanel = () => {
 
     const handleRefresh = () => {
         void loadLogFiles();
-        void loadEntries();
+        void reloadEntries();
     };
 
     return (

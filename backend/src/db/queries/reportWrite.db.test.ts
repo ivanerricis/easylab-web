@@ -2,7 +2,13 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "../index";
 import { reportTable, reportTechnicianTable } from "../schema";
-import { assignTechnician, insertCollaborator, insertReport, insertTechnician } from "../../test/db/fixtures";
+import {
+    assignTechnician,
+    insertCollaborator,
+    insertIssue,
+    insertReport,
+    insertTechnician,
+} from "../../test/db/fixtures";
 import { createReport, deleteReportById, getReportDetailById, updateReportById } from "./report";
 
 const technicianRowsOf = (reportId: number) =>
@@ -79,6 +85,48 @@ describe("createReport / updateReportById: il tecnico esterno", () => {
 
         const [detail] = await getReportDetailById(report.id);
         expect(detail.note).toBe("Prima");
+    });
+});
+
+/**
+ * Q2: il totale (prezzo interno + compenso del tecnico) e D5: il problema (descrizione scritta
+ * a mano se c'è, altrimenti l'etichetta del difetto) arrivano già calcolati dalla query, non più
+ * ricalcolati dalla rotta della ricevuta (`routes/reports.ts`).
+ */
+describe("getReportDetailById: totalPrice e issueText", () => {
+    it("somma prezzo interno e compenso del tecnico esterno", async () => {
+        const report = await insertReport({ price: 40 });
+        await assignTechnician(report.id, (await insertTechnician()).id, 25);
+
+        const [detail] = await getReportDetailById(report.id);
+
+        expect(detail.totalPrice).toBe(65);
+    });
+
+    it("resta il solo prezzo interno senza un tecnico esterno", async () => {
+        const report = await insertReport({ price: 40 });
+
+        const [detail] = await getReportDetailById(report.id);
+
+        expect(detail.totalPrice).toBe(40);
+    });
+
+    it("usa la descrizione scritta a mano quando c'è", async () => {
+        const issue = await insertIssue("Altro");
+        const report = await insertReport({ issueId: issue.id, issueDescription: "Non carica più" });
+
+        const [detail] = await getReportDetailById(report.id);
+
+        expect(detail.issueText).toBe("Non carica più");
+    });
+
+    it("ripiega sull'etichetta del difetto quando la descrizione manca", async () => {
+        const issue = await insertIssue("Schermo rotto");
+        const report = await insertReport({ issueId: issue.id, issueDescription: null });
+
+        const [detail] = await getReportDetailById(report.id);
+
+        expect(detail.issueText).toBe("Schermo rotto");
     });
 });
 

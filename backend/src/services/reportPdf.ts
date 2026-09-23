@@ -3,6 +3,7 @@ import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
+    formatEuro,
     loadLogoDataUrl,
     pdfStyles,
     sectionBarCell,
@@ -10,6 +11,8 @@ import {
     tableLayout,
     wrapPdfDocument,
 } from "./pdf/shared";
+import { formatReportPaymentMethod, formatYesNo } from "./reportLabels";
+import type { ReportPaymentMethod } from "../db/schema";
 
 /** Altezza A4 in punti, come la usa pdfmake. */
 const PAGE_HEIGHT = 841.89;
@@ -63,7 +66,7 @@ export type CustomerReportSummaryItem = {
     issueDescription: string;
     closed: boolean;
     alerted: boolean;
-    paymentMethod: "non_paid" | "cash" | "card";
+    paymentMethod: ReportPaymentMethod;
     totalPrice: number;
     /** Solo nel riepilogo del collaboratore, dove i report sono di clienti diversi. */
     customerName?: string;
@@ -85,28 +88,6 @@ export type CustomerReportsPrintData = {
     reportCount: number;
     reports: CustomerReportSummaryItem[];
 };
-
-const yesNo = (value: boolean) => (value ? "Si" : "No");
-
-const formatPaymentMethod = (value: CustomerReportSummaryItem["paymentMethod"]) => {
-    if (value === "cash") {
-        return "Contanti";
-    }
-
-    if (value === "card") {
-        return "Carta";
-    }
-
-    return "Non pagato";
-};
-
-const formatEuro = (value: number) =>
-    new Intl.NumberFormat("it-IT", {
-        style: "currency",
-        currency: "EUR",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
 
 const formatOptionalEuro = (value: number) => (Number.isFinite(value) && value > 0 ? formatEuro(value) : "");
 
@@ -277,7 +258,7 @@ const buildCustomerReportsTable = (reports: CustomerReportSummaryItem[], showCus
                 { text: report.deviceName, bold: true },
                 { text: report.issueDescription, fontSize: 8.5 },
                 { text: report.closed ? "Chiuso" : "Aperto", alignment: "center" },
-                { text: formatPaymentMethod(report.paymentMethod), alignment: "center" },
+                { text: formatReportPaymentMethod(report.paymentMethod), alignment: "center" },
                 { text: formatEuro(report.totalPrice), alignment: "right", bold: true },
             ]);
         }
@@ -330,7 +311,13 @@ const buildDeviceSection = (report: ReportPrintData, rowPadding: number, valueFo
         body: [
             sectionBarRow("DISPOSITIVO", 4),
             dualFieldRow("Dispositivo", report.deviceName, "Password", report.password, valueFontSize),
-            dualFieldRow("Backup dati", yesNo(report.dataBackup), "Alimentatore", yesNo(report.charger), valueFontSize),
+            dualFieldRow(
+                "Backup dati",
+                formatYesNo(report.dataBackup),
+                "Alimentatore",
+                formatYesNo(report.charger),
+                valueFontSize
+            ),
         ],
     },
     layout: reportTableLayout(rowPadding),
@@ -427,7 +414,7 @@ const buildWorkAndAlertBox = (report: ReportPrintData, rowPadding: number) => ({
         // questo riquadro rispetto a quelle di "IMPORTO" e "PAGAMENTO".
         body: [
             [sectionBarCell("COMPLETATO"), sectionBarCell("AVVISATO")],
-            [buildFilledCell(""), buildFilledCell(report.alerted ? yesNo(report.alerted) : "")],
+            [buildFilledCell(""), buildFilledCell(report.alerted ? formatYesNo(report.alerted) : "")],
         ],
     },
     layout: reportTableLayout(rowPadding),

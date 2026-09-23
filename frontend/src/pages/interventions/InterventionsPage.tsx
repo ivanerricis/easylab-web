@@ -60,10 +60,9 @@ const InterventionsPage = () => {
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     usePageShortcut("n", () => setIsCreateDialogOpen(true));
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [interventionIdToEdit, setInterventionIdToEdit] = useState<number | null>(null);
-    const [interventionCustomerNameToEdit, setInterventionCustomerNameToEdit] = useState("");
+    // Un solo stato per dialogo + bersaglio, invece di un booleano più uno o due stati
+    // separati che ogni `onOpenChange` doveva azzerare insieme.
+    const [interventionToEdit, setInterventionToEdit] = useState<InterventionDto | null>(null);
     const [interventionToDelete, setInterventionToDelete] = useState<InterventionDto | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [interventionIdToEmail, setInterventionIdToEmail] = useState<number | null>(null);
@@ -96,6 +95,7 @@ const InterventionsPage = () => {
             dateTo,
             currentPage,
             pageSize,
+            onPageOutOfRange: setCurrentPage,
         });
 
     const handleSortOptionChange = (value: InterventionSortOption) =>
@@ -128,7 +128,6 @@ const InterventionsPage = () => {
 
     const handleOpenDeleteDialog = (intervention: InterventionDto) => {
         setInterventionToDelete(intervention);
-        setIsDeleteDialogOpen(true);
     };
 
     const handleOpenIntervention = (id: number) => {
@@ -141,9 +140,7 @@ const InterventionsPage = () => {
 
     const handleOpenEditDialog = (id: number) => {
         const intervention = interventionRows.find((row) => row.id === id);
-        setInterventionIdToEdit(id);
-        setInterventionCustomerNameToEdit(intervention?.customer ?? "");
-        setIsEditDialogOpen(true);
+        setInterventionToEdit(intervention ?? null);
     };
 
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
@@ -163,7 +160,6 @@ const InterventionsPage = () => {
             setIsDeleting(true);
             await deleteIntervention(interventionToDelete.id);
             toast.success("Intervento eliminato con successo");
-            setIsDeleteDialogOpen(false);
             setInterventionToDelete(null);
             await loadInterventions();
         } catch (error) {
@@ -216,23 +212,20 @@ const InterventionsPage = () => {
                 />
 
                 <EditInterventionDialog
-                    open={isEditDialogOpen}
-                    interventionId={interventionIdToEdit}
-                    customerName={interventionCustomerNameToEdit}
+                    open={interventionToEdit != null}
+                    interventionId={interventionToEdit?.id ?? null}
+                    customerName={interventionToEdit?.customer ?? ""}
                     onOpenChange={(open) => {
-                        setIsEditDialogOpen(open);
                         if (!open) {
-                            setInterventionIdToEdit(null);
-                            setInterventionCustomerNameToEdit("");
+                            setInterventionToEdit(null);
                         }
                     }}
                     onSubmit={handleEditIntervention}
                 />
 
                 <ConfirmDeleteDialog
-                    open={isDeleteDialogOpen}
+                    open={interventionToDelete != null}
                     onOpenChange={(open) => {
-                        setIsDeleteDialogOpen(open);
                         if (!open) {
                             setInterventionToDelete(null);
                         }

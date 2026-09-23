@@ -4,21 +4,19 @@ import CustomerLink from "@/components/customer-link";
 import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
+import { useEntityDetail } from "@/hooks/useEntityDetail";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
+import TableActionButton from "@/components/table-action-button";
 import CustomDialog from "@/components/dialogs/customDialog";
 import EditInterventionDialog, {
     type EditInterventionSubmitValues,
 } from "@/components/dialogs/edit/editInterventionDialog";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     getApiErrorMessage,
-    getApiErrorStatus,
     getIntervention,
     getInterventionPrintUrl,
-    type InterventionEntityDto,
     updateIntervention,
     deleteIntervention,
     sendInterventionEmail,
@@ -35,57 +33,53 @@ import {
     isOnSiteInterventionType,
 } from "@/lib/interventions";
 import { ArrowLeft, Pencil, Printer, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import StatusBadge from "@/components/status-badge";
 
-type InterventionPageDetails = {
-    intervention: InterventionEntityDto;
-    customerName: string;
-    customerPhone: string | null;
-    collaboratorName: string;
-};
-
 const InterventionPage = () => {
-    const navigate = useNavigate();
     const { id } = useParams();
-    const interventionId = Number(id);
-    const [isLoading, setIsLoading] = useState(true);
-    const [details, setDetails] = useState<InterventionPageDetails | null>(null);
-    useDocumentTitle(details ? `Intervento #${details.intervention.id} - ${details.customerName}` : "Intervento");
+    // Una richiesta sola: l'intervento arriva con i nomi di cliente e collaboratore.
+    // `useEntityDetail` tiene id, 404 e ritorno all'elenco su altri errori.
+    const {
+        data: intervention,
+        isLoading,
+        isNotFound,
+        reload,
+    } = useEntityDetail(id, getIntervention, {
+        backTo: "/interventions",
+        errorMessage: "Impossibile caricare l'intervento",
+    });
+    useDocumentTitle(
+        intervention
+            ? `Intervento #${intervention.id} - ${intervention.customerName ?? "Cliente sconosciuto"}`
+            : "Intervento"
+    );
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
 
-    const hasValidInterventionId = useMemo(
-        () => Number.isInteger(interventionId) && interventionId > 0,
-        [interventionId]
-    );
-
-    // Un id che non esiste (404) non è un errore da segnalare e da cui scappare: è una scheda
-    // da mostrare come "non trovata", lasciando l'indirizzo com'è. Vedi `NotFoundState`.
-    const [isNotFound, setIsNotFound] = useState(false);
     const handleBack = useGoBack("/interventions");
 
     const handlePrintIntervention = () => {
-        if (!details) {
+        if (!intervention) {
             return;
         }
 
-        openPrintWindow(getInterventionPrintUrl(details.intervention.id));
+        openPrintWindow(getInterventionPrintUrl(intervention.id));
     };
 
     // Come nell'elenco interventi, da cui prima era l'unica strada: conferma, invio, e l'esito
     // del server (a chi è andata, o perché no) in un avviso.
     const handleConfirmSendEmail = async () => {
-        if (!details || isSendingEmail) {
+        if (!intervention || isSendingEmail) {
             return;
         }
 
         try {
             setIsSendingEmail(true);
-            const result = await sendInterventionEmail(details.intervention.id);
+            const result = await sendInterventionEmail(intervention.id);
             toast.success(result.message);
             setIsEmailDialogOpen(false);
         } catch (error) {
@@ -95,59 +89,13 @@ const InterventionPage = () => {
         }
     };
 
-    const loadDetails = useCallback(async () => {
-        // Una richiesta sola: l'intervento arriva con i nomi di cliente e collaboratore. Prima la
-        // pagina scaricava l'elenco intero dei collaboratori, più il cliente a parte.
-        const intervention = await getIntervention(interventionId);
-
-        setDetails({
-            intervention,
-            customerName: intervention.customerName ?? "Cliente sconosciuto",
-            customerPhone: intervention.customerPhone,
-            collaboratorName: intervention.collaboratorName ?? "Collaboratore sconosciuto",
-        });
-    }, [interventionId]);
-
-    const handleRefreshIntervention = async () => {
-        try {
-            await loadDetails();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile aggiornare l'intervento"));
-        }
-    };
-
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
         await updateIntervention(values.interventionId, toInterventionUpdatePayload(values));
 
-        await loadDetails();
+        await reload();
     };
 
-    useEffect(() => {
-        if (!hasValidInterventionId) {
-            return;
-        }
-
-        const loadData = async () => {
-            try {
-                setIsLoading(true);
-                await loadDetails();
-            } catch (error) {
-                if (getApiErrorStatus(error) === 404) {
-                    setIsNotFound(true);
-                    return;
-                }
-
-                toast.error(getApiErrorMessage(error, "Impossibile caricare l'intervento"));
-                navigate("/interventions");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        void loadData();
-    }, [hasValidInterventionId, navigate, loadDetails]);
-
-    if (!hasValidInterventionId || isNotFound) {
+    if (isNotFound) {
         return (
             <NotFoundState
                 title="Intervento non trovato"
@@ -162,7 +110,7 @@ const InterventionPage = () => {
         return <LoadingPage />;
     }
 
-    if (!details) {
+    if (!intervention) {
         return (
             <div className="flex h-full items-center justify-center text-muted-foreground">
                 Intervento non disponibile.
@@ -170,7 +118,7 @@ const InterventionPage = () => {
         );
     }
 
-    const isOnSite = isOnSiteInterventionType(details.intervention.type);
+    const isOnSite = isOnSiteInterventionType(intervention.type);
 
     return (
         <div className="flex w-full flex-col gap-4 overflow-auto p-2">
@@ -178,82 +126,66 @@ const InterventionPage = () => {
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        size="icon-lg"
-                                        variant="ghost"
-                                        onClick={handleBack}
-                                        className="shrink-0"
-                                        aria-label="Torna indietro"
-                                    >
-                                        <ArrowLeft className="size-6" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Torna indietro</TooltipContent>
-                            </Tooltip>
+                            <TableActionButton
+                                size="icon-lg"
+                                variant="ghost"
+                                onClick={handleBack}
+                                className="shrink-0"
+                                aria-label="Torna indietro"
+                            >
+                                <ArrowLeft className="size-6" />
+                            </TableActionButton>
 
                             <div className="min-w-0">
                                 <h1 className="text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">
-                                    Intervento #{details.intervention.id} -{" "}
+                                    Intervento #{intervention.id} -{" "}
                                     {/* Il nome in alto è il primo che si guarda: è lui a portare al
                                         cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
                                     <CustomerLink
-                                        customerId={details.intervention.customerId}
-                                        name={details.customerName}
+                                        customerId={intervention.customerId}
+                                        name={intervention.customerName ?? "Cliente sconosciuto"}
                                     />
                                 </h1>
                             </div>
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2 self-end lg:self-auto">
-                            <RefreshButton onRefresh={handleRefreshIntervention} label="Aggiorna intervento" />
+                            <RefreshButton onRefresh={reload} label="Aggiorna intervento" />
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="lg"
-                                        onClick={() => setIsEditDialogOpen(true)}
-                                        aria-label="Modifica intervento"
-                                    >
-                                        <Pencil className="size-5" />
-                                        <span className="hidden text-lg lg:inline">Modifica</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Modifica intervento</TooltipContent>
-                            </Tooltip>
+                            <TableActionButton
+                                variant="outline"
+                                size="lg"
+                                onClick={() => setIsEditDialogOpen(true)}
+                                aria-label="Modifica intervento"
+                            >
+                                <Pencil className="size-5" />
+                                <span className="hidden text-lg lg:inline">Modifica</span>
+                            </TableActionButton>
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button size="lg" onClick={handlePrintIntervention} aria-label="Stampa intervento">
-                                        <Printer className="size-5" />
-                                        <span className="hidden text-lg lg:inline">Stampa</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Stampa intervento</TooltipContent>
-                            </Tooltip>
+                            <TableActionButton
+                                size="lg"
+                                onClick={handlePrintIntervention}
+                                aria-label="Stampa intervento"
+                            >
+                                <Printer className="size-5" />
+                                <span className="hidden text-lg lg:inline">Stampa</span>
+                            </TableActionButton>
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="lg"
-                                        onClick={() => setIsEmailDialogOpen(true)}
-                                        aria-label="Invia email intervento"
-                                    >
-                                        <Send className="size-5" />
-                                        <span className="hidden text-lg lg:inline">Email</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Invia email intervento</TooltipContent>
-                            </Tooltip>
+                            <TableActionButton
+                                variant="outline"
+                                size="lg"
+                                onClick={() => setIsEmailDialogOpen(true)}
+                                aria-label="Invia email intervento"
+                            >
+                                <Send className="size-5" />
+                                <span className="hidden text-lg lg:inline">Email</span>
+                            </TableActionButton>
 
                             <DetailDeleteButton
                                 label="Elimina intervento"
                                 title="Elimina intervento"
-                                description={`Sei sicuro di voler eliminare l'intervento ID ${details.intervention.id}?`}
-                                onDelete={() => deleteIntervention(details.intervention.id)}
+                                description={`Sei sicuro di voler eliminare l'intervento ID ${intervention.id}?`}
+                                onDelete={() => deleteIntervention(intervention.id)}
                                 successMessage="Intervento eliminato con successo"
                                 errorMessage="Impossibile eliminare l'intervento"
                                 redirectTo="/interventions"
@@ -274,8 +206,8 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Stato</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <StatusBadge size="lg" color={interventionStatusColor[details.intervention.status]}>
-                            {formatInterventionStatus(details.intervention.status)}
+                        <StatusBadge size="lg" color={interventionStatusColor[intervention.status]}>
+                            {formatInterventionStatus(intervention.status)}
                         </StatusBadge>
                     </CardContent>
                 </Card>
@@ -285,7 +217,7 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Tipo intervento</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-semibold">{formatInterventionType(details.intervention.type)}</p>
+                        <p className="text-2xl font-semibold">{formatInterventionType(intervention.type)}</p>
                     </CardContent>
                 </Card>
 
@@ -294,7 +226,7 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Data intervento</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-2xl font-semibold">{formatDate(details.intervention.interventionDate)}</p>
+                        <p className="text-2xl font-semibold">{formatDate(intervention.interventionDate)}</p>
                     </CardContent>
                 </Card>
 
@@ -304,7 +236,7 @@ const InterventionPage = () => {
                     </CardHeader>
                     <CardContent>
                         <p className="text-2xl font-semibold">
-                            {isOnSite ? formatInterventionTime(details.intervention.startTime) : "-"}
+                            {isOnSite ? formatInterventionTime(intervention.startTime) : "-"}
                         </p>
                     </CardContent>
                 </Card>
@@ -315,7 +247,7 @@ const InterventionPage = () => {
                     </CardHeader>
                     <CardContent>
                         <p className="text-2xl font-semibold">
-                            {isOnSite ? formatInterventionTime(details.intervention.endTime) : "-"}
+                            {isOnSite ? formatInterventionTime(intervention.endTime) : "-"}
                         </p>
                     </CardContent>
                 </Card>
@@ -327,9 +259,12 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Anagrafica</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2 sm:grid-cols-2">
-                        <DetailItem label="Cliente" value={details.customerName} />
-                        <DetailItem label="Telefono" value={details.customerPhone ?? "-"} />
-                        <DetailItem label="Collaboratore" value={details.collaboratorName} />
+                        <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />
+                        <DetailItem label="Telefono" value={intervention.customerPhone ?? "-"} />
+                        <DetailItem
+                            label="Collaboratore"
+                            value={intervention.collaboratorName ?? "Collaboratore sconosciuto"}
+                        />
                     </CardContent>
                 </Card>
 
@@ -338,24 +273,19 @@ const InterventionPage = () => {
                         <CardTitle className="text-primary">Dettagli</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-2">
-                        {isOnSite ? <DetailItem label="Problema" value={details.intervention.problem ?? "-"} /> : null}
-                        <DetailItem label="Descrizione" value={details.intervention.description ?? "-"} />
-                        <DetailItem label="Note" value={details.intervention.note ?? "-"} />
+                        {isOnSite ? <DetailItem label="Problema" value={intervention.problem ?? "-"} /> : null}
+                        <DetailItem label="Descrizione" value={intervention.description ?? "-"} />
+                        <DetailItem label="Note" value={intervention.note ?? "-"} />
                         <DetailItem
                             label="Prezzo"
-                            value={details.intervention.price != null ? formatEuro(details.intervention.price) : "-"}
+                            value={intervention.price != null ? formatEuro(intervention.price) : "-"}
                         />
-                        <DetailItem label="Pagamento" value={formatPaidStatus(details.intervention.paid)} />
-                        <DetailItem
-                            label="Da fatturare"
-                            value={formatToInvoiceStatus(details.intervention.toInvoice)}
-                        />
-                        <DetailItem label="Creato il" value={formatDateTime(details.intervention.created_at)} />
+                        <DetailItem label="Pagamento" value={formatPaidStatus(intervention.paid)} />
+                        <DetailItem label="Da fatturare" value={formatToInvoiceStatus(intervention.toInvoice)} />
+                        <DetailItem label="Creato il" value={formatDateTime(intervention.created_at)} />
                         <DetailItem
                             label="Ultimo aggiornamento"
-                            value={
-                                details.intervention.updated_at ? formatDateTime(details.intervention.updated_at) : "-"
-                            }
+                            value={intervention.updated_at ? formatDateTime(intervention.updated_at) : "-"}
                         />
                     </CardContent>
                 </Card>
@@ -365,7 +295,7 @@ const InterventionPage = () => {
                 open={isEmailDialogOpen}
                 onOpenChange={setIsEmailDialogOpen}
                 title="Invia email intervento"
-                description={`Sei sicuro di voler inviare l'email per l'intervento ID ${details.intervention.id}?`}
+                description={`Sei sicuro di voler inviare l'email per l'intervento ID ${intervention.id}?`}
                 confirmLabel="Invia"
                 confirmIcon={Send}
                 cancelLabel="Annulla"
@@ -376,8 +306,8 @@ const InterventionPage = () => {
 
             <EditInterventionDialog
                 open={isEditDialogOpen}
-                interventionId={details.intervention.id}
-                customerName={details.customerName}
+                interventionId={intervention.id}
+                customerName={intervention.customerName ?? "Cliente sconosciuto"}
                 onOpenChange={setIsEditDialogOpen}
                 onSubmit={handleEditIntervention}
             />

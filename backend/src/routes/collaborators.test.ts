@@ -68,7 +68,7 @@ describe("collaborators router", () => {
         const response = await request(buildApp()).get("/api/collaborators/999");
 
         expect(response.status).toBe(404);
-        expect(response.body.message).toBe("Collaborator not found");
+        expect(response.body.message).toBe("Collaboratore non trovato");
     });
 
     it("crea un collaboratore e risponde 201", async () => {
@@ -169,6 +169,9 @@ describe("collaborators router", () => {
                         customer: "Anna Bianchi",
                         device: "iPhone 12",
                         issue: "Schermo rotto",
+                        // Come la calcola ormai `listReports` (`issueTextExpr`): qui non c'è una
+                        // descrizione scritta a mano, quindi coincide con l'etichetta.
+                        issueText: "Schermo rotto",
                         closed: false,
                         alerted: false,
                         paymentMethod: "card",
@@ -200,7 +203,15 @@ describe("collaborators router", () => {
                 subjectLabel: "Collaboratore",
                 showCustomerColumn: true,
                 reportCount: 1,
-                reports: [{ id: 42, customerName: "Anna Bianchi", deviceName: "iPhone 12", totalPrice: 5000 }],
+                reports: [
+                    {
+                        id: 42,
+                        customerName: "Anna Bianchi",
+                        deviceName: "iPhone 12",
+                        issueDescription: "Schermo rotto",
+                        totalPrice: 5000,
+                    },
+                ],
             });
             expect(data).not.toHaveProperty("customerEmail");
         });

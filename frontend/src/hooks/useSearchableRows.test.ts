@@ -75,4 +75,25 @@ describe("useSearchableRows", () => {
 
         expect(fetchRows).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 }));
     });
+
+    // D11: eliminare l'unica riga dell'ultima pagina non deve lasciare la tabella vuota su
+    // una pagina che non esiste più. Vedi `usePaginatedRows`.
+    it("avvisa con l'ultima pagina valida quando quella richiesta la supera", async () => {
+        const fetchRows = vi.fn().mockResolvedValue({ items: [], totalItems: 8, page: 3, pageSize: 4, totalPages: 2 });
+        const onPageOutOfRange = vi.fn();
+
+        renderHook(() =>
+            useSearchableRows({
+                fetchRows,
+                searchText: "",
+                currentPage: 3,
+                pageSize: 4,
+                errorMessage: "Errore",
+                onPageOutOfRange,
+            })
+        );
+        await flush();
+
+        expect(onPageOutOfRange).toHaveBeenCalledWith(2);
+    });
 });

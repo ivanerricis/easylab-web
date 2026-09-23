@@ -11,6 +11,44 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-23 — Tre azioni sensibili in più nel registro
+
+Seguito diretto della correzione del registro azioni dello stesso giorno (l'export della chiave
+di backup registrato con il metodo sbagliato): rivista tutta la superficie delle rotte per
+trovare altre azioni sensibili rimaste invisibili o etichettate in modo fuorviante.
+
+- **Il ripristino di un backup** (`POST /api/settings/backup/restore` e
+  `/backup/restore/upload`) finiva nel registro come il generico "creato
+  /api/settings/backup/restore": la POST viene già tracciata, ma quel verbo è più che
+  fuorviante per l'azione più delicata di tutta l'app — sovrascrive l'intero database.
+  Etichette dedicate ("ripristino backup", "ripristino backup da file caricato").
+- **Le sessioni di un altro utente viste da un admin** (`GET /api/users/:id/sessions`) sono
+  una GET, quindi restavano fuori dal registro come qualunque consultazione — ma sapere chi ha
+  guardato l'attività (dispositivo, IP, ultimo accesso) di chi è esattamente il tipo di cosa per
+  cui il registro esiste.
+- **La disattivazione della 2FA di un altro utente** da parte di un admin
+  (`POST /api/users/:id/disable-2fa`) aveva anch'essa il verbo generico "creato". Etichetta
+  distinta da quella che scatta già per un utente che disattiva la propria (`DELETE
+  /api/auth/2fa`): sono due azioni di rischio molto diverso.
+
+Considerate e scartate: l'avvio manuale di un backup o di un aggiornamento (il percorso della
+rotta dice già cosa è successo, anche col verbo generico); le letture del registro stesso e
+dell'elenco dei backup disponibili (log-del-log, o metadati poco sensibili); la lista utenti e
+le proprie sessioni (consultazioni di routine, come aprire una qualunque pagina di lista).
+
+→ [backend/src/middleware/userActionLogger.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/middleware/userActionLogger.ts)
+
+### Verifiche
+
+Typecheck, lint, 1024 test (3 in più). Percorsi delle tre regole confrontati con le rotte vere
+in `routes/settings.ts` e `routes/users.ts` (lo stesso controllo che aveva trovato il difetto
+sulla chiave di backup). Dal vivo, contro il backend reale: `GET /api/users/1/sessions` finisce
+nel log del giorno come `action=consultazione sessioni di un utente`. Non provate dal vivo le
+altre due: il ripristino sovrascriverebbe il database solo per controllare una riga di log, la
+disattivazione della 2FA toglierebbe per davvero il secondo fattore a un utente.
+
+---
+
 ## 2026-09-23 — Un solo limitatore a finestra per login, 2FA ed email
 
 Tre mappe in memoria — tentativi di login (`loginRateLimit.ts`), challenge del secondo fattore

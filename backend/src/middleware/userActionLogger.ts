@@ -66,6 +66,20 @@ const actionLabelRules: { method: string; match: string | RegExp; label: string 
         match: /^\/api\/collaborators\/\d+\/interventions\/print$/,
         label: "stampa resoconto interventi collaboratore",
     },
+    // Il ripristino sovrascrive l'intero database: è l'azione più delicata di tutta l'app, e
+    // "creato /api/settings/backup/restore" (il verbo generico di una POST) è più che
+    // fuorviante per quello che succede davvero — lo stesso motivo per cui login e logout
+    // hanno un'etichetta a sé.
+    { method: "POST", match: "/api/settings/backup/restore", label: "ripristino backup" },
+    { method: "POST", match: "/api/settings/backup/restore/upload", label: "ripristino backup da file caricato" },
+    // Un admin che guarda le sessioni (dispositivo, IP, ultima attività) di un altro utente:
+    // è una GET, quindi fuori dal registro come ogni altra consultazione, ma è esattamente il
+    // tipo di "chi ha guardato l'attività di chi" per cui il registro esiste.
+    { method: "GET", match: /^\/api\/users\/\d+\/sessions$/, label: "consultazione sessioni di un utente" },
+    // Un admin che toglie la 2FA a un altro utente, non a sé stesso (quel caso resta
+    // "DELETE /api/auth/2fa", già etichettato sopra): abbassa la sicurezza di un account che
+    // non è il suo, va distinto dal verbo generico "creato" di questa POST.
+    { method: "POST", match: /^\/api\/users\/\d+\/disable-2fa$/, label: "disattivazione 2FA di un utente" },
 ];
 
 const findActionLabel = (method: string, normalizedPath: string): string | null => {

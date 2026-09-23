@@ -217,6 +217,75 @@ describe("userActionLogger", () => {
         }
     });
 
+    /**
+     * Il ripristino sovrascrive l'intero database: senza un'etichetta a sé finiva nel registro
+     * come il generico "creato /api/settings/backup/restore", fuorviante per l'azione più
+     * delicata di tutta l'app.
+     */
+    it("registra il ripristino del backup, da file esistente o caricato, con la sua etichetta", async () => {
+        const fromExisting = createResponse(200);
+        userActionLogger(
+            createRequest("POST", "/api/settings/backup/restore", { username: "admin" }),
+            fromExisting,
+            vi.fn() as NextFunction
+        );
+        fromExisting.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=ripristino backup");
+
+        const fromUpload = createResponse(200);
+        userActionLogger(
+            createRequest("POST", "/api/settings/backup/restore/upload", { username: "admin" }),
+            fromUpload,
+            vi.fn() as NextFunction
+        );
+        fromUpload.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[1][0]).toContain("action=ripristino backup da file caricato");
+    });
+
+    /**
+     * Un admin che guarda le sessioni di un altro utente è una GET, quindi fuori dal registro
+     * come ogni altra consultazione senza questa regola — ma è proprio il tipo di "chi ha
+     * guardato l'attività di chi" per cui il registro esiste.
+     */
+    it("registra la consultazione delle sessioni di un utente da parte di un admin", async () => {
+        const res = createResponse(200);
+
+        userActionLogger(
+            createRequest("GET", "/api/users/7/sessions", { username: "admin" }),
+            res,
+            vi.fn() as NextFunction
+        );
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(appendUserActionLog).toHaveBeenCalledOnce();
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=consultazione sessioni di un utente");
+    });
+
+    /**
+     * Distinta dalla disattivazione della propria 2FA (`DELETE /api/auth/2fa`, già etichettata
+     * sopra): qui è un admin che la toglie a un altro utente, un'azione che abbassa la
+     * sicurezza di un account che non è il suo.
+     */
+    it("registra la disattivazione della 2FA di un altro utente con un'etichetta distinta dalla propria", async () => {
+        const res = createResponse(200);
+
+        userActionLogger(
+            createRequest("POST", "/api/users/7/disable-2fa", { username: "admin" }),
+            res,
+            vi.fn() as NextFunction
+        );
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(appendUserActionLog).toHaveBeenCalledOnce();
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=disattivazione 2FA di un utente");
+    });
+
     it("usa etichette dedicate per login e logout invece del verbo generico", async () => {
         const loginRes = createResponse(200);
         userActionLogger(createRequest("POST", "/api/auth/login"), loginRes, vi.fn() as NextFunction);

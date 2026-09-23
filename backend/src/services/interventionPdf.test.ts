@@ -89,6 +89,7 @@ const buildInterventionSummary = (
     status: "in_lavorazione",
     description: "Consegnati due monitor",
     scheduleLabel: null,
+    price: null,
     ...overrides,
 });
 
@@ -235,6 +236,20 @@ describe("createInterventionPdfBuffer", () => {
         // Lo stato "Completato" non deve comparire da nessuna parte in questo documento.
         expect(JSON.stringify(doc)).not.toContain("Completato");
     });
+
+    it("mostra sia la firma del tecnico sia quella del cliente", async () => {
+        const serialized = JSON.stringify(await captureInterventionDoc(buildIntervention()));
+
+        expect(serialized).toContain("Firma del tecnico");
+        expect(serialized).toContain("Firma del cliente");
+    });
+
+    it("attiva il numero di pagina nel footer del documento", async () => {
+        const doc = await captureInterventionDoc(buildIntervention());
+        const footer = doc.footer as (currentPage: number, pageCount: number) => { text: string };
+
+        expect(footer(2, 3).text).toBe("Pagina 2 di 3");
+    });
 });
 
 describe("createCustomerInterventionsPdfBuffer", () => {
@@ -297,9 +312,40 @@ describe("createCustomerInterventionsPdfBuffer", () => {
         expect(serialized).toContain("Collaboratore #5");
         expect(serialized).toContain("Anna Verdi");
         expect(serialized).not.toContain("Email");
-        expect(table.widths).toHaveLength(7);
+        expect(table.widths).toHaveLength(8);
         for (const row of table.body) {
-            expect(row).toHaveLength(7);
+            expect(row).toHaveLength(8);
         }
+    });
+
+    it("somma i prezzi degli interventi in una riga di totale, trattando quelli senza prezzo come 0", async () => {
+        const doc = await captureCustomerInterventionsDoc(
+            buildCustomerInterventions({
+                interventions: [
+                    buildInterventionSummary({ id: 1, price: 45 }),
+                    buildInterventionSummary({ id: 2, price: null }),
+                    buildInterventionSummary({ id: 3, price: 30.5 }),
+                ],
+            })
+        );
+        const table = (doc.content as { table?: { body: { text?: string }[][] } }[])[2].table!;
+        const totalRow = table.body.find((row) => row.some((cell) => cell.text === "Totale complessivo"));
+
+        expect(totalRow?.at(-1)?.text).toContain("75,50");
+    });
+
+    it("senza interventi non mostra la riga di totale", async () => {
+        const serialized = JSON.stringify(
+            await captureCustomerInterventionsDoc(buildCustomerInterventions({ interventions: [] }))
+        );
+
+        expect(serialized).not.toContain("Totale complessivo");
+    });
+
+    it("attiva il numero di pagina nel footer del documento", async () => {
+        const doc = await captureCustomerInterventionsDoc(buildCustomerInterventions());
+        const footer = doc.footer as (currentPage: number, pageCount: number) => { text: string };
+
+        expect(footer(1, 4).text).toBe("Pagina 1 di 4");
     });
 });

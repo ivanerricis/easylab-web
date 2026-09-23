@@ -127,6 +127,7 @@ export const registerSummaryPrintRoutes = (router: Router, options: SummaryPrint
                     intervention.startTime,
                     intervention.endTime
                 ),
+                price: intervention.price,
             })),
         });
 

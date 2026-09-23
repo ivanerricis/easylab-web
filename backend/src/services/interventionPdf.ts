@@ -51,6 +51,8 @@ export type CustomerInterventionSummaryItem = {
     status: InterventionStatus;
     description: string | null;
     scheduleLabel: string | null;
+    /** Facoltativo come nella ricevuta singola: niente 0 € per gli interventi senza prezzo. */
+    price: number | null;
     /** Solo nel riepilogo del collaboratore, dove gli interventi sono di clienti diversi. */
     customerName?: string;
 };
@@ -274,22 +276,29 @@ const buildLegalNoticeSection = () => ({
     margin: [0, 4, 0, 0],
 });
 
+const buildSignatureBlock = (label: string) => ({
+    width: 220,
+    stack: [
+        { text: label, style: "sectionTitle", alignment: "center", margin: [0, 0, 0, 28] },
+        {
+            canvas: [{ type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 1, lineColor: "#111" }],
+        },
+    ],
+});
+
+// Due firme, non una: chi ha eseguito l'intervento conferma il lavoro svolto quanto il
+// cliente che lo riceve. Il cliente resta più vicino al margine destro, dov'era la sua
+// unica firma prima di questa modifica.
 const buildSignatureSection = () => ({
     columns: [
         {
             width: "*",
             text: "",
         },
-        {
-            width: 220,
-            stack: [
-                { text: "Firma del cliente", style: "sectionTitle", alignment: "center", margin: [0, 0, 0, 28] },
-                {
-                    canvas: [{ type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 1, lineColor: "#111" }],
-                },
-            ],
-        },
+        buildSignatureBlock("Firma del tecnico"),
+        buildSignatureBlock("Firma del cliente"),
     ],
+    columnGap: 24,
     margin: [0, 24, 0, 0],
 });
 
@@ -305,11 +314,14 @@ type SummaryTableCell = {
     fillColor?: string;
 };
 
+// Una cella vuota per ogni colonna coperta da un `colSpan`, come vuole pdfmake.
+const spanFillers = (count: number) => new Array<SummaryTableCell>(count).fill({});
+
 const buildCustomerInterventionsTable = (
     interventions: CustomerInterventionSummaryItem[],
     showCustomerColumn = false
 ) => {
-    const columnCount = showCustomerColumn ? 7 : 6;
+    const columnCount = showCustomerColumn ? 8 : 7;
     const body: SummaryTableCell[][] = [
         sectionBarRow("RESOCONTO INTERVENTI", columnCount),
         [
@@ -320,6 +332,7 @@ const buildCustomerInterventionsTable = (
             { text: "Descrizione", style: "summaryHeader" },
             { text: "Data/Orario", style: "summaryHeader" },
             { text: "Stato", style: "summaryHeader" },
+            { text: "Prezzo", style: "summaryHeader" },
         ],
     ];
 
@@ -332,8 +345,7 @@ const buildCustomerInterventionsTable = (
                 italics: true,
                 margin: [0, 8, 0, 8],
             },
-            // Una cella vuota per ogni colonna coperta dal `colSpan`, come vuole pdfmake.
-            ...new Array<SummaryTableCell>(columnCount - 1).fill({}),
+            ...spanFillers(columnCount - 1),
         ]);
     } else {
         for (const intervention of interventions) {
@@ -345,8 +357,24 @@ const buildCustomerInterventionsTable = (
                 { text: intervention.description ?? "-", fontSize: 8.5 },
                 { text: intervention.scheduleLabel ?? "-", alignment: "center" },
                 { text: formatInterventionStatus(intervention.status), alignment: "center" },
+                { text: intervention.price != null ? formatEuro(intervention.price) : "-", alignment: "right" },
             ]);
         }
+
+        // Somma solo gli interventi con un prezzo: quelli senza (es. molte consegne
+        // materiale) contano come 0, non come assenti dal totale.
+        const totalAmount = interventions.reduce((sum, intervention) => sum + (intervention.price ?? 0), 0);
+        body.push([
+            {
+                text: "Totale complessivo",
+                colSpan: columnCount - 1,
+                alignment: "right",
+                bold: true,
+                fillColor: "#F4F8FD",
+            },
+            ...spanFillers(columnCount - 2),
+            { text: formatEuro(totalAmount), alignment: "right", bold: true, fillColor: "#F4F8FD" },
+        ]);
     }
 
     return {
@@ -354,7 +382,7 @@ const buildCustomerInterventionsTable = (
             // Barra di sezione + intestazione colonne: entrambe si ripetono a ogni pagina.
             headerRows: 2,
             // "#" tiene un id a cinque cifre su una riga: a 22 andava a capo già dalla quarta.
-            widths: showCustomerColumn ? [34, 56, 80, 70, "*", 90, 62] : [34, 56, 76, "*", 100, 62],
+            widths: showCustomerColumn ? [34, 56, 80, 70, "*", 90, 62, 56] : [34, 56, 76, "*", 100, 62, 56],
             body,
         },
         layout: tableLayout,
@@ -366,15 +394,19 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
     const hoursSection = buildTechnicianHoursSection(intervention);
     const notesSection = buildNotesSection(intervention);
 
-    const documentDefinition = wrapPdfDocument([
-        buildHeader(intervention, logoDataUrl),
-        buildCustomerSection(intervention),
-        buildActivitySection(intervention),
-        ...(hoursSection ? [hoursSection] : []),
-        ...(notesSection ? [notesSection] : []),
-        buildLegalNoticeSection(),
-        buildSignatureSection(),
-    ]);
+    const documentDefinition = wrapPdfDocument(
+        [
+            buildHeader(intervention, logoDataUrl),
+            buildCustomerSection(intervention),
+            buildActivitySection(intervention),
+            ...(hoursSection ? [hoursSection] : []),
+            ...(notesSection ? [notesSection] : []),
+            buildLegalNoticeSection(),
+            buildSignatureSection(),
+        ],
+        [14, 14, 14, 24],
+        { pageNumbers: true }
+    );
 
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 
@@ -384,11 +416,15 @@ export const createInterventionPdfBuffer = async (intervention: InterventionPrin
 export const createCustomerInterventionsPdfBuffer = async (customer: CustomerInterventionsPrintData) => {
     const logoDataUrl = await loadLogoDataUrl();
 
-    const documentDefinition = wrapPdfDocument([
-        buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.interventionCount} interventi`),
-        buildCustomerSummaryInfoSection(customer),
-        buildCustomerInterventionsTable(customer.interventions, customer.showCustomerColumn),
-    ]);
+    const documentDefinition = wrapPdfDocument(
+        [
+            buildCustomerSummaryHeader(customer, logoDataUrl, `${customer.interventionCount} interventi`),
+            buildCustomerSummaryInfoSection(customer),
+            buildCustomerInterventionsTable(customer.interventions, customer.showCustomerColumn),
+        ],
+        [14, 14, 14, 24],
+        { pageNumbers: true }
+    );
 
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 

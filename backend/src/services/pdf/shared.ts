@@ -133,7 +133,8 @@ export const tableLayout = {
  */
 export const wrapPdfDocument = (
     content: unknown[],
-    pageMargins: [number, number, number, number] = [14, 14, 14, 14]
+    pageMargins: [number, number, number, number] = [14, 14, 14, 14],
+    options: { pageNumbers?: boolean } = {}
 ) => ({
     pageSize: "A4" as const,
     pageMargins,
@@ -144,6 +145,20 @@ export const wrapPdfDocument = (
     },
     content,
     styles: pdfStyles,
+    // Il footer occupa esattamente il margine inferiore della pagina (vedi
+    // `LayoutBuilder.addHeadersAndFooters` di pdfmake): chi lo attiva deve passare un
+    // `pageMargins` col margine inferiore abbastanza alto da contenerlo, altrimenti il
+    // numero di pagina si sovrappone al contenuto.
+    ...(options.pageNumbers
+        ? {
+              footer: (currentPage: number, pageCount: number) => ({
+                  text: `Pagina ${currentPage} di ${pageCount}`,
+                  style: "fineprint",
+                  alignment: "center" as const,
+                  margin: [0, 6, 0, 0] as [number, number, number, number],
+              }),
+          }
+        : {}),
 });
 
 export const sectionBarCell = (title: string, colSpan?: number) => ({

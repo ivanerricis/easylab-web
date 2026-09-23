@@ -11,6 +11,41 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-23 — Firma del tecnico, numero di pagina e totale nel PDF degli interventi
+
+Tre aggiunte alla stampa degli interventi, decise dopo una revisione informale di cosa manca
+nel documento (nessun difetto: solo spazio per migliorare).
+
+- **Firma del tecnico accanto a quella del cliente**, nella ricevuta singola
+  (`createInterventionPdfBuffer`). Prima firmava solo il cliente: per una contestazione,
+  serve poter identificare anche chi ha eseguito il lavoro. Il cliente resta nella posizione
+  di prima, più vicina al margine destro.
+- **Numero di pagina nel footer** (`Pagina X di Y`), su ricevuta singola e resoconto. Nessuno
+  dei due documenti impagina il contenuto per stare su un solo foglio (a differenza della
+  ricevuta del report, che lo misura apposta): un problema/nota lunghi nella ricevuta, o un
+  periodo con molti interventi nel resoconto, sforano già oggi su più pagine, e senza
+  numerazione fogli sciolti e firmati perdono l'ordine. Aggiunta come opzione in
+  `wrapPdfDocument` (`pdf/shared.ts`), spenta per chi non la usa: il footer occupa esattamente
+  il margine inferiore della pagina (comportamento di pdfmake), quindi va attivata insieme a un
+  margine più alto (14 → 24pt) per non sovrapporsi al contenuto.
+- **Riga "Totale complessivo" nel resoconto interventi**, sulla falsariga di quella già
+  presente nel resoconto report. Serviva anche una colonna "Prezzo" per riga, che il resoconto
+  non aveva mai avuto: gli interventi senza prezzo (es. alcune consegne materiale) mostrano
+  "-" invece di 0 €, coerente con la ricevuta singola, ma contano come 0 nella somma.
+  `CustomerInterventionSummaryItem` guadagna il campo `price`, valorizzato in
+  `summaryPrint.ts` da `listInterventions` (che lo selezionava già, solo non lo passava alla
+  stampa).
+
+Verificato renderizzando i due PDF con dati reali e screenshottandoli via Playwright/Edge
+(stesso setup delle verifiche visive di interfaccia): nessuna sovrapposizione fra footer e
+contenuto, intestazione di tabella ripetuta correttamente sulla pagina 2, totale corretto.
+
+→ [backend/src/services/interventionPdf.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/interventionPdf.ts),
+[backend/src/services/pdf/shared.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/services/pdf/shared.ts),
+[backend/src/routes/summaryPrint.ts](https://github.com/ivanerricis/easylab-web/blob/main/backend/src/routes/summaryPrint.ts)
+
+---
+
 ## 2026-09-23 — I due vincoli sui dati rimasti dalla revisione
 
 Gli ultimi 2 degli 8 punti rimasti dalla revisione del giorno stesso (colonne delle tabelle

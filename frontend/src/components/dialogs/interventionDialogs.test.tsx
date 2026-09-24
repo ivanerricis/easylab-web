@@ -89,7 +89,9 @@ describe("CreateInterventionDialog", () => {
 
     const fillCustomerAndCollaborator = async () => {
         await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
-        await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }));
+        // Tre secondi invece di uno: la ricerca clienti aspetta 250ms di pausa nella battitura, e su
+        // CI il risultato è arrivato oltre il secondo di default (vedi `reportDialogs.test.tsx`).
+        await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }, { timeout: 3000 }));
         await chooseOption(/^Collaboratore/, "Luca Bianchi");
     };
 
@@ -285,6 +287,54 @@ describe("CreateInterventionDialog", () => {
             expect(onSubmit).toHaveBeenCalledWith(
                 expect.objectContaining({ type: "consegna_materiale", problem: null, startTime: null, endTime: null })
             );
+        });
+    });
+
+    /** Su telefono il modulo diventa a quattro passi (vedi `interventionSteps`). */
+    describe("su telefono, a passi", () => {
+        const desktopWidth = window.innerWidth;
+
+        beforeEach(() => {
+            window.innerWidth = 390;
+            return () => {
+                window.innerWidth = desktopWidth;
+            };
+        });
+
+        it("mostra una parte alla volta e salva all'ultimo passo", async () => {
+            const onSubmit = await renderDialog({ initialDate: "2026-10-05" });
+
+            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.queryByRole("combobox", { name: "Tipo intervento" })).not.toBeInTheDocument();
+
+            // "Avanti" controlla solo cliente e collaboratore, i campi del primo passo.
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+                "Seleziona un cliente",
+                "Seleziona un collaboratore",
+            ]);
+
+            await fillCustomerAndCollaborator();
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(screen.getByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
+            expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
+
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(screen.getByLabelText(/^Note/)).toBeInTheDocument();
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            await userEvent.type(screen.getByLabelText(/^Prezzo/), "45");
+            await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0]).toMatchObject({
+                customerId: 30,
+                collaboratorId: 40,
+                interventionDate: "2026-10-05",
+                price: 45,
+            });
         });
     });
 });

@@ -7,6 +7,8 @@ import {
     InterventionCollaboratorField,
     InterventionDetailsSection,
 } from "@/components/dialogs/intervention-form-fields";
+import StepProgress from "@/components/dialogs/step-progress";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,6 +16,8 @@ import InputWithAdd from "@/components/inputWithAdd";
 import { createCustomer, getApiErrorMessage, listCollaborators, listCustomers } from "@/lib/api";
 import {
     emptyInterventionFormState,
+    interventionDetailsPartTitles,
+    type InterventionDetailsPart,
     interventionFieldOrder,
     toInterventionSubmitFields,
     validateInterventionForm,
@@ -23,7 +27,7 @@ import {
 import { getTodayDateString } from "@/lib/interventions";
 import type { CollaboratorDto, CustomerDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export type CreateInterventionSubmitValues = {
@@ -67,6 +71,26 @@ type FieldErrors = InterventionFieldErrors & { customer?: string };
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 const fieldOrder = ["customer", ...interventionFieldOrder] as const;
 
+type FieldKey = (typeof fieldOrder)[number];
+
+/**
+ * Su telefono il modulo intero era lungo quattro schermate. Sotto `sm` diventa a passi, come il
+ * nuovo report (vedi `reportSteps` in `createReportDialog.tsx`): una parte alla volta, "Avanti"
+ * controlla solo i campi di quella, "Salva" all'ultimo. Da `sm` in su resta tutto in una pagina.
+ */
+const interventionSteps: { title: string; part?: InterventionDetailsPart; fields: readonly FieldKey[] }[] = [
+    { title: "Anagrafica", fields: ["customer", "collaboratorId"] },
+    {
+        title: interventionDetailsPartTitles.schedule,
+        part: "schedule",
+        fields: ["interventionDate", "startTime", "endTime"],
+    },
+    { title: interventionDetailsPartTitles.work, part: "work", fields: ["problem", "description"] },
+    { title: interventionDetailsPartTitles.payment, part: "payment", fields: ["price"] },
+];
+const lastStep = interventionSteps.length - 1;
+const stepOfField = (field: FieldKey) => interventionSteps.findIndex((step) => step.fields.includes(field));
+
 /**
  * Il modulo come si presenta all'apertura. Nella quasi totalità dei casi l'intervento è di oggi;
  * resta comunque modificabile, e `initialDate` (slot cliccato nel calendario) ha la precedenza.
@@ -87,6 +111,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isStepped = useIsMobile(640);
+    const [step, setStep] = useState(0);
+    // Il campo da mettere a fuoco quando il passo che lo contiene sarà montato: con un errore in
+    // un passo precedente, "Salva" torna lì, e il campo esiste solo dopo il render.
+    const pendingFocusRef = useRef<FieldKey | null>(null);
+    const isLastStep = !isStepped || step === lastStep;
 
     const initialCustomerId = initialCustomer?.id ?? null;
     const initialCustomerOption = initialCustomer
@@ -117,6 +147,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
 
         startTransition(() => {
             setErrors({});
+            setStep(0);
             const emptyFormValues = buildEmptyFormValues(initialDate, initialCustomerOption);
             setFormValues(emptyFormValues);
             setInitialFormValues(emptyFormValues);
@@ -155,6 +186,25 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         return options.map((item) => item.label);
     }, []);
 
+    useEffect(() => {
+        if (pendingFocusRef.current) {
+            document.getElementById(pendingFocusRef.current)?.focus();
+            pendingFocusRef.current = null;
+        }
+    }, [step]);
+
+    const focusField = (field: FieldKey) => {
+        const fieldStep = stepOfField(field);
+
+        if (isStepped && fieldStep !== step) {
+            pendingFocusRef.current = field;
+            setStep(fieldStep);
+            return;
+        }
+
+        document.getElementById(field)?.focus();
+    };
+
     const handleConfirm = async () => {
         if (isSubmitting) {
             return;
@@ -169,12 +219,34 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
             nextErrors.customer = "Seleziona un cliente";
         }
 
+        // A metà del percorso a passi si controllano solo i campi del passo visibile: segnalare
+        // come sbagliato un campo che non si è ancora visto non servirebbe a niente.
+        if (!isLastStep) {
+            const stepErrors: FieldErrors = {};
+
+            for (const field of interventionSteps[step].fields) {
+                stepErrors[field] = nextErrors[field];
+            }
+
+            setErrors(stepErrors);
+
+            const firstInvalidStepField = fieldOrder.find((field) => stepErrors[field]);
+
+            if (firstInvalidStepField) {
+                focusField(firstInvalidStepField);
+                return;
+            }
+
+            setStep(step + 1);
+            return;
+        }
+
         setErrors(nextErrors);
 
         const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
 
         if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+            focusField(firstInvalidField);
             return;
         }
 
@@ -204,67 +276,83 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 title="Nuovo intervento"
                 description="Inserisci i dati dell'intervento e conferma per salvare."
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-                confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
-                confirmIcon={Save}
-                cancelLabel="Annulla"
-                onCancel={() => onOpenChange(false)}
+                confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
+                confirmIcon={isLastStep ? Save : undefined}
+                cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
+                onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
+                footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting}
                 confirmDisabled={isSubmitting}
                 content={
                     <div className="grid max-h-[72vh] gap-4 overflow-y-auto py-1 pr-1">
-                        <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                Anagrafica
-                            </h3>
+                        {isStepped ? (
+                            <StepProgress steps={interventionSteps.map((item) => item.title)} current={step} />
+                        ) : null}
 
-                            <div className="grid items-start gap-4 lg:grid-cols-2">
-                                <div className="grid">
-                                    <Label htmlFor="customer" className="text-lg">
-                                        Cliente
-                                        <RequiredMark />
-                                    </Label>
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="customer"
-                                            {...fieldErrorAria("customer", errors.customer)}
-                                            placeholder="Cliente"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.customer}
-                                            onSearch={searchCustomers}
-                                            isSelectedOption={customerIdByOption[formValues.customer] != null}
-                                            onChange={(customer) => handleChange({ customer })}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon-lg"
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateCustomerDialogOpen(true)}
-                                                    aria-label="Crea nuovo cliente"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo cliente</TooltipContent>
-                                        </Tooltip>
+                        {!isStepped || step === 0 ? (
+                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
+                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Anagrafica
+                                </h3>
+
+                                <div className="grid items-start gap-4 lg:grid-cols-2">
+                                    <div className="grid">
+                                        <Label htmlFor="customer" className="text-lg">
+                                            Cliente
+                                            <RequiredMark />
+                                        </Label>
+                                        <div className="flex">
+                                            <InputWithAdd
+                                                id="customer"
+                                                {...fieldErrorAria("customer", errors.customer)}
+                                                placeholder="Cliente"
+                                                inputClassName="rounded-r-none"
+                                                value={formValues.customer}
+                                                onSearch={searchCustomers}
+                                                isSelectedOption={customerIdByOption[formValues.customer] != null}
+                                                onChange={(customer) => handleChange({ customer })}
+                                                required
+                                            />
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon-lg"
+                                                        className="rounded-l-none border-l-0!"
+                                                        onClick={() => setIsCreateCustomerDialogOpen(true)}
+                                                        aria-label="Crea nuovo cliente"
+                                                    >
+                                                        <Plus className="size-5" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Crea nuovo cliente</TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <FieldError id="customer" error={errors.customer} />
                                     </div>
-                                    <FieldError id="customer" error={errors.customer} />
+
+                                    <InterventionCollaboratorField
+                                        values={formValues}
+                                        errors={errors}
+                                        onChange={handleChange}
+                                        collaborators={collaborators}
+                                    />
                                 </div>
+                            </section>
+                        ) : null}
 
-                                <InterventionCollaboratorField
-                                    values={formValues}
-                                    errors={errors}
-                                    onChange={handleChange}
-                                    collaborators={collaborators}
-                                />
-                            </div>
-                        </section>
-
-                        <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
+                        {!isStepped ? (
+                            <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
+                        ) : step > 0 ? (
+                            <InterventionDetailsSection
+                                values={formValues}
+                                errors={errors}
+                                onChange={handleChange}
+                                part={interventionSteps[step].part}
+                            />
+                        ) : null}
                     </div>
                 }
             />

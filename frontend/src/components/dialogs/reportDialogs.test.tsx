@@ -78,10 +78,14 @@ const chooseOption = async (label: string | RegExp, option: string) => {
     await userEvent.click(await screen.findByRole("option", { name: option }));
 };
 
-/** Scrive in un campo con suggerimenti e clicca quello indicato. */
+/**
+ * Scrive in un campo con suggerimenti e clicca quello indicato. Tre secondi invece del secondo di
+ * default di `findBy`: la ricerca clienti parte solo dopo 250ms di pausa nella battitura, e su CI
+ * (più lenta) il risultato è arrivato oltre il secondo, facendo fallire un test che in locale passa.
+ */
 const pickSuggestion = async (field: HTMLElement, text: string, suggestion: string) => {
     await userEvent.type(field, text);
-    await userEvent.click(await screen.findByRole("button", { name: suggestion }));
+    await userEvent.click(await screen.findByRole("button", { name: suggestion }, { timeout: 3000 }));
 };
 
 beforeEach(() => {

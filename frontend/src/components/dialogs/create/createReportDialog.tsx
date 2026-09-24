@@ -20,7 +20,7 @@ import {
 } from "@/lib/api";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import StepProgress from "@/components/dialogs/step-progress";
 import { toast } from "sonner";
 import InputWithAdd from "@/components/inputWithAdd";
 import { Input } from "@/components/ui/input";
@@ -329,23 +329,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 content={
                     <div className="grid max-h-[72vh] gap-4 overflow-y-auto py-1 pr-1">
                         {isStepped ? (
-                            <div className="grid gap-2" aria-live="polite">
-                                <p className="text-sm text-muted-foreground">
-                                    Passo {step + 1} di {reportSteps.length}:{" "}
-                                    <span className="font-medium text-foreground">{reportSteps[step].title}</span>
-                                </p>
-                                <div className="flex gap-1.5" aria-hidden="true">
-                                    {reportSteps.map((reportStep, index) => (
-                                        <span
-                                            key={reportStep.title}
-                                            className={cn(
-                                                "h-1.5 flex-1 rounded-full",
-                                                index <= step ? "bg-primary" : "bg-muted-foreground/25"
-                                            )}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
+                            <StepProgress steps={reportSteps.map((reportStep) => reportStep.title)} current={step} />
                         ) : null}
 
                         {!isStepped || step === 0 ? (

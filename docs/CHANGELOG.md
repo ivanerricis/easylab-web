@@ -24,6 +24,16 @@ solo l'evoluzione del codice e dell'infrastruttura.
   Interventi; Clienti ha solo l'ordinamento e resta com'è. Nota: "Azzera tutti" non c'è
   di proposito, perché stato, tipo e date scrivono nello stesso `URLSearchParams` e più
   scritture sincrone si sovrascrivono (lo stesso problema già documentato in `DateRangeFilter`).
+- **Nuovo intervento su telefono, a passi.** Stesso schema del report, in quattro passi:
+  Anagrafica (cliente, collaboratore), Pianificazione (tipo, stato, data, orari), Dettagli
+  (problema, descrizione, note) e Pagamento (prezzo, pagamento, fatturazione). La sezione
+  "Intervento" condivisa con il dialogo di modifica accetta ora una `part` per mostrarne solo un
+  pezzo; senza, è intera come prima (il dialogo di modifica non cambia). L'indicatore dei passi è
+  un componente comune ai due dialoghi (`StepProgress`).
+- **Test dei suggerimenti meno fragili su CI.** Il test del report a passi è fallito su CI (in
+  locale passava): la ricerca clienti parte dopo 250ms di pausa nella battitura, e il risultato è
+  arrivato oltre il secondo che `findBy` aspetta di default. L'attesa per i suggerimenti è ora
+  di tre secondi nei test dei dialoghi di report e intervento.
 - **Suggerimenti dei campi con ricerca (cliente, dispositivo, difetto) su telefono.** Le voci
   "Nome Cognome - telefono" non andavano a capo e finivano tagliate a destra, e la lista,
   sovrapposta al modulo ma dentro l'area che scorre del dialogo, veniva tagliata in fondo (si

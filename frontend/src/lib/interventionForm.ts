@@ -43,6 +43,19 @@ export const emptyInterventionFormState = (interventionDate: string): Interventi
     endTime: "",
 });
 
+/**
+ * Una parte della sezione, per il dialogo di creazione a passi su telefono: pianificazione (tipo,
+ * stato, data, orari), dettagli (problema, descrizione, note) e pagamento (prezzo, pagamento,
+ * fatturazione). Senza `part` la sezione è intera, come nel dialogo di modifica e da `sm` in su.
+ */
+export type InterventionDetailsPart = "schedule" | "work" | "payment";
+
+export const interventionDetailsPartTitles: Record<InterventionDetailsPart, string> = {
+    schedule: "Pianificazione",
+    work: "Dettagli",
+    payment: "Pagamento",
+};
+
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 export const interventionFieldOrder = [
     "collaboratorId",

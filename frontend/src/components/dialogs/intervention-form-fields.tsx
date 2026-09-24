@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
-import type { InterventionFieldErrors, InterventionFormState } from "@/lib/interventionForm";
+import {
+    interventionDetailsPartTitles,
+    type InterventionDetailsPart,
+    type InterventionFieldErrors,
+    type InterventionFormState,
+} from "@/lib/interventionForm";
 import {
     interventionDateLabel,
     interventionDescriptionLabel,
@@ -65,7 +70,13 @@ export const InterventionCollaboratorField = ({
 );
 
 /** L'intera sezione "Intervento": tipo, stato, data, prezzo, pagamento, orari, problema, descrizione, note. */
-export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsProps) => {
+export const InterventionDetailsSection = ({
+    values,
+    errors,
+    onChange,
+    part,
+}: FieldsProps & { part?: InterventionDetailsPart }) => {
+    const shows = (fieldPart: InterventionDetailsPart) => part == null || part === fieldPart;
     const isOnSite = isOnSiteInterventionType(values.type);
     // Orari e lavoro svolto si chiedono solo a intervento completato: prima restano
     // compilabili ma senza asterisco. L'asterisco rosso è l'unico segno dell'obbligo: le
@@ -75,7 +86,9 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
 
     return (
         <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Intervento</h3>
+            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                {part ? interventionDetailsPartTitles[part] : "Intervento"}
+            </h3>
 
             {/*
                 `items-start` in tutte le griglie di campi: quando un campo mostra l'errore sotto di
@@ -83,90 +96,101 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                 etichetta e campo.
             */}
             <div className="grid items-start gap-4 lg:grid-cols-2">
-                <div className="grid gap-1">
-                    <Label htmlFor="type" className="text-lg">
-                        Tipo intervento
-                    </Label>
-                    <Select value={values.type} onValueChange={(type) => onChange({ type: type as InterventionType })}>
-                        <SelectTrigger id="type" className="w-full">
-                            <SelectValue placeholder="Seleziona tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {interventionTypeOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {shows("schedule") ? (
+                    <>
+                        <div className="grid gap-1">
+                            <Label htmlFor="type" className="text-lg">
+                                Tipo intervento
+                            </Label>
+                            <Select
+                                value={values.type}
+                                onValueChange={(type) => onChange({ type: type as InterventionType })}
+                            >
+                                <SelectTrigger id="type" className="w-full">
+                                    <SelectValue placeholder="Seleziona tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {interventionTypeOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                <div className="grid gap-1">
-                    <Label htmlFor="status" className="text-lg">
-                        Stato
-                    </Label>
-                    <Select
-                        value={values.status}
-                        onValueChange={(status) => onChange({ status: status as InterventionStatus })}
-                    >
-                        <SelectTrigger id="status" className="w-full">
-                            <SelectValue placeholder="Seleziona stato" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {interventionStatusOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                        <div className="grid gap-1">
+                            <Label htmlFor="status" className="text-lg">
+                                Stato
+                            </Label>
+                            <Select
+                                value={values.status}
+                                onValueChange={(status) => onChange({ status: status as InterventionStatus })}
+                            >
+                                <SelectTrigger id="status" className="w-full">
+                                    <SelectValue placeholder="Seleziona stato" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {interventionStatusOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                <div className="grid gap-1">
-                    <Label htmlFor="interventionDate" className="text-lg">
-                        {interventionDateLabel(values.type)}
-                        <RequiredMark />
-                    </Label>
-                    <DatePickerField
-                        id="interventionDate"
-                        {...fieldErrorAria("interventionDate", errors.interventionDate)}
-                        value={values.interventionDate}
-                        onValueChange={(interventionDate) => onChange({ interventionDate })}
-                    />
-                    <FieldError id="interventionDate" error={errors.interventionDate} />
-                </div>
+                        <div className="grid gap-1">
+                            <Label htmlFor="interventionDate" className="text-lg">
+                                {interventionDateLabel(values.type)}
+                                <RequiredMark />
+                            </Label>
+                            <DatePickerField
+                                id="interventionDate"
+                                {...fieldErrorAria("interventionDate", errors.interventionDate)}
+                                value={values.interventionDate}
+                                onValueChange={(interventionDate) => onChange({ interventionDate })}
+                            />
+                            <FieldError id="interventionDate" error={errors.interventionDate} />
+                        </div>
+                    </>
+                ) : null}
 
-                <div className="grid gap-1">
-                    <Label htmlFor="price" className="text-lg">
-                        Prezzo
-                    </Label>
-                    <EuroInput
-                        {...fieldProps("price", { error: errors.price })}
-                        value={values.price}
-                        onChange={(event) => onChange({ price: event.target.value })}
-                    />
-                    <FieldError id="price" error={errors.price} />
-                </div>
+                {shows("payment") ? (
+                    <>
+                        <div className="grid gap-1">
+                            <Label htmlFor="price" className="text-lg">
+                                Prezzo
+                            </Label>
+                            <EuroInput
+                                {...fieldProps("price", { error: errors.price })}
+                                value={values.price}
+                                onChange={(event) => onChange({ price: event.target.value })}
+                            />
+                            <FieldError id="price" error={errors.price} />
+                        </div>
 
-                {/*
-                 * Larghi quanto tutta la sezione: dentro mezza colonna le due schede radio si
-                 * stringono sotto i 200px e "Non da fatturare" andava a capo, lasciando la riga
-                 * sfalsata rispetto al pagamento qui accanto.
-                 */}
-                <div className="grid gap-1 lg:col-span-2">
-                    <Label className="text-lg">Pagamento</Label>
-                    <PaidStatusSelector value={values.paid} onValueChange={(paid) => onChange({ paid })} />
-                </div>
+                        {/*
+                         * Larghi quanto tutta la sezione: dentro mezza colonna le due schede radio si
+                         * stringono sotto i 200px e "Non da fatturare" andava a capo, lasciando la riga
+                         * sfalsata rispetto al pagamento qui accanto.
+                         */}
+                        <div className="grid gap-1 lg:col-span-2">
+                            <Label className="text-lg">Pagamento</Label>
+                            <PaidStatusSelector value={values.paid} onValueChange={(paid) => onChange({ paid })} />
+                        </div>
 
-                <div className="grid gap-1 lg:col-span-2">
-                    <Label className="text-lg">Fatturazione</Label>
-                    <ToInvoiceSelector
-                        value={values.toInvoice}
-                        onValueChange={(toInvoice) => onChange({ toInvoice })}
-                    />
-                </div>
+                        <div className="grid gap-1 lg:col-span-2">
+                            <Label className="text-lg">Fatturazione</Label>
+                            <ToInvoiceSelector
+                                value={values.toInvoice}
+                                onValueChange={(toInvoice) => onChange({ toInvoice })}
+                            />
+                        </div>
+                    </>
+                ) : null}
 
-                {isOnSite ? (
+                {isOnSite && shows("schedule") ? (
                     // Anche gli orari occupano tutta la sezione, come le altre coppie: stretti in
                     // mezza colonna le etichette andavano a capo ("Ora / inizio") e i campi non
                     // erano allineati con quelli sopra.
@@ -194,7 +218,7 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                     </div>
                 ) : null}
 
-                {isOnSite ? (
+                {isOnSite && shows("work") ? (
                     <div className="grid gap-1 lg:col-span-2">
                         <Label htmlFor="problem" className="text-lg">
                             Problema
@@ -212,39 +236,43 @@ export const InterventionDetailsSection = ({ values, errors, onChange }: FieldsP
                     </div>
                 ) : null}
 
-                <div className="grid gap-1 lg:col-span-2">
-                    <Label htmlFor="description" className="text-lg">
-                        {interventionDescriptionLabel(values.type)}
-                        {isCompleted ? <RequiredMark /> : null}
-                    </Label>
-                    <Textarea
-                        {...fieldProps("description", { error: errors.description })}
-                        className="resize-none"
-                        rows={4}
-                        placeholder={
-                            values.type === "consegna_materiale"
-                                ? "Elenca i materiali da consegnare"
-                                : "Descrivi l'assistenza effettuata"
-                        }
-                        value={values.description}
-                        onChange={(event) => onChange({ description: event.target.value })}
-                    />
-                    <FieldError id="description" error={errors.description} />
-                </div>
+                {shows("work") ? (
+                    <>
+                        <div className="grid gap-1 lg:col-span-2">
+                            <Label htmlFor="description" className="text-lg">
+                                {interventionDescriptionLabel(values.type)}
+                                {isCompleted ? <RequiredMark /> : null}
+                            </Label>
+                            <Textarea
+                                {...fieldProps("description", { error: errors.description })}
+                                className="resize-none"
+                                rows={4}
+                                placeholder={
+                                    values.type === "consegna_materiale"
+                                        ? "Elenca i materiali da consegnare"
+                                        : "Descrivi l'assistenza effettuata"
+                                }
+                                value={values.description}
+                                onChange={(event) => onChange({ description: event.target.value })}
+                            />
+                            <FieldError id="description" error={errors.description} />
+                        </div>
 
-                <div className="grid gap-1 lg:col-span-2">
-                    <Label htmlFor="note" className="text-lg">
-                        Note
-                    </Label>
-                    <Textarea
-                        id="note"
-                        className="resize-none"
-                        rows={4}
-                        placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
-                        value={values.note}
-                        onChange={(event) => onChange({ note: event.target.value })}
-                    />
-                </div>
+                        <div className="grid gap-1 lg:col-span-2">
+                            <Label htmlFor="note" className="text-lg">
+                                Note
+                            </Label>
+                            <Textarea
+                                id="note"
+                                className="resize-none"
+                                rows={4}
+                                placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
+                                value={values.note}
+                                onChange={(event) => onChange({ note: event.target.value })}
+                            />
+                        </div>
+                    </>
+                ) : null}
             </div>
         </section>
     );

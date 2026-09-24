@@ -1,7 +1,11 @@
 import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
 import type { InterventionCreateInput } from "@/lib/api";
-import { getInterventionValidationError, isOnSiteInterventionType, type InterventionField } from "@/lib/interventions";
+import {
+    getInterventionValidationError,
+    isAssistanceInterventionType,
+    type InterventionField,
+} from "@/lib/interventions";
 import type { InterventionStatus, InterventionType } from "@/types/dtos";
 
 /**
@@ -101,21 +105,21 @@ export const validateInterventionForm = (values: InterventionFormState): Interve
  * esistono solo per gli interventi in sede o da remoto.
  */
 export const toInterventionSubmitFields = (values: InterventionFormState) => {
-    const isOnSite = isOnSiteInterventionType(values.type);
+    const isAssistance = isAssistanceInterventionType(values.type);
 
     return {
         type: values.type,
         status: values.status,
         description: values.description.trim() || null,
-        problem: isOnSite ? values.problem.trim() : null,
+        problem: isAssistance ? values.problem.trim() : null,
         note: values.note.trim() || null,
         price: parsePrice(values.price),
         paid: values.paid,
         toInvoice: values.toInvoice,
         collaboratorId: Number(values.collaboratorId),
         interventionDate: values.interventionDate,
-        startTime: isOnSite ? values.startTime || null : null,
-        endTime: isOnSite ? values.endTime || null : null,
+        startTime: isAssistance ? values.startTime || null : null,
+        endTime: isAssistance ? values.endTime || null : null,
     };
 };
 

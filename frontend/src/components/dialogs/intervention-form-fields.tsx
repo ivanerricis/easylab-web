@@ -19,7 +19,7 @@ import {
     interventionDescriptionLabel,
     interventionStatusOptions,
     interventionTypeOptions,
-    isOnSiteInterventionType,
+    isAssistanceInterventionType,
     isCompletedInterventionStatus,
 } from "@/lib/interventions";
 import { formatPersonName } from "@/lib/people";
@@ -77,7 +77,7 @@ export const InterventionDetailsSection = ({
     part,
 }: FieldsProps & { part?: InterventionDetailsPart }) => {
     const shows = (fieldPart: InterventionDetailsPart) => part == null || part === fieldPart;
-    const isOnSite = isOnSiteInterventionType(values.type);
+    const isAssistance = isAssistanceInterventionType(values.type);
     // Orari e lavoro svolto si chiedono solo a intervento completato: prima restano
     // compilabili ma senza asterisco. L'asterisco rosso è l'unico segno dell'obbligo: le
     // scritte "(facoltativo)" accanto agli altri campi sono state tolte perché affollavano
@@ -190,7 +190,7 @@ export const InterventionDetailsSection = ({
                     </>
                 ) : null}
 
-                {isOnSite && shows("schedule") ? (
+                {isAssistance && shows("schedule") ? (
                     // Anche gli orari occupano tutta la sezione, come le altre coppie: stretti in
                     // mezza colonna le etichette andavano a capo ("Ora / inizio") e i campi non
                     // erano allineati con quelli sopra.
@@ -218,7 +218,7 @@ export const InterventionDetailsSection = ({
                     </div>
                 ) : null}
 
-                {isOnSite && shows("work") ? (
+                {isAssistance && shows("work") ? (
                     <div className="grid gap-1 lg:col-span-2">
                         <Label htmlFor="problem" className="text-lg">
                             Problema

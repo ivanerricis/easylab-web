@@ -1,6 +1,7 @@
 import TableActionButton from "@/components/table-action-button";
 import { ArrowLeft, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type DetailHeaderProps = {
     /** Il contenuto dell'`h1`: testo, o testo con il collegamento al cliente. */
@@ -8,6 +9,16 @@ type DetailHeaderProps = {
     onBack: () => void;
     /** I pulsanti a destra: aggiorna, modifica, stampa, elimina... */
     children?: ReactNode;
+    /**
+     * Sotto `sm` il titolo qui non c'è: la pagina mostra il suo `h1` in cima alla prima card
+     * (i dati del cliente, il riepilogo di report e intervento), e freccia e pulsanti stanno su
+     * una riga sola invece che su due. Non disegnato affatto, non nascosto con il CSS: il titolo
+     * di report e intervento contiene il link al cliente, e un link invisibile ma raggiungibile da
+     * tastiera sarebbe un punto del giro di Tab dove il focus sparisce; e con due `h1` nel DOM,
+     * uno solo visibile, chi legge la pagina senza CSS (lettori di schermo datati, i test) ne
+     * troverebbe due. Così a ogni larghezza ce n'è uno.
+     */
+    hideTitleOnMobile?: boolean;
 };
 
 /**
@@ -22,26 +33,32 @@ type DetailHeaderProps = {
  * stessa riga (un telefono, il cliente con sei pulsanti) le azioni scendono sotto, allineate a
  * destra, invece di stringere il titolo su tre righe. La freccia resta sempre accanto al titolo.
  */
-const DetailHeader = ({ title, onBack, children }: DetailHeaderProps) => (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
-        <div className="flex min-w-0 flex-auto items-center gap-2">
-            {/* `-ml-2`: il pulsante fantasma ha 8px di aria attorno all'icona, e senza
-                compensarli la freccia partiva rientrata rispetto al bordo delle card sotto. */}
-            <TableActionButton
-                size="icon-lg"
-                variant="ghost"
-                onClick={onBack}
-                className="-ml-2 shrink-0"
-                aria-label="Torna indietro"
-            >
-                <ArrowLeft className="size-6" />
-            </TableActionButton>
-            <h1 className="min-w-0 text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">{title}</h1>
-        </div>
+const DetailHeader = ({ title, onBack, children, hideTitleOnMobile = false }: DetailHeaderProps) => {
+    const showsTitle = !(useIsMobile(640) && hideTitleOnMobile);
 
-        {children ? <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div> : null}
-    </div>
-);
+    return (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+            <div className="flex min-w-0 flex-auto items-center gap-2">
+                {/* `-ml-2`: il pulsante fantasma ha 8px di aria attorno all'icona, e senza
+                compensarli la freccia partiva rientrata rispetto al bordo delle card sotto. */}
+                <TableActionButton
+                    size="icon-lg"
+                    variant="ghost"
+                    onClick={onBack}
+                    className="-ml-2 shrink-0"
+                    aria-label="Torna indietro"
+                >
+                    <ArrowLeft className="size-6" />
+                </TableActionButton>
+                {showsTitle ? (
+                    <h1 className="min-w-0 text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">{title}</h1>
+                ) : null}
+            </div>
+
+            {children ? <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div> : null}
+        </div>
+    );
+};
 
 type DetailHeaderActionProps = Omit<ComponentProps<typeof TableActionButton>, "children" | "size"> & {
     icon: LucideIcon;

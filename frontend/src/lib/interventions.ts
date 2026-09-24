@@ -34,7 +34,12 @@ export const formatInterventionType = (value: InterventionType) =>
 export const formatInterventionStatus = (value: InterventionStatus) =>
     interventionStatusOptions.find((option) => option.value === value)?.label ?? value;
 
-export const isOnSiteInterventionType = (value: InterventionType) =>
+/**
+ * Un intervento di assistenza, in sede o da remoto, contrapposto alla consegna di materiale: è
+ * l'assistenza ad avere orari e un problema da descrivere. Si chiamava `isOnSiteInterventionType`,
+ * ma valeva anche per gli interventi da remoto e il nome faceva pensare a un errore.
+ */
+export const isAssistanceInterventionType = (value: InterventionType) =>
     value === "intervento_sede" || value === "intervento_remoto";
 
 export const interventionDescriptionLabel = (value: InterventionType) =>
@@ -85,7 +90,7 @@ export type InterventionValidationError = {
  */
 export const getInterventionValidationError = (values: InterventionFormValues): InterventionValidationError | null => {
     const completed = isCompletedInterventionStatus(values.status);
-    const isOnSite = isOnSiteInterventionType(values.type);
+    const isAssistance = isAssistanceInterventionType(values.type);
 
     if (completed && values.description.trim() === "") {
         return {
@@ -100,11 +105,11 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
     if (values.interventionDate.trim() === "") {
         return {
             field: "interventionDate",
-            message: isOnSite ? "Seleziona la data dell'intervento" : "Seleziona la data di consegna",
+            message: isAssistance ? "Seleziona la data dell'intervento" : "Seleziona la data di consegna",
         };
     }
 
-    if (!isOnSite) {
+    if (!isAssistance) {
         return null;
     }
 

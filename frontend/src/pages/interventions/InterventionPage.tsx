@@ -30,7 +30,7 @@ import {
     formatPaidStatus,
     formatToInvoiceStatus,
     interventionStatusColor,
-    isOnSiteInterventionType,
+    isAssistanceInterventionType,
 } from "@/lib/interventions";
 import { Pencil, Printer, Send } from "lucide-react";
 import { useState } from "react";
@@ -117,25 +117,26 @@ const InterventionPage = () => {
         );
     }
 
-    const isOnSite = isOnSiteInterventionType(intervention.type);
+    const isAssistance = isAssistanceInterventionType(intervention.type);
+
+    // Il titolo va in due posti a seconda della larghezza: nell'intestazione da `sm` in su, in
+    // cima al riepilogo sotto (vedi `hideTitleOnMobile`).
+    const pageTitle = (
+        <>
+            Intervento #{intervention.id} -{" "}
+            {/* Il nome è il primo che si guarda: è lui a portare al cliente, e l'anagrafica
+                sotto resta testo per non ripeterlo. */}
+            <CustomerLink
+                customerId={intervention.customerId}
+                name={intervention.customerName ?? "Cliente sconosciuto"}
+            />
+        </>
+    );
 
     return (
         // Scorre il `main` del layout, come nella scheda del report: vedi il commento lì.
         <div className="flex w-full flex-col gap-4 self-start">
-            <DetailHeader
-                onBack={handleBack}
-                title={
-                    <>
-                        Intervento #{intervention.id} -{" "}
-                        {/* Il nome in alto è il primo che si guarda: è lui a portare al
-                            cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
-                        <CustomerLink
-                            customerId={intervention.customerId}
-                            name={intervention.customerName ?? "Cliente sconosciuto"}
-                        />
-                    </>
-                }
-            >
+            <DetailHeader onBack={handleBack} hideTitleOnMobile title={pageTitle}>
                 <RefreshButton onRefresh={reload} label="Aggiorna intervento" />
 
                 <DetailHeaderAction
@@ -175,6 +176,7 @@ const InterventionPage = () => {
             {/* Sotto `xl` una riga per voce, con il valore a destra: "In lavorazione" o
                 "Intervento da remoto" non escono più dal bordo di una mezza card. */}
             <DetailStats
+                mobileTitle={pageTitle}
                 items={[
                     {
                         label: "Stato",
@@ -188,15 +190,16 @@ const InterventionPage = () => {
                     { label: "Data intervento", value: formatDate(intervention.interventionDate) },
                     {
                         label: "Ora inizio",
-                        value: isOnSite ? formatInterventionTime(intervention.startTime) : "-",
+                        value: isAssistance ? formatInterventionTime(intervention.startTime) : "-",
                     },
-                    { label: "Ora fine", value: isOnSite ? formatInterventionTime(intervention.endTime) : "-" },
+                    { label: "Ora fine", value: isAssistance ? formatInterventionTime(intervention.endTime) : "-" },
                 ]}
             />
 
             <div className="grid gap-4 xl:grid-cols-2">
                 <DetailSection title="Anagrafica" className="self-start">
-                    <DetailGrid className="grid-cols-2">
+                    {/* A righe come la scheda report: etichetta a sinistra, valore a destra. */}
+                    <DetailGrid layout="rows">
                         <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />
                         <DetailItem label="Telefono" value={intervention.customerPhone ?? "-"} />
                         <DetailItem
@@ -206,23 +209,15 @@ const InterventionPage = () => {
                     </DetailGrid>
                 </DetailSection>
 
-                {/* I testi lunghi (problema, descrizione, note) su tutta la riga; prezzo, stati e
-                    date, brevi, affiancati: prima erano otto riquadri uno sotto l'altro. */}
+                {/* A righe come la scheda report; i testi liberi (problema, descrizione, note) su
+                    telefono vanno sotto l'etichetta (`longText`). */}
                 <DetailSection title="Dettagli">
-                    <DetailGrid className="grid-cols-2 sm:grid-cols-3">
-                        {isOnSite ? (
-                            <DetailItem
-                                label="Problema"
-                                value={intervention.problem ?? "-"}
-                                className="col-span-full"
-                            />
+                    <DetailGrid layout="rows">
+                        {isAssistance ? (
+                            <DetailItem label="Problema" value={intervention.problem ?? "-"} longText />
                         ) : null}
-                        <DetailItem
-                            label="Descrizione"
-                            value={intervention.description ?? "-"}
-                            className="col-span-full"
-                        />
-                        <DetailItem label="Note" value={intervention.note ?? "-"} className="col-span-full" />
+                        <DetailItem label="Descrizione" value={intervention.description ?? "-"} longText />
+                        <DetailItem label="Note" value={intervention.note ?? "-"} longText />
                         <DetailItem
                             label="Prezzo"
                             value={intervention.price != null ? formatEuro(intervention.price) : "-"}

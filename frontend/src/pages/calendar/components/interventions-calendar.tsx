@@ -16,6 +16,7 @@ import {
     type Components,
     dateFnsLocalizer,
     type EventPropGetter,
+    type Formats,
     type Messages,
     type SlotInfo,
     type View,
@@ -36,6 +37,26 @@ const localizer = dateFnsLocalizer({
     getDay,
     locales,
 });
+
+/**
+ * Un intervallo di giorni come lo si scrive in italiano: "21 – 27 settembre 2026", "28 settembre –
+ * 4 ottobre 2026"; l'anno compare anche sulla prima data solo se l'intervallo lo attraversa
+ * ("28 dicembre 2026 – 3 gennaio 2027"). Il formato di serie della libreria
+ * seguiva l'ordine inglese ("settembre 21 – 27") e l'agenda mostrava due date numeriche
+ * ("24/09/2026 – 24/10/2026").
+ */
+const formatDayRange = ({ start, end }: { start: Date; end: Date }) => {
+    const sameYear = start.getFullYear() === end.getFullYear();
+    const sameMonth = sameYear && start.getMonth() === end.getMonth();
+    const startText = format(start, sameMonth ? "d" : sameYear ? "d MMMM" : "d MMMM yyyy", { locale: it });
+
+    return `${startText} – ${format(end, "d MMMM yyyy", { locale: it })}`;
+};
+
+const formats: Formats = {
+    dayRangeHeaderFormat: formatDayRange,
+    agendaHeaderFormat: formatDayRange,
+};
 
 const messages: Messages = {
     date: "Data",
@@ -227,6 +248,7 @@ const InterventionsCalendar = ({
                     culture="it"
                     events={events}
                     messages={messages}
+                    formats={formats}
                     view={view}
                     onView={handleViewChange}
                     date={date}

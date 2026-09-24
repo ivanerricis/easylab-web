@@ -78,6 +78,17 @@ const ReportPage = () => {
     const hasTechnician = report.technicianId != null;
     const technicianName = report.technicianName ?? `Tecnico #${report.technicianId}`;
 
+    // Il titolo va in due posti a seconda della larghezza: nell'intestazione da `sm` in su, in
+    // cima al riepilogo sotto (vedi `hideTitleOnMobile`).
+    const pageTitle = (
+        <>
+            Report #{report.id} -{" "}
+            {/* Il nome è il primo che si guarda: è lui a portare al cliente, e l'anagrafica
+                sotto resta testo per non ripeterlo. */}
+            <CustomerLink customerId={report.customerId} name={report.customerName ?? "Cliente sconosciuto"} />
+        </>
+    );
+
     return (
         // Niente più `overflow-auto` e `p-2` propri: scorre il `main` del layout, come nelle altre
         // schede. Il padding in più spostava freccia e titolo rispetto a cliente e collaboratore,
@@ -85,20 +96,7 @@ const ReportPage = () => {
         // perché il `main` è un flex a riga: tirata all'altezza dello schermo, la colonna
         // schiacciava le card per farcele stare, invece di allungarsi e lasciar scorrere il `main`.
         <div className="flex w-full flex-col gap-4 self-start">
-            <DetailHeader
-                onBack={handleBack}
-                title={
-                    <>
-                        Report #{report.id} -{" "}
-                        {/* Il nome in alto è il primo che si guarda: è lui a portare al
-                            cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
-                        <CustomerLink
-                            customerId={report.customerId}
-                            name={report.customerName ?? "Cliente sconosciuto"}
-                        />
-                    </>
-                }
-            >
+            <DetailHeader onBack={handleBack} hideTitleOnMobile title={pageTitle}>
                 <RefreshButton onRefresh={reload} label="Aggiorna report" />
 
                 <DetailHeaderAction
@@ -128,6 +126,7 @@ const ReportPage = () => {
             </DetailHeader>
 
             <DetailStats
+                mobileTitle={pageTitle}
                 items={[
                     {
                         label: "Stato",
@@ -146,12 +145,15 @@ const ReportPage = () => {
 
             <div className="grid gap-4 xl:grid-cols-2">
                 <DetailSection title="Anagrafica">
-                    <DetailGrid className="grid-cols-2">
+                    {/* Le sezioni della scheda report a righe (etichetta a sinistra, valore a destra),
+                        come il riepilogo in cima su telefono: si scorre una colonna sola invece di
+                        saltare fra due, e i valori si allineano tutti sul bordo destro. */}
+                    <DetailGrid layout="rows">
                         <DetailItem label="Cliente" value={report.customerName ?? "Cliente sconosciuto"} />
                         <DetailItem label="Telefono" value={report.customerPhone ?? "-"} />
                         <DetailItem label="Collaboratore" value={report.collaboratorName ?? "-"} />
                         <DetailItem label="Dispositivo" value={report.deviceName} />
-                        <DetailItem label="Difetto catalogo" value={report.issueName} className="col-span-2" />
+                        <DetailItem label="Difetto catalogo" value={report.issueName} />
                     </DetailGrid>
                 </DetailSection>
 
@@ -161,7 +163,7 @@ const ReportPage = () => {
                     modifica ma in questa pagina non compariva da nessuna parte.
                 */}
                 <DetailSection title="Stato e gestione">
-                    <DetailGrid className="grid-cols-2 sm:grid-cols-3">
+                    <DetailGrid layout="rows">
                         <DetailItem label="Alimentatore" value={formatYesNo(report.charger)} />
                         <DetailItem label="Backup dati" value={formatYesNo(report.dataBackup)} />
                         <DetailItem label="Avvisato" value={formatYesNo(report.alerted)} />
@@ -176,11 +178,11 @@ const ReportPage = () => {
 
             <div className="grid gap-4 xl:grid-cols-2">
                 <DetailSection title="Dettagli intervento">
-                    <DetailGrid>
-                        <DetailItem label="Problema riscontrato" value={report.issueDescription ?? "-"} />
-                        <DetailItem label="Descrizione intervento" value={report.serviceDescription ?? "-"} />
+                    <DetailGrid layout="rows">
+                        <DetailItem label="Problema riscontrato" value={report.issueDescription ?? "-"} longText />
+                        <DetailItem label="Descrizione intervento" value={report.serviceDescription ?? "-"} longText />
                         <DetailItem label="Password" value={report.password ?? "-"} />
-                        <DetailItem label="Note" value={report.note ?? "-"} />
+                        <DetailItem label="Note" value={report.note ?? "-"} longText />
                     </DetailGrid>
                 </DetailSection>
 
@@ -190,7 +192,7 @@ const ReportPage = () => {
                     {!hasTechnician ? (
                         <p className="text-muted-foreground">Nessun tecnico associato a questo report.</p>
                     ) : (
-                        <DetailGrid className="grid-cols-2">
+                        <DetailGrid layout="rows">
                             <DetailItem label="Tecnico" value={technicianName} />
                             <DetailItem label="Prezzo" value={formatEuro(report.technicianPrice)} />
                         </DetailGrid>

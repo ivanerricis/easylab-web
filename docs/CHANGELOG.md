@@ -11,6 +11,49 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-24 — Voci a righe in tutte le schede, errori dentro il layout, rifiniture
+
+- **Voci a righe in tutte le schede.** Lo schema della scheda report (etichetta a sinistra, valore
+  a destra, linea sottile fra le righe; testi liberi sotto l'etichetta su telefono) ora vale anche
+  per intervento, cliente, collaboratore e tecnico. Nelle card larghe quanto la pagina (dati di
+  cliente, collaboratore, tecnico) le righe stanno su più colonne (due da `sm`, tre da `xl`): con
+  una colonna sola il valore finiva a mille pixel dalla sua etichetta. Per reggere più colonne la
+  linea è sotto ogni voce invece di `divide-y` (che sfalsava la prima riga), e `DetailGrid` taglia
+  il margine sopra la prima riga e la linea sotto l'ultima.
+- **Scheda cliente su telefono: una riga per freccia e azioni.** Con il nome accanto alla freccia i
+  sei pulsanti andavano a capo, e l'intestazione prendeva due righe. Sotto `sm` il titolo è
+  tolto (`DetailHeader hideTitleOnMobile`) e il nome
+  compare come titolo della card dei dati, al posto di "Dati del cliente".
+  Sempre su telefono la card parte chiusa, con nome e telefono: le altre quattro righe spingevano
+  l'elenco dei report fuori dal primo schermo. Una freccia accanto al nome (`aria-expanded`) apre la
+  card intera; da `sm` in su la card è sempre completa.
+  Lo stesso spostamento del titolo (senza card apribile) vale per report e intervento: su telefono
+  "Report #3174 - Andrea Rossi" va in cima alla card del riepilogo (`DetailStats mobileTitle`), con
+  il nome del cliente sempre blu e cliccabile. Sotto `sm` il titolo dell'intestazione non viene
+  proprio disegnato (`useIsMobile(640)`), invece di essere nascosto con il CSS: conteneva il link
+  al cliente, e un link invisibile ma raggiungibile con Tab farebbe sparire il focus; e con due
+  `h1` nel DOM, uno solo visibile, chi legge senza CSS (compresi i test) ne trovava due. A ogni
+  larghezza c'è un solo `h1`. Stesso criterio per il nome nella card del cliente.
+- **Etichetta della settimana nel calendario.** "21 – 27 settembre 2026" invece di "Settembre 21 –
+  27" (ordine inglese della libreria); lo stesso formato per l'agenda, che mostrava due date
+  numeriche. L'anno compare sulla prima data solo se l'intervallo lo attraversa.
+- **Il crash di una pagina non porta via la navigazione.** C'era un solo `AppErrorBoundary`, in
+  App.tsx sopra tutto: una pagina che si rompeva faceva sparire anche barra laterale e
+  intestazione. Ora ce n'è uno anche in `MainLayout` attorno alla sola pagina, con `key` sul
+  percorso: cambiando voce nella barra laterale riparte da zero. Quello in App.tsx resta per i
+  crash del layout stesso. Verificato bloccando in Playwright il file della pagina report.
+- **`isOnSiteInterventionType` → `isAssistanceInterventionType`.** Valeva anche per gli interventi
+  da remoto (intende "assistenza", contrapposta alla consegna di materiale), e il nome faceva
+  sembrare un errore che un intervento da remoto mostrasse gli orari.
+- **Sidebar: tolti i componenti inutilizzati.** Dieci componenti di shadcn mai usati (sotto-menu,
+  badge, azioni, skeleton, input, separatore, rail…) e la taglia `lg`, rimasti con lo stile vecchio.
+- **Tab come pulsanti a segmenti.** Le tab ("Report | Interventi" nelle schede) avevano ancora lo
+  stile di serie di shadcn, fondo grigio con la scheda attiva bianca in rilievo: l'unico controllo
+  dell'app con quei colori. Ora sono segmenti con bordo sul fondo delle card e l'attiva piena nel
+  primario, come il selettore delle viste del calendario.
+
+---
+
 ## 2026-09-24 — Pulizia visiva: controlli, schede di dettaglio, sidebar, calendario, errori
 
 Secondo giro sull'aspetto, dopo il rinnovo di palette e superfici della mattina.
@@ -31,6 +74,13 @@ Secondo giro sull'aspetto, dopo il rinnovo di palette e superfici della mattina.
   sono a 14px. Su telefono le cinque card del riepilogo (stato, prezzi, totale, pagamento)
   diventano una card a righe (`DetailStats`: ~210px invece di ~400). Tolto anche l'`overflow-auto`
   proprio di report e intervento, che su telefono dava una seconda barra di scorrimento.
+- **Scheda report: voci a righe.** Dentro le sezioni (Anagrafica, Stato e gestione, Dettagli,
+  Tecnici) ogni voce è una riga con l'etichetta a sinistra e il valore allineato a destra, divise
+  da una linea sottile: lo stesso disegno del riepilogo in cima su telefono, e una colonna sola da
+  scorrere invece di due. `DetailGrid layout="rows"`, per ora solo sul report. I testi liberi
+  (problema, descrizione, note: `DetailItem longText`) su telefono vanno sotto l'etichetta e
+  allineati a sinistra, perché a destra di un'etichetta in una colonna stretta diventavano righe
+  corte faticose da leggere; da `sm` restano affiancati.
 - **Sidebar più leggera.** Voci a 15px con icone da 20px e righe da 40px (prima 18px e 48px); la
   voce aperta è una tinta leggera del primario con testo nel primario, non più un blocco blu
   pieno. Il blu del tema come testo è corretto per il contrasto: scurito in chiaro (6.0:1),

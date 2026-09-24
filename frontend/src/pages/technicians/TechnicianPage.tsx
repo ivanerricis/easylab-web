@@ -173,7 +173,9 @@ const TechnicianPage = () => {
 
             {technician ? (
                 <DetailSection title="Dati del tecnico">
-                    <DetailGrid className="grid-cols-2 xl:grid-cols-4">
+                    {/* A righe come la scheda report, su più colonne come la scheda cliente, così le
+                        righe hanno la stessa lunghezza in tutte le schede (vedi `DetailGrid`). */}
+                    <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
                         <DetailItem label="Telefono" value={technician.phoneNumber ?? "-"} />
                         <DetailItem label="Partita IVA" value={technician.vatNumber ?? "-"} />
                     </DetailGrid>

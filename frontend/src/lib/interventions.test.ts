@@ -7,7 +7,7 @@ import {
     getTodayDateString,
     interventionDateLabel,
     interventionDescriptionLabel,
-    isOnSiteInterventionType,
+    isAssistanceInterventionType,
 } from "./interventions";
 
 type Values = Parameters<typeof getInterventionValidationError>[0];
@@ -45,9 +45,9 @@ describe("etichette degli interventi", () => {
     });
 
     it("distingue le consegne dagli interventi veri e propri", () => {
-        expect(isOnSiteInterventionType("intervento_sede")).toBe(true);
-        expect(isOnSiteInterventionType("intervento_remoto")).toBe(true);
-        expect(isOnSiteInterventionType("consegna_materiale")).toBe(false);
+        expect(isAssistanceInterventionType("intervento_sede")).toBe(true);
+        expect(isAssistanceInterventionType("intervento_remoto")).toBe(true);
+        expect(isAssistanceInterventionType("consegna_materiale")).toBe(false);
 
         expect(interventionDescriptionLabel("consegna_materiale")).toBe("Materiali da consegnare");
         expect(interventionDescriptionLabel("intervento_sede")).toBe("Assistenza effettuata");

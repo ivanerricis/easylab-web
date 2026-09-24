@@ -186,7 +186,9 @@ const CollaboratorPage = () => {
 
             {collaborator ? (
                 <DetailSection title="Dati del collaboratore">
-                    <DetailGrid className="grid-cols-2 xl:grid-cols-4">
+                    {/* A righe come la scheda report, su più colonne come la scheda cliente, così le
+                        righe hanno la stessa lunghezza in tutte le schede (vedi `DetailGrid`). */}
+                    <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
                         <DetailItem label="Telefono" value={collaborator.phoneNumber ?? "-"} />
                         <DetailItem label="Collaboratore dal" value={formatDateTime(collaborator.createdAt)} />
                     </DetailGrid>

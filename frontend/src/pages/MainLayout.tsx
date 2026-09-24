@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import AppErrorBoundary from "@/components/app-error-boundary";
 import LoadingPage from "@/components/loadingPage";
 // import { ModeToggle } from "@/components/mode-toggle"
 import GlobalSearch from "@/components/global-search";
@@ -12,6 +13,7 @@ import { useUpdateWatcher } from "@/hooks/useUpdateWatcher";
 
 export const MainLayout = () => {
     useUpdateWatcher();
+    const { pathname } = useLocation();
 
     return (
         <SidebarProvider defaultOpen>
@@ -57,13 +59,22 @@ export const MainLayout = () => {
                         a ogni cambio di rotta: un'attesa inventata, che si vedeva anche quando
                         la pagina era già pronta. Ora il velo compare solo se c'è davvero da
                         aspettare, e per il tempo che serve. */}
-                    <Suspense
-                        fallback={
-                            <LoadingPage className="absolute inset-3 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-                        }
-                    >
-                        <Outlet />
-                    </Suspense>
+                    {/* Un confine d'errore anche qui, attorno alla sola pagina: prima c'era solo quello
+                        in App.tsx, sopra tutto, e il crash di una pagina faceva sparire anche barra
+                        laterale e intestazione, lasciando la card d'errore da sola. Così la
+                        navigazione resta e si può andare altrove. `key` sul percorso: cambiando
+                        pagina dalla barra laterale il confine riparte da zero, invece di restare
+                        sull'errore della pagina di prima. Quello in App.tsx resta per i crash del
+                        layout stesso. */}
+                    <AppErrorBoundary key={pathname}>
+                        <Suspense
+                            fallback={
+                                <LoadingPage className="absolute inset-3 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
+                            }
+                        >
+                            <Outlet />
+                        </Suspense>
+                    </AppErrorBoundary>
                 </main>
             </SidebarInset>
         </SidebarProvider>

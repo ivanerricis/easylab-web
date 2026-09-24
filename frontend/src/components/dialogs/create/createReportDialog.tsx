@@ -344,7 +344,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                 stiravano con lei spingendo in giù etichetta e campo.
                             */}
                                 <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid lg:col-span-1">
+                                    <div className="grid gap-1 lg:col-span-1">
                                         <Label htmlFor="client" className="text-lg">
                                             Cliente
                                             <RequiredMark />
@@ -383,7 +383,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         <FieldError id="client" error={fieldErrors.client} />
                                     </div>
 
-                                    <div className="grid lg:col-span-2 xl:col-span-1">
+                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-1">
                                         <Label htmlFor="deviceType" className="text-lg">
                                             Tipologia dispositivo
                                             <RequiredMark />
@@ -435,7 +435,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                 </h3>
 
                                 <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid lg:col-span-2 xl:col-span-1">
+                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-1">
                                         <Label htmlFor="issue" className="text-lg">
                                             Difetto
                                             <RequiredMark />
@@ -485,7 +485,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                     qualunque altro difetto la casella non serve e non compare.
                                 */}
                                     {isCatchAllIssue(formValues.issue) ? (
-                                        <div className="grid lg:col-span-2 xl:col-span-2">
+                                        <div className="grid gap-1 lg:col-span-2 xl:col-span-2">
                                             <Label htmlFor="issueDescription" className="text-lg">
                                                 Problema riscontrato
                                                 <RequiredMark />
@@ -512,7 +512,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         </div>
                                     ) : null}
 
-                                    <div className="grid">
+                                    <div className="grid gap-1">
                                         <Label htmlFor="password" className="text-lg">
                                             Password sblocco
                                         </Label>
@@ -526,7 +526,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         />
                                     </div>
 
-                                    <div className="grid lg:col-span-2 xl:col-span-2">
+                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-2">
                                         <Label htmlFor="notes" className="text-lg">
                                             Note
                                         </Label>
@@ -551,7 +551,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                 </h3>
 
                                 <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid gap-2 rounded-md">
+                                    <div className="grid gap-1">
                                         <Label htmlFor="charger" className="w-full text-lg">
                                             Alimentatore presente
                                             <RequiredMark />
@@ -581,7 +581,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         <FieldError id="charger" error={fieldErrors.charger} />
                                     </div>
 
-                                    <div className="grid gap-2 rounded-md">
+                                    <div className="grid gap-1">
                                         <Label htmlFor="dataBackup" className="w-full text-lg">
                                             Backup dati
                                             <RequiredMark />

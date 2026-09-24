@@ -40,6 +40,10 @@ solo l'evoluzione del codice e dell'infrastruttura.
   stessa griglia. `CustomDialog` porta ora `Input` e trigger dei menu a 40px; il selettore della
   data, che non è un `Input`, lo fa da sé. Testo già coerente (18px per campi, etichette e
   pulsanti in fondo).
+  Anche lo spazio fra etichetta e campo era diverso da un campo all'altro (0px nella maggior parte
+  del nuovo report, 4px nella sezione intervento, 8px per alimentatore e backup), e nel nuovo
+  intervento il campo del cliente stava 4px più in alto di quello del collaboratore sulla stessa
+  riga. Ora è 4px ovunque, come già nei dialoghi di modifica.
 - **Etichetta della settimana nel calendario.** "21 – 27 settembre 2026" invece di "Settembre 21 –
   27" (ordine inglese della libreria); lo stesso formato per l'agenda, che mostrava due date
   numeriche. L'anno compare sulla prima data solo se l'intervallo lo attraversa.

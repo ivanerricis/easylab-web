@@ -132,7 +132,9 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
                                         key={requirement.label}
                                         className={cn(
                                             "flex items-center gap-1.5 text-xs",
-                                            satisfied ? "text-green-600 line-through" : "text-red-600"
+                                            satisfied
+                                                ? "text-status-green-foreground line-through"
+                                                : "text-status-red-foreground"
                                         )}
                                     >
                                         {satisfied ? (

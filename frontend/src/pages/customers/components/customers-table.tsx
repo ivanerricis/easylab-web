@@ -44,20 +44,20 @@ const CustomersTable = ({
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-action-print/20 hover:bg-action-print/30"
+                className="bg-muted hover:bg-action-print/20"
                 onClick={() => onPrintCustomer(row.id)}
                 aria-label={`Stampa resoconto cliente ${row.id}`}
             >
-                <Printer className="size-5 text-action-print" />
+                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-primary/10 hover:bg-primary/20"
+                className="bg-muted hover:bg-primary/20"
                 onClick={() => onEditCustomer(row.id)}
                 aria-label={`Modifica cliente ${row.id}`}
             >
-                <Pencil className="size-5 text-primary" />
+                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
             </TableActionButton>
             <TableActionButton
                 variant="destructive"

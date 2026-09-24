@@ -225,11 +225,11 @@ const TechnicianPage = () => {
                                 <TableActionButton
                                     variant="default"
                                     size="icon-lg"
-                                    className="bg-primary/10 hover:bg-primary/20"
+                                    className="bg-muted hover:bg-primary/20"
                                     onClick={() => handleOpenEditDialog(row)}
                                     aria-label={`Modifica report ${row.id}`}
                                 >
-                                    <Pencil className="size-5 text-primary" />
+                                    <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
                                 </TableActionButton>
                             </>
                         )}

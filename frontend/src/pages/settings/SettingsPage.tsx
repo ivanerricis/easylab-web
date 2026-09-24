@@ -186,7 +186,7 @@ const SettingsPage = () => {
                 </div>
             </aside>
 
-            <section className="min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-background/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
+            <section className="min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-card/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
                 {sectionContent[activeSection]}
             </section>
         </div>

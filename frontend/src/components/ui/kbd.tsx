@@ -10,7 +10,7 @@ const Kbd = ({ className, ...props }: ComponentProps<"kbd">) => (
     <kbd
         data-slot="kbd"
         className={cn(
-            "pointer-events-none rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground",
+            "pointer-events-none rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground",
             className
         )}
         {...props}

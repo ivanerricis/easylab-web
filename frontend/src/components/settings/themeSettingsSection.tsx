@@ -78,9 +78,16 @@ const IntensityPreview = ({ intensityKey }: { intensityKey: TableRowIntensityKey
         data-table-row-intensity={intensityKey}
         className="mt-0.5 flex shrink-0 flex-col gap-px overflow-hidden rounded-sm border border-border"
     >
-        <span className="h-1.5 w-4 bg-[var(--table-row-red)]" />
-        <span className="h-1.5 w-4 bg-[var(--table-row-yellow)]" />
-        <span className="h-1.5 w-4 bg-[var(--table-row-green)]" />
+        {(["red", "yellow", "green"] as const).map((color) => (
+            <span
+                key={color}
+                className="h-1.5 w-4"
+                style={{
+                    backgroundColor: `var(--table-row-${color})`,
+                    boxShadow: `inset var(--table-row-bar-width) 0 0 var(--status-${color})`,
+                }}
+            />
+        ))}
     </span>
 );
 
@@ -277,7 +284,7 @@ const ThemeSettingsSection = () => {
                 </div>
 
                 <SettingsGroup title="Anteprima" description="Le righe qui sotto usano il livello selezionato.">
-                    <Table className="bg-background">
+                    <Table className="bg-card">
                         <TableBody>
                             {rowIntensityPreviewRows.map((previewRow) => (
                                 <TableRow key={previewRow.statusColor} data-status-color={previewRow.statusColor}>

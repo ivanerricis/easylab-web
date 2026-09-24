@@ -30,7 +30,7 @@ export const MainLayout = () => {
                 {/* Stesso passo orizzontale del `p-3` di <main>: con `px-2` il pulsante del menu
                     e il badge utente stavano 4px più vicini al bordo dello schermo del contenuto
                     sotto, e su mobile — dove le schede toccano i due bordi — lo scalino si vedeva. */}
-                <header className="flex h-13 items-center justify-between border-b px-3">
+                <header className="flex h-13 items-center justify-between border-b bg-card px-3">
                     <SidebarTrigger />
                     <div className="flex items-center gap-2">
                         {/* La ricerca sta qui e non in una pagina: vale per tutta l'app, e

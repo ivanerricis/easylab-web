@@ -27,7 +27,7 @@ type InterventionsTableProps = {
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
-// in Impostazioni > Tema; la cella azioni torna a bg-background/text-foreground per non
+// in Impostazioni > Tema; la cella azioni torna a bg-card/text-foreground per non
 // colorare le icone dei pulsanti. La corrispondenza stato -> colore sta in lib/interventions,
 // condivisa con le altre liste di interventi.
 
@@ -56,29 +56,29 @@ const InterventionsTable = ({
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-primary/10 hover:bg-primary/20"
+                className="bg-muted hover:bg-primary/20"
                 onClick={() => onEditIntervention(row.id)}
                 aria-label={`Modifica intervento ${row.id}`}
             >
-                <Pencil className="size-5 text-primary" />
+                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-action-print/20 hover:bg-action-print/30"
+                className="bg-muted hover:bg-action-print/20"
                 onClick={() => onPrintIntervention(row.id)}
                 aria-label={`Stampa intervento ${row.id}`}
             >
-                <Printer className="size-5 text-action-print" />
+                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
             </TableActionButton>
             <TableActionButton
                 variant="default"
                 size="icon-lg"
-                className="bg-action-email/20 hover:bg-action-email/30"
+                className="bg-muted hover:bg-action-email/20"
                 onClick={() => onSendEmailIntervention(row.id)}
                 aria-label={`Invia email intervento ${row.id}`}
             >
-                <Mail className="size-5 text-action-email" />
+                <Mail className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-email" />
             </TableActionButton>
             <TableActionButton
                 variant="destructive"

@@ -15,7 +15,7 @@ const runStatusLabels: Record<SettingsRunStatus, string> = {
 
 const runStatusClasses: Record<SettingsRunStatus, string> = {
     idle: "bg-muted text-muted-foreground",
-    success: "bg-green-500/15 text-green-700 dark:text-green-400",
+    success: "bg-status-green/15 text-status-green-foreground",
     failed: "bg-destructive/15 text-destructive",
 };
 

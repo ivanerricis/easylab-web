@@ -186,7 +186,7 @@ const SecuritySettingsSection = () => {
                                 className={cn(
                                     "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium",
                                     isEnabled
-                                        ? "bg-green-500/15 text-green-700 dark:text-green-400"
+                                        ? "bg-status-green/15 text-status-green-foreground"
                                         : "bg-muted text-muted-foreground"
                                 )}
                             >

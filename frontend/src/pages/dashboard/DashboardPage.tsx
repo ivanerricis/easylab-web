@@ -304,7 +304,7 @@ const DashboardPage = () => {
                     mobileText="Chiusi"
                     icon={CircleCheck}
                     number={String(closedReports)}
-                    iconColor="text-green-700 dark:text-green-400"
+                    iconColor="text-status-green-foreground"
                     onClick={() => goToReportsPage("closed")}
                 />
 
@@ -329,7 +329,7 @@ const DashboardPage = () => {
                     mobileText="Completati"
                     icon={CircleCheck}
                     number={String(completedInterventions)}
-                    iconColor="text-green-700 dark:text-green-400"
+                    iconColor="text-status-green-foreground"
                     onClick={() => goToInterventionsPage("completato")}
                 />
 
@@ -388,7 +388,7 @@ const DashboardPage = () => {
                                             className={cn(
                                                 "mt-1 inline-flex items-center gap-1 text-sm font-medium",
                                                 revenueComparison.change >= 0
-                                                    ? "text-green-700 dark:text-green-400"
+                                                    ? "text-status-green-foreground"
                                                     : "text-destructive"
                                             )}
                                         >
@@ -448,7 +448,7 @@ const DashboardPage = () => {
                                             <span
                                                 aria-hidden="true"
                                                 className={cn(
-                                                    "max-w-full truncate text-[10px] tabular-nums sm:text-xs",
+                                                    "max-w-full truncate text-xs tabular-nums",
                                                     isSelected ? "font-semibold text-primary" : "text-muted-foreground"
                                                 )}
                                             >
@@ -468,7 +468,7 @@ const DashboardPage = () => {
                                 })}
                             </div>
 
-                            <div className="flex gap-2 text-[10px] text-muted-foreground uppercase">
+                            <div className="flex gap-2 text-xs text-muted-foreground uppercase">
                                 {monthlyRevenueSeries.map((point) => (
                                     <span
                                         key={point.monthKey}

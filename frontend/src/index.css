@@ -14,7 +14,21 @@ body,
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Inter Variable', sans-serif;
+  --font-sans: "Inter Variable", sans-serif;
+  /* Scala tipografica dell'app: cinque livelli con nome invece di misure sparse.
+     title = titolo di pagina, section = titolo di sezione/card, body = testo (text-sm
+     di Tailwind, il default), label = etichette e dati secondari, caption = note
+     e badge. Sotto 12px (0.75rem) non si scende: i vecchi 10px/11px erano illeggibili. */
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--font-weight: 700;
+  --text-section: 1.125rem;
+  --text-section--line-height: 1.75rem;
+  --text-section--font-weight: 600;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -70,13 +84,19 @@ body,
   color-scheme: light;
   --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
   --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* Tinta dei neutri: un'unica manopola per tutta la scala di grigi. I grigi puri
+     (croma 0) facevano sembrare l'app un template; con una punta di blu (croma <= 0.015)
+     restano neutri ma parlano la stessa lingua del primario. */
+  --neutral-hue: 250;
+  /* Lo sfondo pagina è un gradino più scuro delle card: le card si staccano per luminosità
+     invece che solo per il bordo. */
+  --background: oklch(0.95 0.01 var(--neutral-hue));
+  --foreground: oklch(0.17 0.02 var(--neutral-hue));
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.17 0.02 var(--neutral-hue));
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: #2A75B9;
+  --popover-foreground: oklch(0.17 0.02 var(--neutral-hue));
+  --primary: #2a75b9;
   --primary-foreground: oklch(0.977 0.013 236.62);
   /* Le icone delle azioni di riga (stampa, email) erano scritte a mano nei componenti come
      text-yellow-400 e text-sky-500. Oltre a essere colori grezzi fuori dal sistema di token,
@@ -102,43 +122,48 @@ body,
   --status-yellow-foreground: oklch(0.48 0.1 80);
   --status-green: oklch(0.627 0.194 149.214);
   --status-green-foreground: oklch(0.48 0.14 150);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
+  --secondary: oklch(0.925 0.011 var(--neutral-hue));
+  --secondary-foreground: oklch(0.22 0.02 var(--neutral-hue));
+  --muted: oklch(0.925 0.011 var(--neutral-hue));
+  --muted-foreground: oklch(0.5 0.02 var(--neutral-hue));
+  --accent: oklch(0.925 0.011 var(--neutral-hue));
+  --accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
+  --border: oklch(0.87 0.012 var(--neutral-hue));
+  --input: oklch(0.85 0.012 var(--neutral-hue));
+  --ring: oklch(0.705 0.03 var(--neutral-hue));
   --chart-1: oklch(0.78 0.16 84);
   --chart-2: oklch(0.72 0.18 152);
   --chart-3: oklch(0.68 0.16 32);
   --chart-4: oklch(0.64 0.15 195);
   --chart-5: oklch(0.58 0.14 18);
-  --radius: 0.3375rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: #2A75B9;
+  /* 0.45rem: 5.8px su input e pulsanti (md), 7.2px (lg), 10px su card e dialog (xl).
+     Con 0.3375rem le card avevano ~7px e sembravano rigide. */
+  --radius: 0.45rem;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.17 0.02 var(--neutral-hue));
+  --sidebar-primary: #2a75b9;
   --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --sidebar-accent: oklch(0.925 0.011 var(--neutral-hue));
+  --sidebar-accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
+  --sidebar-border: oklch(0.87 0.012 var(--neutral-hue));
+  --sidebar-ring: oklch(0.705 0.03 var(--neutral-hue));
 }
 
 .dark {
   color-scheme: dark;
   --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
   --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #2A75B9;
+  /* Quattro gradini di luminosità ben separati (sfondo 0.15, sidebar 0.19, card 0.225,
+     popover 0.265): prima card e sfondo distavano un solo passo e su schermi economici
+     i livelli si fondevano. */
+  --background: oklch(0.15 0.012 var(--neutral-hue));
+  --foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --card: oklch(0.225 0.014 var(--neutral-hue));
+  --card-foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --popover: oklch(0.265 0.015 var(--neutral-hue));
+  --popover-foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --primary: #2a75b9;
   --primary-foreground: oklch(0.977 0.013 236.62);
   /* Su fondo scuro i colori vividi originali (yellow-400 e sky-500) hanno già contrasto
      abbondante: 12.68:1 e 7.33:1. */
@@ -150,29 +175,29 @@ body,
   --status-yellow-foreground: oklch(0.9 0.15 92);
   --status-green: oklch(0.723 0.219 149.579);
   --status-green-foreground: oklch(0.871 0.15 154.449);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.3 0.015 var(--neutral-hue));
+  --secondary-foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --muted: oklch(0.3 0.015 var(--neutral-hue));
+  --muted-foreground: oklch(0.72 0.02 var(--neutral-hue));
+  --accent: oklch(0.3 0.015 var(--neutral-hue));
+  --accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
+  --border: oklch(1 0 0 / 13%);
+  --input: oklch(1 0 0 / 17%);
+  --ring: oklch(0.6 0.03 var(--neutral-hue));
   --chart-1: oklch(0.78 0.16 84);
   --chart-2: oklch(0.72 0.18 152);
   --chart-3: oklch(0.68 0.16 32);
   --chart-4: oklch(0.64 0.15 195);
   --chart-5: oklch(0.58 0.14 18);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #2A75B9;
+  --sidebar: oklch(0.19 0.013 var(--neutral-hue));
+  --sidebar-foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --sidebar-primary: #2a75b9;
   --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar-accent: oklch(0.3 0.015 var(--neutral-hue));
+  --sidebar-accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
+  --sidebar-border: oklch(1 0 0 / 13%);
+  --sidebar-ring: oklch(0.6 0.03 var(--neutral-hue));
 }
 
 @layer base {
@@ -251,6 +276,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    trasformerebbe in un senape. */
 :root,
 [data-table-row-intensity="default"] {
+  /* Stile predefinito "barra laterale": la riga resta neutra e lo stato è una barra colorata
+     sul bordo sinistro. Un elenco lungo di righe piene sembrava una macchia di colori. Le
+     variabili dei colori pieni qui sono trasparenti; la barra usa i token --status-*. */
+  --table-row-red: transparent;
+  --table-row-red-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+  --table-row-yellow: transparent;
+  --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+  --table-row-green: transparent;
+  --table-row-green-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+  --table-row-foreground: var(--foreground);
+  --table-row-bar-width: 4px;
+}
+
+[data-table-row-intensity="medium"] {
   --table-row-red: oklch(57.7% 0.245 27.325);
   --table-row-red-hover: oklch(50.5% 0.213 27.518);
   --table-row-yellow: oklch(79.5% 0.184 86.047);
@@ -258,6 +297,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(62.7% 0.194 149.214);
   --table-row-green-hover: oklch(52.7% 0.154 150.069);
   --table-row-foreground: oklch(1 0 0);
+  --table-row-bar-width: 0px;
 }
 
 [data-table-row-intensity="soft"] {
@@ -268,6 +308,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(72.3% 0.219 149.579 / 30%);
   --table-row-green-hover: oklch(72.3% 0.219 149.579 / 40%);
   --table-row-foreground: var(--foreground);
+  --table-row-bar-width: 0px;
 }
 
 [data-table-row-intensity="strong"] {
@@ -278,11 +319,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(52.7% 0.154 150.069);
   --table-row-green-hover: oklch(44.8% 0.119 151.328);
   --table-row-foreground: oklch(1 0 0);
+  --table-row-bar-width: 0px;
 }
 
 .dark,
 .dark[data-table-row-intensity="default"],
 .dark [data-table-row-intensity="default"] {
+  --table-row-red: transparent;
+  --table-row-red-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --table-row-yellow: transparent;
+  --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --table-row-green: transparent;
+  --table-row-green-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --table-row-foreground: var(--foreground);
+  --table-row-bar-width: 4px;
+}
+
+.dark[data-table-row-intensity="medium"],
+.dark [data-table-row-intensity="medium"] {
   --table-row-red: oklch(50.5% 0.213 27.518);
   --table-row-red-hover: oklch(57.7% 0.245 27.325);
   --table-row-yellow: oklch(79.5% 0.184 86.047);
@@ -290,6 +344,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(52.7% 0.154 150.069);
   --table-row-green-hover: oklch(62.7% 0.194 149.214);
   --table-row-foreground: oklch(1 0 0);
+  --table-row-bar-width: 0px;
 }
 
 .dark[data-table-row-intensity="soft"],
@@ -301,6 +356,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(72.3% 0.219 149.579 / 15%);
   --table-row-green-hover: oklch(72.3% 0.219 149.579 / 20%);
   --table-row-foreground: var(--foreground);
+  --table-row-bar-width: 0px;
 }
 
 .dark[data-table-row-intensity="strong"],
@@ -312,6 +368,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(44.8% 0.119 151.328);
   --table-row-green-hover: oklch(52.7% 0.154 150.069);
   --table-row-foreground: oklch(1 0 0);
+  --table-row-bar-width: 0px;
 }
 
 /* Fuori da @layer di proposito: le utility Tailwind della riga (hover:bg-muted/50 su
@@ -328,16 +385,25 @@ tr[data-status-color]:hover {
 tr[data-status-color="red"] {
   --table-row-bg: var(--table-row-red);
   --table-row-bg-hover: var(--table-row-red-hover);
+  --table-row-bar: var(--status-red);
 }
 
 tr[data-status-color="yellow"] {
   --table-row-bg: var(--table-row-yellow);
   --table-row-bg-hover: var(--table-row-yellow-hover);
+  --table-row-bar: var(--status-yellow);
 }
 
 tr[data-status-color="green"] {
   --table-row-bg: var(--table-row-green);
   --table-row-bg-hover: var(--table-row-green-hover);
+  --table-row-bar: var(--status-green);
+}
+
+/* La barra è un'ombra interna sulla prima cella (non un bordo): non sposta il layout e
+   segue gli angoli. Larghezza 0 negli stili a riga piena. */
+tr[data-status-color] > :first-child {
+  box-shadow: inset var(--table-row-bar-width, 0px) 0 0 var(--table-row-bar, transparent);
 }
 
 /* Densità delle tabelle: l'attributo sta su <html> (scritto da applyTableDensity in

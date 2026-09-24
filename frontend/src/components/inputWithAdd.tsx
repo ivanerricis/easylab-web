@@ -180,7 +180,7 @@ const InputWithAdd = ({
             />
 
             {isOpen && hasSuggestions ? (
-                <div className="absolute z-10 mt-2 w-full rounded-md border bg-background shadow-sm">
+                <div className="absolute z-10 mt-2 w-full rounded-md border bg-card shadow-sm">
                     <div className="max-h-48 overflow-auto">
                         {filteredOptions.map((option) => (
                             <Button

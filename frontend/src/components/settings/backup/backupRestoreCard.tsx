@@ -57,7 +57,7 @@ const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
                 </SettingsGroup>
 
                 {panel.secretsToReconfigure.length > 0 ? (
-                    <div className="grid gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                    <div className="grid gap-1 rounded-md border border-status-yellow/40 bg-status-yellow/10 p-3 text-sm">
                         <p className="font-medium">Password da reinserire dopo il ripristino</p>
                         <p className="text-muted-foreground">
                             Le password sono cifrate con una chiave che resta sul server e non viene inclusa nei backup.

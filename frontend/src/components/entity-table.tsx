@@ -201,7 +201,7 @@ const EntityTableRowImpl = <TRow,>({
                     className={cn(
                         truncateClassName(column.key),
                         column.key === actionsColumnKey && getRowStatusColor
-                            ? "bg-background text-foreground"
+                            ? "bg-card text-foreground"
                             : column.className
                     )}
                 >
@@ -293,7 +293,7 @@ const EntityTable = <TRow,>({
                 // Si nasconde il contenitore, non la tabella: vedi `containerClassName` in `Table`.
                 containerClassName="hidden sm:block"
                 className={cn(
-                    "bg-background",
+                    "bg-card",
                     // Attenuare è sufficiente a dire "sto ricaricando" e non impedisce di
                     // leggere né di cliccare: chi sta cercando vede la lista precedente finché
                     // non arriva quella nuova. Il conteggio sotto la tabella ha `role="status"`,

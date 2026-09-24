@@ -11,6 +11,45 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-24 — Rinnovo estetico: palette, raggi, stati, tipografia
+
+Sei interventi sull'aspetto, nati dal giudizio "sembra un template shadcn": il design system
+era ben fatto (token, contrasti) ma senza identità.
+
+- **Palette.** I neutri erano grigi puri (croma ~0, hue 286 dal preset zinc). Ora condividono
+  una manopola sola, `--neutral-hue: 250`, con croma <= 0.02: restano neutri ma parlano la
+  lingua del primario blu. Lo sfondo pagina è un gradino più scuro delle card (0.95 contro
+  bianco; con 0.972 la differenza non si vedeva), così le card si staccano per luminosità invece che per bordo.
+- **Superfici.** Tabelle, filtri (input, select, campo di ricerca, pulsanti outline dell'header) e pannelli
+  e la barra in alto (`MainLayout`) usano `bg-card` invece di `bg-background`, come la sidebar: prima in tema chiaro avevano lo
+  stesso colore della pagina e non si staccavano.
+- **Raggio.** `--radius` da 0.3375rem a 0.45rem: input/pulsanti ~5.8px, card/dialog ~10px.
+  Le card a ~7px sembravano rigide. Le preimpostazioni Squadrato/Arrotondato non cambiano.
+- **Colori di stato.** Eliminati i colori Tailwind scritti a mano (`text-green-700`,
+  `bg-amber-500/10`, `text-red-600`...) a favore dei token `--status-*`, che hanno già il
+  contrasto verificato. Le azioni di riga (modifica, stampa, email) sono neutre a riposo e colorate solo
+  in hover: le tabelle non sono più un arlecchino.
+- **Tipografia.** Tolti i `text-[10px]`/`text-[11px]` (illeggibili): minimo 12px. Aggiunta una
+  scala con nome in `@theme` (`text-title`, `text-section`, `text-label`, `text-caption`);
+  per ora la usa il titolo di pagina, il resto migra quando si tocca.
+- **Righe delle tabelle.** Nuovo stile predefinito "Barra laterale": la riga resta neutra e lo
+  stato è una barra colorata di 4px sul bordo sinistro (box-shadow interno sulla prima cella,
+  senza spostare il layout), come già sulle schede mobile. Un elenco lungo di righe piene era
+  una macchia di colori. Il vecchio "Media" (colore pieno) resta selezionabile con la chiave
+  `medium`; chi lo aveva scelto non aveva nulla salvato (era il default), quindi passa alla
+  barra. Anche i bordi di riga erano `border-2 border-primary` (griglia blu pesante): ora
+  un filetto da 2px in `foreground` al 45% (30% nel tema scuro), più marcato di `border-border`
+  che a 1px si perdeva; bordo chiaro solo nell'intestazione blu.
+- **Tema scuro.** Quattro gradini di luminosità distinti (sfondo 0.15, sidebar 0.19, card
+  0.225, popover 0.265) e bordi al 13% invece del 10%: su schermi economici sfondo e card si
+  fondevano.
+
+File: `frontend/src/index.css`, `lib/theme.ts`, `components/ui/table.tsx`, `themeSettingsSection`,
+tabelle di clienti/interventi/report, dashboard. Non toccato: i colori pieni degli eventi del
+calendario in dashboard (candidati a un secondo giro).
+
+---
+
 ## 2026-09-23 — Tre azioni sensibili in più nel registro
 
 Seguito diretto della correzione del registro azioni dello stesso giorno (l'export della chiave

@@ -60,7 +60,7 @@ describe("ThemeSettingsSection", () => {
         expect(isHighlighted(option("Modalità", "Sistema"))).toBe(true);
         expect(isHighlighted(option("Colore principale", "Predefinito"))).toBe(true);
         expect(isHighlighted(option("Raggio degli angoli", "Normale"))).toBe(true);
-        expect(isHighlighted(option("Righe delle tabelle", "Media"))).toBe(true);
+        expect(isHighlighted(option("Righe delle tabelle", "Barra laterale"))).toBe(true);
         expect(isHighlighted(option("Densità tabelle", "Normale"))).toBe(true);
         expect(isHighlighted(option("Dimensione testo", "Medio"))).toBe(true);
     });
@@ -177,7 +177,7 @@ describe("ThemeSettingsSection", () => {
 
         expect(isHighlighted(option("Colore principale", "Predefinito"))).toBe(true);
         expect(isHighlighted(option("Raggio degli angoli", "Normale"))).toBe(true);
-        expect(isHighlighted(option("Righe delle tabelle", "Media"))).toBe(true);
+        expect(isHighlighted(option("Righe delle tabelle", "Barra laterale"))).toBe(true);
         expect(isHighlighted(option("Densità tabelle", "Normale"))).toBe(true);
         expect(isHighlighted(option("Dimensione testo", "Medio"))).toBe(true);
         expect(localStorage.getItem("easylab-web-theme-accent")).toBeNull();

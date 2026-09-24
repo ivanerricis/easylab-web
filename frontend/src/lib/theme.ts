@@ -17,7 +17,7 @@ export type ThemeAccentPreset = {
     chart5: string;
 };
 
-export type TableRowIntensityKey = "soft" | "default" | "strong";
+export type TableRowIntensityKey = "soft" | "default" | "medium" | "strong";
 
 export type TableRowIntensity = {
     key: TableRowIntensityKey;
@@ -80,7 +80,7 @@ const accentStorageKey = "easylab-web-theme-accent";
 const tableRowIntensityStorageKey = "easylab-web-table-row-intensity";
 const tableRowIntensityAttribute = "data-table-row-intensity";
 const cornerRadiusStorageKey = "easylab-web-corner-radius";
-const defaultRadius = "0.3375rem";
+const defaultRadius = "0.45rem";
 const tableDensityStorageKey = "easylab-web-table-density";
 const tableDensityAttribute = "data-table-density";
 const fontSizeStorageKey = "easylab-web-font-size";
@@ -171,12 +171,17 @@ export const tableRowsPerPageOptions: TableRowsPerPage[] = [
 
 export const tableRowIntensities: TableRowIntensity[] = [
     {
+        key: "default",
+        label: "Barra laterale",
+        description: "Riga neutra con una barra colorata a sinistra.",
+    },
+    {
         key: "soft",
         label: "Tenue",
         description: "Sfondo velato e leggero.",
     },
     {
-        key: "default",
+        key: "medium",
         label: "Media",
         description: "Colore pieno con testo bianco.",
     },

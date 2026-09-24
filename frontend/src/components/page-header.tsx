@@ -21,7 +21,7 @@ const PageHeader = ({ title, description, action }: PageHeaderProps) => {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <div className="flex flex-col">
-                    <h1 className="text-2xl font-bold">{title}</h1>
+                    <h1 className="text-title">{title}</h1>
                     <p className="hidden text-muted-foreground md:block">{description}</p>
                 </div>
                 {action}

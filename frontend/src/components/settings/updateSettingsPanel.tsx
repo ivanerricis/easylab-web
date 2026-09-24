@@ -297,7 +297,7 @@ const UpdateSettingsPanel = () => {
                 title="Aggiorna applicazione"
                 description="I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile. Continuare?"
                 content={
-                    <div className="grid gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                    <div className="grid gap-2 rounded-md border border-status-yellow/40 bg-status-yellow/10 p-3 text-sm">
                         <p className="font-medium">Esegui un backup prima di aggiornare</p>
                         <p className="text-muted-foreground">
                             L&apos;aggiornamento può applicare modifiche al database che non si annullano da sole. Se

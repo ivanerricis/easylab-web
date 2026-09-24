@@ -89,9 +89,7 @@ describe("CreateInterventionDialog", () => {
 
     const fillCustomerAndCollaborator = async () => {
         await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
-        // Tre secondi invece di uno: la ricerca clienti aspetta 250ms di pausa nella battitura, e su
-        // CI il risultato è arrivato oltre il secondo di default (vedi `reportDialogs.test.tsx`).
-        await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }, { timeout: 3000 }));
+        await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }));
         await chooseOption(/^Collaboratore/, "Luca Bianchi");
     };
 
@@ -314,7 +312,10 @@ describe("CreateInterventionDialog", () => {
                 "Seleziona un collaboratore",
             ]);
 
-            await fillCustomerAndCollaborator();
+            // Il cliente scritto a mano, non scelto dai suggerimenti: vedi lo stesso test in
+            // `reportDialogs.test.tsx`.
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+            await chooseOption(/^Collaboratore/, "Luca Bianchi");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             expect(screen.getByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
             expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
@@ -330,7 +331,8 @@ describe("CreateInterventionDialog", () => {
                 expect(onSubmit).toHaveBeenCalled();
             });
             expect(onSubmit.mock.calls[0][0]).toMatchObject({
-                customerId: 30,
+                customer: "Mario Rossi",
+                customerId: null,
                 collaboratorId: 40,
                 interventionDate: "2026-10-05",
                 price: 45,

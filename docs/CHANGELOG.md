@@ -30,10 +30,11 @@ solo l'evoluzione del codice e dell'infrastruttura.
   "Intervento" condivisa con il dialogo di modifica accetta ora una `part` per mostrarne solo un
   pezzo; senza, è intera come prima (il dialogo di modifica non cambia). L'indicatore dei passi è
   un componente comune ai due dialoghi (`StepProgress`).
-- **Test dei suggerimenti meno fragili su CI.** Il test del report a passi è fallito su CI (in
-  locale passava): la ricerca clienti parte dopo 250ms di pausa nella battitura, e il risultato è
-  arrivato oltre il secondo che `findBy` aspetta di default. L'attesa per i suggerimenti è ora
-  di tre secondi nei test dei dialoghi di report e intervento.
+- **Test a passi senza la ricerca clienti.** Su CI i due test dei dialoghi a passi non vedevano
+  comparire il suggerimento del cliente (in locale sì, anche ripetendoli; nel browser vero la lista
+  compare). Allungare l'attesa non è servito, quindi non è una questione di tempi. I test a passi
+  ora scrivono il cliente a mano: verificano il percorso fra i passi, e la ricerca clienti resta
+  coperta dai test da desktop. La causa su CI non è chiarita.
 - **Suggerimenti dei campi con ricerca (cliente, dispositivo, difetto) su telefono.** Le voci
   "Nome Cognome - telefono" non andavano a capo e finivano tagliate a destra, e la lista,
   sovrapposta al modulo ma dentro l'area che scorre del dialogo, veniva tagliata in fondo (si

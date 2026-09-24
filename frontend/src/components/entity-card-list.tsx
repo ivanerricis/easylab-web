@@ -127,7 +127,9 @@ const EntityCardImpl = <T,>({
 
     return (
         <article className={cardClassName}>
-            {status ? <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1", status.stripe)} /> : null}
+            {status ? (
+                <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", status.stripe)} />
+            ) : null}
 
             <div className="flex items-start justify-between gap-3 px-4 pt-3.5">
                 <div className="min-w-0">
@@ -163,7 +165,15 @@ const EntityCardImpl = <T,>({
                 // di un'icona da 40px allineata a destra. `empty:hidden` per le righe bloccate
                 // (la voce fissa dei difetti), che non hanno pulsanti: senza, restava una fascia
                 // grigia vuota in fondo.
-                <div className="flex items-center gap-2 border-t bg-muted/40 px-3 py-2.5 *:h-11 *:w-auto *:min-w-0 *:flex-1 empty:hidden">
+                // La striscia di stato copre i primi 6px a sinistra: senza compensarli lo spazio
+                // visibile a sinistra dei pulsanti era la metà di quello a destra (`pl-4.5` =
+                // 12px di padding + 6px di striscia).
+                <div
+                    className={cn(
+                        "flex items-center gap-2 border-t bg-muted/40 px-3 py-2.5 *:h-11 *:w-auto *:min-w-0 *:flex-1 empty:hidden",
+                        status && "pl-4.5"
+                    )}
+                >
                     {actionsNode}
                 </div>
             ) : null}

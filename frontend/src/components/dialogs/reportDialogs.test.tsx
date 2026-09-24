@@ -307,6 +307,57 @@ describe("CreateReportDialog", () => {
         expect(createIssue).toHaveBeenCalledWith({ description: "Tastiera bagnata" });
         expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Tastiera bagnata");
     });
+
+    /** Su telefono le tre sezioni diventano tre passi (vedi `reportSteps`). */
+    describe("su telefono, a passi", () => {
+        const desktopWidth = window.innerWidth;
+
+        beforeEach(() => {
+            window.innerWidth = 390;
+            return () => {
+                window.innerWidth = desktopWidth;
+            };
+        });
+
+        it("mostra una sezione alla volta e controlla solo i campi del passo visibile", async () => {
+            const onSubmit = renderDialog();
+            await waitFor(() => {
+                expect(listIssues).toHaveBeenCalled();
+            });
+
+            expect(screen.getByText("Passo 1 di 3:")).toBeInTheDocument();
+            expect(screen.queryByLabelText(/^Difetto/)).not.toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "Salva" })).not.toBeInTheDocument();
+
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            // Solo i due campi del primo passo: alimentatore e backup non si sono ancora visti.
+            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+                "Seleziona un cliente",
+                "Seleziona un dispositivo",
+            ]);
+
+            await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
+            await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+            // "Indietro" torna al passo prima senza perdere quanto scritto.
+            await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Schermo rotto");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            await chooseOption(/^Alimentatore presente/, "Sì");
+            await chooseOption(/^Backup dati/, "No");
+            await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            expect(onSubmit.mock.calls[0][0]).toMatchObject({ customerId: 30, deviceId: 10, issueId: 20 });
+        });
+    });
 });
 
 describe("EditReportDialog", () => {

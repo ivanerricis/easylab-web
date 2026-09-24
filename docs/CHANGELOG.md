@@ -11,6 +11,58 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-24 — Ritocchi mobile: filtri in un pannello, report a passi, ID colorato nelle tabelle
+
+- **Filtri su telefono.** Stato, tipo, ordinamento e le due date occupavano tre righe sopra
+  l'elenco (i due campi data da 176px andavano a capo). Sotto 640px ora restano dietro un
+  pulsante "Filtri" accanto alla ricerca, che apre un pannello dal basso
+  (`MobileFiltersSheet`); il badge sul pulsante conta i filtri attivi (l'ordinamento no: non
+  toglie righe), così una lista filtrata non sembra vuota senza motivo. Nel pannello le date
+  stanno su una riga sola in due colonne ("Da"/"A", `DateRangeFilter layout="stacked"`; a 360px
+  i campi sono larghi 156px e una data di 10 caratteri ci sta). I controlli sono gli stessi
+  della barra desktop (`FilterSelect variant="sheet"`), non una copia. Riguarda Report e
+  Interventi; Clienti ha solo l'ordinamento e resta com'è. Nota: "Azzera tutti" non c'è
+  di proposito, perché stato, tipo e date scrivono nello stesso `URLSearchParams` e più
+  scritture sincrone si sovrascrivono (lo stesso problema già documentato in `DateRangeFilter`).
+- **Suggerimenti dei campi con ricerca (cliente, dispositivo, difetto) su telefono.** Le voci
+  "Nome Cognome - telefono" non andavano a capo e finivano tagliate a destra, e la lista,
+  sovrapposta al modulo ma dentro l'area che scorre del dialogo, veniva tagliata in fondo (si
+  vedevano due voci e mezza). Sotto `sm` la lista ora sta nel flusso sotto il campo e le voci
+  vanno a capo; da `sm` in su resta sovrapposta come prima. Il campo ha altezza fissa (40px,
+  come il "+" accanto) invece di `h-full`, che con la lista nel flusso lo faceva allungare.
+- **Nuovo report su telefono, a passi.** Il modulo intero era una colonna di tre schermate, con
+  "Salva" in fondo e gli errori spesso fuori vista. Sotto 640px le tre sezioni (Anagrafica,
+  Intervento, Stato) diventano tre passi, con l'indicatore "Passo N di 3" e una barra di
+  avanzamento; "Avanti" controlla solo i campi del passo visibile, "Indietro" torna senza perdere
+  niente, e "Salva" compare all'ultimo. Se al salvataggio resta un errore in un passo precedente,
+  il dialogo torna lì e mette il focus sul campo. I pulsanti stanno affiancati (nuovo
+  `footerClassName` di `CustomDialog`). Da 640px in su il dialogo è quello di prima. Per ora solo
+  il report: l'intervento si fa dopo aver visto come va questo.
+- **Schede mobile: pulsanti in fondo simmetrici.** Il footer con le azioni aveva `px-3`, ma la
+  striscia di stato copre i primi 6px a sinistra: lo spazio visibile era 6px a sinistra e 12px a
+  destra. Con la striscia il padding sinistro sale a 18px (misurato: 12px contro 13px).
+- **Calendario: il popup "+N altri" scorre.** Non aveva un'altezza massima, quindi in un giorno con
+  un centinaio di interventi usciva dallo schermo e dal riquadro del calendario e non si poteva
+  vedere il resto. Ora ha un tetto (`min(60dvh, 26rem)`, in `dvh` perché su mobile `vh` include la
+  barra degli indirizzi), scorre da solo con l'intestazione della data fissa in cima e non passa
+  lo scorrimento alla pagina sotto. Su mobile, dove il calendario è largo 640px e scorre in
+  orizzontale, il popup è ancorato alla finestra (prima l'angolo destro finiva fuori schermo).
+- **Dashboard: la card "Incassi mese" aperta su mobile.** L'importo, il confronto e "al netto
+  tecnici esterni" sono più larghi dei 358px del dialogo, e un elemento di una griglia non si
+  restringe sotto il proprio contenuto: la freccia destra e l'ultima barra uscivano dal riquadro.
+  Ora `min-w-0` e testo che va a capo; gli importi sulle barre su telefono sono in forma corta
+  ("345k" invece di "344.7…" troncato); l'icona del trend non va più a capo da sola; e il
+  fumetto "Mese precedente" non si apre più da solo all'apertura del dialogo (il focus
+  automatico finiva sulla freccia).
+- **Schede mobile: striscia di stato più larga** (da 4 a 6px, `entity-card-list.tsx`), più leggibile a colpo d'occhio.
+- **Tabelle: cella ID colorata al posto della barra.** Lo stato colora tutta la cella dell'ID
+  (colore pieno, testo bianco in grassetto) invece di una barra di 4px sul bordo: si vede meglio
+  e la riga resta neutra. Lo stile predefinito si chiama ora "Cella ID"; Tenue, Media e Intensa
+  non cambiano. L'anteprima nelle Impostazioni ha due celle per riga, altrimenti colorava tutta
+  la riga.
+
+---
+
 ## 2026-09-24 — Rinnovo estetico: palette, raggi, stati, tipografia
 
 Sei interventi sull'aspetto, nati dal giudizio "sembra un template shadcn": il design system
@@ -32,12 +84,11 @@ era ben fatto (token, contrasti) ma senza identità.
 - **Tipografia.** Tolti i `text-[10px]`/`text-[11px]` (illeggibili): minimo 12px. Aggiunta una
   scala con nome in `@theme` (`text-title`, `text-section`, `text-label`, `text-caption`);
   per ora la usa il titolo di pagina, il resto migra quando si tocca.
-- **Righe delle tabelle.** Nuovo stile predefinito "Barra laterale": la riga resta neutra e lo
-  stato è una barra colorata di 4px sul bordo sinistro (box-shadow interno sulla prima cella,
-  senza spostare il layout), come già sulle schede mobile. Un elenco lungo di righe piene era
+- **Righe delle tabelle.** Nuovo stile predefinito: la riga resta neutra e lo stato colora la
+  cella dell'ID (vedi la voce sopra: la prima versione era una barra di 4px sul bordo
+  sinistro). Un elenco lungo di righe piene era
   una macchia di colori. Il vecchio "Media" (colore pieno) resta selezionabile con la chiave
-  `medium`; chi lo aveva scelto non aveva nulla salvato (era il default), quindi passa alla
-  barra. Anche i bordi di riga erano `border-2 border-primary` (griglia blu pesante): ora
+  `medium`; chi lo aveva scelto non aveva nulla salvato (era il default), quindi passa al nuovo stile. Anche i bordi di riga erano `border-2 border-primary` (griglia blu pesante): ora
   un filetto da 2px in `foreground` al 45% (30% nel tema scuro), più marcato di `border-border`
   che a 1px si perdeva; bordo chiaro solo nell'intestazione blu.
 - **Tema scuro.** Quattro gradini di luminosità distinti (sfondo 0.15, sidebar 0.19, card

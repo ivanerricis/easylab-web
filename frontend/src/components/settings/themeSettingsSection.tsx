@@ -83,8 +83,7 @@ const IntensityPreview = ({ intensityKey }: { intensityKey: TableRowIntensityKey
                 key={color}
                 className="h-1.5 w-4"
                 style={{
-                    backgroundColor: `var(--table-row-${color})`,
-                    boxShadow: `inset var(--table-row-bar-width) 0 0 var(--status-${color})`,
+                    background: `linear-gradient(to right, var(--table-row-id-${color}, transparent) 5px, var(--table-row-${color}) 5px)`,
                 }}
             />
         ))}
@@ -286,8 +285,11 @@ const ThemeSettingsSection = () => {
                 <SettingsGroup title="Anteprima" description="Le righe qui sotto usano il livello selezionato.">
                     <Table className="bg-card">
                         <TableBody>
-                            {rowIntensityPreviewRows.map((previewRow) => (
+                            {rowIntensityPreviewRows.map((previewRow, index) => (
                                 <TableRow key={previewRow.statusColor} data-status-color={previewRow.statusColor}>
+                                    {/* Due celle, come in una tabella vera: nello stile "Cella ID" si colora
+                                        solo la prima, e con una cella sola si colorerebbe tutta la riga. */}
+                                    <TableCell className="w-16">{index + 1}</TableCell>
                                     <TableCell>{previewRow.label}</TableCell>
                                 </TableRow>
                             ))}

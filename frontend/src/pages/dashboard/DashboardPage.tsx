@@ -93,6 +93,13 @@ const barValueFormatter = new Intl.NumberFormat("it-IT", {
     maximumFractionDigits: 0,
 });
 
+/**
+ * Versione corta per i telefoni: una colonna su sei larga ~50px non ci porta "344.765 €" (finiva
+ * troncato in "344.7…"), ma "345k" sì. Sotto i mille resta il numero intero.
+ */
+const formatBarValueShort = (value: number) =>
+    Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value));
+
 const percentFormatter = new Intl.NumberFormat("it-IT", {
     style: "percent",
     maximumFractionDigits: 0,
@@ -360,14 +367,20 @@ const DashboardPage = () => {
                         </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="sm:max-w-md">
+                    {/* Senza `onOpenAutoFocus` il focus finiva sul primo pulsante, la freccia "Mese
+                        precedente", e il suo fumetto si apriva da solo sopra l'importo. */}
+                    <DialogContent className="sm:max-w-md" onOpenAutoFocus={(event) => event.preventDefault()}>
                         <DialogHeader>
                             <DialogTitle>Incassi mese</DialogTitle>
                             <DialogDescription>Andamento degli ultimi 6 mesi.</DialogDescription>
                         </DialogHeader>
 
-                        <div className="grid gap-3">
-                            <div className="flex items-center justify-between gap-2">
+                        {/* `min-w-0` sul contenitore e sui suoi figli: un elemento di una griglia non si
+                            restringe sotto la larghezza del suo contenuto, e la riga con importo,
+                            confronto e "al netto" (più larga dei 358px di un telefono) spingeva
+                            fuori dal riquadro la freccia destra e l'ultima barra del grafico. */}
+                        <div className="grid min-w-0 gap-3 *:min-w-0">
+                            <div className="flex items-center justify-between gap-1 sm:gap-2">
                                 <TableActionButton
                                     type="button"
                                     variant="ghost"
@@ -378,29 +391,33 @@ const DashboardPage = () => {
                                     <ChevronLeft className="size-4" />
                                 </TableActionButton>
 
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">{formatEuro(monthlyRevenue)}</div>
+                                <div className="min-w-0 flex-1 text-center">
+                                    <div className="text-2xl font-bold sm:text-3xl">{formatEuro(monthlyRevenue)}</div>
                                     <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
                                     {revenueComparison ? (
                                         // Freccia e segno oltre al colore: l'andamento si legge anche
                                         // senza distinguere il verde dal rosso.
                                         <div
                                             className={cn(
-                                                "mt-1 inline-flex items-center gap-1 text-sm font-medium",
+                                                "mt-1 inline-flex items-start justify-center gap-1 text-sm font-medium",
                                                 revenueComparison.change >= 0
                                                     ? "text-status-green-foreground"
                                                     : "text-destructive"
                                             )}
                                         >
                                             {revenueComparison.change >= 0 ? (
-                                                <TrendingUp className="size-4" aria-hidden="true" />
+                                                <TrendingUp className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                                             ) : (
-                                                <TrendingDown className="size-4" aria-hidden="true" />
+                                                <TrendingDown className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                                             )}
-                                            {percentFormatter.format(revenueComparison.change)} rispetto{" "}
-                                            {/* "ad agosto", "ad aprile", ma "a luglio". */}
-                                            {revenueComparison.previousMonthLabel.startsWith("a") ? "ad" : "a"}{" "}
-                                            {revenueComparison.previousMonthLabel}
+                                            {/* Icona e testo in due elementi: con l'icona nel flusso del testo, a
+                                                360px andava a capo da sola sopra la scritta. */}
+                                            <span>
+                                                {percentFormatter.format(revenueComparison.change)} rispetto{" "}
+                                                {/* "ad agosto", "ad aprile", ma "a luglio". */}
+                                                {revenueComparison.previousMonthLabel.startsWith("a") ? "ad" : "a"}{" "}
+                                                {revenueComparison.previousMonthLabel}
+                                            </span>
                                         </div>
                                     ) : null}
                                     <div className="mt-2 text-sm text-muted-foreground">
@@ -452,7 +469,10 @@ const DashboardPage = () => {
                                                     isSelected ? "font-semibold text-primary" : "text-muted-foreground"
                                                 )}
                                             >
-                                                {barValueFormatter.format(point.value)}
+                                                <span className="sm:hidden">{formatBarValueShort(point.value)}</span>
+                                                <span className="max-sm:hidden">
+                                                    {barValueFormatter.format(point.value)}
+                                                </span>
                                             </span>
                                             <div
                                                 className={cn(

@@ -276,9 +276,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    trasformerebbe in un senape. */
 :root,
 [data-table-row-intensity="default"] {
-  /* Stile predefinito "barra laterale": la riga resta neutra e lo stato è una barra colorata
-     sul bordo sinistro. Un elenco lungo di righe piene sembrava una macchia di colori. Le
-     variabili dei colori pieni qui sono trasparenti; la barra usa i token --status-*. */
+  /* Stile predefinito "cella ID": la riga resta neutra e lo stato colora solo la cella
+     dell'ID. Un elenco lungo di righe piene sembrava una macchia di colori. Le variabili dei
+     colori pieni della riga sono trasparenti; la cella usa --table-row-id-*. */
   --table-row-red: transparent;
   --table-row-red-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
   --table-row-yellow: transparent;
@@ -286,7 +286,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: transparent;
   --table-row-green-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
   --table-row-foreground: var(--foreground);
-  --table-row-bar-width: 4px;
+  --table-row-id-red: oklch(57.7% 0.245 27.325);
+  --table-row-id-yellow: oklch(79.5% 0.184 86.047);
+  --table-row-id-green: oklch(62.7% 0.194 149.214);
+  --table-row-id-foreground: oklch(1 0 0);
 }
 
 [data-table-row-intensity="medium"] {
@@ -297,7 +300,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(62.7% 0.194 149.214);
   --table-row-green-hover: oklch(52.7% 0.154 150.069);
   --table-row-foreground: oklch(1 0 0);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 [data-table-row-intensity="soft"] {
@@ -308,7 +314,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(72.3% 0.219 149.579 / 30%);
   --table-row-green-hover: oklch(72.3% 0.219 149.579 / 40%);
   --table-row-foreground: var(--foreground);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 [data-table-row-intensity="strong"] {
@@ -319,7 +328,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(52.7% 0.154 150.069);
   --table-row-green-hover: oklch(44.8% 0.119 151.328);
   --table-row-foreground: oklch(1 0 0);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 .dark,
@@ -332,7 +344,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: transparent;
   --table-row-green-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
   --table-row-foreground: var(--foreground);
-  --table-row-bar-width: 4px;
+  --table-row-id-red: oklch(50.5% 0.213 27.518);
+  --table-row-id-yellow: oklch(79.5% 0.184 86.047);
+  --table-row-id-green: oklch(52.7% 0.154 150.069);
+  --table-row-id-foreground: oklch(1 0 0);
 }
 
 .dark[data-table-row-intensity="medium"],
@@ -344,7 +359,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(52.7% 0.154 150.069);
   --table-row-green-hover: oklch(62.7% 0.194 149.214);
   --table-row-foreground: oklch(1 0 0);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 .dark[data-table-row-intensity="soft"],
@@ -356,7 +374,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(72.3% 0.219 149.579 / 15%);
   --table-row-green-hover: oklch(72.3% 0.219 149.579 / 20%);
   --table-row-foreground: var(--foreground);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 .dark[data-table-row-intensity="strong"],
@@ -368,7 +389,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   --table-row-green: oklch(44.8% 0.119 151.328);
   --table-row-green-hover: oklch(52.7% 0.154 150.069);
   --table-row-foreground: oklch(1 0 0);
-  --table-row-bar-width: 0px;
+  --table-row-id-red: initial;
+  --table-row-id-yellow: initial;
+  --table-row-id-green: initial;
+  --table-row-id-foreground: initial;
 }
 
 /* Fuori da @layer di proposito: le utility Tailwind della riga (hover:bg-muted/50 su
@@ -385,25 +409,29 @@ tr[data-status-color]:hover {
 tr[data-status-color="red"] {
   --table-row-bg: var(--table-row-red);
   --table-row-bg-hover: var(--table-row-red-hover);
-  --table-row-bar: var(--status-red);
+  --table-row-id-bg: var(--table-row-id-red);
 }
 
 tr[data-status-color="yellow"] {
   --table-row-bg: var(--table-row-yellow);
   --table-row-bg-hover: var(--table-row-yellow-hover);
-  --table-row-bar: var(--status-yellow);
+  --table-row-id-bg: var(--table-row-id-yellow);
 }
 
 tr[data-status-color="green"] {
   --table-row-bg: var(--table-row-green);
   --table-row-bg-hover: var(--table-row-green-hover);
-  --table-row-bar: var(--status-green);
+  --table-row-id-bg: var(--table-row-id-green);
 }
 
-/* La barra è un'ombra interna sulla prima cella (non un bordo): non sposta il layout e
-   segue gli angoli. Larghezza 0 negli stili a riga piena. */
+/* Nello stile predefinito la riga resta neutra e a colorarsi è solo la cella ID (la prima):
+   pieno e con testo bianco, come le righe piene ma limitato a una cella. Negli altri stili le
+   variabili --table-row-id-* sono `initial` (valore non valido), quindi scattano i fallback
+   qui sotto e la cella non fa niente di suo. */
 tr[data-status-color] > :first-child {
-  box-shadow: inset var(--table-row-bar-width, 0px) 0 0 var(--table-row-bar, transparent);
+  background-color: var(--table-row-id-bg, transparent);
+  color: var(--table-row-id-foreground, inherit);
+  font-weight: 600;
 }
 
 /* Densità delle tabelle: l'attributo sta su <html> (scritto da applyTableDensity in

@@ -18,7 +18,9 @@ import {
     listDevices,
     listIssues,
 } from "@/lib/api";
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import InputWithAdd from "@/components/inputWithAdd";
 import { Input } from "@/components/ui/input";
@@ -70,8 +72,24 @@ type FieldErrors = Partial<
     Record<"issue" | "issueDescription" | "client" | "deviceType" | "charger" | "dataBackup", string>
 >;
 
+type FieldKey = keyof FieldErrors;
+
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
 const fieldOrder = ["client", "deviceType", "issue", "issueDescription", "charger", "dataBackup"] as const;
+
+/**
+ * Su telefono il modulo intero era una colonna lunga tre schermate, con "Salva" in fondo e gli
+ * errori spesso fuori vista. Sotto `sm` ogni sezione diventa un passo: se ne vede una alla volta,
+ * "Avanti" controlla solo i campi di quella, e "Salva" arriva all'ultimo. Da `sm` in su il
+ * dialogo resta quello di sempre, tutto in una pagina.
+ */
+const reportSteps: { title: string; fields: readonly FieldKey[] }[] = [
+    { title: "Anagrafica", fields: ["client", "deviceType"] },
+    { title: "Intervento", fields: ["issue", "issueDescription"] },
+    { title: "Stato", fields: ["charger", "dataBackup"] },
+];
+const lastStep = reportSteps.length - 1;
+const stepOfField = (field: FieldKey) => reportSteps.findIndex((step) => step.fields.includes(field));
 
 /** Il modulo come si presenta all'apertura: da qui si riparte, e con questo si confronta. */
 const emptyFormValues = {
@@ -103,6 +121,12 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
     // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
     // qui il testo, l'errore sta sotto il campo e ci resta finché non si corregge.
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+    const isStepped = useIsMobile(640);
+    const [step, setStep] = useState(0);
+    // Il campo da mettere a fuoco quando il passo che lo contiene sarà montato: con un errore in
+    // un passo precedente, "Salva" torna lì, e il campo esiste solo dopo il render.
+    const pendingFocusRef = useRef<FieldKey | null>(null);
+    const isLastStep = !isStepped || step === lastStep;
     const initialCustomerId = initialCustomer?.id ?? null;
     const initialCustomerOption = initialCustomer
         ? formatCustomerOption(
@@ -128,6 +152,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
         if (open) {
             startTransition(() => {
                 setFieldErrors({});
+                setStep(0);
                 setFormValues(initialFormValues);
                 setCustomerIdByOption(initialCustomerId == null ? {} : { [initialCustomerOption]: initialCustomerId });
             });
@@ -166,6 +191,25 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
         return options.map((item) => item.label);
     }, []);
+
+    useEffect(() => {
+        if (pendingFocusRef.current) {
+            document.getElementById(pendingFocusRef.current)?.focus();
+            pendingFocusRef.current = null;
+        }
+    }, [step]);
+
+    const focusField = (field: FieldKey) => {
+        const fieldStep = stepOfField(field);
+
+        if (isStepped && fieldStep !== step) {
+            pendingFocusRef.current = field;
+            setStep(fieldStep);
+            return;
+        }
+
+        document.getElementById(field)?.focus();
+    };
 
     const handleConfirm = async () => {
         if (isSubmitting) {
@@ -210,12 +254,34 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
             nextFieldErrors.dataBackup = "Seleziona se deve essere effettuato il backup dati";
         }
 
+        // A metà del percorso a passi si controllano solo i campi del passo visibile: segnalare
+        // come sbagliato un campo che non si è ancora visto non servirebbe a niente.
+        if (!isLastStep) {
+            const stepErrors: FieldErrors = {};
+
+            for (const field of reportSteps[step].fields) {
+                stepErrors[field] = nextFieldErrors[field];
+            }
+
+            setFieldErrors(stepErrors);
+
+            const firstInvalidStepField = fieldOrder.find((field) => stepErrors[field]);
+
+            if (firstInvalidStepField) {
+                focusField(firstInvalidStepField);
+                return;
+            }
+
+            setStep(step + 1);
+            return;
+        }
+
         setFieldErrors(nextFieldErrors);
 
         const firstInvalidField = fieldOrder.find((field) => nextFieldErrors[field]);
 
         if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+            focusField(firstInvalidField);
             return;
         }
 
@@ -250,285 +316,319 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 title="Nuovo report"
                 description="Inserisci i dati del report e conferma per salvare."
                 contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-                confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
-                confirmIcon={Save}
-                cancelLabel="Annulla"
-                onCancel={() => onOpenChange(false)}
+                confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
+                confirmIcon={isLastStep ? Save : undefined}
+                cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
+                onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
+                // Sotto `sm` il footer impila i pulsanti; in un percorso a passi "Indietro" e
+                // "Avanti" stanno meglio affiancati, ciascuno dal suo lato.
+                footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting}
                 confirmDisabled={isSubmitting}
                 content={
                     <div className="grid max-h-[72vh] gap-4 overflow-y-auto py-1 pr-1">
-                        <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                Anagrafica
-                            </h3>
+                        {isStepped ? (
+                            <div className="grid gap-2" aria-live="polite">
+                                <p className="text-sm text-muted-foreground">
+                                    Passo {step + 1} di {reportSteps.length}:{" "}
+                                    <span className="font-medium text-foreground">{reportSteps[step].title}</span>
+                                </p>
+                                <div className="flex gap-1.5" aria-hidden="true">
+                                    {reportSteps.map((reportStep, index) => (
+                                        <span
+                                            key={reportStep.title}
+                                            className={cn(
+                                                "h-1.5 flex-1 rounded-full",
+                                                index <= step ? "bg-primary" : "bg-muted-foreground/25"
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
 
-                            {/*
+                        {!isStepped || step === 0 ? (
+                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
+                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Anagrafica
+                                </h3>
+
+                                {/*
                                 `items-start` in tutte le griglie di campi: quando un campo mostra
                                 l'errore sotto di sé la riga si allunga, e senza le celle vicine si
                                 stiravano con lei spingendo in giù etichetta e campo.
                             */}
-                            <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                <div className="grid lg:col-span-1">
-                                    <Label htmlFor="client" className="text-lg">
-                                        Cliente
-                                        <RequiredMark />
-                                    </Label>
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="client"
-                                            {...fieldErrorAria("client", fieldErrors.client)}
-                                            placeholder="Cliente"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.customer}
-                                            onSearch={searchCustomers}
-                                            isSelectedOption={customerIdByOption[formValues.customer] != null}
-                                            onChange={(value: string) => {
-                                                setFormValues((prev) => ({ ...prev, customer: value }));
-                                                setFieldErrors((prev) => ({ ...prev, client: undefined }));
-                                            }}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size={"icon-lg"}
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateCustomerDialogOpen(true)}
-                                                    aria-label="Crea nuovo cliente"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo cliente</TooltipContent>
-                                        </Tooltip>
+                                <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                                    <div className="grid lg:col-span-1">
+                                        <Label htmlFor="client" className="text-lg">
+                                            Cliente
+                                            <RequiredMark />
+                                        </Label>
+                                        <div className="flex">
+                                            <InputWithAdd
+                                                id="client"
+                                                {...fieldErrorAria("client", fieldErrors.client)}
+                                                placeholder="Cliente"
+                                                inputClassName="rounded-r-none"
+                                                value={formValues.customer}
+                                                onSearch={searchCustomers}
+                                                isSelectedOption={customerIdByOption[formValues.customer] != null}
+                                                onChange={(value: string) => {
+                                                    setFormValues((prev) => ({ ...prev, customer: value }));
+                                                    setFieldErrors((prev) => ({ ...prev, client: undefined }));
+                                                }}
+                                                required
+                                            />
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size={"icon-lg"}
+                                                        className="rounded-l-none border-l-0!"
+                                                        onClick={() => setIsCreateCustomerDialogOpen(true)}
+                                                        aria-label="Crea nuovo cliente"
+                                                    >
+                                                        <Plus className="size-5" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Crea nuovo cliente</TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <FieldError id="client" error={fieldErrors.client} />
                                     </div>
-                                    <FieldError id="client" error={fieldErrors.client} />
-                                </div>
 
-                                <div className="grid lg:col-span-2 xl:col-span-1">
-                                    <Label htmlFor="deviceType" className="text-lg">
-                                        Tipologia dispositivo
-                                        <RequiredMark />
-                                    </Label>
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="deviceType"
-                                            {...fieldErrorAria("deviceType", fieldErrors.deviceType)}
-                                            placeholder="Es. iPhone 13"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.deviceType}
-                                            options={deviceOptions}
-                                            onCreate={async (value: string) => {
-                                                const createdDevice = await createDevice({ name: value });
-                                                addDeviceOption(createdDevice);
-                                            }}
-                                            onChange={(value: string) => {
-                                                setFormValues((prev) => ({ ...prev, deviceType: value }));
-                                                setFieldErrors((prev) => ({ ...prev, deviceType: undefined }));
-                                            }}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size={"icon-lg"}
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateDeviceDialogOpen(true)}
-                                                    aria-label="Crea nuovo dispositivo"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo dispositivo</TooltipContent>
-                                        </Tooltip>
+                                    <div className="grid lg:col-span-2 xl:col-span-1">
+                                        <Label htmlFor="deviceType" className="text-lg">
+                                            Tipologia dispositivo
+                                            <RequiredMark />
+                                        </Label>
+                                        <div className="flex">
+                                            <InputWithAdd
+                                                id="deviceType"
+                                                {...fieldErrorAria("deviceType", fieldErrors.deviceType)}
+                                                placeholder="Es. iPhone 13"
+                                                inputClassName="rounded-r-none"
+                                                value={formValues.deviceType}
+                                                options={deviceOptions}
+                                                onCreate={async (value: string) => {
+                                                    const createdDevice = await createDevice({ name: value });
+                                                    addDeviceOption(createdDevice);
+                                                }}
+                                                onChange={(value: string) => {
+                                                    setFormValues((prev) => ({ ...prev, deviceType: value }));
+                                                    setFieldErrors((prev) => ({ ...prev, deviceType: undefined }));
+                                                }}
+                                                required
+                                            />
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size={"icon-lg"}
+                                                        className="rounded-l-none border-l-0!"
+                                                        onClick={() => setIsCreateDeviceDialogOpen(true)}
+                                                        aria-label="Crea nuovo dispositivo"
+                                                    >
+                                                        <Plus className="size-5" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Crea nuovo dispositivo</TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <FieldError id="deviceType" error={fieldErrors.deviceType} />
                                     </div>
-                                    <FieldError id="deviceType" error={fieldErrors.deviceType} />
                                 </div>
-                            </div>
-                        </section>
+                            </section>
+                        ) : null}
 
-                        <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                Intervento
-                            </h3>
+                        {!isStepped || step === 1 ? (
+                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
+                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Intervento
+                                </h3>
 
-                            <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                <div className="grid lg:col-span-2 xl:col-span-1">
-                                    <Label htmlFor="issue" className="text-lg">
-                                        Difetto
-                                        <RequiredMark />
-                                    </Label>
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="issue"
-                                            {...fieldErrorAria("issue", fieldErrors.issue)}
-                                            placeholder="Cerca il difetto"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.issue}
-                                            options={issueOptions}
-                                            showAllOnFocus
-                                            onCreate={async (value: string) => {
-                                                const createdIssue = await createIssue({ description: value });
-                                                addIssueOption(createdIssue);
-                                            }}
-                                            onChange={(value: string) => {
-                                                setFormValues((prev) => ({ ...prev, issue: value }));
-                                                setFieldErrors((prev) => ({ ...prev, issue: undefined }));
-                                            }}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size={"icon-lg"}
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateIssueDialogOpen(true)}
-                                                    aria-label="Crea nuovo difetto"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo difetto</TooltipContent>
-                                        </Tooltip>
+                                <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                                    <div className="grid lg:col-span-2 xl:col-span-1">
+                                        <Label htmlFor="issue" className="text-lg">
+                                            Difetto
+                                            <RequiredMark />
+                                        </Label>
+                                        <div className="flex">
+                                            <InputWithAdd
+                                                id="issue"
+                                                {...fieldErrorAria("issue", fieldErrors.issue)}
+                                                placeholder="Cerca il difetto"
+                                                inputClassName="rounded-r-none"
+                                                value={formValues.issue}
+                                                options={issueOptions}
+                                                showAllOnFocus
+                                                onCreate={async (value: string) => {
+                                                    const createdIssue = await createIssue({ description: value });
+                                                    addIssueOption(createdIssue);
+                                                }}
+                                                onChange={(value: string) => {
+                                                    setFormValues((prev) => ({ ...prev, issue: value }));
+                                                    setFieldErrors((prev) => ({ ...prev, issue: undefined }));
+                                                }}
+                                                required
+                                            />
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size={"icon-lg"}
+                                                        className="rounded-l-none border-l-0!"
+                                                        onClick={() => setIsCreateIssueDialogOpen(true)}
+                                                        aria-label="Crea nuovo difetto"
+                                                    >
+                                                        <Plus className="size-5" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Crea nuovo difetto</TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <FieldError id="issue" error={fieldErrors.issue} />
                                     </div>
-                                    <FieldError id="issue" error={fieldErrors.issue} />
-                                </div>
 
-                                {/*
+                                    {/*
                                     Solo con "Altro": è il caso in cui l'etichetta del catalogo non
                                     dice niente al cliente, e quello che si scrive qui è ciò che
                                     compare sulla ricevuta sotto "Problema riscontrato". Con
                                     qualunque altro difetto la casella non serve e non compare.
                                 */}
-                                {isCatchAllIssue(formValues.issue) ? (
+                                    {isCatchAllIssue(formValues.issue) ? (
+                                        <div className="grid lg:col-span-2 xl:col-span-2">
+                                            <Label htmlFor="issueDescription" className="text-lg">
+                                                Problema riscontrato
+                                                <RequiredMark />
+                                            </Label>
+                                            <Textarea
+                                                {...fieldProps("issueDescription", {
+                                                    error: fieldErrors.issueDescription,
+                                                })}
+                                                placeholder="Descrivi il problema: è quello che il cliente legge sulla ricevuta"
+                                                maxLength={255}
+                                                value={formValues.issueDescription}
+                                                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+                                                    setFormValues((prev) => ({
+                                                        ...prev,
+                                                        issueDescription: event.target.value,
+                                                    }));
+                                                    setFieldErrors((prev) => ({
+                                                        ...prev,
+                                                        issueDescription: undefined,
+                                                    }));
+                                                }}
+                                            />
+                                            <FieldError id="issueDescription" error={fieldErrors.issueDescription} />
+                                        </div>
+                                    ) : null}
+
+                                    <div className="grid">
+                                        <Label htmlFor="password" className="text-lg">
+                                            Password sblocco
+                                        </Label>
+                                        <Input
+                                            id="password"
+                                            placeholder="Password dispositivo"
+                                            value={formValues.password}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setFormValues((prev) => ({ ...prev, password: event.target.value }))
+                                            }
+                                        />
+                                    </div>
+
                                     <div className="grid lg:col-span-2 xl:col-span-2">
-                                        <Label htmlFor="issueDescription" className="text-lg">
-                                            Problema riscontrato
-                                            <RequiredMark />
+                                        <Label htmlFor="notes" className="text-lg">
+                                            Note
                                         </Label>
                                         <Textarea
-                                            {...fieldProps("issueDescription", { error: fieldErrors.issueDescription })}
-                                            placeholder="Descrivi il problema: è quello che il cliente legge sulla ricevuta"
-                                            maxLength={255}
-                                            value={formValues.issueDescription}
-                                            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-                                                setFormValues((prev) => ({
-                                                    ...prev,
-                                                    issueDescription: event.target.value,
-                                                }));
-                                                setFieldErrors((prev) => ({ ...prev, issueDescription: undefined }));
-                                            }}
+                                            id="notes"
+                                            placeholder="Note"
+                                            rows={4}
+                                            value={formValues.notes}
+                                            onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                                                setFormValues((prev) => ({ ...prev, notes: event.target.value }))
+                                            }
                                         />
-                                        <FieldError id="issueDescription" error={fieldErrors.issueDescription} />
                                     </div>
-                                ) : null}
-
-                                <div className="grid">
-                                    <Label htmlFor="password" className="text-lg">
-                                        Password sblocco
-                                    </Label>
-                                    <Input
-                                        id="password"
-                                        placeholder="Password dispositivo"
-                                        value={formValues.password}
-                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                                            setFormValues((prev) => ({ ...prev, password: event.target.value }))
-                                        }
-                                    />
                                 </div>
+                            </section>
+                        ) : null}
 
-                                <div className="grid lg:col-span-2 xl:col-span-2">
-                                    <Label htmlFor="notes" className="text-lg">
-                                        Note
-                                    </Label>
-                                    <Textarea
-                                        id="notes"
-                                        placeholder="Note"
-                                        rows={4}
-                                        value={formValues.notes}
-                                        onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-                                            setFormValues((prev) => ({ ...prev, notes: event.target.value }))
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </section>
+                        {!isStepped || step === 2 ? (
+                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
+                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Stato
+                                </h3>
 
-                        <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                Stato
-                            </h3>
-
-                            <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
-                                <div className="grid gap-2 rounded-md">
-                                    <Label htmlFor="charger" className="w-full text-lg">
-                                        Alimentatore presente
-                                        <RequiredMark />
-                                    </Label>
-                                    <Select
-                                        value={formValues.charger}
-                                        onValueChange={(value) => {
-                                            setFormValues((prev) => ({ ...prev, charger: value }));
-                                            if (value !== "unset") {
-                                                setFieldErrors((prev) => ({ ...prev, charger: undefined }));
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger
-                                            id="charger"
-                                            {...fieldErrorAria("charger", fieldErrors.charger)}
-                                            className="w-full"
+                                <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
+                                    <div className="grid gap-2 rounded-md">
+                                        <Label htmlFor="charger" className="w-full text-lg">
+                                            Alimentatore presente
+                                            <RequiredMark />
+                                        </Label>
+                                        <Select
+                                            value={formValues.charger}
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, charger: value }));
+                                                if (value !== "unset") {
+                                                    setFieldErrors((prev) => ({ ...prev, charger: undefined }));
+                                                }
+                                            }}
                                         >
-                                            <SelectValue placeholder="Seleziona" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="unset">Seleziona</SelectItem>
-                                            <SelectItem value="yes">Sì</SelectItem>
-                                            <SelectItem value="no">No</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FieldError id="charger" error={fieldErrors.charger} />
-                                </div>
+                                            <SelectTrigger
+                                                id="charger"
+                                                {...fieldErrorAria("charger", fieldErrors.charger)}
+                                                className="w-full"
+                                            >
+                                                <SelectValue placeholder="Seleziona" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="unset">Seleziona</SelectItem>
+                                                <SelectItem value="yes">Sì</SelectItem>
+                                                <SelectItem value="no">No</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="charger" error={fieldErrors.charger} />
+                                    </div>
 
-                                <div className="grid gap-2 rounded-md">
-                                    <Label htmlFor="dataBackup" className="w-full text-lg">
-                                        Backup dati
-                                        <RequiredMark />
-                                    </Label>
-                                    <Select
-                                        value={formValues.dataBackup}
-                                        onValueChange={(value) => {
-                                            setFormValues((prev) => ({ ...prev, dataBackup: value }));
-                                            if (value !== "unset") {
-                                                setFieldErrors((prev) => ({ ...prev, dataBackup: undefined }));
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger
-                                            id="dataBackup"
-                                            {...fieldErrorAria("dataBackup", fieldErrors.dataBackup)}
-                                            className="w-full"
+                                    <div className="grid gap-2 rounded-md">
+                                        <Label htmlFor="dataBackup" className="w-full text-lg">
+                                            Backup dati
+                                            <RequiredMark />
+                                        </Label>
+                                        <Select
+                                            value={formValues.dataBackup}
+                                            onValueChange={(value) => {
+                                                setFormValues((prev) => ({ ...prev, dataBackup: value }));
+                                                if (value !== "unset") {
+                                                    setFieldErrors((prev) => ({ ...prev, dataBackup: undefined }));
+                                                }
+                                            }}
                                         >
-                                            <SelectValue placeholder="Seleziona" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="unset">Seleziona</SelectItem>
-                                            <SelectItem value="yes">Sì</SelectItem>
-                                            <SelectItem value="no">No</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FieldError id="dataBackup" error={fieldErrors.dataBackup} />
+                                            <SelectTrigger
+                                                id="dataBackup"
+                                                {...fieldErrorAria("dataBackup", fieldErrors.dataBackup)}
+                                                className="w-full"
+                                            >
+                                                <SelectValue placeholder="Seleziona" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="unset">Seleziona</SelectItem>
+                                                <SelectItem value="yes">Sì</SelectItem>
+                                                <SelectItem value="no">No</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError id="dataBackup" error={fieldErrors.dataBackup} />
+                                    </div>
                                 </div>
-                            </div>
-                        </section>
+                            </section>
+                        ) : null}
                     </div>
                 }
             />

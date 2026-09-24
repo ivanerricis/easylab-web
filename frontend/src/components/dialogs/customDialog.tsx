@@ -7,6 +7,8 @@ import type { LucideIcon } from "lucide-react";
 type Props = Readonly<{
     content?: ReactNode;
     contentClassName?: string;
+    /** Classi in più per la riga dei pulsanti (es. affiancati anche su mobile, nei moduli a passi). */
+    footerClassName?: string;
 
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -70,6 +72,7 @@ const CustomDialog = ({
     preventOutsideClose = false,
     isDirty = false,
     contentClassName,
+    footerClassName,
 }: Props) => {
     const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
 
@@ -160,7 +163,7 @@ const CustomDialog = ({
                     {content}
 
                     {(showCancelButton || showConfirmButton) && (
-                        <DialogFooter className="mt-2">
+                        <DialogFooter className={cn("mt-2", footerClassName)}>
                             {showCancelButton && (
                                 <Button
                                     type="button"

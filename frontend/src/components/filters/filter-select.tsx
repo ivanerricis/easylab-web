@@ -38,8 +38,10 @@ type FilterSelectProps<TValue extends string> = {
      * `inline` è il filtro accanto alle tab nelle schede di cliente, collaboratore e tecnico:
      * lì il testo resta sempre, e su mobile il menu prende lo spazio che le tab lasciano. Prima
      * quelle schede avevano cinque `Select` scritti a mano con le stesse classi.
+     * `sheet` è il menu a tutta larghezza dentro il pannello dei filtri su mobile: testo sempre
+     * visibile, senza la riduzione all'icona della barra.
      */
-    variant?: "toolbar" | "inline";
+    variant?: "toolbar" | "inline" | "sheet";
 };
 
 const FilterSelect = <TValue extends string>({
@@ -61,7 +63,9 @@ const FilterSelect = <TValue extends string>({
                 className={
                     variant === "inline"
                         ? "min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
-                        : cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")
+                        : variant === "sheet"
+                          ? "w-full text-base data-[size=default]:h-10"
+                          : cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")
                 }
                 aria-label={label}
             >

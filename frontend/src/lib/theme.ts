@@ -172,8 +172,8 @@ export const tableRowsPerPageOptions: TableRowsPerPage[] = [
 export const tableRowIntensities: TableRowIntensity[] = [
     {
         key: "default",
-        label: "Barra laterale",
-        description: "Riga neutra con una barra colorata a sinistra.",
+        label: "Cella ID",
+        description: "Riga neutra, colorata solo la cella dell'ID.",
     },
     {
         key: "soft",

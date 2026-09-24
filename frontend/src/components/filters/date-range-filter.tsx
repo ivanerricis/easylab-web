@@ -15,6 +15,12 @@ type DateRangeFilterProps = {
      * precedente, così "Pulisci date" toglieva solo la data di fine.
      */
     onClearDates: () => void;
+    /**
+     * `inline` (il default) sono i due campi in barra, con il trattino in mezzo. `stacked` è per
+     * il pannello dei filtri su mobile: due colonne uguali con l'etichetta "Da"/"A" sopra, che
+     * occupano una riga sola invece di due.
+     */
+    layout?: "inline" | "stacked";
 };
 
 /**
@@ -32,7 +38,51 @@ const DateRangeFilter = ({
     dateTo,
     onDateToChange,
     onClearDates,
+    layout = "inline",
 }: DateRangeFilterProps) => {
+    if (layout === "stacked") {
+        return (
+            <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-3">
+                    <label className="grid gap-1.5 text-sm font-medium">
+                        Da
+                        <Input
+                            type="date"
+                            aria-label="Data di inizio"
+                            value={dateFrom ?? ""}
+                            max={dateTo}
+                            onChange={(event) => onDateFromChange(event.target.value || undefined)}
+                            className="h-10 w-full"
+                        />
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-medium">
+                        A
+                        <Input
+                            type="date"
+                            aria-label="Data di fine"
+                            value={dateTo ?? ""}
+                            min={dateFrom}
+                            onChange={(event) => onDateToChange(event.target.value || undefined)}
+                            className="h-10 w-full"
+                        />
+                    </label>
+                </div>
+                {dateFrom || dateTo ? (
+                    <Button
+                        variant="ghost"
+                        size="lg"
+                        className="gap-2 self-start px-2"
+                        onClick={onClearDates}
+                        aria-label="Pulisci date"
+                    >
+                        <FilterX className="size-4" />
+                        <span>Pulisci date</span>
+                    </Button>
+                ) : null}
+            </div>
+        );
+    }
+
     return (
         <>
             <div className="flex flex-wrap items-center gap-2">

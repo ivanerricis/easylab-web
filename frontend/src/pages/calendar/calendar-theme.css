@@ -78,8 +78,26 @@
     border-color: var(--border);
 }
 
+/*
+ * Il popup non ha un'altezza massima nel CSS della libreria: in un giorno con cento interventi
+ * cresceva quanto la lista, uscendo dallo schermo e dal riquadro del calendario (che taglia),
+ * e non si poteva scorrere per vederli tutti. Con un tetto e `overflow-y: auto` scorre da sé;
+ * `overscroll-behavior: contain` evita che a fine lista lo scorrimento passi alla pagina sotto,
+ * e l'intestazione con la data resta fissa in cima. Il tetto è in `dvh`, non in `vh`, perché su
+ * mobile `vh` include la barra degli indirizzi e il fondo del popup finirebbe sotto lo schermo.
+ */
+.rbc-overlay {
+    max-height: min(60dvh, 26rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .rbc-overlay-header {
     border-color: var(--border);
+    position: sticky;
+    top: -10px;
+    z-index: 1;
+    background-color: var(--popover);
 }
 
 .rbc-agenda-view table.rbc-agenda-table {
@@ -98,6 +116,21 @@
 }
 
 @media (max-width: 640px) {
+    /*
+     * Il popup "+N altri" è posizionato dalla libreria dentro il calendario, che su mobile è largo
+     * 640px e scorre in orizzontale: l'angolo destro finiva fuori dallo schermo. Qui lo si
+     * ancora alla finestra, con un margine di 1rem per lato. `!important` perché top, left e
+     * larghezza sono scritti dalla libreria come stile in linea.
+     */
+    .rbc-overlay {
+        position: fixed !important;
+        top: 6rem !important;
+        right: 1rem !important;
+        left: 1rem !important;
+        width: auto !important;
+        max-height: min(70dvh, calc(100dvh - 8rem));
+    }
+
     .rbc-month-view,
     .rbc-time-view {
         min-width: 640px;

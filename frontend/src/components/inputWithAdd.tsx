@@ -162,7 +162,9 @@ const InputWithAdd = ({
     return (
         <div className="relative w-full">
             <Input
-                className={cn("group h-full", inputClassName)}
+                // 40px fissi come il "+" accanto (`icon-lg`), non `h-full`: su telefono la lista
+                // sta nel flusso sotto il campo, e con `h-full` il campo si allungava con lei.
+                className={cn("group h-10", inputClassName)}
                 id={id}
                 aria-invalid={ariaInvalid}
                 aria-describedby={ariaDescribedBy}
@@ -180,7 +182,12 @@ const InputWithAdd = ({
             />
 
             {isOpen && hasSuggestions ? (
-                <div className="absolute z-10 mt-2 w-full rounded-md border bg-card shadow-sm">
+                // Sotto `sm` la lista sta nel flusso invece che sovrapposta: nei dialoghi il campo
+                // è dentro un'area che scorre, e una lista `absolute` veniva tagliata dal bordo di
+                // quell'area (su telefono si vedevano due voci e mezza). Nel flusso spinge in giù
+                // i campi sotto, e l'area scorre per mostrarla tutta. Da `sm` il dialogo è largo
+                // e alto abbastanza, e la lista torna sovrapposta come prima.
+                <div className="mt-1 w-full rounded-md border bg-card shadow-sm sm:absolute sm:z-10 sm:mt-2">
                     <div className="max-h-48 overflow-auto">
                         {filteredOptions.map((option) => (
                             <Button
@@ -188,7 +195,10 @@ const InputWithAdd = ({
                                 type="button"
                                 variant="ghost"
                                 size={"lg"}
-                                className="w-full justify-start rounded-sm"
+                                // `whitespace-normal` e altezza libera: "Nome Cognome - telefono"
+                                // è più largo di un campo su telefono, e senza andare a capo il
+                                // numero finiva tagliato. Una voce lunga ora occupa due righe.
+                                className="h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal"
                                 onMouseDown={() => {
                                     onChange(option);
                                     setIsOpen(false);

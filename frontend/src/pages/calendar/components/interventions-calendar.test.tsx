@@ -41,7 +41,7 @@ const event: InterventionCalendarEvent = {
     },
 };
 
-const renderCalendar = (onRangeChange = vi.fn()) => {
+const renderCalendar = (onRangeChange = vi.fn(), { reactStrictMode = false } = {}) => {
     renderWithProviders(
         <InterventionsCalendar
             events={[event]}
@@ -49,7 +49,8 @@ const renderCalendar = (onRangeChange = vi.fn()) => {
             isInitialLoading={false}
             onCreateIntervention={vi.fn()}
             onRangeChange={onRangeChange}
-        />
+        />,
+        { reactStrictMode }
     );
     return onRangeChange;
 };
@@ -129,6 +130,44 @@ describe("InterventionsCalendar", () => {
         await waitFor(() => {
             expect(onRangeChange).toHaveBeenLastCalledWith({ from: "2026-09-28", to: "2026-11-01" });
         });
+    });
+
+    /**
+     * Non basta che parta la richiesta del nuovo intervallo: in sviluppo la barra restava su
+     * "settembre 2026" e la griglia sul mese corrente anche dopo "Avanti" (vedi `date` nel
+     * componente). Succedeva solo sotto `StrictMode`, come in `main.tsx`: per questo il test lo
+     * accende, e controlla ciò che vede l'utente, compreso "Oggi" che riporta indietro.
+     */
+    // Quindici secondi invece dei cinque di default: quattro navigazioni con il calendario intero
+    // ridisegnato in StrictMode (doppio render) prendono ~2s da sole, e nella suite completa, con
+    // gli altri file in parallelo, hanno superato i 5s.
+    it("Avanti, Indietro e Oggi cambiano il periodo mostrato nella barra", async () => {
+        renderCalendar(vi.fn(), { reactStrictMode: true });
+
+        expect(screen.getByText("settembre 2026")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+        expect(await screen.findByText("ottobre 2026")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+        expect(await screen.findByText("novembre 2026")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+        expect(await screen.findByText("ottobre 2026")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Oggi" }));
+        expect(await screen.findByText("settembre 2026")).toBeInTheDocument();
+    }, 15000);
+
+    it("segnala la vista attiva e la cambia", async () => {
+        renderCalendar();
+
+        expect(screen.getByRole("button", { name: "Mese" })).toHaveAttribute("aria-pressed", "true");
+
+        await userEvent.click(screen.getByRole("button", { name: "Giorno" }));
+
+        expect(screen.getByRole("button", { name: "Giorno" })).toHaveAttribute("aria-pressed", "true");
+        expect(screen.getByRole("button", { name: "Mese" })).toHaveAttribute("aria-pressed", "false");
     });
 
     /**

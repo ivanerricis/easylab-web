@@ -11,6 +11,61 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-24 — Pulizia visiva: controlli, schede di dettaglio, sidebar, calendario, errori
+
+Secondo giro sull'aspetto, dopo il rinnovo di palette e superfici della mattina.
+
+- **Controlli alla stessa misura.** Nelle barre dei filtri la ricerca era a 14px e i menu a
+  tendina accanto a 18px (`SelectTrigger` aveva `text-lg` fisso); nella scheda cliente le tab
+  "Report | Interventi" erano più piccole del menu accanto. Ora il trigger segue `Input`
+  (`text-base md:text-sm`: 14px da `md`, 16px sotto per evitare lo zoom di iOS), il menu accanto
+  alle tab è alto 40px come loro, e i pulsanti di pagina ("Crea nuovo …") sono a 14px. Nei
+  dialoghi i campi restano a 18px: `CustomDialog` riporta anche il trigger dei menu alla misura
+  degli altri campi.
+- **Schede di dettaglio senza "scatola nella scatola".** Ogni valore stava in un riquadro con
+  bordo, dentro una card, dentro la pagina, con tre stili di etichetta in competizione (titoli
+  blu, etichette maiuscole grigie, valori). Ora `DetailItem` è una coppia etichetta/valore senza
+  riquadro dentro una griglia `<dl>`, i titoli di sezione sono nel colore del testo (il blu resta
+  per ciò che si clicca), l'intestazione freccia/titolo/azioni è un componente unico
+  (`DetailHeader`: prima la freccia stava a x diverse fra report e cliente) e i pulsanti in alto
+  sono a 14px. Su telefono le cinque card del riepilogo (stato, prezzi, totale, pagamento)
+  diventano una card a righe (`DetailStats`: ~210px invece di ~400). Tolto anche l'`overflow-auto`
+  proprio di report e intervento, che su telefono dava una seconda barra di scorrimento.
+- **Sidebar più leggera.** Voci a 15px con icone da 20px e righe da 40px (prima 18px e 48px); la
+  voce aperta è una tinta leggera del primario con testo nel primario, non più un blocco blu
+  pieno. Il blu del tema come testo è corretto per il contrasto: scurito in chiaro (6.0:1),
+  schiarito in scuro (7.0:1); da solo era 4.2:1 e sotto 3:1.
+- **Calendario: barra dei comandi dell'app.** "Oggi / Indietro / Avanti" e "Mese / Settimana /
+  Giorno / Agenda" erano i pulsanti della libreria; ora un `CalendarToolbar` con i `Button`
+  dell'app, a gruppi, con la vista attiva in `aria-pressed`. Su telefono le viste stanno su una
+  riga a tutta larghezza. Corretto anche un difetto solo di sviluppo: in StrictMode l'helper
+  `uncontrollable` di react-big-calendar si segnava smontato e ignorava i cambi di data, quindi
+  le frecce caricavano il mese dopo ma griglia ed etichetta restavano ferme; la data visibile ora
+  è uno stato del componente.
+- **Dialogo "Modifiche non salvate".** L'azione consigliata ("Continua a modificare") era grigia
+  accanto a un "Chiudi senza salvare" colorato: ora è il pulsante pieno, a destra su desktop e in
+  cima su telefono come l'azione principale di ogni altro dialogo. Il focus all'apertura è dato
+  esplicitamente al pulsante sicuro (`onOpenAutoFocus`): Radix mette a fuoco il primo elemento e
+  ignora `autoFocus`, e col nuovo ordine sarebbe toccato a "Chiudi senza salvare". I titoli dei
+  dialoghi sono in semibold.
+- **Nuovo indicatore di caricamento.** La luna di `react-spinners` (`MoonLoader`, nuova
+  dipendenza) al posto della rotellina, nel componente `Spinner`, per le attese a tutta area
+  (pagine, blocco "operazione in corso"). Colore `var(--primary)`, così segue tavolozza e tema;
+  anello al 25% invece del 10% della libreria, che su sfondo grigio o scuro quasi non si vedeva.
+  L'esenzione dal motion ridotto copre ora anche i discendenti di `[data-slot="spinner"]`, perché
+  la libreria anima gli elementi figli. Le icone piccole che girano nei pulsanti restano
+  `Loader2`.
+- **Schermata "Si è verificato un errore".** Sulla rotta `/error` la card stava schiacciata a
+  sinistra (il contenitore non era largo quanto il `main` flex) e ora è centrata; lo sfondo sfuma
+  su `card` invece che su `background`, che con la nuova palette la rendeva grigia; "Riprova" su
+  telefono sta in cima. Soprattutto: quando il crash era il file di una pagina che non si carica
+  (la scheda rimasta sulla versione vecchia dopo un aggiornamento), "Riprova" ridisegnava e
+  ricadeva nello stesso errore, perché React tiene in memoria il caricamento fallito della rotta
+  `lazy`. `AppErrorBoundary` ora riconosce quel caso e ricarica la pagina; per gli altri errori
+  resta il reset senza ricaricare. Verificato bloccando il file della pagina report in Playwright.
+
+---
+
 ## 2026-09-24 — Ritocchi mobile: filtri in un pannello, report a passi, ID colorato nelle tabelle
 
 - **Filtri su telefono.** Stato, tipo, ordinamento e le due date occupavano tre righe sopra

@@ -21,7 +21,7 @@ const OpenEntityButton = ({ to, size = "lg", className, "aria-label": ariaLabel,
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button asChild variant="outline" size={size} className={cn("border-0 text-lg", className)} {...props}>
+                <Button asChild variant="outline" size={size} className={cn("border-0", className)} {...props}>
                     <Link to={to} aria-label={ariaLabel}>
                         <ExternalLink className="size-5" />
                     </Link>

@@ -1,5 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem from "@/components/detail-item";
+import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
@@ -7,8 +8,6 @@ import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
-import TableActionButton from "@/components/table-action-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CreateCollaboratorDialog, {
     type CollaboratorSubmitValues,
 } from "@/components/dialogs/create/createCollaboratorDialog";
@@ -23,7 +22,7 @@ import {
     updateCollaborator,
 } from "@/lib/api";
 import { useCallback, useState } from "react";
-import { ArrowLeft, Pencil, Printer } from "lucide-react";
+import { Pencil, Printer } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { collaboratorInterventionColumns, collaboratorReportColumns } from "./components/collaborator-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
@@ -152,56 +151,46 @@ const CollaboratorPage = () => {
                 />
             ) : null}
 
-            <div className="flex items-center gap-2">
-                <TableActionButton size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
-                    <ArrowLeft className="size-6" />
-                </TableActionButton>
-                <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{collaboratorName}</h1>
+            <DetailHeader onBack={handleBack} title={collaboratorName}>
+                <RefreshButton
+                    onRefresh={handleRefresh}
+                    isRefreshing={lists.isLoading}
+                    label="Aggiorna i dati del collaboratore"
+                />
 
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <RefreshButton
-                        onRefresh={handleRefresh}
-                        isRefreshing={lists.isLoading}
-                        label="Aggiorna i dati del collaboratore"
-                    />
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Pencil}
+                    text="Modifica"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    aria-label="Modifica collaboratore"
+                />
 
-                    <TableActionButton
-                        variant="outline"
-                        size="lg"
-                        onClick={() => setIsEditDialogOpen(true)}
-                        aria-label="Modifica collaboratore"
-                    >
-                        <Pencil className="size-5" />
-                        <span className="hidden text-lg lg:inline">Modifica</span>
-                    </TableActionButton>
+                <DetailHeaderAction
+                    icon={Printer}
+                    text="Stampa"
+                    onClick={() => setIsPrintDialogOpen(true)}
+                    aria-label={printTitle}
+                />
 
-                    <TableActionButton size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
-                        <Printer className="size-5" />
-                        <span className="hidden text-lg lg:inline">Stampa</span>
-                    </TableActionButton>
-
-                    <DetailDeleteButton
-                        label="Elimina collaboratore"
-                        title="Elimina collaboratore"
-                        description={`Sei sicuro di voler eliminare il collaboratore ${collaboratorName}?`}
-                        onDelete={() => deleteCollaborator(collaboratorId)}
-                        successMessage="Collaboratore eliminato con successo"
-                        errorMessage="Impossibile eliminare il collaboratore"
-                        redirectTo="/collaborators"
-                    />
-                </div>
-            </div>
+                <DetailDeleteButton
+                    label="Elimina collaboratore"
+                    title="Elimina collaboratore"
+                    description={`Sei sicuro di voler eliminare il collaboratore ${collaboratorName}?`}
+                    onDelete={() => deleteCollaborator(collaboratorId)}
+                    successMessage="Collaboratore eliminato con successo"
+                    errorMessage="Impossibile eliminare il collaboratore"
+                    redirectTo="/collaborators"
+                />
+            </DetailHeader>
 
             {collaborator ? (
-                <Card className="gap-1">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Dati del collaboratore</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <DetailSection title="Dati del collaboratore">
+                    <DetailGrid className="grid-cols-2 xl:grid-cols-4">
                         <DetailItem label="Telefono" value={collaborator.phoneNumber ?? "-"} />
                         <DetailItem label="Collaboratore dal" value={formatDateTime(collaborator.createdAt)} />
-                    </CardContent>
-                </Card>
+                    </DetailGrid>
+                </DetailSection>
             ) : null}
 
             <ReportsInterventionsTabs

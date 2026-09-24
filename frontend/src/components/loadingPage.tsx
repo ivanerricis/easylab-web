@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import Spinner from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 type LoadingPageProps = {
@@ -12,8 +12,8 @@ type LoadingPageProps = {
  *
  * `role="status"` con un'etichetta è l'unica cosa che rende questo stato percepibile a chi
  * non vede la rotellina: prima qui c'era un'icona e nient'altro, quindi per uno screen
- * reader la pagina risultava semplicemente vuota. `data-slot="spinner"` lo esenta dalla
- * regola di motion ridotto in index.css: la rotazione qui è informazione, non decoro.
+ * reader la pagina risultava semplicemente vuota. L'esenzione dal motion ridotto sta in
+ * `Spinner`.
  */
 const LoadingPage = ({ className, label = "Caricamento in corso" }: LoadingPageProps) => {
     return (
@@ -22,7 +22,7 @@ const LoadingPage = ({ className, label = "Caricamento in corso" }: LoadingPageP
             aria-live="polite"
             className={cn("flex h-full w-full items-center justify-center", className)}
         >
-            <Loader2 data-slot="spinner" className="size-10 animate-spin text-primary" />
+            <Spinner />
             <span className="sr-only">{label}</span>
         </div>
     );

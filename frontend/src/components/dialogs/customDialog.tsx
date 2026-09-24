@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -75,6 +75,7 @@ const CustomDialog = ({
     footerClassName,
 }: Props) => {
     const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+    const keepEditingButtonRef = useRef<HTMLButtonElement>(null);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen && isDirty) {
@@ -100,9 +101,11 @@ const CustomDialog = ({
                     // lo dimenticava usciva più piccolo dei suoi vicini. `**:` perché i campi non
                     // sono figli diretti di `DialogContent`, ma annidati dentro `FormField`,
                     // `EuroInput` e simili; `!` per vincere `md:text-sm`, che l'`Input` di base
-                    // applica da `md` in su. `Select` non serve: il suo trigger è già `text-lg`
-                    // di suo, senza distinzione fra breakpoint.
-                    "**:data-[slot=input]:text-lg! **:data-[slot=textarea]:text-lg!",
+                    // applica da `md` in su. Lo stesso per il trigger dei `Select`: era `text-lg`
+                    // di suo, ma ora segue `Input` (`md:text-sm`) per stare alla pari del campo di
+                    // ricerca nelle barre dei filtri, e nei dialoghi va riportato alla misura dei
+                    // campi accanto.
+                    "**:data-[slot=input]:text-lg! **:data-[slot=select-trigger]:text-lg! **:data-[slot=textarea]:text-lg!",
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}
@@ -156,7 +159,7 @@ const CustomDialog = ({
                     }}
                 >
                     <DialogHeader>
-                        {title ? <DialogTitle className="text-lg">{title}</DialogTitle> : null}
+                        {title ? <DialogTitle className="text-lg font-semibold">{title}</DialogTitle> : null}
                         {description ? <DialogDescription>{description}</DialogDescription> : null}
                     </DialogHeader>
 
@@ -201,31 +204,32 @@ const CustomDialog = ({
                         colonna della griglia (le celle nascono `min-width: auto`), e header e
                         footer sbordavano nel padding destro: 25px di margine a sinistra, 4 a
                         destra. */}
-                    <DialogContent className="border! border-destructive! sm:max-w-lg" showCloseButton={false}>
+                    <DialogContent
+                        className="border! border-destructive! sm:max-w-lg"
+                        showCloseButton={false}
+                        // Il focus va al pulsante sicuro, che nel markup sta per ultimo: Radix
+                        // all'apertura mette a fuoco il primo elemento focalizzabile e ignora
+                        // `autoFocus`, quindi senza questo toccava a "Chiudi senza salvare" — e un
+                        // Invio di troppo avrebbe buttato via il modulo.
+                        onOpenAutoFocus={(event) => {
+                            event.preventDefault();
+                            keepEditingButtonRef.current?.focus();
+                        }}
+                    >
                         <DialogHeader>
-                            <DialogTitle className="text-lg">Modifiche non salvate</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold">Modifiche non salvate</DialogTitle>
                             <DialogDescription>
                                 Se chiudi adesso, quello che hai inserito in questa finestra andrà perso.
                             </DialogDescription>
                         </DialogHeader>
-                        {/* `flex-col` invece del `flex-col-reverse` di default: sotto `sm` il
-                            footer normale mette in cima il pulsante che sta per ultimo nel
-                            markup (di solito il submit, l'azione consigliata). Qui invece è il
-                            primo, quello sicuro, a essere l'azione consigliata — lasciando la
-                            reverse finiva in cima "Chiudi senza salvare". */}
-                        <DialogFooter className="mt-2 flex-col sm:flex-row">
-                            <Button
-                                type="button"
-                                size="lg"
-                                className="text-lg"
-                                variant="outline"
-                                // Il pulsante sicuro prende il focus: un Invio di troppo non
-                                // deve buttare via il modulo.
-                                autoFocus
-                                onClick={() => setIsDiscardConfirmOpen(false)}
-                            >
-                                Continua a modificare
-                            </Button>
+                        {/* L'azione consigliata è quella sicura, quindi è lei il pulsante pieno:
+                            prima era grigia (`outline`) accanto a un "Chiudi senza salvare" colorato,
+                            e a colpo d'occhio sembrava più importante l'azione che butta via il
+                            lavoro. Nel markup sta per ultima, come il "Salva" dei moduli: col footer
+                            di serie finisce a destra da `sm` in su e in cima sotto `sm` (dove il
+                            footer è `flex-col-reverse`), cioè dove l'app mette sempre l'azione
+                            principale. */}
+                        <DialogFooter className="mt-2">
                             <Button
                                 type="button"
                                 size="lg"
@@ -234,6 +238,15 @@ const CustomDialog = ({
                                 onClick={handleDiscard}
                             >
                                 Chiudi senza salvare
+                            </Button>
+                            <Button
+                                type="button"
+                                size="lg"
+                                className="text-lg"
+                                ref={keepEditingButtonRef}
+                                onClick={() => setIsDiscardConfirmOpen(false)}
+                            >
+                                Continua a modificare
                             </Button>
                         </DialogFooter>
                     </DialogContent>

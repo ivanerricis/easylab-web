@@ -1,5 +1,7 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem from "@/components/detail-item";
+import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
+import DetailStats, { DetailStatBadge } from "@/components/detail-stats";
 import CustomerLink from "@/components/customer-link";
 import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
@@ -7,12 +9,10 @@ import { useGoBack } from "@/hooks/useGoBack";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
-import TableActionButton from "@/components/table-action-button";
 import CustomDialog from "@/components/dialogs/customDialog";
 import EditInterventionDialog, {
     type EditInterventionSubmitValues,
 } from "@/components/dialogs/edit/editInterventionDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     getApiErrorMessage,
     getIntervention,
@@ -32,11 +32,10 @@ import {
     interventionStatusColor,
     isOnSiteInterventionType,
 } from "@/lib/interventions";
-import { ArrowLeft, Pencil, Printer, Send } from "lucide-react";
+import { Pencil, Printer, Send } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
-import StatusBadge from "@/components/status-badge";
 
 const InterventionPage = () => {
     const { id } = useParams();
@@ -121,161 +120,109 @@ const InterventionPage = () => {
     const isOnSite = isOnSiteInterventionType(intervention.type);
 
     return (
-        <div className="flex w-full flex-col gap-4 overflow-auto p-2">
-            <div className="border-primary/30">
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex min-w-0 items-start gap-3">
-                            <TableActionButton
-                                size="icon-lg"
-                                variant="ghost"
-                                onClick={handleBack}
-                                className="shrink-0"
-                                aria-label="Torna indietro"
-                            >
-                                <ArrowLeft className="size-6" />
-                            </TableActionButton>
+        // Scorre il `main` del layout, come nella scheda del report: vedi il commento lì.
+        <div className="flex w-full flex-col gap-4 self-start">
+            <DetailHeader
+                onBack={handleBack}
+                title={
+                    <>
+                        Intervento #{intervention.id} -{" "}
+                        {/* Il nome in alto è il primo che si guarda: è lui a portare al
+                            cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
+                        <CustomerLink
+                            customerId={intervention.customerId}
+                            name={intervention.customerName ?? "Cliente sconosciuto"}
+                        />
+                    </>
+                }
+            >
+                <RefreshButton onRefresh={reload} label="Aggiorna intervento" />
 
-                            <div className="min-w-0">
-                                <h1 className="text-xl font-bold tracking-tight wrap-break-word sm:text-2xl">
-                                    Intervento #{intervention.id} -{" "}
-                                    {/* Il nome in alto è il primo che si guarda: è lui a portare al
-                                        cliente, e l'anagrafica sotto resta testo per non ripeterlo. */}
-                                    <CustomerLink
-                                        customerId={intervention.customerId}
-                                        name={intervention.customerName ?? "Cliente sconosciuto"}
-                                    />
-                                </h1>
-                            </div>
-                        </div>
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Pencil}
+                    text="Modifica"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    aria-label="Modifica intervento"
+                />
 
-                        <div className="flex shrink-0 items-center gap-2 self-end lg:self-auto">
-                            <RefreshButton onRefresh={reload} label="Aggiorna intervento" />
+                <DetailHeaderAction
+                    icon={Printer}
+                    text="Stampa"
+                    onClick={handlePrintIntervention}
+                    aria-label="Stampa intervento"
+                />
 
-                            <TableActionButton
-                                variant="outline"
-                                size="lg"
-                                onClick={() => setIsEditDialogOpen(true)}
-                                aria-label="Modifica intervento"
-                            >
-                                <Pencil className="size-5" />
-                                <span className="hidden text-lg lg:inline">Modifica</span>
-                            </TableActionButton>
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Send}
+                    text="Email"
+                    onClick={() => setIsEmailDialogOpen(true)}
+                    aria-label="Invia email intervento"
+                />
 
-                            <TableActionButton
-                                size="lg"
-                                onClick={handlePrintIntervention}
-                                aria-label="Stampa intervento"
-                            >
-                                <Printer className="size-5" />
-                                <span className="hidden text-lg lg:inline">Stampa</span>
-                            </TableActionButton>
+                <DetailDeleteButton
+                    label="Elimina intervento"
+                    title="Elimina intervento"
+                    description={`Sei sicuro di voler eliminare l'intervento ID ${intervention.id}?`}
+                    onDelete={() => deleteIntervention(intervention.id)}
+                    successMessage="Intervento eliminato con successo"
+                    errorMessage="Impossibile eliminare l'intervento"
+                    redirectTo="/interventions"
+                />
+            </DetailHeader>
 
-                            <TableActionButton
-                                variant="outline"
-                                size="lg"
-                                onClick={() => setIsEmailDialogOpen(true)}
-                                aria-label="Invia email intervento"
-                            >
-                                <Send className="size-5" />
-                                <span className="hidden text-lg lg:inline">Email</span>
-                            </TableActionButton>
-
-                            <DetailDeleteButton
-                                label="Elimina intervento"
-                                title="Elimina intervento"
-                                description={`Sei sicuro di voler eliminare l'intervento ID ${intervention.id}?`}
-                                onDelete={() => deleteIntervention(intervention.id)}
-                                successMessage="Intervento eliminato con successo"
-                                errorMessage="Impossibile eliminare l'intervento"
-                                redirectTo="/interventions"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/*
-                Sotto xl solo i due orari stanno affiancati: stato, tipo e data prendono la riga
-                intera, perché "In lavorazione" o "Intervento da remoto" in mezza card uscivano
-                dal bordo. Prima erano cinque card una per riga, circa 650px su mobile.
-            */}
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-primary">Stato</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <StatusBadge size="lg" color={interventionStatusColor[intervention.status]}>
-                            {formatInterventionStatus(intervention.status)}
-                        </StatusBadge>
-                    </CardContent>
-                </Card>
-
-                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-primary">Tipo intervento</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">{formatInterventionType(intervention.type)}</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="col-span-2 gap-2! border-primary/20 xl:col-span-1">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-primary">Data intervento</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">{formatDate(intervention.interventionDate)}</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="gap-2! border-primary/20">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-primary">Ora inizio</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">
-                            {isOnSite ? formatInterventionTime(intervention.startTime) : "-"}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="gap-2! border-primary/20">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-primary">Ora fine</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">
-                            {isOnSite ? formatInterventionTime(intervention.endTime) : "-"}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+            {/* Sotto `xl` una riga per voce, con il valore a destra: "In lavorazione" o
+                "Intervento da remoto" non escono più dal bordo di una mezza card. */}
+            <DetailStats
+                items={[
+                    {
+                        label: "Stato",
+                        value: (
+                            <DetailStatBadge color={interventionStatusColor[intervention.status]}>
+                                {formatInterventionStatus(intervention.status)}
+                            </DetailStatBadge>
+                        ),
+                    },
+                    { label: "Tipo intervento", value: formatInterventionType(intervention.type) },
+                    { label: "Data intervento", value: formatDate(intervention.interventionDate) },
+                    {
+                        label: "Ora inizio",
+                        value: isOnSite ? formatInterventionTime(intervention.startTime) : "-",
+                    },
+                    { label: "Ora fine", value: isOnSite ? formatInterventionTime(intervention.endTime) : "-" },
+                ]}
+            />
 
             <div className="grid gap-4 xl:grid-cols-2">
-                <Card className="gap-1">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Anagrafica</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-2 sm:grid-cols-2">
+                <DetailSection title="Anagrafica" className="self-start">
+                    <DetailGrid className="grid-cols-2">
                         <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />
                         <DetailItem label="Telefono" value={intervention.customerPhone ?? "-"} />
                         <DetailItem
                             label="Collaboratore"
                             value={intervention.collaboratorName ?? "Collaboratore sconosciuto"}
                         />
-                    </CardContent>
-                </Card>
+                    </DetailGrid>
+                </DetailSection>
 
-                <Card className="gap-1">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Dettagli</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-2">
-                        {isOnSite ? <DetailItem label="Problema" value={intervention.problem ?? "-"} /> : null}
-                        <DetailItem label="Descrizione" value={intervention.description ?? "-"} />
-                        <DetailItem label="Note" value={intervention.note ?? "-"} />
+                {/* I testi lunghi (problema, descrizione, note) su tutta la riga; prezzo, stati e
+                    date, brevi, affiancati: prima erano otto riquadri uno sotto l'altro. */}
+                <DetailSection title="Dettagli">
+                    <DetailGrid className="grid-cols-2 sm:grid-cols-3">
+                        {isOnSite ? (
+                            <DetailItem
+                                label="Problema"
+                                value={intervention.problem ?? "-"}
+                                className="col-span-full"
+                            />
+                        ) : null}
+                        <DetailItem
+                            label="Descrizione"
+                            value={intervention.description ?? "-"}
+                            className="col-span-full"
+                        />
+                        <DetailItem label="Note" value={intervention.note ?? "-"} className="col-span-full" />
                         <DetailItem
                             label="Prezzo"
                             value={intervention.price != null ? formatEuro(intervention.price) : "-"}
@@ -287,8 +234,8 @@ const InterventionPage = () => {
                             label="Ultimo aggiornamento"
                             value={intervention.updated_at ? formatDateTime(intervention.updated_at) : "-"}
                         />
-                    </CardContent>
-                </Card>
+                    </DetailGrid>
+                </DetailSection>
             </div>
 
             <CustomDialog

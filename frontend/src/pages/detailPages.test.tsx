@@ -90,11 +90,9 @@ const notFoundError = () =>
 
 const timestamps = { createdAt: "2026-01-01T00:00:00.000Z", updatedAt: null };
 
-/** Il valore di una voce `DetailItem`: l'etichetta è un paragrafo, il valore quello dopo. */
+/** Il valore di una voce `DetailItem`: l'etichetta è un `dt`, il valore il `dd` dopo. */
 const detailValue = (label: string) => {
-    const labelElement = screen
-        .getAllByText(label)
-        .find((element) => element.tagName === "P" && element.className.includes("uppercase"));
+    const labelElement = screen.getAllByText(label).find((element) => element.tagName === "DT");
     return labelElement?.nextElementSibling?.textContent;
 };
 
@@ -189,7 +187,7 @@ describe("ReportPage", () => {
         await renderPage();
 
         const euro = (text: string) => text.replace(/\s/g, " ");
-        const totalCard = screen.getByText("Totale").closest("[data-slot='card']");
+        const totalCard = screen.getByText("Totale").closest("[data-slot='detail-stat']");
         expect(euro(totalCard?.textContent ?? "")).toContain("105,00 €");
     });
 

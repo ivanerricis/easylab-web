@@ -1,10 +1,10 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem from "@/components/detail-item";
+import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import EntityTable from "@/components/entity-table";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import CreateTechnicianDialog, {
     type TechnicianSubmitValues,
@@ -14,7 +14,7 @@ import { toReportUpdatePayload } from "@/lib/reportForm";
 import TablePagination from "@/components/table-pagination";
 import { deleteTechnician, getTechnician, listReports, updateReport, updateTechnician } from "@/lib/api";
 import { useCallback, useState } from "react";
-import { ArrowLeft, ListFilter, Pencil } from "lucide-react";
+import { ListFilter, Pencil } from "lucide-react";
 import type { ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
@@ -135,40 +135,31 @@ const TechnicianPage = () => {
 
     return (
         <div className="flex h-full min-h-0 w-full flex-col gap-4">
-            <div className="flex items-center gap-2">
-                <TableActionButton size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
-                    <ArrowLeft className="size-6" />
-                </TableActionButton>
-                <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{technicianName}</h1>
+            <DetailHeader onBack={handleBack} title={technicianName}>
+                <RefreshButton
+                    onRefresh={handleRefresh}
+                    isRefreshing={areReportsLoading}
+                    label="Aggiorna i dati del tecnico"
+                />
 
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <RefreshButton
-                        onRefresh={handleRefresh}
-                        isRefreshing={areReportsLoading}
-                        label="Aggiorna i dati del tecnico"
-                    />
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Pencil}
+                    text="Modifica"
+                    onClick={() => setIsEditTechnicianDialogOpen(true)}
+                    aria-label="Modifica tecnico"
+                />
 
-                    <TableActionButton
-                        variant="outline"
-                        size="lg"
-                        onClick={() => setIsEditTechnicianDialogOpen(true)}
-                        aria-label="Modifica tecnico"
-                    >
-                        <Pencil className="size-5" />
-                        <span className="hidden text-lg lg:inline">Modifica</span>
-                    </TableActionButton>
-
-                    <DetailDeleteButton
-                        label="Elimina tecnico"
-                        title="Elimina tecnico"
-                        description={`Sei sicuro di voler eliminare il tecnico ${technicianName}?`}
-                        onDelete={() => deleteTechnician(technicianId)}
-                        successMessage="Tecnico eliminato con successo"
-                        errorMessage="Impossibile eliminare il tecnico"
-                        redirectTo="/technicians"
-                    />
-                </div>
-            </div>
+                <DetailDeleteButton
+                    label="Elimina tecnico"
+                    title="Elimina tecnico"
+                    description={`Sei sicuro di voler eliminare il tecnico ${technicianName}?`}
+                    onDelete={() => deleteTechnician(technicianId)}
+                    successMessage="Tecnico eliminato con successo"
+                    errorMessage="Impossibile eliminare il tecnico"
+                    redirectTo="/technicians"
+                />
+            </DetailHeader>
 
             {isEditTechnicianDialogOpen && technician ? (
                 <CreateTechnicianDialog
@@ -181,15 +172,12 @@ const TechnicianPage = () => {
             ) : null}
 
             {technician ? (
-                <Card className="gap-1">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Dati del tecnico</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <DetailSection title="Dati del tecnico">
+                    <DetailGrid className="grid-cols-2 xl:grid-cols-4">
                         <DetailItem label="Telefono" value={technician.phoneNumber ?? "-"} />
                         <DetailItem label="Partita IVA" value={technician.vatNumber ?? "-"} />
-                    </CardContent>
-                </Card>
+                    </DetailGrid>
+                </DetailSection>
             ) : null}
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">

@@ -22,7 +22,6 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
 
 const DOCS_URL = "https://ivanerricis.github.io/easylab-web/";
 
@@ -51,9 +50,13 @@ const isPathActive = (pathname: string, itemPath: string) => {
     return pathname.startsWith(`${itemPath}/`);
 };
 
+// Righe da 40px con testo 15px e icone 20px: un gradino sopra la scala base di
+// `sidebarMenuButtonVariants` (14px/18px), che a 36px risultava un po' piccola per la voce di
+// navigazione principale. Resta comunque ben sotto i vecchi 48px con testo a 18px, che facevano
+// pesare la barra più del contenuto. Nella modalità a sole icone il riquadro è di 32px, quindi lì
+// l'icona torna a 18px. Lo stile della voce aperta viene da `isActive` nel componente.
 const menuButtonClassName =
-    "flex w-full items-center gap-2 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
-const activeMenuButtonClassName = "bg-primary! text-background! dark:text-foreground!";
+    "h-10 text-[0.9375rem] [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_svg]:size-4.5";
 
 /**
  * Le voci sono link (`<a>` tramite `Link`), non pulsanti che chiamano `navigate`: così si
@@ -88,7 +91,7 @@ const MainSidebar = () => {
             </SidebarHeader>
 
             <SidebarContent className="p-2">
-                <SidebarMenu className="gap-1">
+                <SidebarMenu className="gap-0.5">
                     {sidebarItems.map((item) => {
                         const Icon = item.icon;
                         const active = isPathActive(pathname, item.path);
@@ -99,15 +102,14 @@ const MainSidebar = () => {
                                     asChild
                                     tooltip={item.label}
                                     isActive={active}
-                                    size="lg"
-                                    className={cn(menuButtonClassName, active && activeMenuButtonClassName)}
+                                    className={menuButtonClassName}
                                 >
                                     <Link
                                         to={item.path}
                                         onClick={closeMobile}
                                         aria-current={active ? "page" : undefined}
                                     >
-                                        <Icon className="size-7 shrink-0" />
+                                        <Icon />
                                         <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                                     </Link>
                                 </SidebarMenuButton>
@@ -118,11 +120,11 @@ const MainSidebar = () => {
             </SidebarContent>
 
             <SidebarFooter className="border-t border-sidebar-border p-2">
-                <SidebarMenu className="gap-1">
+                <SidebarMenu className="gap-0.5">
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Documentazione" size="lg" className={menuButtonClassName}>
+                        <SidebarMenuButton asChild tooltip="Documentazione" className={menuButtonClassName}>
                             <a href={DOCS_URL} target="_blank" rel="noopener noreferrer">
-                                <BookOpen className="size-7 shrink-0" />
+                                <BookOpen />
                                 <span className="group-data-[collapsible=icon]:hidden">Documentazione</span>
                             </a>
                         </SidebarMenuButton>
@@ -132,16 +134,15 @@ const MainSidebar = () => {
                         <SidebarMenuButton
                             asChild
                             tooltip="Impostazioni"
-                            size="lg"
                             isActive={isSettingsActive}
-                            className={cn(menuButtonClassName, isSettingsActive && activeMenuButtonClassName)}
+                            className={menuButtonClassName}
                         >
                             <Link
                                 to="/settings"
                                 onClick={closeMobile}
                                 aria-current={isSettingsActive ? "page" : undefined}
                             >
-                                <Settings className="size-7 shrink-0" />
+                                <Settings />
                                 <span className="group-data-[collapsible=icon]:hidden">Impostazioni</span>
                             </Link>
                         </SidebarMenuButton>

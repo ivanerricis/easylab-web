@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Circle, CircleCheck, Loader2 } from "lucide-react";
+import Spinner from "@/components/ui/spinner";
 import { BusyGuardContext, type BusyGuardState } from "@/components/busy-guard-context";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,7 @@ export const BusyGuardProvider = ({ children }: { children: ReactNode }) => {
                     role="alert"
                     aria-live="assertive"
                 >
-                    <Loader2 className="size-10 animate-spin text-primary" />
+                    <Spinner />
                     <p className="text-lg font-semibold">{busy.title}</p>
                     <p className="max-w-sm text-center text-sm text-muted-foreground">{busy.description}</p>
                     <BusySteps steps={busy.steps} activeStepKey={busy.activeStepKey} />

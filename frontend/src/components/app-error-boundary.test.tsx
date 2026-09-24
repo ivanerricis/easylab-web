@@ -80,4 +80,28 @@ describe("AppErrorBoundary", () => {
 
         expect(screen.getByText("Contenuto applicativo")).toBeInTheDocument();
     });
+
+    /**
+     * Con il file di una pagina che non si carica (una rotta `lazy` dopo un aggiornamento),
+     * ridisegnare non basta: React ricorda il caricamento fallito. Lì "Riprova" ricarica.
+     */
+    it("se non si è caricato il file di una pagina, Riprova ricarica la pagina", async () => {
+        const user = userEvent.setup();
+        const reload = vi.fn();
+        vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, reload });
+
+        const FailedChunk = () => {
+            throw new TypeError("Failed to fetch dynamically imported module: /src/pages/reports/ReportPage.tsx");
+        };
+
+        render(
+            <AppErrorBoundary>
+                <FailedChunk />
+            </AppErrorBoundary>
+        );
+
+        await user.click(screen.getByRole("button", { name: /Riprova/i }));
+
+        expect(reload).toHaveBeenCalled();
+    });
 });

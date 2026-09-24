@@ -489,8 +489,11 @@ input[type="search"]::-webkit-search-decoration {
      l'informazione. La classe `animate-spin` è nell'elenco insieme all'attributo
      perché legare l'eccezione al solo `data-slot` significava ricordarsi di marcare a
      mano ogni spinner: quello del blocco aggiornamento era rimasto indietro e restava
-     immobile proprio mentre l'app diceva di non chiudere la pagina. */
+     immobile proprio mentre l'app diceva di non chiudere la pagina. I discendenti di
+     `[data-slot="spinner"]` perché la luna di `Spinner` (react-spinners) anima degli
+     elementi figli, non il contenitore marcato. */
   [data-slot="spinner"],
+  [data-slot="spinner"] *,
   .animate-spin {
     animation-duration: 1.5s !important;
     animation-iteration-count: infinite !important;

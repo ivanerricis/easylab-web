@@ -3,31 +3,6 @@
     font-family: inherit;
 }
 
-.rbc-toolbar {
-    color: var(--foreground);
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.rbc-toolbar button {
-    color: var(--foreground);
-    background-color: var(--background);
-    border-color: var(--border);
-    border-radius: var(--radius-md);
-}
-
-.rbc-toolbar button:hover {
-    background-color: var(--muted);
-    color: var(--foreground);
-}
-
-.rbc-toolbar button.rbc-active,
-.rbc-toolbar button.rbc-active:hover {
-    background-color: var(--primary);
-    color: var(--primary-foreground);
-    border-color: var(--primary);
-}
-
 .rbc-month-view,
 .rbc-time-view,
 .rbc-agenda-view table.rbc-agenda-table {
@@ -134,14 +109,6 @@
     .rbc-month-view,
     .rbc-time-view {
         min-width: 640px;
-    }
-
-    .rbc-toolbar {
-        font-size: 0.8rem;
-    }
-
-    .rbc-toolbar button {
-        padding: 0.25rem 0.5rem;
     }
 
     .rbc-header {

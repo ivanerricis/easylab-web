@@ -64,7 +64,8 @@ const DetailDeleteButton = ({
                 <TooltipTrigger asChild>
                     <Button variant="destructive" size="lg" onClick={() => setIsOpen(true)} aria-label={label}>
                         <Trash2 className="size-5" />
-                        <span className="hidden text-lg lg:inline">Elimina</span>
+                        {/* 14px come le altre azioni dell'intestazione (`DetailHeaderAction`), non più 18px. */}
+                        <span className="hidden lg:inline">Elimina</span>
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>{label}</TooltipContent>

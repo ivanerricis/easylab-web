@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     type AgendaTimeProps,
     Calendar,
+    type Components,
     dateFnsLocalizer,
     type EventPropGetter,
     type Messages,
@@ -22,6 +23,7 @@ import {
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "../calendar-theme.css";
 import CalendarEventPopover from "./calendar-event-popover";
+import CalendarToolbar from "./calendar-toolbar";
 import { useNavigate } from "react-router-dom";
 import type { CalendarRange, InterventionCalendarEvent } from "../hooks/useCalendarInterventions";
 
@@ -88,7 +90,12 @@ const AgendaTime = ({ event, label }: AgendaTimeProps) => {
     );
 };
 
-const components = { event: CalendarEventPopover, agenda: { time: AgendaTime } };
+// Tipizzato sull'evento: la barra è generica, e senza questo il calendario lo dedurrebbe come `object`.
+const components: Components<InterventionCalendarEvent> = {
+    event: CalendarEventPopover,
+    toolbar: CalendarToolbar,
+    agenda: { time: AgendaTime },
+};
 
 /**
  * Giorni effettivamente disegnati dalla vista corrente, che non coincidono con il mese di
@@ -163,6 +170,11 @@ const InterventionsCalendar = ({
 }: Props) => {
     const navigate = useNavigate();
     const [view, setView] = useState<View>(() => getStoredCalendarView());
+    // La data mostrata è tenuta qui e non lasciata alla libreria: il suo stato interno passa da
+    // `uncontrollable`, che sotto `StrictMode` (vedi `main.tsx`) si crede smontato dopo il finto
+    // smontaggio di prova e da lì ignora ogni cambio. In sviluppo "Avanti" chiedeva così gli
+    // interventi del mese dopo ma la griglia e il titolo restavano su quello corrente.
+    const [date, setDate] = useState(() => new Date());
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [initialInterventionDate, setInitialInterventionDate] = useState("");
 
@@ -217,6 +229,8 @@ const InterventionsCalendar = ({
                     messages={messages}
                     view={view}
                     onView={handleViewChange}
+                    date={date}
+                    onNavigate={setDate}
                     eventPropGetter={eventPropGetter}
                     components={components}
                     onSelectEvent={(event) => navigate(entityPaths.intervention(event.id))}

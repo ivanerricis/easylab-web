@@ -58,13 +58,16 @@ const FilterSelect = <TValue extends string>({
     return (
         <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
             {/* 40px come gli altri controlli della barra (vedi `SearchInput`). L'altezza di serie
-                del trigger sta in `data-[size=default]:h-9`, che vince su un `h-10` semplice. */}
+                del trigger sta in `data-[size=default]:h-9`, che vince su un `h-10` semplice.
+                La dimensione del testo è quella del trigger (come `Input`); solo `inline` la fissa
+                a `text-sm` a ogni larghezza, perché sta accanto alle tab, che sono `text-sm`: prima
+                era `text-lg`, e il menu sembrava più importante delle tab che filtra. */}
             <SelectTrigger
                 className={
                     variant === "inline"
-                        ? "min-w-0 flex-1 text-base sm:w-56 sm:flex-none sm:text-lg"
+                        ? "min-w-0 flex-1 text-sm data-[size=default]:h-10 sm:w-56 sm:flex-none"
                         : variant === "sheet"
-                          ? "w-full text-base data-[size=default]:h-10"
+                          ? "w-full data-[size=default]:h-10"
                           : cn("data-[size=default]:h-10", isCompact ? "w-auto px-2" : "w-56")
                 }
                 aria-label={label}

@@ -1,5 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem from "@/components/detail-item";
+import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import LoadingPage from "@/components/loadingPage";
 import RefreshButton from "@/components/refresh-button";
 import NotFoundState from "@/components/not-found-state";
@@ -12,7 +13,6 @@ import CreateInterventionDialog, {
     type CreateInterventionSubmitValues,
 } from "@/components/dialogs/create/createInterventionDialog";
 import DetailDeleteButton from "@/components/detail-delete-button";
-import TableActionButton from "@/components/table-action-button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,7 +26,6 @@ import { resolveCustomerId } from "@/lib/customerLookup";
 import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
 import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     createIntervention,
     createReport,
@@ -40,7 +39,7 @@ import {
 } from "@/lib/api";
 import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { useCallback, useState } from "react";
-import { ArrowLeft, ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
+import { ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
@@ -221,87 +220,76 @@ const CustomerPage = () => {
                 />
             ) : null}
 
-            {/* Con sei azioni i pulsanti non stanno accanto al nome su un telefono: `flex-wrap`
-                li manda sotto, allineati a destra, solo quando serve. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <TableActionButton size="icon-lg" variant="ghost" onClick={handleBack} aria-label="Torna indietro">
-                    <ArrowLeft className="size-6" />
-                </TableActionButton>
-                <h1 className="min-w-0 text-2xl font-bold wrap-break-word">{customerName}</h1>
+            <DetailHeader onBack={handleBack} title={customerName}>
+                <RefreshButton
+                    onRefresh={handleRefresh}
+                    isRefreshing={lists.isLoading}
+                    label="Aggiorna i dati del cliente"
+                />
 
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <RefreshButton
-                        onRefresh={handleRefresh}
-                        isRefreshing={lists.isLoading}
-                        label="Aggiorna i dati del cliente"
-                    />
+                {/* Un menu solo per le due creazioni: sono azioni sorelle, e due pulsanti in
+                    più non starebbero nell'intestazione su un telefono. */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="lg" aria-label="Nuovo report o intervento">
+                            <Plus className="size-5" />
+                            {/* A 14px come le altre azioni dell'intestazione: vedi `DetailHeaderAction`. */}
+                            <span className="hidden lg:inline">Nuovo</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    {/* Largo quanto le voci, non quanto il pulsante: da solo prende la larghezza
+                        del trigger, che su mobile è un'icona. */}
+                    <DropdownMenuContent align="end" className="w-auto">
+                        <DropdownMenuItem onSelect={() => setIsCreateReportDialogOpen(true)}>
+                            <ClipboardList />
+                            Nuovo report
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setIsCreateInterventionDialogOpen(true)}>
+                            <HardHat />
+                            Nuovo intervento
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-                    {/* Un menu solo per le due creazioni: sono azioni sorelle, e due pulsanti in
-                        più non starebbero nell'intestazione su un telefono. */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="lg" aria-label="Nuovo report o intervento">
-                                <Plus className="size-5" />
-                                <span className="hidden text-lg lg:inline">Nuovo</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        {/* Largo quanto le voci, non quanto il pulsante: da solo prende la larghezza
-                            del trigger, che su mobile è un'icona. */}
-                        <DropdownMenuContent align="end" className="w-auto">
-                            <DropdownMenuItem onSelect={() => setIsCreateReportDialogOpen(true)}>
-                                <ClipboardList />
-                                Nuovo report
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setIsCreateInterventionDialogOpen(true)}>
-                                <HardHat />
-                                Nuovo intervento
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Pencil}
+                    text="Modifica"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    aria-label="Modifica cliente"
+                />
 
-                    <TableActionButton
-                        variant="outline"
-                        size="lg"
-                        onClick={() => setIsEditDialogOpen(true)}
-                        aria-label="Modifica cliente"
-                    >
-                        <Pencil className="size-5" />
-                        <span className="hidden text-lg lg:inline">Modifica</span>
-                    </TableActionButton>
+                <DetailHeaderAction
+                    icon={Printer}
+                    text="Stampa"
+                    onClick={() => setIsPrintDialogOpen(true)}
+                    aria-label={printTitle}
+                />
 
-                    <TableActionButton size="lg" onClick={() => setIsPrintDialogOpen(true)} aria-label={printTitle}>
-                        <Printer className="size-5" />
-                        <span className="hidden text-lg lg:inline">Stampa</span>
-                    </TableActionButton>
-
-                    <DetailDeleteButton
-                        label="Elimina cliente"
-                        title="Elimina cliente"
-                        description={`Sei sicuro di voler eliminare il cliente ${customerName}?`}
-                        onDelete={() => deleteCustomer(customerId)}
-                        successMessage="Cliente eliminato con successo"
-                        errorMessage="Impossibile eliminare il cliente"
-                        redirectTo="/clients"
-                    />
-                </div>
-            </div>
+                <DetailDeleteButton
+                    label="Elimina cliente"
+                    title="Elimina cliente"
+                    description={`Sei sicuro di voler eliminare il cliente ${customerName}?`}
+                    onDelete={() => deleteCustomer(customerId)}
+                    successMessage="Cliente eliminato con successo"
+                    errorMessage="Impossibile eliminare il cliente"
+                    redirectTo="/clients"
+                />
+            </DetailHeader>
 
             {customer ? (
-                <Card className="gap-1">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Dati del cliente</CardTitle>
-                    </CardHeader>
+                <DetailSection title="Dati del cliente">
                     {/* Due colonne anche su mobile: una voce per riga, la scheda occupava metà
                         schermo e alla tabella restava lo spazio di una riga. L'email, che può
                         essere lunga, prende la riga intera finché le colonne sono due. */}
-                    <CardContent className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+                    <DetailGrid className="grid-cols-2 xl:grid-cols-5">
                         <DetailItem label="Telefono" value={customer.phoneNumber ?? "-"} />
                         <DetailItem label="Telefono 2" value={customer.phoneNumberSecondary ?? "-"} />
                         <DetailItem label="Email" value={customer.email ?? "-"} className="col-span-2 xl:col-span-1" />
                         <DetailItem label="Località" value={customer.city ?? "-"} />
                         <DetailItem label="Cliente dal" value={formatDateTime(customer.createdAt)} />
-                    </CardContent>
-                </Card>
+                    </DetailGrid>
+                </DetailSection>
             ) : null}
 
             <ReportsInterventionsTabs

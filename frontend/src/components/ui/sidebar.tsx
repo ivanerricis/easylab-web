@@ -440,19 +440,28 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
     );
 }
 
+/**
+ * Voce della barra laterale alla stessa scala del resto dell'app (testo 14px, icone 18px):
+ * con testo a 18px e la voce aperta come blocco blu pieno la barra pesava più del contenuto.
+ * La voce aperta è ora una tinta leggera del primario con testo e icona nel primario; il
+ * passaggio del mouse resta una tinta neutra, così le due cose non si confondono.
+ * Il blu del tema (#2a75b9) non regge da solo come testo: sulla tinta chiara arriva a circa
+ * 4.2:1 (sotto il 4.5:1 richiesto a 14px), quindi in chiaro è scurito un poco verso il nero;
+ * sul fondo scuro della barra è sotto 3:1, quindi in scuro è schiarito verso il bianco.
+ */
 const sidebarMenuButtonVariants = cva(
-    "peer/menu-button group/menu-button flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-lg ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground [&_svg]:size-5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+    "peer/menu-button group/menu-button flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-[color-mix(in_oklab,var(--primary)_85%,black)] data-active:hover:bg-primary/15 data-active:hover:text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:data-active:bg-primary/20 dark:data-active:text-[color-mix(in_oklab,var(--primary)_55%,white)] dark:data-active:hover:bg-primary/25 dark:data-active:hover:text-[color-mix(in_oklab,var(--primary)_55%,white)] [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
     {
         variants: {
             variant: {
-                default: "hover:bg-primary/15 hover:text-sidebar-accent-foreground",
+                default: "",
                 outline:
                     "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
             },
             size: {
                 default: "h-8 text-sm",
                 sm: "h-7 text-xs",
-                lg: "h-12 text-lg group-data-[collapsible=icon]:p-0!",
+                lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
             },
         },
         defaultVariants: {

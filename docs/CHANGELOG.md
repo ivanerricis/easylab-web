@@ -34,6 +34,12 @@ solo l'evoluzione del codice e dell'infrastruttura.
   al cliente, e un link invisibile ma raggiungibile con Tab farebbe sparire il focus; e con due
   `h1` nel DOM, uno solo visibile, chi legge senza CSS (compresi i test) ne trovava due. A ogni
   larghezza c'è un solo `h1`. Stesso criterio per il nome nella card del cliente.
+- **Campi dei dialoghi alla stessa altezza.** Misurati nel dialogo del nuovo report: i campi con
+  suggerimenti (cliente, dispositivo, difetto) erano a 40px, per stare alla pari del "+" accanto,
+  mentre la password e i menu a tendina restavano ai 36px di serie, con uno scalino visibile sulla
+  stessa griglia. `CustomDialog` porta ora `Input` e trigger dei menu a 40px; il selettore della
+  data, che non è un `Input`, lo fa da sé. Testo già coerente (18px per campi, etichette e
+  pulsanti in fondo).
 - **Etichetta della settimana nel calendario.** "21 – 27 settembre 2026" invece di "Settembre 21 –
   27" (ordine inglese della libreria); lo stesso formato per l'agenda, che mostrava due date
   numeriche. L'anno compare sulla prima data solo se l'intervallo lo attraversa.

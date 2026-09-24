@@ -54,8 +54,9 @@ const DatePickerField = ({
                     // Stesso corpo testo degli `Input`/`Textarea` dei dialoghi (vedi
                     // `CustomDialog`): qui va fissato nel componente perché non è un `Input` e
                     // quella regola non lo tocca. Nessun `!`: a differenza di `Input`, `Button`
-                    // non ha un `md:text-sm` di base con cui competere.
-                    className={cn("w-full justify-start gap-2 text-lg font-normal", className)}
+                    // non ha un `md:text-sm` di base con cui competere. Alto 40px come gli altri campi
+                    // dei dialoghi (vedi `CustomDialog`).
+                    className={cn("h-10 w-full justify-start gap-2 text-lg font-normal", className)}
                 >
                     <CalendarDays className="size-4" />
                     <span className="truncate">{label}</span>

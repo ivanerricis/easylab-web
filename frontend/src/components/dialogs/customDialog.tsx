@@ -106,6 +106,11 @@ const CustomDialog = ({
                     // ricerca nelle barre dei filtri, e nei dialoghi va riportato alla misura dei
                     // campi accanto.
                     "**:data-[slot=input]:text-lg! **:data-[slot=select-trigger]:text-lg! **:data-[slot=textarea]:text-lg!",
+                    // Anche l'altezza, 40px per tutti: i campi con suggerimenti (cliente,
+                    // dispositivo, difetto) erano a 40px per stare alla pari del "+" accanto, mentre
+                    // un `Input` semplice (la password) e i menu a tendina restavano ai 36px di
+                    // serie, e sulla stessa griglia si vedeva lo scalino.
+                    "**:data-[slot=input]:h-10 **:data-[slot=select-trigger]:data-[size=default]:h-10",
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}

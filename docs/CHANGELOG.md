@@ -27,7 +27,7 @@ Unite due pull request di Dependabot (#12 e #11); la #13, del frontend, resta ap
   primo utilizzo"): non per l'aggiornamento, ma perché quel test legge e scrive il vero
   `data/backup.key`, che altri file di test creano e cancellano in parallelo (lo dice il
   commento nello stesso file). Rilanciato, è passato. Il test resta instabile finché non usa un
-  percorso suo.
+  percorso suo: annotato in [BACKLOG](BACKLOG.md).
 - **Non unita: #13 (dipendenze del frontend).** Contiene jsdom 30.0 → 30.1, con cui nei test i
   menu di Radix (select, dropdown) non si aprono più: 12 test falliti, non un difetto dell'app.
   Gli altri aggiornamenti del gruppo sono minori; jsdom va escluso dal gruppo o affrontato a parte.

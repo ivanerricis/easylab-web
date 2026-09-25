@@ -138,6 +138,27 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - Piccola: il clic fuori da `CustomDialog` non ha un test automatico, perché jsdom non simula
     un vero clic fuori da un dialogo Radix (verificato a mano nel browser, vedi CHANGELOG del
     2026-09-23).
+- Dagli aggiornamenti delle dipendenze del 2026-09-25 (vedi CHANGELOG dello stesso giorno):
+  - **`backupKey.test.ts` è instabile.** Il test "genera una chiave al primo utilizzo e la
+    persiste su disco" legge e scrive il vero `data/backup.key`, che altri file di test creano e
+    cancellano in parallelo: ogni tanto trova la chiave di un altro test e il confronto dei
+    `Buffer` fallisce (è successo nella CI della pull request #11, rilanciata e passata). Gli
+    altri test dello stesso file usano già `node:fs` finto proprio per questo. La strada: lo
+    stesso `fs` finto anche qui, oppure un percorso della chiave configurabile e diverso per ogni
+    file di test.
+  - **jsdom 30.1 rompe i menu di Radix nei test.** La pull request #13 (gruppo delle dipendenze
+    del frontend) lo porta da 30.0.1 a 30.1.0, e con quella versione select e dropdown di Radix
+    non si aprono più in jsdom: 12 test falliti in `ReportsPage`, `CustomerPage` e `layout`, nessun
+    difetto dell'app. Gli altri sei aggiornamenti del gruppo sono minori e passano. La strada:
+    escludere `jsdom` dal gruppo in `.github/dependabot.yml` (come già per le versioni maggiori),
+    unire il resto, e capire a parte cosa è cambiato nella 30.1 (eventi del puntatore o
+    `hasPointerCapture`, che Radix usa per aprire i menu).
+  - **Il suggerimento del cliente non compariva su CI nei test dei dialoghi a passi** (2026-09-24),
+    mentre in locale sì, anche ripetendo il test, e nel browser vero pure. Un'attesa più lunga non
+    è servita. Aggirato facendo scrivere il cliente a mano in quei due test; la causa non è
+    chiarita. Da guardare insieme alla voce su jsdom qui sopra: stesso ambiente di test, e CI
+    installa da `package-lock.json` le stesse versioni del locale, quindi la differenza è altrove
+    (Linux, tempi, ordine dei file).
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): fatta per intero
   il 2026-09-21, tranne la 2FA di `authManager`, ancora provata solo con un `db` finto.
 

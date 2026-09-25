@@ -93,7 +93,7 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                 onConfirm={() => void handlePasswordStep()}
                 preventOutsideClose
                 content={
-                    <div className="grid gap-2 py-2">
+                    <div className="grid gap-2 pb-2">
                         <Label htmlFor="twoFactorPassword">
                             Password
                             <RequiredMark />
@@ -125,7 +125,7 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             onConfirm={() => void handleCodeStep()}
             preventOutsideClose
             content={
-                <div className="grid gap-3 py-2">
+                <div className="grid gap-3 pb-2">
                     <div className="flex justify-center rounded-md border border-primary/15 bg-white p-3">
                         {/* Il QR arriva già come PNG in un data URL: il segreto non passa mai
                             per un URL, dove finirebbe nei log e nella cronologia. */}

@@ -201,7 +201,7 @@ const EditInterventionDialog = ({
             cancelDisabled={isSubmitting || isLoading}
             confirmDisabled={isSubmitting || isLoading}
             content={
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 pb-4">
                     {isLoading || loadedInterventionId !== interventionId ? (
                         <div className="rounded-md border border-dashed border-primary/20 bg-muted/30 px-4 py-8 text-center text-muted-foreground">
                             Caricamento dati dell'intervento...

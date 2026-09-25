@@ -65,10 +65,10 @@ const PrintRangeDialog = ({
                 onCancel={() => onOpenChange(false)}
                 onConfirm={handleConfirm}
                 content={
-                    // Etichette e campi alla stessa misura degli altri dialoghi, e un po' d'aria
-                    // sotto la descrizione, a cui prima le etichette stavano attaccate. Sotto sm
-                    // le due date vanno una sotto l'altra: affiancate non ci stavano.
-                    <div className="grid gap-4 py-4">
+                    // Etichette e campi alla stessa misura degli altri dialoghi. Lo spazio sotto la
+                    // descrizione lo dà ormai `CustomDialog` a tutti (16px): qui resta solo quello
+                    // in fondo. Sotto sm le due date vanno una sotto l'altra: affiancate non ci stavano.
+                    <div className="grid gap-4 pb-4">
                         {extraFields}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-1">

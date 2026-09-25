@@ -536,7 +536,7 @@ const UsersSettingsSection = () => {
                 }
                 content={
                     isResettingOwnTwoFactor ? (
-                        <div className="grid gap-2 py-2">
+                        <div className="grid gap-2 pb-2">
                             <Label htmlFor="ownTwoFactorResetPassword">Password</Label>
                             <Input
                                 id="ownTwoFactorResetPassword"

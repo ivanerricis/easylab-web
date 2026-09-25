@@ -25,7 +25,7 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                       : ""
             }
             content={
-                <div className="grid gap-3 py-2">
+                <div className="grid gap-3 pb-2">
                     <div className="flex items-start gap-3 rounded-md border border-destructive/20 bg-muted/20 p-3">
                         <Checkbox
                             id="resetSchemaOnRestore"

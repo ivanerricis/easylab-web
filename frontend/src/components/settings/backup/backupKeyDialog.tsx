@@ -14,7 +14,7 @@ const BackupKeyDialog = ({ panel }: { panel: BackupPanel }) => (
         title="Conferma password"
         description="La chiave rende leggibile qualsiasi backup rubato dal NAS: confermala di nuovo con la tua password."
         content={
-            <div className="grid gap-2 py-2">
+            <div className="grid gap-2 pb-2">
                 <Label htmlFor="backupKeyPassword">La tua password</Label>
                 <Input
                     id="backupKeyPassword"

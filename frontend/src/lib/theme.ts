@@ -9,7 +9,6 @@ export type ThemeAccentPreset = {
     primaryForeground: string;
     sidebarPrimary: string;
     sidebarPrimaryForeground: string;
-    ring: string;
     chart1: string;
     chart2: string;
     chart3: string;
@@ -201,7 +200,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.977 0.013 236.62)",
         sidebarPrimary: "#2A75B9",
         sidebarPrimaryForeground: "oklch(0.977 0.013 236.62)",
-        ring: "oklch(0.705 0.015 286.067)",
         chart1: "oklch(0.78 0.16 84)",
         chart2: "oklch(0.72 0.18 152)",
         chart3: "oklch(0.68 0.16 32)",
@@ -216,7 +214,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#0F766E",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.72 0.14 182)",
         chart1: "oklch(0.72 0.18 182)",
         chart2: "oklch(0.68 0.16 152)",
         chart3: "oklch(0.68 0.14 210)",
@@ -231,7 +228,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#2F855A",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.72 0.14 145)",
         chart1: "oklch(0.72 0.18 145)",
         chart2: "oklch(0.68 0.14 165)",
         chart3: "oklch(0.66 0.12 110)",
@@ -246,7 +242,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#57801F",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.72 0.16 130)",
         chart1: "oklch(0.72 0.16 130)",
         chart2: "oklch(0.7 0.15 100)",
         chart3: "oklch(0.66 0.13 160)",
@@ -261,7 +256,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#B7791F",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.76 0.16 80)",
         chart1: "oklch(0.76 0.16 80)",
         chart2: "oklch(0.72 0.17 45)",
         chart3: "oklch(0.68 0.12 100)",
@@ -276,7 +270,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#B34432",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.7 0.16 32)",
         chart1: "oklch(0.7 0.16 32)",
         chart2: "oklch(0.72 0.15 62)",
         chart3: "oklch(0.66 0.14 12)",
@@ -291,7 +284,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#C05678",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.7 0.16 350)",
         chart1: "oklch(0.7 0.16 350)",
         chart2: "oklch(0.66 0.14 20)",
         chart3: "oklch(0.62 0.12 320)",
@@ -306,7 +298,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#6D4AAF",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.72 0.16 296)",
         chart1: "oklch(0.72 0.16 296)",
         chart2: "oklch(0.68 0.15 326)",
         chart3: "oklch(0.66 0.13 266)",
@@ -321,7 +312,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#4A5568",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        ring: "oklch(0.68 0.07 261)",
         // Le serie dei grafici restano distinguibili anche qui: un accento neutro non è una
         // richiesta di grafici grigi, che sarebbero illeggibili. La saturazione è bassa —
         // il tono sobrio resta — ma le tinte sono ben separate fra loro.
@@ -358,7 +348,6 @@ export const applyThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) =
         root.style.removeProperty("--primary-foreground");
         root.style.removeProperty("--sidebar-primary");
         root.style.removeProperty("--sidebar-primary-foreground");
-        root.style.removeProperty("--ring");
         root.style.removeProperty("--chart-1");
         root.style.removeProperty("--chart-2");
         root.style.removeProperty("--chart-3");
@@ -377,7 +366,6 @@ export const applyThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) =
     root.style.setProperty("--primary-foreground", preset.primaryForeground);
     root.style.setProperty("--sidebar-primary", preset.sidebarPrimary);
     root.style.setProperty("--sidebar-primary-foreground", preset.sidebarPrimaryForeground);
-    root.style.setProperty("--ring", preset.ring);
     root.style.setProperty("--chart-1", preset.chart1);
     root.style.setProperty("--chart-2", preset.chart2);
     root.style.setProperty("--chart-3", preset.chart3);

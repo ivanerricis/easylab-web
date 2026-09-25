@@ -83,7 +83,7 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
                 cancelLabel="Chiudi"
                 onCancel={() => onOpenChange(false)}
                 content={
-                    <div className="py-2">
+                    <div className="pb-2">
                         <SessionsList
                             sessions={sessions}
                             isLoading={isLoading}

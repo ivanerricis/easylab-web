@@ -36,7 +36,7 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
             title={title}
             description={description}
             content={
-                <div className="grid gap-2 py-2">
+                <div className="grid gap-2 pb-2">
                     {/* `block`: `Label` è un flex con `gap-2`, e il testo attorno a "ELIMINA"
                         diventava tre elementi flessibili, con 8px più lo spazio fra una parola e
                         l'altra (sembrava un doppio spazio). `text-lg` come le etichette degli

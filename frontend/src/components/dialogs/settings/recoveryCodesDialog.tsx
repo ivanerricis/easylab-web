@@ -54,7 +54,7 @@ const RecoveryCodesDialog = ({ open, onOpenChange, codes }: Props) => {
             onConfirm={() => onOpenChange(false)}
             preventOutsideClose
             content={
-                <div className="grid gap-3 py-2">
+                <div className="grid gap-3 pb-2">
                     <div className="grid grid-cols-2 gap-2 rounded-md border border-primary/15 bg-muted/20 p-3">
                         {codes.map((code) => (
                             <span key={code} className="text-center font-mono text-sm tracking-wider">

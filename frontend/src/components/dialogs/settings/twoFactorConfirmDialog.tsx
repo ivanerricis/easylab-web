@@ -85,7 +85,7 @@ const TwoFactorConfirmDialog = ({
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleConfirm()}
             content={
-                <div className="grid gap-3 py-2">
+                <div className="grid gap-3 pb-2">
                     <div className="grid gap-2">
                         <Label htmlFor="twoFactorConfirmPassword">
                             Password

@@ -155,7 +155,7 @@ describe("palette dei colori principali", () => {
      * `applyThemeAccentPreset` (per esempio `--chart-4` scritta con `chart3`), che a valore
      * non vuoto passerebbe inosservata.
      */
-    it("ogni preset scrive tutte e dieci le variabili CSS con i propri valori", () => {
+    it("ogni preset scrive tutte e nove le variabili CSS con i propri valori", () => {
         for (const preset of themeAccentPresets.filter((item) => item.key !== "default")) {
             document.documentElement.removeAttribute("style");
             applyThemeAccentPreset(preset.key);
@@ -165,7 +165,6 @@ describe("palette dei colori principali", () => {
                 ["--primary-foreground", preset.primaryForeground],
                 ["--sidebar-primary", preset.sidebarPrimary],
                 ["--sidebar-primary-foreground", preset.sidebarPrimaryForeground],
-                ["--ring", preset.ring],
                 ["--chart-1", preset.chart1],
                 ["--chart-2", preset.chart2],
                 ["--chart-3", preset.chart3],
@@ -206,7 +205,6 @@ describe("applicazione del tema al DOM", () => {
 
         const root = document.documentElement;
         expect(root.style.getPropertyValue("--primary")).toBe(ocean!.primary);
-        expect(root.style.getPropertyValue("--ring")).toBe(ocean!.ring);
         expect(root.style.getPropertyValue("--chart-1")).toBe(ocean!.chart1);
     });
 

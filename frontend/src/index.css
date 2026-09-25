@@ -111,9 +111,9 @@ body,
     --primary-text: color-mix(in oklab, var(--primary) 85%, black);
     /* Anello di focus: deve staccarsi almeno 3:1 sia dalle card sia dallo sfondo pagina (WCAG
      1.4.11). Il vecchio --ring era un grigio chiaro, per giunta usato al 25-50%: 2.3-2.6:1.
-     È un token a parte e non --ring perché le preimpostazioni del colore principale
-     (lib/theme.ts) scrivono un proprio --ring chiaro, pensato come alone, che qui
-     tornerebbe sotto soglia. Il blu del testo ha già il contrasto giusto in entrambi i temi. */
+     È nato come token a parte perché le preimpostazioni del colore principale (lib/theme.ts)
+     scrivevano un proprio --ring chiaro; ora non lo scrivono più e --ring rimanda qui (sotto).
+     Il blu del testo ha già il contrasto giusto in entrambi i temi. */
     --focus-ring: var(--primary-text);
     /* Fondo dell'intestazione delle tabelle. Sul primario pieno il testo quasi bianco arrivava a
      4.18:1, sotto il 4.5:1 del testo normale; scurito come il blu del testo, con il bianco
@@ -153,7 +153,11 @@ body,
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.87 0.012 var(--neutral-hue));
     --input: oklch(0.85 0.012 var(--neutral-hue));
-    --ring: oklch(0.705 0.03 var(--neutral-hue));
+    /* `--ring` è il nome del focus nei componenti shadcn (`ring-ring`): qui segue `--focus-ring`,
+       così un componente aggiunto in futuro con le classi di serie ha già un focus visibile. Prima
+       era un grigio chiaro (sotto 3:1) e le preimpostazioni di colore ne scrivevano uno loro; da
+       quando il focus usa `--focus-ring` non lo leggeva più nessuno. */
+    --ring: var(--focus-ring);
     --chart-1: oklch(0.78 0.16 84);
     --chart-2: oklch(0.72 0.18 152);
     --chart-3: oklch(0.68 0.16 32);
@@ -210,7 +214,6 @@ body,
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 13%);
     --input: oklch(1 0 0 / 17%);
-    --ring: oklch(0.6 0.03 var(--neutral-hue));
     --chart-1: oklch(0.78 0.16 84);
     --chart-2: oklch(0.72 0.18 152);
     --chart-3: oklch(0.68 0.16 32);

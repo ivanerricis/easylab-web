@@ -53,3 +53,16 @@ export const currentMonthKey = (timeZone: string, now = new Date()): string => {
 
     return `${year}-${month}`;
 };
+
+/** Il giorno corrente nel fuso indicato, come `YYYY-MM-DD`: il "fino a oggi" è quello del laboratorio. */
+export const currentLocalDay = (timeZone: string, now = new Date()): string => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(now);
+    const valueOf = (type: string) => parts.find((part) => part.type === type)?.value;
+
+    return `${valueOf("year")}-${valueOf("month")}-${valueOf("day")}`;
+};

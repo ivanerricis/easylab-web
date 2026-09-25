@@ -14,7 +14,7 @@ import type { NewReport, UpdateReport } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
 import { personName, personNameOrDash } from "./personName";
 import { containsText, parseIdSearch } from "./search";
-import { currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
+import { currentLocalDay, currentMonthKey, localDayStartUtc, onLocalDays, toLocalTimestamp } from "./timeZone";
 
 type ReportSortBy = "createdAt" | "customer";
 
@@ -269,6 +269,47 @@ const getTrailingMonthKeys = (monthsCount: number, timeZone: string, now = new D
     });
 };
 
+/** L'incasso: prezzo del report più il compenso dell'eventuale tecnico esterno. */
+const reportRevenueSum = sql<number>`coalesce(sum(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0)), 0)::int`;
+
+/**
+ * L'incasso del mese prima di quello in corso, ma solo fino allo stesso giorno: il confronto
+ * della dashboard metteva il mese in corso (il 25 settembre: 25 giorni) contro l'intero mese
+ * precedente (31), e a metà mese il calo era sempre "rosso" per niente. Se il mese prima è più
+ * corto (il 31 marzo contro febbraio) si ferma al suo ultimo giorno. `null` quando il mese
+ * richiesto non è quello in corso: un mese chiuso si confronta con il mese intero prima.
+ */
+const getPreviousMonthToDateRevenue = async (targetMonthKey: string, timeZone: string, now: Date) => {
+    const today = currentLocalDay(timeZone, now);
+
+    if (targetMonthKey !== today.slice(0, 7)) {
+        return null;
+    }
+
+    const [year, month] = targetMonthKey.split("-").map(Number);
+    // Date.UTC solo per l'aritmetica: il giorno 0 del mese corrente è l'ultimo del precedente.
+    const lastDayOfPrevious = new Date(Date.UTC(year, month - 1, 0));
+    const previousMonthKey = `${lastDayOfPrevious.getUTCFullYear()}-${String(lastDayOfPrevious.getUTCMonth() + 1).padStart(2, "0")}`;
+    const days = Math.min(Number(today.slice(8, 10)), lastDayOfPrevious.getUTCDate());
+
+    const [row] = await db
+        .select({ revenue: reportRevenueSum })
+        .from(reportTable)
+        .leftJoin(reportTechnicianTable, eq(reportTechnicianTable.reportId, reportTable.id))
+        .where(
+            and(
+                eq(reportTable.closed, true),
+                onLocalDays(
+                    reportTable.created_at,
+                    { from: `${previousMonthKey}-01`, to: `${previousMonthKey}-${String(days).padStart(2, "0")}` },
+                    timeZone
+                )
+            )
+        );
+
+    return { revenue: Number(row?.revenue ?? 0), days };
+};
+
 export const getReportStats = async (month: string | undefined, timeZone: string, now = new Date()) => {
     const seriesMonthKeys = getTrailingMonthKeys(6, timeZone, now);
     const targetMonthKey = month ?? seriesMonthKeys[seriesMonthKeys.length - 1];
@@ -277,7 +318,7 @@ export const getReportStats = async (month: string | undefined, timeZone: string
     // Roma è di quel mese, anche se in UTC è ancora il giorno prima.
     const localMonth = sql<string>`to_char(${toLocalTimestamp(reportTable.created_at, timeZone)}, 'YYYY-MM')`;
 
-    const [statusCountRows, revenueRows] = await Promise.all([
+    const [statusCountRows, revenueRows, previousMonthToDate] = await Promise.all([
         db
             .select({ closed: reportTable.closed, count: sql<number>`count(*)::int` })
             .from(reportTable)
@@ -285,7 +326,7 @@ export const getReportStats = async (month: string | undefined, timeZone: string
         db
             .select({
                 month: localMonth,
-                revenue: sql<number>`coalesce(sum(${reportTable.price} + coalesce(${reportTechnicianTable.price}, 0)), 0)::int`,
+                revenue: reportRevenueSum,
                 // Compenso pagato ai tecnici esterni: l'incasso netto è il totale meno questa
                 // spesa, non un'altra colonna della riga (`report.price` da solo non basta
                 // perché un report può non avere alcun tecnico esterno assegnato).
@@ -305,6 +346,7 @@ export const getReportStats = async (month: string | undefined, timeZone: string
             // entra come parametro, e per Postgres `… AT TIME ZONE $2` nella SELECT e
             // `… AT TIME ZONE $5` nel GROUP BY sono espressioni diverse, quindi un errore.
             .groupBy(sql`1`),
+        getPreviousMonthToDateRevenue(targetMonthKey, timeZone, now),
     ]);
 
     const revenueByMonth = new Map(revenueRows.map((row) => [row.month, Number(row.revenue)]));
@@ -317,6 +359,7 @@ export const getReportStats = async (month: string | undefined, timeZone: string
         closedCount: Number(statusCountRows.find((row) => row.closed)?.count ?? 0),
         monthlyRevenue: revenueByMonth.get(targetMonthKey) ?? 0,
         monthlyNetRevenue: netRevenueOf(targetMonthKey),
+        previousMonthToDate,
         series: seriesMonthKeys.map((monthKey) => ({
             monthKey,
             value: revenueByMonth.get(monthKey) ?? 0,

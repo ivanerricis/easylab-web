@@ -202,6 +202,21 @@ describe("DashboardPage", () => {
         expect(within(dialog).queryByText(/rispetto/)).not.toBeInTheDocument();
     });
 
+    /**
+     * Il mese in corso si confronta con il mese prima fino allo stesso giorno: l'11 settembre,
+     * contro tutto agosto, il calo usciva quasi sempre anche a parità di lavoro.
+     */
+    it("per il mese in corso confronta con il mese prima fino allo stesso giorno", async () => {
+        api.getReportStats.mockResolvedValue({ ...reportStats, previousMonthToDate: { revenue: 500, days: 11 } });
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+
+        // (1520,50 - 500) / 500, non (1520,50 - 900) / 900 del mese intero.
+        expect(within(dialog).getByText(/\+204% rispetto ai primi 11 giorni di agosto 2026/)).toBeInTheDocument();
+    });
+
     it("segnala se i contatori non si caricano", async () => {
         api.getReportStats.mockRejectedValue(new Error("Database non raggiungibile"));
         renderWithProviders(<DashboardPage />);

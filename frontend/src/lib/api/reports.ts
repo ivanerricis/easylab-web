@@ -180,6 +180,11 @@ export type ReportStatsDto = {
     /** Incasso al netto del compenso pagato ai tecnici esterni. */
     monthlyNetRevenue: number;
     series: { monthKey: string; value: number; netValue: number }[];
+    /**
+     * Solo per il mese in corso: l'incasso del mese prima fino allo stesso giorno (`days`), per
+     * confrontare periodi uguali. `null` per un mese già chiuso.
+     */
+    previousMonthToDate: { revenue: number; days: number } | null;
 };
 
 export const getReportStats = async (month?: string) =>

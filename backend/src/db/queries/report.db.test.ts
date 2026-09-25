@@ -478,3 +478,45 @@ describe("getReportStats: confini del mese nel fuso del laboratorio", () => {
         expect(stats.closedCount).toBe(1);
     });
 });
+
+/**
+ * Il confronto della dashboard metteva il mese in corso, a metà, contro tutto il mese prima.
+ * `previousMonthToDate` è il mese prima fino allo stesso giorno del laboratorio.
+ */
+describe("getReportStats: mese precedente fino allo stesso giorno", () => {
+    const timeZone = "Europe/Rome";
+
+    it("somma il mese prima solo fino al giorno di oggi, compreso", async () => {
+        const collaborator = await insertCollaborator();
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 70,
+            created_at: new Date("2026-01-15T20:00:00Z"),
+        });
+        // Il 16 gennaio: oltre il 15, non conta.
+        await insertReport({
+            closed: true,
+            collaboratorId: collaborator.id,
+            price: 500,
+            created_at: new Date("2026-01-16T09:00:00Z"),
+        });
+
+        const stats = await getReportStats(undefined, timeZone, new Date("2026-02-15T12:00:00Z"));
+
+        expect(stats.previousMonthToDate).toEqual({ revenue: 70, days: 15 });
+        expect(stats.series.find((entry) => entry.monthKey === "2026-01")?.value).toBe(570);
+    });
+
+    it("se il mese prima è più corto si ferma al suo ultimo giorno", async () => {
+        const stats = await getReportStats(undefined, timeZone, new Date("2026-03-31T10:00:00Z"));
+
+        expect(stats.previousMonthToDate).toEqual({ revenue: 0, days: 28 });
+    });
+
+    it("per un mese già chiuso non c'è: si confronta con il mese intero", async () => {
+        const stats = await getReportStats("2026-01", timeZone, new Date("2026-02-15T12:00:00Z"));
+
+        expect(stats.previousMonthToDate).toBeNull();
+    });
+});

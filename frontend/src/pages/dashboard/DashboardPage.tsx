@@ -137,6 +137,7 @@ const DashboardPage = () => {
     const [openReports, setOpenReports] = useState(0);
     const [closedReports, setClosedReports] = useState(0);
     const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+    const [previousMonthToDate, setPreviousMonthToDate] = useState<{ revenue: number; days: number } | null>(null);
     const [monthlyNetRevenue, setMonthlyNetRevenue] = useState(0);
     const [monthlyRevenueSeries, setMonthlyRevenueSeries] = useState<
         { monthKey: string; value: number; netValue: number }[]
@@ -170,20 +171,35 @@ const DashboardPage = () => {
      * Il mese precedente si prende dalla serie (gli ultimi sei mesi): per un mese più vecchio
      * non c'è, e il confronto non si mostra. Con un mese precedente a zero la percentuale non
      * ha senso, e anche lì non si mostra.
+     *
+     * Per il mese in corso il confronto è con il mese prima fino allo stesso giorno
+     * (`previousMonthToDate`, dal backend): contro il mese intero, il 25 settembre si
+     * confrontavano 25 giorni con 31 e il calo usciva quasi sempre, rosso, anche a parità di
+     * lavoro. `days` pari alla lunghezza del mese prima (il 30 aprile contro marzo non lo è, il
+     * 31 marzo contro febbraio sì) vuol dire che il confronto è già con il mese intero.
      */
     const revenueComparison = useMemo(() => {
         const previousMonthKey = shiftMonthKey(selectedRevenueMonth, -1);
         const previousPoint = monthlyRevenueSeries.find((point) => point.monthKey === previousMonthKey);
+        const [previousYear, previousMonth] = previousMonthKey.split("-").map(Number);
+        const previousMonthLength = new Date(previousYear, previousMonth, 0).getDate();
+        const partial =
+            isCurrentRevenueMonth && previousMonthToDate && previousMonthToDate.days < previousMonthLength
+                ? previousMonthToDate
+                : null;
+        const previousValue =
+            isCurrentRevenueMonth && previousMonthToDate ? previousMonthToDate.revenue : previousPoint?.value;
 
-        if (!previousPoint || previousPoint.value <= 0) {
+        if (previousValue == null || previousValue <= 0) {
             return null;
         }
 
         return {
-            change: (monthlyRevenue - previousPoint.value) / previousPoint.value,
+            change: (monthlyRevenue - previousValue) / previousValue,
             previousMonthLabel: getMonthLabel(previousMonthKey),
+            previousDays: partial?.days ?? null,
         };
-    }, [monthlyRevenue, monthlyRevenueSeries, selectedRevenueMonth]);
+    }, [isCurrentRevenueMonth, monthlyRevenue, monthlyRevenueSeries, previousMonthToDate, selectedRevenueMonth]);
 
     const maxMonthlyRevenue = useMemo(
         () => monthlyRevenueSeries.reduce((max, point) => Math.max(max, point.value), 0),
@@ -198,6 +214,7 @@ const DashboardPage = () => {
             setOpenReports(reportStats.openCount);
             setClosedReports(reportStats.closedCount);
             setMonthlyRevenue(reportStats.monthlyRevenue);
+            setPreviousMonthToDate(reportStats.previousMonthToDate ?? null);
             setMonthlyNetRevenue(reportStats.monthlyNetRevenue);
             setMonthlyRevenueSeries(reportStats.series);
             setScheduledInterventions(interventionStats.programmatoCount);
@@ -431,11 +448,20 @@ const DashboardPage = () => {
                                                 360px andava a capo da sola sopra la scritta. */}
                                                 <span>
                                                     {percentFormatter.format(revenueComparison.change)} rispetto{" "}
-                                                    {/* "ad agosto", "ad aprile", ma "a luglio". */}
-                                                    {revenueComparison.previousMonthLabel.startsWith("a")
-                                                        ? "ad"
-                                                        : "a"}{" "}
-                                                    {revenueComparison.previousMonthLabel}
+                                                    {revenueComparison.previousDays != null ? (
+                                                        <>
+                                                            ai primi {revenueComparison.previousDays} giorni di{" "}
+                                                            {revenueComparison.previousMonthLabel}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {/* "ad agosto", "ad aprile", ma "a luglio". */}
+                                                            {revenueComparison.previousMonthLabel.startsWith("a")
+                                                                ? "ad"
+                                                                : "a"}{" "}
+                                                            {revenueComparison.previousMonthLabel}
+                                                        </>
+                                                    )}
                                                 </span>
                                             </div>
                                         ) : null}

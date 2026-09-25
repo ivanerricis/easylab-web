@@ -13,6 +13,8 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 **Interfaccia**
 - [Contrasto del testo sulle righe gialle e verdi](#contrasto-del-testo-sulle-righe-e-sugli-eventi-gialli-e-verdi):
   testo bianco su giallo a 1,91:1, serve una scelta fra due strade.
+- [Eventi del calendario con fondo tenue e striscia di stato](#eventi-del-calendario-con-fondo-tenue-e-striscia-di-stato):
+  provato e annullato il 2026-09-25; qui la richiesta originale e cosa è emerso.
 - Colonne ridimensionabili nelle tabelle di Impostazioni (utenti, log, backup, tema): sono le
   ultime tabelle scritte a mano fuori da `EntityTable`. Dal CHANGELOG del 2026-09-08; le schede
   di cliente, collaboratore e tecnico, citate nella stessa voce, sono state coperte il 09-10 e
@@ -236,6 +238,52 @@ riconoscibili e risolve il contrasto con una variabile in più.
 `getComputedStyle` delle righe `tr[data-status-color]` e degli eventi `.rbc-event`, convertendo
 i colori `oklch` in RGB con un canvas (il parsing diretto delle stringhe `oklch` dà numeri
 sbagliati). Controllare tutte e tre le intensità, in chiaro e in scuro.
+
+## Eventi del calendario con fondo tenue e striscia di stato
+
+*Provato il 2026-09-25 e annullato su richiesta, senza commit: per ora gli eventi restano come
+sono. Se si riprende, questa è la richiesta di partenza, così come era stata scritta.*
+
+> Nella dashboard di masso-web (frontend/src/pages/calendar/) gli eventi del calendario hanno colori
+> pieni e saturi: blocchi rosso/giallo/verde con testo bianco. Su telefono la vista Agenda diventa
+> un muro rosso. Voglio ammorbidirli.
+>
+> Obiettivo: eventi con fondo tenue e una barra colorata a sinistra per lo stato, testo nel colore
+> normale, come le card delle liste su mobile (vedi la striscia in entity-card-list.tsx).
+>
+> Dove guardare:
+> - interventions-calendar.tsx: `statusEventStyle` usa var(--color-green-500), --color-yellow-400,
+>   --color-red-500 con testo #fff; `eventPropGetter` li applica.
+> - calendar-theme.css: stili di .rbc-event, agenda e popup "+N altri".
+> - index.css: i token di stato già verificati per il contrasto (--status-red/yellow/green e i
+>   relativi -foreground) da usare al posto dei colori Tailwind grezzi.
+>
+> Vincoli:
+> - Tutte le viste: Mese, Settimana, Giorno, Agenda, e il popup "+N altri".
+> - Stato riconoscibile anche senza distinguere i colori, e contrasto del testo almeno 4.5:1 in
+>   tema chiaro e scuro.
+> - Non toccare la barra dei pulsanti del calendario (CalendarToolbar), l'abbiamo appena rifatta.
+> - Verifica con Playwright a 390 e 1440px, chiaro e scuro, e confronta prima/dopo.
+> - Aggiungi la voce in docs/CHANGELOG.md; non fare commit finché non ti dico che va bene.
+
+**Cosa era emerso nel tentativo** (utile per non ripartire da zero):
+- Al posto dello stile in linea basta una classe da `eventPropGetter` (`status-event
+  status-event-<colore>`) con il disegno in `calendar-theme.css`: caricato dopo il CSS della
+  libreria, vince per specificità e ordine, compreso il bordo blu di `.rbc-day-slot .rbc-event`.
+- Nell'agenda la classe finisce sulla `<tr>`, non su `.rbc-event`: va colorato solo orario ed
+  evento, perché la cella della data ha `rowspan` e raggruppa più interventi (è lei a fare il
+  "muro rosso").
+- Il fondo con `color-mix()` va miscelato **in `oklab`, non in `oklch`**: col bianco (senza
+  tinta) Chromium interpola la tinta da 0° e giallo e verde escono rosa. Fondo opaco (sulla
+  card, o sul popover nel popup), perché nelle viste orarie gli eventi si sovrappongono. Il
+  giallo al 12% sul bianco quasi non si vede: serviva il 18%; in tema scuro il 20% per tutti.
+- Per lo stato senza colore: l'icona delle card della dashboard davanti al titolo
+  (`CalendarClock`, `Loader`, `CircleCheck`) più il nome dello stato in `sr-only`. Nell'agenda
+  l'icona va in linea col testo, non in una colonna flex: altrimenti su mobile i titoli vanno su
+  tre righe.
+- Contrasti misurati così: testo 7,5–17:1, icona ≥ 4,95:1, in chiaro e scuro, anche in hover.
+  La striscia gialla sul fondo chiaro resta a 1,7:1 (è solo un rinforzo).
+- Chiude anche la parte "calendario" della voce sul contrasto qui sopra.
 
 ## Test sul database vero, seconda parte
 

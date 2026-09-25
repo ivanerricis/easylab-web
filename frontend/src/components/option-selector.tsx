@@ -60,7 +60,7 @@ const OptionSelector = <TValue extends string | number | boolean>({
                         data-state={isSelected ? "checked" : "unchecked"}
                         onClick={() => onValueChange(option.value)}
                         className={cn(
-                            "flex cursor-pointer items-center justify-start gap-3 rounded-xl border-2 px-4 py-3 text-left transition outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                            "flex cursor-pointer items-center justify-start gap-3 rounded-xl border-2 px-4 py-3 text-left focus-outline transition outline-none",
                             isSelected
                                 ? "border-primary bg-primary/10 shadow-sm"
                                 : "border-border bg-card hover:border-primary/40 hover:bg-muted/60"

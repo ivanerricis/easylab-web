@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
     type CompanySettingsInput,
 } from "@/lib/api";
 import TimeZoneField from "@/components/settings/timeZoneField";
+import SettingsFileInput from "@/components/settings/settingsFileInput";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
 import { formatDateTime } from "@/lib/utils";
 
@@ -63,7 +64,6 @@ const CompanySettingsPanel = () => {
     const [isLogoResetConfirmOpen, setIsLogoResetConfirmOpen] = useState(false);
     const [hasCustomLogo, setHasCustomLogo] = useState(false);
     const [logoUpdatedAt, setLogoUpdatedAt] = useState<string | null>(null);
-    const logoInputRef = useRef<HTMLInputElement>(null);
 
     const isDirty = isSettingsFormDirty(formValues, savedValues);
     const selectedTimeZone = formValues.timeZone.trim() ? canonicalTimeZone(formValues.timeZone) : null;
@@ -285,11 +285,15 @@ const CompanySettingsPanel = () => {
             <SettingsCard
                 title="Logo"
                 description="Carica un'immagine per sostituire il logo mostrato nell'app e nei report PDF."
+                contentClassName="@container"
             >
                 {isLoadingLogo ? (
                     <SettingsLoadingBox />
                 ) : (
-                    <div className="grid gap-3 xl:grid-cols-2">
+                    // Affiancati in base alla larghezza della card, non dello schermo: a 1440px,
+                    // fra barra laterale e menu delle impostazioni, `xl` scattava con la card
+                    // larga poco più di 700px. Come in Email.
+                    <div className="grid gap-3 @2xl:grid-cols-2">
                         <SettingsGroup title="Logo attuale">
                             <div className="flex items-center gap-4">
                                 <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/15 bg-background">
@@ -334,14 +338,13 @@ const CompanySettingsPanel = () => {
 
                         <SettingsGroup title="Sostituisci logo">
                             <div className="grid gap-2">
-                                <Label htmlFor="logoUpload">Carica nuovo logo</Label>
-                                <Input
+                                <SettingsFileInput
                                     id="logoUpload"
-                                    type="file"
+                                    label="Carica nuovo logo"
                                     accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                                    ref={logoInputRef}
                                     disabled={isUploadingLogo}
                                     onChange={(event) => void handleLogoFileSelected(event)}
+                                    status={isUploadingLogo ? "Caricamento in corso..." : undefined}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Formati supportati: JPG, PNG, WEBP, GIF, SVG. Dimensione massima 5 MB. Il logo viene

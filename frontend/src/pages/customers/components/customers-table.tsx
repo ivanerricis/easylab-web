@@ -1,4 +1,5 @@
 import EntityTable from "@/components/entity-table";
+import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
 import { entityPaths } from "@/lib/entityPaths";
@@ -22,6 +23,8 @@ type CustomersTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /** La ricerca in vigore, per dire perché la lista è vuota: vedi `resolveEmptyListMessage`. */
+    searchText?: string;
 };
 
 const CustomersTable = ({
@@ -37,6 +40,7 @@ const CustomersTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    searchText,
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
         <>
@@ -76,7 +80,7 @@ const CustomersTable = ({
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}
-            emptyMessage="Nessun cliente disponibile."
+            emptyMessage={resolveEmptyListMessage({ emptyMessage: "Nessun cliente disponibile.", searchText })}
             renderRowActions={renderRowActions}
             onRowOpen={(row) => onOpenCustomer(row.id)}
             isInitialLoading={isInitialLoading}

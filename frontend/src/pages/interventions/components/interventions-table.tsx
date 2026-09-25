@@ -1,4 +1,5 @@
 import EntityTable from "@/components/entity-table";
+import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
 import { entityPaths } from "@/lib/entityPaths";
@@ -24,6 +25,12 @@ type InterventionsTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /**
+     * Ricerca e filtri in vigore, per dire perché la lista è vuota: vedi
+     * `resolveEmptyListMessage`.
+     */
+    searchText?: string;
+    hasActiveFilters?: boolean;
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
@@ -45,6 +52,8 @@ const InterventionsTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    searchText,
+    hasActiveFilters,
 }: InterventionsTableProps) => {
     const renderRowActions = (row: InterventionDto) => (
         <>
@@ -97,7 +106,12 @@ const InterventionsTable = ({
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}
-            emptyMessage="Nessun intervento disponibile."
+            emptyMessage={resolveEmptyListMessage({
+                emptyMessage: "Nessun intervento disponibile.",
+                searchText,
+                hasActiveFilters,
+                filteredMessage: "Nessun intervento corrisponde ai filtri.",
+            })}
             renderRowActions={renderRowActions}
             getRowStatusColor={(row) => interventionStatusColor[row.status]}
             onRowOpen={(row) => onOpenIntervention(row.id)}

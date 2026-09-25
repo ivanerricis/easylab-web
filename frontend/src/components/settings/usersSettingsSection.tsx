@@ -1,7 +1,14 @@
 import { startTransition, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { KeyRound, Monitor, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
+import { Ellipsis, KeyRound, Monitor, ShieldCheck, ShieldOff, Trash2, UserPlus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -172,32 +179,52 @@ const UsersSettingsSection = () => {
         }
     };
 
-    const renderUserActions = (user: UserDto) => (
-        <>
-            <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
-                <Monitor className="size-4" />
-                Sessioni
-            </Button>
-            {/* Non sul proprio account: il backend lo rifiuta, perché consegnerebbe una
-                password nuova senza chiedere quella attuale. Per sé c'è "Cambia password". */}
-            {user.id !== currentUser?.id ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
-                    <KeyRound className="size-4" />
-                    Rigenera password
+    // Quali azioni offrire su un utente: una regola sola per le schede su telefono (pulsanti)
+    // e per la tabella (menu "⋯"), così le due viste non possono divergere.
+    // - "Rigenera password" non sul proprio account: il backend lo rifiuta, perché consegnerebbe
+    //   una password nuova senza chiedere quella attuale. Per sé c'è "Cambia password".
+    // - "Disattiva 2FA" anche sul proprio account, a differenza di "disabilita" ed "elimina": è
+    //   l'unico modo che un admin ha di rientrare dopo aver perso il telefono, senza mettere le
+    //   mani sulla macchina. Su di sé il dialogo chiede la password.
+    const getUserActions = (user: UserDto) => {
+        const isSelf = user.id === currentUser?.id;
+
+        return {
+            canRegenerate: !isSelf,
+            canResetTwoFactor: user.twoFactorEnabled,
+            canToggleActive: !isSelf,
+            canDelete: !isSelf,
+        };
+    };
+
+    const renderUserActionButtons = (user: UserDto) => {
+        const actions = getUserActions(user);
+
+        return (
+            <>
+                <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
+                    <Monitor className="size-4" />
+                    Sessioni
                 </Button>
-            ) : null}
-            {/* Anche sul proprio account, a differenza di "disabilita" ed "elimina": è
-                l'unico modo che un admin ha di rientrare dopo aver perso il telefono, senza
-                mettere le mani sulla macchina. Su di sé il dialogo chiede la password. */}
-            {user.twoFactorEnabled ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingTwoFactorReset(user)}>
-                    <ShieldOff className="size-4" />
-                    Disattiva 2FA
-                </Button>
-            ) : null}
-            {user.id !== currentUser?.id ? (
-                <>
-                    {user.active ? (
+                {actions.canRegenerate ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
+                        <KeyRound className="size-4" />
+                        Rigenera password
+                    </Button>
+                ) : null}
+                {actions.canResetTwoFactor ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUserPendingTwoFactorReset(user)}
+                    >
+                        <ShieldOff className="size-4" />
+                        Disattiva 2FA
+                    </Button>
+                ) : null}
+                {actions.canToggleActive ? (
+                    user.active ? (
                         <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingDisable(user)}>
                             <UserX className="size-4" />
                             Disabilita
@@ -213,15 +240,96 @@ const UsersSettingsSection = () => {
                             <ShieldCheck className="size-4" />
                             Riabilita
                         </Button>
-                    )}
+                    )
+                ) : null}
+                {actions.canDelete ? (
                     <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingDelete(user)}>
                         <Trash2 className="size-4" />
                         Elimina
                     </Button>
-                </>
-            ) : null}
-        </>
-    );
+                ) : null}
+            </>
+        );
+    };
+
+    /**
+     * In tabella restano in riga solo "Sessioni", l'azione di consultazione, e un menu "⋯" per
+     * le altre quattro. Con tutti i pulsanti affiancati la colonna Azioni sfondava la tabella
+     * anche a 1440px ("Disat…", "Elimina" tagliato fuori), e sono comunque azioni rare, quasi
+     * tutte confermate da un dialogo: un clic in più non pesa.
+     */
+    const renderUserActionsMenu = (user: UserDto) => {
+        const actions = getUserActions(user);
+        const hasMenuActions =
+            actions.canRegenerate || actions.canResetTwoFactor || actions.canToggleActive || actions.canDelete;
+
+        return (
+            <>
+                <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
+                    <Monitor className="size-4" />
+                    Sessioni
+                </Button>
+                {hasMenuActions ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                aria-label={`Altre azioni per ${user.username}`}
+                            >
+                                <Ellipsis className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        {/* `w-auto`: di serie il menu è largo quanto il trigger, qui un'icona da 32px. */}
+                        <DropdownMenuContent align="end" className="w-auto min-w-48">
+                            {actions.canRegenerate ? (
+                                <DropdownMenuItem onSelect={() => setUserPendingRegeneration(user)}>
+                                    <KeyRound />
+                                    Rigenera password
+                                </DropdownMenuItem>
+                            ) : null}
+                            {actions.canResetTwoFactor ? (
+                                <DropdownMenuItem onSelect={() => setUserPendingTwoFactorReset(user)}>
+                                    <ShieldOff />
+                                    Disattiva 2FA
+                                </DropdownMenuItem>
+                            ) : null}
+                            {actions.canToggleActive ? (
+                                user.active ? (
+                                    <DropdownMenuItem onSelect={() => setUserPendingDisable(user)}>
+                                        <UserX />
+                                        Disabilita
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem
+                                        disabled={isTogglingActive}
+                                        onSelect={() => void handleEnable(user)}
+                                    >
+                                        <ShieldCheck />
+                                        Riabilita
+                                    </DropdownMenuItem>
+                                )
+                            ) : null}
+                            {actions.canDelete ? (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem variant="destructive" onSelect={() => setUserPendingDelete(user)}>
+                                        <Trash2 />
+                                        Elimina
+                                    </DropdownMenuItem>
+                                </>
+                            ) : null}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    // Tiene il posto del menu, così "Sessioni" resta incolonnato con le altre
+                    // righe anche sul proprio account senza 2FA, che non ha altre azioni.
+                    <span aria-hidden="true" className="size-8 shrink-0" />
+                )}
+            </>
+        );
+    };
 
     return (
         <SettingsSection>
@@ -258,7 +366,11 @@ const UsersSettingsSection = () => {
                             <TableBody>
                                 {users.map((user) => (
                                     <TableRow key={user.id}>
-                                        <TableCell className="font-medium">
+                                        {/* Nome, contrassegni e data vanno a capo invece di stare su una
+                                            riga sola: a 768px, con la barra laterale aperta, la tabella
+                                            ha ~400px, e "claude_visual_check" più la data intera
+                                            spingevano il menu delle azioni fuori dalla card. */}
+                                        <TableCell className="font-medium [overflow-wrap:anywhere] whitespace-normal">
                                             {user.username}
                                             {user.id === currentUser?.id ? (
                                                 <span className="ml-2 text-xs text-muted-foreground">(tu)</span>
@@ -273,9 +385,13 @@ const UsersSettingsSection = () => {
                                                 <span className="ml-2 text-xs text-muted-foreground">(2FA)</span>
                                             ) : null}
                                         </TableCell>
-                                        <TableCell>{formatDateTime(user.createdAt)}</TableCell>
+                                        <TableCell className="whitespace-normal">
+                                            {formatDateTime(user.createdAt)}
+                                        </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">{renderUserActions(user)}</div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                {renderUserActionsMenu(user)}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -330,7 +446,7 @@ const UsersSettingsSection = () => {
                                         </dl>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 border-t bg-muted/40 px-3 py-2.5">
-                                        {renderUserActions(user)}
+                                        {renderUserActionButtons(user)}
                                     </div>
                                 </article>
                             ))}

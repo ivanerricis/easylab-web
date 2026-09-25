@@ -230,6 +230,10 @@ const ReportsPage = () => {
                             sort={parseSortOption(sortOption)}
                             onSortChange={handleTableSortChange}
                             hiddenColumnKeys={hiddenColumnKeys}
+                            searchText={committedSearchText}
+                            // "Report aperti" è il filtro di partenza, ma resta un filtro: con
+                            // nessun report aperto "Nessun report disponibile." sarebbe falso.
+                            hasActiveFilters={visibilityFilter !== "all" || dateFrom != null || dateTo != null}
                             rows={reportRows}
                             onOpenReport={handleOpenReport}
                             onEditReport={handleOpenEditDialog}

@@ -66,10 +66,15 @@ const optionButtonClasses = (isActive: boolean) =>
         isActive && "border-primary bg-primary/10 dark:border-primary dark:bg-primary/10"
     );
 
-// Sotto `sm` ogni riquadro mostra solo icona e titolo: la riga più chiara che spiega la scelta
-// (es. "Interfaccia luminosa e pulita.") si vede già dall'icona e dall'etichetta, ed è lei a
-// far crescere ogni pulsante più del necessario sui telefoni.
-const optionDescriptionClasses = "hidden text-xs font-normal text-muted-foreground sm:block";
+// In poco spazio ogni riquadro mostra solo icona e titolo: la riga più chiara che spiega la
+// scelta (es. "Interfaccia luminosa e pulita.") si vede già dall'icona e dall'etichetta, ed è
+// lei a far crescere ogni pulsante più del necessario sui telefoni.
+//
+// Le soglie di questa sezione (`@md`, `@lg`, `@2xl`) sono del contenitore, non della finestra:
+// la pagina Impostazioni fa della sezione un `@container`. Con i breakpoint di finestra, fra
+// 640 e ~1280px con la barra laterale aperta le griglie andavano a tre colonne in 250–400px e
+// le etichette si leggevano "Chiar", "Scur". A tre colonne si passa da 512px di sezione.
+const optionDescriptionClasses = "hidden text-xs font-normal text-muted-foreground @md:block";
 
 // Le barrette prendono i colori dalle variabili del livello: l'attributo qui sopra le
 // isola dall'intensità attiva, così ogni pulsante mostra davvero il proprio livello.
@@ -188,7 +193,7 @@ const ThemeSettingsSection = () => {
                 title="Modalità"
                 description="Scegli se seguire il sistema oppure forzare il tema chiaro o scuro."
             >
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 @lg:grid-cols-3">
                     {modeOptions.map((option) => {
                         const Icon = option.icon;
 
@@ -215,7 +220,7 @@ const ThemeSettingsSection = () => {
                 title="Colore principale"
                 description="Palette usata per pulsanti, sidebar e accenti dell'applicazione."
             >
-                <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-3">
                     {themeAccentPresets.map((preset) => (
                         <Button
                             key={preset.key}
@@ -241,7 +246,7 @@ const ThemeSettingsSection = () => {
                 title="Raggio degli angoli"
                 description="Quanto sono arrotondati i bordi di card, pulsanti e campi."
             >
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 @lg:grid-cols-3">
                     {cornerRadiusPresets.map((preset) => (
                         <Button
                             key={preset.key}
@@ -264,7 +269,7 @@ const ThemeSettingsSection = () => {
                 title="Righe delle tabelle"
                 description="Quanto sono marcati i colori di stato nelle tabelle di interventi e report."
             >
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 @lg:grid-cols-3">
                     {tableRowIntensities.map((intensity) => (
                         <Button
                             key={intensity.key}
@@ -302,7 +307,7 @@ const ThemeSettingsSection = () => {
                 title="Densità tabelle"
                 description="Quanto sono ravvicinate le righe nelle tabelle dell'app."
             >
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 @lg:grid-cols-3">
                     {tableDensities.map((density) => (
                         <Button
                             key={density.key}
@@ -322,7 +327,7 @@ const ThemeSettingsSection = () => {
             </SettingsCard>
 
             <SettingsCard title="Dimensione testo" description="Scala il testo e gli elementi di tutta l'applicazione.">
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 @lg:grid-cols-3">
                     {fontSizes.map((fontSize) => (
                         <Button
                             key={fontSize.key}

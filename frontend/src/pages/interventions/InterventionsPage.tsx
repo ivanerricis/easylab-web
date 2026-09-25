@@ -49,7 +49,7 @@ import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
 import { showCreatedToast } from "@/lib/createdToast";
-import { Send } from "lucide-react";
+import { Mail } from "lucide-react";
 
 const statusFilters: InterventionStatusFilter[] = ["all", "programmato", "in_lavorazione", "completato"];
 const typeFilters: InterventionTypeFilter[] = ["all", "consegna_materiale", "intervento_sede", "intervento_remoto"];
@@ -250,7 +250,8 @@ const InterventionsPage = () => {
                     title="Invia email intervento"
                     description={`Sei sicuro di voler inviare l'email per l'intervento ID ${interventionIdToEmail}?`}
                     confirmLabel="Invia"
-                    confirmIcon={Send}
+                    // La busta come il pulsante della riga che apre questo dialogo.
+                    confirmIcon={Mail}
                     cancelLabel="Annulla"
                     confirmDisabled={isSendingEmail}
                     onCancel={() => setInterventionIdToEmail(null)}
@@ -296,6 +297,10 @@ const InterventionsPage = () => {
                             onSortChange={handleTableSortChange}
                             hiddenColumnKeys={hiddenColumnKeys}
                             rows={interventionRows}
+                            searchText={committedSearchText}
+                            hasActiveFilters={
+                                statusFilter !== "all" || typeFilter !== "all" || dateFrom != null || dateTo != null
+                            }
                             onOpenIntervention={handleOpenIntervention}
                             onEditIntervention={handleOpenEditDialog}
                             onPrintIntervention={handlePrintIntervention}

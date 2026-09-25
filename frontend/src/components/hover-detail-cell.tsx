@@ -22,9 +22,12 @@ const HoverDetailCell = ({ text, detail }: HoverDetailCellProps) => {
     return (
         <Popover>
             <PopoverTrigger asChild>
+                {/* `block max-w-full truncate`: con la tabella a larghezze fisse la cella tronca
+                    il testo con i puntini, ma un bottone inline non si lascia troncare e veniva
+                    tagliato di netto sul bordo della colonna. */}
                 <button
                     type="button"
-                    className="cursor-pointer text-left underline decoration-muted-foreground decoration-dotted underline-offset-4"
+                    className="block max-w-full cursor-pointer truncate text-left underline decoration-muted-foreground decoration-dotted underline-offset-4"
                 >
                     {text}
                 </button>

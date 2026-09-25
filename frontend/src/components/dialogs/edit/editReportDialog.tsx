@@ -21,9 +21,20 @@ import { formatPersonName } from "@/lib/people";
  * Un riquadro del dialogo. `content-start` tiene i campi in alto quando la sezione si allunga
  * per pareggiare le vicine nella riga in fondo: senza, la griglia distribuirebbe lo spazio in
  * più fra le righe e i campi finirebbero sparsi.
+ *
+ * Sotto `sm` il riquadro diventa solo una linea sopra il titolo: padding del dialogo più bordo e
+ * padding della sezione lasciavano ai campi ~268px su 358, e i valori lunghi (il cliente col
+ * telefono) finivano tagliati. Con la sola linea i campi guadagnano 34px, e le sezioni restano
+ * distinte.
  */
 const FormSection = ({ title, className, children }: { title: string; className?: string; children: ReactNode }) => (
-    <section className={cn("grid content-start gap-3 rounded-md border border-primary/15 bg-muted/20 p-4", className)}>
+    <section
+        className={cn(
+            "grid content-start gap-3 rounded-md border border-primary/15 bg-muted/20 p-4",
+            "max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:bg-transparent max-sm:px-0 max-sm:pt-3 max-sm:pb-0",
+            className
+        )}
+    >
         <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
         {children}
     </section>
@@ -310,7 +321,9 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             onOpenChange={onOpenChange}
             isDirty={isDirty}
             title={reportId ? `Modifica report #${reportId}` : "Modifica report"}
-            contentClassName="sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
+            // `max-sm:p-4`: su telefono 16px per lato invece di 24, per lo stesso motivo della
+            // sezione senza riquadro (vedi `FormSection`).
+            contentClassName="max-sm:p-4 sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
             confirmIcon={Save}
             cancelLabel="Annulla"

@@ -64,7 +64,11 @@ const EntityCrudTable = <TRow extends { id: number }>({
     const renderRowActions = (row: TRow) => (
         <>
             {getOpenPath ? (
-                <OpenEntityButton size="lg" to={getOpenPath(row.id)} aria-label={`Apri ${entityLabel} ${row.id}`} />
+                <OpenEntityButton
+                    size="icon-lg"
+                    to={getOpenPath(row.id)}
+                    aria-label={`Apri ${entityLabel} ${row.id}`}
+                />
             ) : null}
             {isRowLocked?.(row) ? null : (
                 <>

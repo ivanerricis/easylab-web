@@ -38,7 +38,8 @@ const CustomersFilters = ({
                 icon={ArrowUpDown}
             />
 
-            {columnsMenu}
+            {/* Sempre sul bordo destro, come nelle liste di report e interventi. */}
+            {columnsMenu ? <div className="ml-auto hidden sm:block">{columnsMenu}</div> : null}
         </div>
     );
 };

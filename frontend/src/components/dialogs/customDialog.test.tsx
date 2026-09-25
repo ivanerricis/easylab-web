@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import CustomDialog from "./customDialog";
 import { renderWithProviders } from "@/test/render";
 
@@ -60,3 +61,39 @@ describe("CustomDialog: Ctrl+Invio", () => {
  * (Esc, la X, Annulla) è comunque coperto in `entityDialogs.test.tsx`, e passa dallo stesso
  * `handleOpenChange` che gestirebbe anche il clic fuori.
  */
+
+/**
+ * I dialoghi dell'app sono controllati e si aprono da un pulsante qualunque, non da un
+ * `DialogTrigger`: Radix alla chiusura non sapeva dove riportare il focus e lo lasciava sul
+ * `body`, e chi usa la tastiera ripartiva dall'inizio della pagina.
+ */
+describe("CustomDialog: focus alla chiusura", () => {
+    const Opener = () => {
+        const [open, setOpen] = useState(false);
+
+        return (
+            <>
+                <button type="button" onClick={() => setOpen(true)}>
+                    Apri
+                </button>
+                <CustomDialog
+                    open={open}
+                    onOpenChange={setOpen}
+                    title="Nuovo report"
+                    content={<input aria-label="Nome" />}
+                />
+            </>
+        );
+    };
+
+    it("torna sul pulsante che ha aperto il dialogo", async () => {
+        renderWithProviders(<Opener />);
+
+        await userEvent.click(screen.getByRole("button", { name: "Apri" }));
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+        await userEvent.keyboard("{Escape}");
+
+        await vi.waitFor(() => expect(screen.getByRole("button", { name: "Apri" })).toHaveFocus());
+    });
+});

@@ -1,4 +1,5 @@
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
+import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import CreateEntityButton from "@/components/create-entity-button";
 import EntityCrudTable from "@/components/entity-crud-table";
 import type { EntityColumn } from "@/components/entity-table";
@@ -128,11 +129,8 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
         }
     );
 
-    // Due vuoti diversi meritano due frasi diverse: una lista vuota è un invito a creare il
-    // primo elemento, una ricerca senza esiti è un vicolo cieco da cui bisogna poter uscire —
-    // e chi cerca "mrio" per errore deve capire che il problema è quello che ha scritto.
-    const resolvedEmptyMessage =
-        committedSearchText.trim() === "" ? emptyMessage : `Nessun risultato per "${committedSearchText.trim()}".`;
+    // Lista vuota e ricerca senza esiti hanno frasi diverse: vedi `resolveEmptyListMessage`.
+    const resolvedEmptyMessage = resolveEmptyListMessage({ emptyMessage, searchText: committedSearchText });
 
     const setPageSize = (nextPageSize: typeof pageSize) => {
         setStoredPageSize(nextPageSize);

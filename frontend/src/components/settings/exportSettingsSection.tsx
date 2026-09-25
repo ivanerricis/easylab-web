@@ -62,10 +62,15 @@ const ExportFilterSelect = <TValue extends string>({
     options: { value: TValue; label: string }[];
     onValueChange: (value: TValue) => void;
 }) => (
-    <div className="grid gap-2">
-        <Label htmlFor={id}>{label}</Label>
+    // Stesse misure delle etichette "Dal"/"Al" di `DateRangeFilter` accanto (riga da 20px, 6px
+    // di stacco) e stessa altezza dei campi data (40px): prima le etichette erano a scalini e i
+    // menu 4px più bassi delle date.
+    <div className="grid gap-1.5">
+        <Label htmlFor={id} className="leading-5">
+            {label}
+        </Label>
         <Select value={value} onValueChange={(next) => onValueChange(next as TValue)}>
-            <SelectTrigger id={id} className="w-full">
+            <SelectTrigger id={id} className="w-full data-[size=default]:h-10">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -92,17 +97,19 @@ const ExportDateRange = ({
     onDateToChange: (value: string | undefined) => void;
     onClearDates: () => void;
 }) => (
-    <div className="grid gap-2">
-        <Label>Periodo</Label>
-        <div className="flex flex-wrap items-center gap-2">
-            <DateRangeFilter
-                dateFrom={dateFrom}
-                onDateFromChange={onDateFromChange}
-                dateTo={dateTo}
-                onDateToChange={onDateToChange}
-                onClearDates={onClearDates}
-            />
-        </div>
+    // Il layout `stacked`, a due colonne: quello in riga, stretto in una cella da ~230px, metteva
+    // le due date una sotto l'altra con il trattino rimasto appeso a destra della prima. Occupa
+    // due colonne della griglia, così ogni data è larga quanto un menu.
+    <div role="group" aria-label="Periodo" className="@md:col-span-2">
+        <DateRangeFilter
+            layout="stacked"
+            stackedLabels={{ from: "Dal", to: "Al" }}
+            dateFrom={dateFrom}
+            onDateFromChange={onDateFromChange}
+            dateTo={dateTo}
+            onDateToChange={onDateToChange}
+            onClearDates={onClearDates}
+        />
     </div>
 );
 
@@ -115,7 +122,14 @@ const ExportButton = ({ label, onClick }: { label: string; onClick: () => void }
 
 const ExportFilters = ({ children }: { children: ReactNode }) => (
     <SettingsGroup title="Cosa esportare" description="Senza filtri esce l'archivio intero, in un file solo.">
-        <div className="grid gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-3">{children}</div>
+        {/* Colonne in base alla larghezza del riquadro, non dello schermo: le date hanno bisogno
+            di ~160px ciascuna, e a `xl` con barra laterale e menu delle impostazioni aperti tre
+            colonne ne davano ~230 al periodo intero. Da 672px di riquadro quattro colonne (stato,
+            tipo, dal, al), da 448 due, sotto una. Etichette in alto (`items-start`): con
+            `items-end` "Stato" e "Tipo" finivano 52px più in basso di "Periodo". */}
+        <div className="@container">
+            <div className="grid items-start gap-3 @md:grid-cols-2 @2xl:grid-cols-4">{children}</div>
+        </div>
     </SettingsGroup>
 );
 

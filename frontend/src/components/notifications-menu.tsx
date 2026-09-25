@@ -41,7 +41,10 @@ export function NotificationsMenu() {
                 </TooltipTrigger>
                 <TooltipContent>Notifiche</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="w-96">
+            {/* 24rem, ma mai più della finestra meno 8px per lato: su telefono (390px) il
+                pannello da 384px ancorato al campanello usciva a sinistra. `collisionPadding`
+                tiene lo stesso margine quando Radix lo sposta per farlo stare. */}
+            <DropdownMenuContent align="end" collisionPadding={8} className="w-[min(24rem,calc(100vw-1rem))]">
                 {sections.length === 0 ? (
                     <div className="px-3 py-4 text-center text-sm text-muted-foreground">Nessuna notifica.</div>
                 ) : (

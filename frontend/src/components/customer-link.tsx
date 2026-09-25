@@ -33,7 +33,7 @@ const CustomerLink = ({ customerId, name, tone = "primary", className }: Custome
         className={cn(
             "underline-offset-4 focus-visible:underline",
             tone === "primary"
-                ? "text-primary hover:underline"
+                ? "text-primary-text hover:underline"
                 : "underline decoration-current/40 hover:decoration-current",
             className
         )}

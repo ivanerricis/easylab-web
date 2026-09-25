@@ -30,9 +30,10 @@ import {
     formatPaidStatus,
     formatToInvoiceStatus,
     interventionStatusColor,
+    interventionDescriptionLabel,
     isAssistanceInterventionType,
 } from "@/lib/interventions";
-import { Pencil, Printer, Send } from "lucide-react";
+import { Mail, Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -156,7 +157,10 @@ const InterventionPage = () => {
 
                 <DetailHeaderAction
                     variant="outline"
-                    icon={Send}
+                    // La busta, come il pulsante email nella lista interventi e la sezione Email delle
+                    // Impostazioni: prima qui c'era l'aeroplanino (`Send`), e la stessa azione aveva
+                    // due icone diverse fra lista e scheda.
+                    icon={Mail}
                     text="Email"
                     onClick={() => setIsEmailDialogOpen(true)}
                     aria-label="Invia email intervento"
@@ -216,7 +220,13 @@ const InterventionPage = () => {
                         {isAssistance ? (
                             <DetailItem label="Problema" value={intervention.problem ?? "-"} longText />
                         ) : null}
-                        <DetailItem label="Descrizione" value={intervention.description ?? "-"} longText />
+                        {/* Lo stesso nome del campo nel modulo ("Assistenza effettuata" o "Materiali
+                            da consegnare"): "Descrizione" non diceva cosa ci fosse scritto. */}
+                        <DetailItem
+                            label={interventionDescriptionLabel(intervention.type)}
+                            value={intervention.description ?? "-"}
+                            longText
+                        />
                         <DetailItem label="Note" value={intervention.note ?? "-"} longText />
                         <DetailItem
                             label="Prezzo"
@@ -239,7 +249,7 @@ const InterventionPage = () => {
                 title="Invia email intervento"
                 description={`Sei sicuro di voler inviare l'email per l'intervento ID ${intervention.id}?`}
                 confirmLabel="Invia"
-                confirmIcon={Send}
+                confirmIcon={Mail}
                 cancelLabel="Annulla"
                 confirmDisabled={isSendingEmail}
                 onCancel={() => setIsEmailDialogOpen(false)}

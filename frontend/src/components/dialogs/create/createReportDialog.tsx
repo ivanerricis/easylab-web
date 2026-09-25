@@ -2,6 +2,7 @@ import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
+import { findCustomerByText } from "@/lib/customerLookup";
 import { isCatchAllIssue } from "@/lib/issues";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
@@ -117,6 +118,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
     const deviceOptions = useMemo(() => [...deviceIdByOption.keys()], [deviceIdByOption]);
     const issueOptions = useMemo(() => [...issueIdByOption.keys()], [issueIdByOption]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // La verifica del cliente su "Avanti" (vedi `checkCustomerExists`): finché è in corso il
+    // pulsante resta occupato, così un secondo tocco non la lancia due volte.
+    const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
     // Messaggi, non booleani: il bordo rosso c'era già, ma il *perché* viveva solo nel toast
     // che lo accompagnava — un avviso che se ne andava da solo dopo qualche secondo. Tenendo
     // qui il testo, l'errore sta sotto il campo e ci resta finché non si corregge.
@@ -211,8 +215,40 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
         document.getElementById(field)?.focus();
     };
 
+    /**
+     * Su telefono il cliente sta nel primo passo e "Salva" arriva due passi dopo: prima un nome
+     * inesistente si scopriva solo lì, con l'errore del salvataggio in un toast, e bisognava
+     * tornare indietro a cercare il campo. Ora "Avanti" lo verifica subito: se è stato scelto dai
+     * suggerimenti l'id c'è già (controllo sincrono), altrimenti lo si cerca sul server con la
+     * stessa `findCustomerByText` del salvataggio. L'id trovato si tiene, così al salvataggio non
+     * serve cercarlo di nuovo. Restituisce il messaggio d'errore, o `undefined` se va bene.
+     */
+    const checkCustomerExists = async (): Promise<string | undefined> => {
+        const rawValue = formValues.customer;
+
+        if (customerIdByOption[rawValue] != null) {
+            return undefined;
+        }
+
+        setIsCheckingCustomer(true);
+        try {
+            const customer = await findCustomerByText(rawValue);
+
+            if (!customer) {
+                return "Seleziona un cliente esistente o creane uno nuovo.";
+            }
+
+            setCustomerIdByOption((prev) => ({ ...prev, [rawValue]: customer.id }));
+            return undefined;
+        } catch (error) {
+            return getApiErrorMessage(error, "Impossibile verificare il cliente");
+        } finally {
+            setIsCheckingCustomer(false);
+        }
+    };
+
     const handleConfirm = async () => {
-        if (isSubmitting) {
+        if (isSubmitting || isCheckingCustomer) {
             return;
         }
 
@@ -261,6 +297,12 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
             for (const field of reportSteps[step].fields) {
                 stepErrors[field] = nextFieldErrors[field];
+            }
+
+            // Il cliente compilato va anche verificato: solo a telefono, perché su desktop
+            // "Salva" è accanto al campo e la verifica la fa già il salvataggio.
+            if (reportSteps[step].fields.includes("client") && !stepErrors.client) {
+                stepErrors.client = await checkCustomerExists();
             }
 
             setFieldErrors(stepErrors);
@@ -315,8 +357,21 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 isDirty={isDirty}
                 title="Nuovo report"
                 description="Inserisci i dati del report e conferma per salvare."
-                contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-                confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
+                // Sotto `sm`, dove si procede a passi, il dialogo è ancorato in alto e ha
+                // un'altezza fissa: quella del passo più alto (44rem), o lo schermo meno 1rem per
+                // lato sui telefoni più bassi. Con l'altezza data dal contenuto ogni passo era alto
+                // diversamente (284–516px di campi) e "Avanti" cambiava posto fra un tocco e
+                // l'altro; così i campi scorrono dentro e i pulsanti restano fermi in fondo.
+                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
+                confirmLabel={
+                    isLastStep
+                        ? isSubmitting
+                            ? "Salvataggio..."
+                            : "Salva"
+                        : isCheckingCustomer
+                          ? "Verifica..."
+                          : "Avanti"
+                }
                 confirmIcon={isLastStep ? Save : undefined}
                 cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
                 onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
@@ -324,10 +379,10 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 // "Avanti" stanno meglio affiancati, ciascuno dal suo lato.
                 footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
-                cancelDisabled={isSubmitting}
-                confirmDisabled={isSubmitting}
+                cancelDisabled={isSubmitting || isCheckingCustomer}
+                confirmDisabled={isSubmitting || isCheckingCustomer}
                 content={
-                    <div className="grid max-h-[72vh] gap-4 overflow-y-auto py-1 pr-1">
+                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto py-1 pr-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
                         {isStepped ? (
                             <StepProgress steps={reportSteps.map((reportStep) => reportStep.title)} current={step} />
                         ) : null}

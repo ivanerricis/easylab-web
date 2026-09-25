@@ -44,6 +44,11 @@ const DetailItem = ({
     const layout = useContext(DetailLayoutContext);
 
     if (layout === "rows") {
+        // Un testo lungo vuoto ("-") non ha niente da andare a capo: sotto l'etichetta lasciava un
+        // trattino solo su una riga sua, e la voce era alta il doppio delle vicine senza motivo.
+        // Resta affiancato come una voce qualsiasi.
+        const stacksOnMobile = longText && value !== "-";
+
         // `items-baseline`: con un valore che va a capo l'etichetta resta allineata alla prima
         // riga del valore, non al centro del blocco.
         return (
@@ -56,7 +61,7 @@ const DetailItem = ({
                     "flex min-w-0 border-b border-border py-2.5",
                     // Un testo lungo occupa tutta la riga anche quando la griglia ha più colonne.
                     longText && "col-span-full",
-                    longText
+                    stacksOnMobile
                         ? "flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
                         : "items-baseline justify-between gap-4",
                     className
@@ -66,7 +71,7 @@ const DetailItem = ({
                 <dd
                     className={cn(
                         "min-w-0 text-sm font-medium wrap-break-word text-foreground",
-                        longText ? "sm:text-right" : "text-right"
+                        stacksOnMobile ? "sm:text-right" : "text-right"
                     )}
                 >
                     {value}

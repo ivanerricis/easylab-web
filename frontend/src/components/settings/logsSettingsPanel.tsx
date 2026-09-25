@@ -8,6 +8,7 @@ import RefreshButton from "@/components/refresh-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SearchInput from "@/components/search-input";
+import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
 import TablePagination from "@/components/table-pagination";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
@@ -29,6 +30,32 @@ const minRetentionDays = 1;
 const maxRetentionDays = 90;
 
 const formatDayKey = (dayKey: string) => formatDate(`${dayKey}T00:00:00.000Z`);
+
+const isFailedEntry = (entry: LogEntryDto) => entry.status >= 400;
+
+/**
+ * Le stesse sei colonne della tabella, nella forma a schede sotto `sm`: a 390px la tabella
+ * mostrava solo data, IP e utente, e l'azione, cioè il dato che si cerca, finiva tagliata a
+ * destra. Lo stato va nel badge, rosso per le richieste respinte come nella tabella; azione ed
+ * errore prendono tutta la larghezza perché sono frasi.
+ */
+const logCardColumns: EntityCardColumn<LogEntryDto>[] = [
+    { key: "timestamp", header: "Data e ora", render: (entry) => formatDateTime(entry.timestamp), cardSlot: "title" },
+    { key: "status", header: "Stato", render: (entry) => entry.status, cardSlot: "badge" },
+    { key: "ip", header: "IP", render: (entry) => entry.ip },
+    { key: "user", header: "Utente", render: (entry) => entry.user },
+    { key: "action", header: "Azione", render: (entry) => entry.action, cardSlot: "wide" },
+    {
+        key: "error",
+        header: "Errore",
+        render: (entry) => <span className="text-destructive">{entry.error}</span>,
+        cardSlot: "wide",
+    },
+];
+
+// Senza la colonna "Errore" quando non c'è: una riga "Errore" vuota su ogni scheda riuscita
+// era solo rumore.
+const logCardColumnsWithoutError = logCardColumns.filter((column) => column.key !== "error");
 
 const LogsSettingsPanel = () => {
     const [pageSize, setPageSize] = useTableRowsPerPage("logs");
@@ -137,12 +164,17 @@ const LogsSettingsPanel = () => {
     };
 
     return (
-        <SettingsSection className="flex h-full min-h-0 flex-col">
+        // L'altezza fissa (tutta l'area della sezione, con la tabella che scorre dentro) solo da
+        // `sm`: sotto ci sono le schede, e con un'altezza fissa sarebbero uscite dalla card.
+        // La card non si allunga più fino in fondo (`flex-1`): con tre righe restavano ~370px di
+        // tabella vuota sopra la paginazione. Ora è alta quanto il contenuto, e si restringe
+        // (con la tabella che scorre) solo quando le righe non ci stanno.
+        <SettingsSection className="flex min-h-0 flex-col sm:h-full">
             <SettingsCard
                 title="Log azioni"
                 description="Consulta il registro delle azioni eseguite sull'applicazione, giorno per giorno."
-                className="min-h-0 flex-1"
-                contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3 pt-4"}
+                className="min-h-0"
+                contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3"}
                 action={
                     <>
                         <div className="flex items-center gap-1.5">
@@ -160,10 +192,11 @@ const LogsSettingsPanel = () => {
                                 onChange={(event) => setRetentionDays(Number(event.target.value))}
                             />
                             <span className="text-sm whitespace-nowrap text-muted-foreground">giorni</span>
+                            {/* Misura di serie (36px) come il campo accanto e "Scarica log
+                                selezionato": con `sm` era alto 32px, a scalini sulla stessa riga. */}
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
                                 disabled={
                                     isLoadingRetention ||
                                     isSavingRetention ||
@@ -217,7 +250,12 @@ const LogsSettingsPanel = () => {
                             />
                         </div>
 
-                        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-primary/15">
+                        {/* Tabella e schede si scambiano sulla larghezza della sezione (`@container`
+                            in SettingsPage), non dello schermo: a 768px con la barra laterale aperta
+                            la sezione è larga circa 440px e le sei colonne non ci stavano, la
+                            tabella scorreva in orizzontale. Sotto i 36rem si usano le schede, come
+                            su telefono. */}
+                        <div className="hidden min-h-0 overflow-y-auto rounded-md border border-primary/15 @xl:block">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -257,7 +295,7 @@ const LogsSettingsPanel = () => {
                                                 <TableCell className="whitespace-normal">{entry.action}</TableCell>
                                                 <TableCell
                                                     className={cn(
-                                                        entry.status >= 400 && "font-semibold text-destructive"
+                                                        isFailedEntry(entry) && "font-semibold text-destructive"
                                                     )}
                                                 >
                                                     {entry.status}
@@ -271,6 +309,16 @@ const LogsSettingsPanel = () => {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        <EntityCardList
+                            hiddenFromClassName="@xl:hidden"
+                            columns={entries.some((entry) => entry.error) ? logCardColumns : logCardColumnsWithoutError}
+                            rows={entries}
+                            getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.action}-${entry.status}`}
+                            getStatusColor={(entry) => (isFailedEntry(entry) ? "red" : undefined)}
+                            emptyMessage="Nessuna voce trovata per i criteri selezionati."
+                            isInitialLoading={isLoadingEntries}
+                        />
 
                         <TablePagination
                             currentPage={currentPage}

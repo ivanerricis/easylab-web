@@ -20,9 +20,14 @@ const PageHeader = ({ title, description, action }: PageHeaderProps) => {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <div className="flex flex-col">
+                {/* `min-w-0 flex-1`: il titolo prende lo spazio che avanza e, se serve, va a capo
+                    la sua descrizione, invece di spingere il pulsante su una seconda riga (Tecnici
+                    esterni a 768px, dove titolo e descrizione non lasciavano posto al "+"). */}
+                <div className="flex min-w-0 flex-1 flex-col">
                     <h1 className="text-title">{title}</h1>
-                    <p className="hidden text-muted-foreground md:block">{description}</p>
+                    {/* Solo da desktop (`lg`): su tablet e telefono la frase ripete quello che dice
+                        già il titolo e toglie una riga alla lista sotto. */}
+                    <p className="hidden text-muted-foreground lg:block">{description}</p>
                 </div>
                 {action}
             </div>

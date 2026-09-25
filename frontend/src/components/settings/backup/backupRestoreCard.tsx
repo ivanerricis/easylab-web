@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import SettingsFileInput from "@/components/settings/settingsFileInput";
 import {
     SettingsCard,
     SettingsErrorNote,
@@ -23,16 +22,18 @@ const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
             <>
                 <SettingsGroup destructive>
                     <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                        <div className="grid gap-2">
-                            <Label htmlFor="restoreUpload">File .tar.gz o .sql</Label>
-                            <Input
-                                id="restoreUpload"
-                                type="file"
-                                accept=".sql,.gz,.tar.gz,text/plain,application/sql,application/gzip"
-                                disabled={panel.isRestoring}
-                                onChange={panel.handleRestoreFileSelected}
-                            />
-                        </div>
+                        <SettingsFileInput
+                            id="restoreUpload"
+                            label="File .tar.gz o .sql"
+                            accept=".sql,.gz,.tar.gz,text/plain,application/sql,application/gzip"
+                            disabled={panel.isRestoring}
+                            onChange={panel.handleRestoreFileSelected}
+                            status={
+                                panel.restoreUploadFile
+                                    ? `${panel.restoreUploadFile.name} (${formatFileSize(panel.restoreUploadFile.size)})`
+                                    : undefined
+                            }
+                        />
                         <Button
                             type="button"
                             variant="destructive"
@@ -48,12 +49,6 @@ const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
                             Ripristina da questo file
                         </Button>
                     </div>
-                    {panel.restoreUploadFile ? (
-                        <p className="text-xs text-muted-foreground">
-                            File selezionato: {panel.restoreUploadFile.name} (
-                            {formatFileSize(panel.restoreUploadFile.size)})
-                        </p>
-                    ) : null}
                 </SettingsGroup>
 
                 {panel.secretsToReconfigure.length > 0 ? (

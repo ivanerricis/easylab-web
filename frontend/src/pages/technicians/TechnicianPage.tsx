@@ -21,6 +21,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import OpenEntityButton from "@/components/open-entity-button";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
@@ -63,6 +65,8 @@ const TechnicianPage = () => {
     const technicianName = technician ? formatPersonName(technician) : "Tecnico";
     useDocumentTitle(technicianName);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
+    // Sotto `sm` il nome sta nella card dei dati invece che nell'intestazione (`hideTitleOnMobile`).
+    const isPhone = useIsMobile(640);
     const [isEditTechnicianDialogOpen, setIsEditTechnicianDialogOpen] = useState(false);
     // Un solo stato per dialogo + bersaglio: `open={reportToEdit != null}` basta da solo.
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
@@ -135,7 +139,9 @@ const TechnicianPage = () => {
 
     return (
         <div className="flex h-full min-h-0 w-full flex-col gap-4">
-            <DetailHeader onBack={handleBack} title={technicianName}>
+            {/* Solo quando c'è la card dei dati a ospitare il nome: altrimenti su telefono la
+                pagina resterebbe senza titolo. */}
+            <DetailHeader onBack={handleBack} title={technicianName} hideTitleOnMobile={technician != null}>
                 <RefreshButton
                     onRefresh={handleRefresh}
                     isRefreshing={areReportsLoading}
@@ -172,7 +178,20 @@ const TechnicianPage = () => {
             ) : null}
 
             {technician ? (
-                <DetailSection title="Dati del tecnico">
+                <DetailSection
+                    title={
+                        // Su telefono il nome sta qui invece che nell'intestazione (vedi
+                        // `hideTitleOnMobile`), come nella scheda cliente: a 390px freccia, titolo e
+                        // quattro pulsanti non stanno su una riga, e il nome finiva spezzato su due o
+                        // tre righe con le azioni spinte sotto.
+                        isPhone ? (
+                            // L'`h1` della pagina sotto `sm`: vedi `hideTitleOnMobile`.
+                            <h1 className="min-w-0 text-lg wrap-break-word">{technicianName}</h1>
+                        ) : (
+                            "Dati del tecnico"
+                        )
+                    }
+                >
                     {/* A righe come la scheda report, su più colonne come la scheda cliente, così le
                         righe hanno la stessa lunghezza in tutte le schede (vedi `DetailGrid`). */}
                     <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
@@ -204,7 +223,13 @@ const TechnicianPage = () => {
                         columns={technicianReportColumns}
                         rows={reports}
                         getRowKey={(row) => row.id}
-                        emptyMessage="Nessun report associato a questo tecnico."
+                        // Il filtro parte da "aperti": senza nominarlo, un tecnico con soli report
+                        // chiusi sembrava non averne mai avuti.
+                        emptyMessage={resolveEmptyListMessage({
+                            emptyMessage: "Nessun report associato a questo tecnico.",
+                            hasActiveFilters: visibilityFilter !== "all",
+                            filteredMessage: "Nessun report di questo tecnico corrisponde al filtro.",
+                        })}
                         renderRowActions={(row) => (
                             <>
                                 <OpenEntityButton

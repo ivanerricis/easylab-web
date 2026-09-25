@@ -183,8 +183,10 @@ describe("DashboardPage", () => {
         expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
         // Il confronto con il mese prima, scritto e non solo colorato: (1520,50 - 900) / 900.
         expect(within(dialog).getByText(/\+69% rispetto ad agosto 2026/)).toBeInTheDocument();
-        // Gli importi stanno sopra le barre, non solo nel fumetto del mouse.
-        expect(within(dialog).getByText(/^900\s€$/)).toBeInTheDocument();
+        // Gli importi stanno sopra le barre, non solo nel fumetto del mouse, in forma corta (vedi
+        // `formatBarValueShort`): 900 resta intero, 1520,50 diventa "2k".
+        expect(within(dialog).getByText(/^900$/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/^2k$/)).toBeInTheDocument();
         expect(within(dialog).getByRole("button", { name: /^set: / })).toHaveAttribute("aria-pressed", "true");
         // Il mese corrente è l'ultimo: non si va nel futuro.
         expect(within(dialog).getByRole("button", { name: "Mese successivo" })).toBeDisabled();

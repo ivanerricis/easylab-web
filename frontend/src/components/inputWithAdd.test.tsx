@@ -126,7 +126,42 @@ describe("InputWithAdd", () => {
 
         expect(onSearch).toHaveBeenCalledTimes(1);
         expect(onSearch).toHaveBeenCalledWith("mar", expect.any(AbortSignal));
-        expect(suggestionNames()).toEqual(["Mario Rossi - 333"]);
+        expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
+            "Mario Rossi - 333",
+        ]);
+    });
+
+    /**
+     * La voce del cliente si mostra su due righe, nome e telefono, perché andando a capo come
+     * testo il numero si spezzava a metà. Il valore scelto resta la stringa intera: è la chiave
+     * con cui il dialogo ritrova l'id del cliente.
+     */
+    it("mostra nome e telefono del cliente su due righe, ma sceglie la voce intera", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const onChange = vi.fn();
+        const onSearch = vi.fn().mockResolvedValue(["Nicola Longo - +39 3438880123"]);
+        render(<Harness onSearch={onSearch} onChange={onChange} />);
+
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        await user.type(screen.getByRole("textbox"), "nic");
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(250);
+        });
+
+        const option = screen.getByRole("button", { name: "Nicola Longo - +39 3438880123" });
+        expect(screen.getByText("Nicola Longo")).toBeInTheDocument();
+        expect(screen.getByText("+39 3438880123")).toHaveClass("whitespace-nowrap");
+
+        fireEvent.mouseDown(option);
+        expect(onChange).toHaveBeenLastCalledWith("Nicola Longo - +39 3438880123");
+    });
+
+    it("non divide le voci dei cataloghi, anche con un trattino", async () => {
+        render(<Harness options={["Schermo - vetro rotto"]} />);
+
+        await userEvent.type(screen.getByRole("textbox"), "schermo");
+
+        expect(screen.getByRole("button", { name: "Schermo - vetro rotto" })).not.toHaveAttribute("aria-label");
     });
 
     /**

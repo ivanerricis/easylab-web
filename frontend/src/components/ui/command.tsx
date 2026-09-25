@@ -45,7 +45,17 @@ function CommandDialog({
     );
 }
 
-function CommandInput({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
+function CommandInput({
+    className,
+    endAdornment,
+    ...props
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+    /**
+     * Qualcosa in fondo alla riga del campo, dentro la stessa altezza (es. la X di chiusura su
+     * telefono in `GlobalSearch`): nella riga e non sopra, così non copre il testo scritto.
+     */
+    endAdornment?: React.ReactNode;
+}) {
     return (
         <div data-slot="command-input-wrapper" className="flex h-12 items-center gap-2 border-b px-3">
             <SearchIcon className="size-5 shrink-0 text-primary" aria-hidden="true" />
@@ -57,6 +67,7 @@ function CommandInput({ className, ...props }: React.ComponentProps<typeof Comma
                 )}
                 {...props}
             />
+            {endAdornment}
         </div>
     );
 }

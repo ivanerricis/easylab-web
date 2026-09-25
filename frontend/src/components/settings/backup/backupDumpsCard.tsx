@@ -3,8 +3,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { SettingsCard } from "@/components/settings/settingsUi";
 import RefreshButton from "@/components/refresh-button";
 import TableActionButton from "@/components/table-action-button";
+import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
+import { Button } from "@/components/ui/button";
 import { formatDateTime, formatFileSize } from "@/lib/utils";
 import type { BackupPanel } from "./useBackupPanel";
+
+type DumpFile = BackupPanel["dumpFiles"][number];
+
+/**
+ * L'archivio in forma di scheda sotto `sm`: a 390px la tabella mostrava il nome del file su
+ * quattro righe e spingeva i pulsanti fuori dal bordo. Il nome è il titolo, in monospazio come
+ * nella tabella perché è il dato con cui si riconosce un dump.
+ */
+const dumpCardColumns: EntityCardColumn<DumpFile>[] = [
+    {
+        key: "fileName",
+        header: "Nome file",
+        render: (dump) => <span className="font-mono text-sm break-all">{dump.fileName}</span>,
+        cardSlot: "title",
+    },
+    { key: "createdAt", header: "Data", render: (dump) => formatDateTime(dump.createdAt) },
+    { key: "size", header: "Dimensione", render: (dump) => formatFileSize(dump.sizeBytes) },
+];
 
 const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
     <SettingsCard
@@ -19,7 +39,7 @@ const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
             />
         }
     >
-        <div className="rounded-md border border-primary/15">
+        <div className="hidden rounded-md border border-primary/15 sm:block">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -83,6 +103,41 @@ const BackupDumpsCard = ({ panel }: { panel: BackupPanel }) => (
                 </TableBody>
             </Table>
         </div>
+
+        <EntityCardList
+            columns={dumpCardColumns}
+            rows={panel.dumpFiles}
+            getRowKey={(dump) => dump.fileName}
+            emptyMessage="Nessun dump disponibile sul server."
+            isInitialLoading={panel.isLoadingDumps && panel.dumpFiles.length === 0}
+            // Con il testo, non solo l'icona: nelle schede i pulsanti si dividono la larghezza,
+            // e due riquadri larghi con dentro solo un'icona non si capiva cosa facessero.
+            // Niente `disabled={panel.isRestoring}` come in tabella: `EntityCardList` ridisegna
+            // i pulsanti solo quando cambia la riga, e durante un ripristino il dialogo di
+            // conferma resta comunque aperto sopra la pagina.
+            renderActions={(dump) => (
+                <>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => panel.handleDownloadDump(dump.fileName)}
+                        aria-label={`Scarica ${dump.fileName}`}
+                    >
+                        <Download className="size-4" />
+                        Scarica
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => panel.openRestoreConfirm({ type: "existing", fileName: dump.fileName })}
+                        aria-label={`Ripristina ${dump.fileName}`}
+                    >
+                        <RotateCcw className="size-4" />
+                        Ripristina
+                    </Button>
+                </>
+            )}
+        />
     </SettingsCard>
 );
 

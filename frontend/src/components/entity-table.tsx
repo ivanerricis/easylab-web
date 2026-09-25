@@ -92,6 +92,18 @@ type EntityTableProps<TRow> = {
 /** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
 const actionsColumnKey = "actions";
 
+/** La colonna dell'identificativo, che non deve mai finire troncata: vedi `idColumnClassName`. */
+const idColumnKey = "id";
+
+/**
+ * Soglia minima della colonna ID: cinque cifre (gli ID arrivano a 19.735) più il padding.
+ * Con `table-layout: fixed` un `min-width` sulle celle non conta niente, ma durante la misura la
+ * tabella è in `auto` (vedi `measureNaturalWidths`) e lì il browser lo rispetta: la soglia entra
+ * così nella larghezza misurata e poi congelata. `tabular-nums` rende le cifre tutte larghe uguali,
+ * quindi cinque "0" bastano davvero per qualunque ID a cinque cifre.
+ */
+const idColumnClassName = "min-w-[calc(5ch+1rem)] tabular-nums";
+
 /**
  * Quante righe-scheletro disegnare al massimo, qualunque cosa chieda il chiamante.
  *
@@ -200,13 +212,16 @@ const EntityTableRowImpl = <TRow,>({
                     key={`${rowKey}-${column.key}`}
                     className={cn(
                         truncateClassName(column.key),
+                        column.key === idColumnKey && "tabular-nums",
                         column.key === actionsColumnKey && getRowStatusColor
                             ? "bg-card text-foreground"
                             : column.className
                     )}
                 >
                     {column.key === actionsColumnKey ? (
-                        <div className="flex items-center justify-end gap-2">{actionsNode}</div>
+                        // `min-h-10` è l'altezza di un pulsante `icon-lg`: una riga senza azioni
+                        // (la voce fissa "Altro" in Difetti) era alta 38px contro i 58 delle altre.
+                        <div className="flex min-h-10 items-center justify-end gap-2">{actionsNode}</div>
                     ) : (
                         column.render(row)
                     )}
@@ -275,6 +290,8 @@ const EntityTable = <TRow,>({
         columnKeys,
         elasticColumnKey: actionsColumnKey,
         canMeasure: rows.length > 0,
+        // Righe nuove, misure da ricontrollare: vedi `growNaturalWidths`.
+        dataVersion: rows,
     });
     useListScrollRestoration({ anchorRef: tableRef, tableKey, isReady: !isInitialLoading && rows.length > 0 });
 
@@ -323,7 +340,12 @@ const EntityTable = <TRow,>({
                                     // `aria-sort` sulla colonna ordinata: è ciò che fa dire a uno
                                     // screen reader "ordinata in modo crescente" arrivando lì.
                                     aria-sort={sortDirection ? ariaSortValue[sortDirection] : undefined}
-                                    className={cn("relative", truncateClassName(column.key), column.className)}
+                                    className={cn(
+                                        "relative",
+                                        truncateClassName(column.key),
+                                        column.key === idColumnKey && idColumnClassName,
+                                        column.className
+                                    )}
                                 >
                                     {sortKey != null && onSortChange ? (
                                         <button
@@ -332,7 +354,7 @@ const EntityTable = <TRow,>({
                                                 // `max-w-full` e `truncate` tengono il titolo dentro la
                                                 // colonna; `pr-2` lascia libera la maniglia di
                                                 // ridimensionamento, che sta sul bordo destro.
-                                                "inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm pr-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                                                "inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm pr-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
                                                 sortDirection && "font-semibold"
                                             )}
                                             onClick={() =>
@@ -388,8 +410,13 @@ const EntityTable = <TRow,>({
                         ))
                     ) : rows.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={columns.length} className="py-6 text-center text-muted-foreground">
-                                {emptyMessage}
+                            <TableCell colSpan={columns.length} className="py-6 text-muted-foreground">
+                                {/* Centrato nella parte visibile, non su tutta la tabella: con le
+                                    colonne già misurate la tabella resta più larga del contenitore
+                                    e `text-center` metteva il messaggio fuori dallo schermo.
+                                    `left-1/2` di un elemento sticky si riferisce all'area che
+                                    scorre, e la traslazione lo riporta indietro di mezza larghezza. */}
+                                <span className="sticky left-1/2 inline-block -translate-x-1/2">{emptyMessage}</span>
                             </TableCell>
                         </TableRow>
                     ) : (

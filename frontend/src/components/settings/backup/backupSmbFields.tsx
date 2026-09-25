@@ -10,7 +10,8 @@ const BackupSmbFields = ({ panel }: { panel: BackupPanel }) => {
 
     return (
         <SettingsGroup title="Destinazione di rete (NAS)">
-            <div className="flex items-center gap-3">
+            {/* `items-start` e `leading-snug`: vedi le caselle di `BackupScheduleFields`. */}
+            <div className="flex items-start gap-3">
                 <Checkbox
                     id="smbEnabled"
                     checked={formValues.smbEnabled}
@@ -21,7 +22,7 @@ const BackupSmbFields = ({ panel }: { panel: BackupPanel }) => {
                         }))
                     }
                 />
-                <Label htmlFor="smbEnabled" className="cursor-pointer">
+                <Label htmlFor="smbEnabled" className="cursor-pointer leading-snug">
                     Copia ogni backup su una condivisione SMB/CIFS
                 </Label>
             </div>

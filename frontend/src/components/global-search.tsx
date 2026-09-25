@@ -11,6 +11,7 @@ import {
     CommandShortcut,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
+import { DialogClose } from "@/components/ui/dialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getApiErrorMessage, listCustomers, listInterventions, listReports } from "@/lib/api";
 import { entityPaths } from "@/lib/entityPaths";
@@ -30,6 +31,7 @@ import {
     User,
     Users,
     Wrench,
+    X,
     type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -209,6 +211,23 @@ const GlobalSearch = () => {
                         value={query}
                         onValueChange={setQuery}
                         placeholder="Cliente, telefono, numero di report…"
+                        // Su telefono la ricerca non aveva modo visibile di chiudersi: niente Esc
+                        // su una tastiera virtuale, e il velo attorno è una striscia sottile. La X
+                        // sta nella riga del campo, dopo il testo, invece che nell'angolo del
+                        // dialogo dove coprirebbe l'input alto 48px. Da `sm` c'è Esc, come prima.
+                        endAdornment={
+                            <DialogClose asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="-mr-1 text-muted-foreground sm:hidden"
+                                    aria-label="Chiudi la ricerca"
+                                >
+                                    <X className="size-5" />
+                                </Button>
+                            </DialogClose>
+                        }
                     />
                     <CommandList>
                         {isSearching ? <CommandLoading>Ricerca in corso…</CommandLoading> : null}

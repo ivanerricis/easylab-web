@@ -86,16 +86,12 @@ const getMonthShortLabel = (monthKey: string) => {
     );
 };
 
-/** L'importo sopra la barra: senza decimali, perché lo spazio è quello di una colonna su sei. */
-const barValueFormatter = new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-});
-
 /**
- * Versione corta per i telefoni: una colonna su sei larga ~50px non ci porta "344.765 €" (finiva
- * troncato in "344.7…"), ma "345k" sì. Sotto i mille resta il numero intero.
+ * L'importo sopra la barra, in forma corta: una colonna su sei è larga ~50px su telefono e ~60px
+ * anche su desktop (il dialogo è `max-w-md`), e "344.765 €" finiva troncato in "344.7…" a
+ * qualunque larghezza. "345k" ci sta sempre; sotto i mille resta il numero intero. L'importo
+ * esatto resta nel fumetto e nell'etichetta accessibile della barra, e in grande sopra il grafico
+ * per il mese scelto.
  */
 const formatBarValueShort = (value: number) =>
     Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value));
@@ -260,7 +256,7 @@ const DashboardPage = () => {
     };
 
     return (
-        <div className="relative flex w-full flex-col gap-4">
+        <div className="relative flex min-h-full w-full flex-col gap-4">
             <PageHeader
                 title="Dashboard"
                 description="Panoramica del laboratorio e stato delle riparazioni."
@@ -291,224 +287,255 @@ const DashboardPage = () => {
                 }
             />
 
-            <div
-                aria-busy={isLoading}
-                className={cn(
-                    "grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-start sm:gap-4",
-                    isLoading && hasLoadedMetricsOnce && "opacity-60 transition-opacity"
-                )}
-            >
-                <CardDashboard
-                    text="Report aperti"
-                    mobileText="Aperti"
-                    icon={CircleDashed}
-                    number={String(openReports)}
-                    iconColor="text-destructive"
-                    onClick={() => goToReportsPage("open")}
-                />
-                <CardDashboard
-                    text="Report chiusi"
-                    mobileText="Chiusi"
-                    icon={CircleCheck}
-                    number={String(closedReports)}
-                    iconColor="text-status-green-foreground"
-                    onClick={() => goToReportsPage("closed")}
-                />
+            {/*
+                Una griglia vera anche da `sm` in su, non più un flex-wrap: le schede andavano a capo
+                dove capitava ("Incassi mese" restava da sola sulla seconda riga a 1440 con la barra
+                laterale chiusa) e con `items-start` ognuna era alta quanto il suo testo. Ora le
+                celle si stirano (tutte alte uguali per riga, compresa quella degli incassi) e le
+                colonne sono 2, 3 o 6, cioè divisori di sei: nessuna scheda resta mai sola.
 
-                <CardDashboard
-                    text="Interventi programmati"
-                    mobileText="Programmati"
-                    icon={CalendarClock}
-                    number={String(scheduledInterventions)}
-                    iconColor="text-destructive"
-                    onClick={() => goToInterventionsPage("programmato")}
-                />
-                <CardDashboard
-                    text="Interventi in lavorazione"
-                    mobileText="In lavorazione"
-                    icon={Loader}
-                    number={String(inProgressInterventions)}
-                    iconColor="text-action-print"
-                    onClick={() => goToInterventionsPage("in_lavorazione")}
-                />
-                <CardDashboard
-                    text="Interventi completati"
-                    mobileText="Completati"
-                    icon={CircleCheck}
-                    number={String(completedInterventions)}
-                    iconColor="text-status-green-foreground"
-                    onClick={() => goToInterventionsPage("completato")}
-                />
+                Le colonne seguono la larghezza del contenitore, non della finestra, perché la
+                barra laterale aperta o chiusa cambia lo spazio di 12rem a parità di finestra. Tre
+                colonne da 44rem, cioè tre volte il `sm:min-w-56` delle schede (14rem, vedi
+                `cardDashboard.tsx`) più i `gap-4`. Sei da 80rem (1440 con la barra chiusa): lì
+                una scheda è larga ~210px, e il minimo di 14rem va tolto (`*:min-w-0!`, con `!`
+                perché le schede non accettano classi da fuori), altrimenti ognuna sborderebbe
+                dalla sua colonna. Sotto `sm` restano le tre colonne compatte del telefono.
+            */}
+            <div className="@container">
+                <div
+                    aria-busy={isLoading}
+                    className={cn(
+                        "grid grid-cols-3 gap-2 sm:gap-4 sm:@max-[80rem]:gap-3 sm:@max-[44rem]:grid-cols-2 @min-[44rem]:grid-cols-3 @min-[80rem]:grid-cols-6 @min-[80rem]:*:min-w-0!",
+                        isLoading && hasLoadedMetricsOnce && "opacity-60 transition-opacity"
+                    )}
+                >
+                    <CardDashboard
+                        text="Report aperti"
+                        mobileText="Aperti"
+                        icon={CircleDashed}
+                        number={String(openReports)}
+                        iconColor="text-destructive"
+                        onClick={() => goToReportsPage("open")}
+                    />
+                    <CardDashboard
+                        text="Report chiusi"
+                        mobileText="Chiusi"
+                        icon={CircleCheck}
+                        number={String(closedReports)}
+                        iconColor="text-status-green-foreground"
+                        onClick={() => goToReportsPage("closed")}
+                    />
 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            // `whitespace-normal` e `text-left` annullano quelli del pulsante: qui
-                            // l'etichetta deve poter andare a capo come nelle altre schede.
-                            className={cn(
-                                dashboardCardLayoutClassName,
-                                "h-auto justify-items-start border-primary/20 text-left whitespace-normal"
-                            )}
-                        >
-                            <span className={cn(dashboardCardLabelClassName, "font-medium text-primary")}>
-                                Incassi mese
-                            </span>
-                            <Euro className={cn(dashboardCardIconClassName, "text-action-print")} />
-                            <span
-                                // Spaziatura larga solo da `sm`: a 320px i sei pallini la usavano
-                                // per arrivare sopra l'icona dell'euro.
-                                className={cn(dashboardCardValueClassName, "sm:tracking-widest")}
-                                aria-label="Importo nascosto, apri la card per visualizzarlo"
+                    <CardDashboard
+                        text="Interventi programmati"
+                        mobileText="Programmati"
+                        icon={CalendarClock}
+                        number={String(scheduledInterventions)}
+                        iconColor="text-destructive"
+                        onClick={() => goToInterventionsPage("programmato")}
+                    />
+                    <CardDashboard
+                        text="Interventi in lavorazione"
+                        mobileText="In lavorazione"
+                        icon={Loader}
+                        number={String(inProgressInterventions)}
+                        iconColor="text-action-print"
+                        onClick={() => goToInterventionsPage("in_lavorazione")}
+                    />
+                    <CardDashboard
+                        text="Interventi completati"
+                        mobileText="Completati"
+                        icon={CircleCheck}
+                        number={String(completedInterventions)}
+                        iconColor="text-status-green-foreground"
+                        onClick={() => goToInterventionsPage("completato")}
+                    />
+
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                // `whitespace-normal` e `text-left` annullano quelli del pulsante: qui
+                                // l'etichetta deve poter andare a capo come nelle altre schede.
+                                className={cn(
+                                    dashboardCardLayoutClassName,
+                                    "h-auto justify-items-start border-primary/20 text-left whitespace-normal"
+                                )}
                             >
-                                ••••••
-                            </span>
-                        </Button>
-                    </DialogTrigger>
+                                <span className={cn(dashboardCardLabelClassName, "font-medium text-primary-text")}>
+                                    Incassi mese
+                                </span>
+                                <Euro className={cn(dashboardCardIconClassName, "text-action-print")} />
+                                <span
+                                    // Spaziatura larga solo da `sm`: a 320px i sei pallini la usavano
+                                    // per arrivare sopra l'icona dell'euro.
+                                    className={cn(dashboardCardValueClassName, "sm:tracking-widest")}
+                                    aria-label="Importo nascosto, apri la card per visualizzarlo"
+                                >
+                                    ••••••
+                                </span>
+                            </Button>
+                        </DialogTrigger>
 
-                    {/* Senza `onOpenAutoFocus` il focus finiva sul primo pulsante, la freccia "Mese
+                        {/* Senza `onOpenAutoFocus` il focus finiva sul primo pulsante, la freccia "Mese
                         precedente", e il suo fumetto si apriva da solo sopra l'importo. */}
-                    <DialogContent className="sm:max-w-md" onOpenAutoFocus={(event) => event.preventDefault()}>
-                        <DialogHeader>
-                            <DialogTitle>Incassi mese</DialogTitle>
-                            <DialogDescription>Andamento degli ultimi 6 mesi.</DialogDescription>
-                        </DialogHeader>
+                        <DialogContent className="sm:max-w-md" onOpenAutoFocus={(event) => event.preventDefault()}>
+                            <DialogHeader>
+                                <DialogTitle>Incassi mese</DialogTitle>
+                                <DialogDescription>Andamento degli ultimi 6 mesi.</DialogDescription>
+                            </DialogHeader>
 
-                        {/* `min-w-0` sul contenitore e sui suoi figli: un elemento di una griglia non si
+                            {/* `min-w-0` sul contenitore e sui suoi figli: un elemento di una griglia non si
                             restringe sotto la larghezza del suo contenuto, e la riga con importo,
                             confronto e "al netto" (più larga dei 358px di un telefono) spingeva
                             fuori dal riquadro la freccia destra e l'ultima barra del grafico. */}
-                        <div className="grid min-w-0 gap-3 *:min-w-0">
-                            <div className="flex items-center justify-between gap-1 sm:gap-2">
-                                <TableActionButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={handlePreviousRevenueMonth}
-                                    aria-label="Mese precedente"
-                                >
-                                    <ChevronLeft className="size-4" />
-                                </TableActionButton>
+                            <div className="grid min-w-0 gap-3 *:min-w-0">
+                                <div className="flex items-center justify-between gap-1 sm:gap-2">
+                                    <TableActionButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={handlePreviousRevenueMonth}
+                                        aria-label="Mese precedente"
+                                    >
+                                        <ChevronLeft className="size-4" />
+                                    </TableActionButton>
 
-                                <div className="min-w-0 flex-1 text-center">
-                                    <div className="text-2xl font-bold sm:text-3xl">{formatEuro(monthlyRevenue)}</div>
-                                    <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
-                                    {revenueComparison ? (
-                                        // Freccia e segno oltre al colore: l'andamento si legge anche
-                                        // senza distinguere il verde dal rosso.
-                                        <div
-                                            className={cn(
-                                                "mt-1 inline-flex items-start justify-center gap-1 text-sm font-medium",
-                                                revenueComparison.change >= 0
-                                                    ? "text-status-green-foreground"
-                                                    : "text-destructive"
-                                            )}
-                                        >
-                                            {revenueComparison.change >= 0 ? (
-                                                <TrendingUp className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                                            ) : (
-                                                <TrendingDown className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                                            )}
-                                            {/* Icona e testo in due elementi: con l'icona nel flusso del testo, a
-                                                360px andava a capo da sola sopra la scritta. */}
-                                            <span>
-                                                {percentFormatter.format(revenueComparison.change)} rispetto{" "}
-                                                {/* "ad agosto", "ad aprile", ma "a luglio". */}
-                                                {revenueComparison.previousMonthLabel.startsWith("a") ? "ad" : "a"}{" "}
-                                                {revenueComparison.previousMonthLabel}
-                                            </span>
+                                    <div className="min-w-0 flex-1 text-center">
+                                        <div className="text-2xl font-bold sm:text-3xl">
+                                            {formatEuro(monthlyRevenue)}
                                         </div>
-                                    ) : null}
-                                    <div className="mt-2 text-sm text-muted-foreground">
-                                        Al netto tecnici esterni:{" "}
-                                        <span className="font-semibold text-foreground">
-                                            {formatEuro(monthlyNetRevenue)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <TableActionButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={handleNextRevenueMonth}
-                                    disabled={isCurrentRevenueMonth}
-                                    aria-label="Mese successivo"
-                                >
-                                    <ChevronRight className="size-4" />
-                                </TableActionButton>
-                            </div>
-
-                            <div className="flex h-36 items-end gap-2 border-b border-border">
-                                {monthlyRevenueSeries.map((point) => {
-                                    const isSelected = point.monthKey === selectedRevenueMonth;
-                                    const shortLabel = getMonthShortLabel(point.monthKey);
-                                    // Al massimo l'80% della colonna: il resto è per l'importo
-                                    // scritto sopra, che altrimenti la barra più alta spingerebbe fuori.
-                                    const heightPercent =
-                                        maxMonthlyRevenue > 0 ? Math.max((point.value / maxMonthlyRevenue) * 80, 3) : 3;
-
-                                    return (
-                                        <button
-                                            key={point.monthKey}
-                                            type="button"
-                                            onClick={() => setSelectedRevenueMonth(point.monthKey)}
-                                            title={`${shortLabel}: ${formatEuro(point.value)}`}
-                                            aria-label={`${shortLabel}: ${formatEuro(point.value)}`}
-                                            aria-pressed={isSelected}
-                                            className="flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-end gap-1"
-                                        >
-                                            {/* L'importo sta scritto: prima si leggeva solo nel
-                                                fumetto al passaggio del mouse, che su un telefono
-                                                non c'è. */}
-                                            <span
-                                                aria-hidden="true"
-                                                className={cn(
-                                                    "max-w-full truncate text-xs tabular-nums",
-                                                    isSelected ? "font-semibold text-primary" : "text-muted-foreground"
-                                                )}
-                                            >
-                                                <span className="sm:hidden">{formatBarValueShort(point.value)}</span>
-                                                <span className="max-sm:hidden">
-                                                    {barValueFormatter.format(point.value)}
-                                                </span>
-                                            </span>
+                                        <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
+                                        {revenueComparison ? (
+                                            // Freccia e segno oltre al colore: l'andamento si legge anche
+                                            // senza distinguere il verde dal rosso.
                                             <div
                                                 className={cn(
-                                                    "w-full rounded-t-[4px] transition-colors",
-                                                    isSelected
-                                                        ? "bg-primary"
-                                                        : "bg-muted-foreground/25 hover:bg-muted-foreground/40"
+                                                    "mt-1 inline-flex items-start justify-center gap-1 text-sm font-medium",
+                                                    revenueComparison.change >= 0
+                                                        ? "text-status-green-foreground"
+                                                        : "text-destructive"
                                                 )}
-                                                style={{ height: `${heightPercent}%` }}
-                                            />
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                            >
+                                                {revenueComparison.change >= 0 ? (
+                                                    <TrendingUp className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                                ) : (
+                                                    <TrendingDown
+                                                        className="mt-0.5 size-4 shrink-0"
+                                                        aria-hidden="true"
+                                                    />
+                                                )}
+                                                {/* Icona e testo in due elementi: con l'icona nel flusso del testo, a
+                                                360px andava a capo da sola sopra la scritta. */}
+                                                <span>
+                                                    {percentFormatter.format(revenueComparison.change)} rispetto{" "}
+                                                    {/* "ad agosto", "ad aprile", ma "a luglio". */}
+                                                    {revenueComparison.previousMonthLabel.startsWith("a")
+                                                        ? "ad"
+                                                        : "a"}{" "}
+                                                    {revenueComparison.previousMonthLabel}
+                                                </span>
+                                            </div>
+                                        ) : null}
+                                        <div className="mt-2 text-sm text-muted-foreground">
+                                            Al netto tecnici esterni:{" "}
+                                            <span className="font-semibold text-foreground">
+                                                {formatEuro(monthlyNetRevenue)}
+                                            </span>
+                                        </div>
+                                    </div>
 
-                            <div className="flex gap-2 text-xs text-muted-foreground uppercase">
-                                {monthlyRevenueSeries.map((point) => (
-                                    <span
-                                        key={point.monthKey}
-                                        className={cn(
-                                            "flex-1 text-center",
-                                            point.monthKey === selectedRevenueMonth && "font-semibold text-primary"
-                                        )}
+                                    <TableActionButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={handleNextRevenueMonth}
+                                        disabled={isCurrentRevenueMonth}
+                                        aria-label="Mese successivo"
                                     >
-                                        {getMonthShortLabel(point.monthKey)}
-                                    </span>
-                                ))}
+                                        <ChevronRight className="size-4" />
+                                    </TableActionButton>
+                                </div>
+
+                                <div className="flex h-36 items-end gap-2 border-b border-border">
+                                    {monthlyRevenueSeries.map((point) => {
+                                        const isSelected = point.monthKey === selectedRevenueMonth;
+                                        const shortLabel = getMonthShortLabel(point.monthKey);
+                                        // Al massimo l'80% della colonna: il resto è per l'importo
+                                        // scritto sopra, che altrimenti la barra più alta spingerebbe fuori.
+                                        const heightPercent =
+                                            maxMonthlyRevenue > 0
+                                                ? Math.max((point.value / maxMonthlyRevenue) * 80, 3)
+                                                : 3;
+
+                                        return (
+                                            <button
+                                                key={point.monthKey}
+                                                type="button"
+                                                onClick={() => setSelectedRevenueMonth(point.monthKey)}
+                                                title={`${shortLabel}: ${formatEuro(point.value)}`}
+                                                aria-label={`${shortLabel}: ${formatEuro(point.value)}`}
+                                                aria-pressed={isSelected}
+                                                className="flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-end gap-1"
+                                            >
+                                                {/* L'importo sta scritto: prima si leggeva solo nel
+                                                fumetto al passaggio del mouse, che su un telefono
+                                                non c'è. */}
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={cn(
+                                                        "max-w-full truncate text-xs tabular-nums",
+                                                        isSelected
+                                                            ? "font-semibold text-primary-text"
+                                                            : "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {formatBarValueShort(point.value)}
+                                                </span>
+                                                <div
+                                                    className={cn(
+                                                        "w-full rounded-t-[4px] transition-colors",
+                                                        isSelected
+                                                            ? "bg-primary"
+                                                            : "bg-muted-foreground/25 hover:bg-muted-foreground/40"
+                                                    )}
+                                                    style={{ height: `${heightPercent}%` }}
+                                                />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="flex gap-2 text-xs text-muted-foreground uppercase">
+                                    {monthlyRevenueSeries.map((point) => (
+                                        <span
+                                            key={point.monthKey}
+                                            className={cn(
+                                                "flex-1 text-center",
+                                                point.monthKey === selectedRevenueMonth &&
+                                                    "font-semibold text-primary-text"
+                                            )}
+                                        >
+                                            {getMonthShortLabel(point.monthKey)}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
-            <Suspense fallback={<LoadingPage className="h-[calc(100vh-16rem)] min-h-[24rem] sm:min-h-[28rem]" />}>
+            {/* Il calendario prende tutto lo spazio che resta sotto le schede (`flex-1`), con un
+                minimo sotto cui la pagina scorre. Prima aveva un'altezza fissa, `100vh - 16rem`,
+                che non teneva conto delle schede: quando queste andavano su due o tre righe (a
+                finestra non intera) la pagina scorreva, e rimpicciolirle non avrebbe dato al
+                calendario un pixel in più. */}
+            <Suspense fallback={<LoadingPage className="min-h-[24rem] flex-1 sm:min-h-[28rem]" />}>
                 <InterventionsCalendar
-                    className="h-[calc(100vh-16rem)] min-h-[24rem] sm:min-h-[28rem]"
+                    className="min-h-[24rem] flex-1 sm:min-h-[28rem]"
                     events={calendarEvents}
                     isLoading={isCalendarLoading}
                     isInitialLoading={isCalendarInitialLoading}

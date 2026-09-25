@@ -5,6 +5,21 @@ import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
+/**
+ * Le voci dei clienti arrivano come "Nome Cognome - telefono" (`formatCustomerOption`): una
+ * stringa sola, che è anche la chiave con cui il dialogo ritrova l'id. Andando a capo come testo
+ * normale il numero si spezzava a metà ("+39 343" / "8880123"). Qui la si divide solo per
+ * mostrarla, sull'ultimo " - " (il telefono viene per ultimo): il nome sopra, il telefono sotto,
+ * grigio e mai spezzato. Il valore scelto resta la stringa intera.
+ */
+const splitCustomerOption = (option: string): { name: string; phone: string | null } => {
+    const separatorIndex = option.lastIndexOf(" - ");
+
+    return separatorIndex === -1
+        ? { name: option, phone: null }
+        : { name: option.slice(0, separatorIndex), phone: option.slice(separatorIndex + 3) };
+};
+
 type Props = Readonly<{
     id: string;
     /** Segnala il campo come invalido: accende il bordo rosso che `Input` ha già. */
@@ -189,24 +204,45 @@ const InputWithAdd = ({
                 // e alto abbastanza, e la lista torna sovrapposta come prima.
                 <div className="mt-1 w-full rounded-md border bg-card shadow-sm sm:absolute sm:z-10 sm:mt-2">
                     <div className="max-h-48 overflow-auto">
-                        {filteredOptions.map((option) => (
-                            <Button
-                                key={option}
-                                type="button"
-                                variant="ghost"
-                                size={"lg"}
-                                // `whitespace-normal` e altezza libera: "Nome Cognome - telefono"
-                                // è più largo di un campo su telefono, e senza andare a capo il
-                                // numero finiva tagliato. Una voce lunga ora occupa due righe.
-                                className="h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal"
-                                onMouseDown={() => {
-                                    onChange(option);
-                                    setIsOpen(false);
-                                }}
-                            >
-                                {option}
-                            </Button>
-                        ))}
+                        {filteredOptions.map((option) => {
+                            // Solo le voci dei clienti (quelle che arrivano da `onSearch`) hanno il
+                            // telefono in coda: dispositivi e difetti restano come sono, anche se
+                            // contengono un trattino.
+                            const { name, phone } = onSearch
+                                ? splitCustomerOption(option)
+                                : { name: option, phone: null };
+
+                            return (
+                                <Button
+                                    key={option}
+                                    type="button"
+                                    variant="ghost"
+                                    size={"lg"}
+                                    // `whitespace-normal` e altezza libera: "Nome Cognome - telefono"
+                                    // è più largo di un campo su telefono, e senza andare a capo il
+                                    // numero finiva tagliato. Una voce lunga ora occupa due righe.
+                                    className="h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal"
+                                    // Il nome accessibile resta la voce intera, con il trattino:
+                                    // i due pezzi in colonna letti di fila sarebbero "Nome333".
+                                    aria-label={phone == null ? undefined : option}
+                                    onMouseDown={() => {
+                                        onChange(option);
+                                        setIsOpen(false);
+                                    }}
+                                >
+                                    {phone == null ? (
+                                        option
+                                    ) : (
+                                        <span className="flex min-w-0 flex-col">
+                                            <span>{name}</span>
+                                            <span className="text-sm whitespace-nowrap text-muted-foreground">
+                                                {phone}
+                                            </span>
+                                        </span>
+                                    )}
+                                </Button>
+                            );
+                        })}
                     </div>
 
                     {canCreate ? (

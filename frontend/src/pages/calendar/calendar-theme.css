@@ -31,6 +31,13 @@
     background-color: var(--muted);
 }
 
+/* I numeri dei giorni fuori mese: la libreria li scrive in #999, 2,85:1 sul fondo `--muted` in
+   chiaro. Il grigio dei testi secondari resta leggibile (sopra 4,5:1) e continua a distinguerli
+   dai giorni del mese, che sono nel colore del testo. */
+.rbc-off-range {
+    color: var(--muted-foreground);
+}
+
 .rbc-today {
     background-color: color-mix(in oklch, var(--primary) 12%, transparent);
 }
@@ -41,8 +48,10 @@
     padding: 2px 6px;
 }
 
+/* Il blu dei testi (`--primary-text`), non quello dei pulsanti: in scuro `--primary` su card era
+   a 3,54:1, sotto il 4,5:1 di un testo piccolo come questo. */
 .rbc-show-more {
-    color: var(--primary);
+    color: var(--primary-text);
     background-color: transparent;
 }
 

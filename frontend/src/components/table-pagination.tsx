@@ -10,7 +10,7 @@ import {
 import RowsPerPageSelect from "@/components/rows-per-page-select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { scrollListToTop } from "@/lib/listScroll";
-import { useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { TableRowsPerPageKey } from "@/lib/theme";
 
 /**
@@ -19,6 +19,17 @@ import type { TableRowsPerPageKey } from "@/lib/theme";
  * `EntityTable`, perché questo controllo sta sempre appena sotto quella tabella.
  */
 const PAGINATION_COMPACT_BREAKPOINT = 640;
+
+/**
+ * La larghezza del controllo sotto cui si passa alla forma compatta, qualunque sia la finestra.
+ *
+ * La soglia di finestra da sola non bastava: fra 640 e ~900px, con la barra laterale aperta, il
+ * controllo è largo 488–620px, e la griglia a tre zone (`1fr auto 1fr`) dava al conteggio quello
+ * che avanzava dopo pagine (281px) e selettore (175px) — a 768 esattamente 0,6px, e
+ * "Visualizzati 1-10 di 6361" (157px) spariva del tutto. Per stare in piedi la griglia vuole due
+ * lati da ~175px più la paginazione (fino a ~340px con sette pulsanti) più i due spazi: 720.
+ */
+const PAGINATION_COMPACT_CONTAINER_WIDTH = 720;
 
 type TablePaginationProps = {
     currentPage: number;
@@ -63,8 +74,32 @@ const TablePagination = ({
     // diventa "pagina/totale" tra le sole frecce, e le due etichette spariscono lasciando solo
     // i numeri. Prima le tre zone stavano impilate su tre righe sotto `sm` — corretto per
     // spazio, ma l'utente si aspettava la stessa riga unica del desktop.
-    const isCompact = useIsMobile(PAGINATION_COMPACT_BREAKPOINT);
-    const rootRef = useRef<HTMLDivElement>(null);
+    //
+    // Conta la larghezza del controllo, non della finestra: vedi `PAGINATION_COMPACT_CONTAINER_WIDTH`.
+    // Finché non è misurata (primo render, o jsdom che non impagina) vale la soglia di finestra.
+    const isViewportCompact = useIsMobile(PAGINATION_COMPACT_BREAKPOINT);
+    const [containerWidth, setContainerWidth] = useState(0);
+    const isCompact = containerWidth > 0 ? containerWidth < PAGINATION_COMPACT_CONTAINER_WIDTH : isViewportCompact;
+    const rootRef = useRef<HTMLDivElement | null>(null);
+    const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+    // Un ref a callback e non un effetto: il controllo non esiste finché la lista è vuota
+    // (`return null` qui sotto), quindi un effetto al montaggio troverebbe il ref ancora vuoto e
+    // non ripartirebbe più quando il controllo compare.
+    const setRootRef = useCallback((element: HTMLDivElement | null) => {
+        rootRef.current = element;
+        resizeObserverRef.current?.disconnect();
+        resizeObserverRef.current = null;
+
+        if (!element || typeof ResizeObserver === "undefined") {
+            return;
+        }
+
+        const observer = new ResizeObserver(() => setContainerWidth(element.getBoundingClientRect().width));
+        observer.observe(element);
+        resizeObserverRef.current = observer;
+        setContainerWidth(element.getBoundingClientRect().width);
+    }, []);
 
     // La lista sta sempre subito prima di questo controllo, nello stesso contenitore: è la
     // forma di tutte le pagine con una tabella. Vedi `scrollListToTop`.
@@ -87,14 +122,18 @@ const TablePagination = ({
 
     return (
         // Tre zone: conteggio a sinistra, controlli di pagina al centro, selettore a destra.
-        // Da `sm` in su è una griglia e non `justify-between`, perché con le colonne laterali
+        // In forma estesa è una griglia e non `justify-between`, perché con le colonne laterali
         // a `1fr` la paginazione resta centrata sulla tabella anche quando i due lati hanno
         // larghezze diverse (ed è il caso normale: "Visualizzati 1-10 di 16" contro il
-        // select). Sotto `sm` bastano tre elementi in riga: la versione compatta di conteggio
+        // select). In forma compatta bastano tre elementi in riga: la versione compatta di conteggio
         // e paginazione è già abbastanza stretta da stare affiancata al selettore.
         <div
-            ref={rootRef}
-            className="flex items-center justify-between gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4"
+            ref={setRootRef}
+            className={
+                isCompact
+                    ? "flex items-center justify-between gap-2"
+                    : "grid grid-cols-[1fr_auto_1fr] items-center gap-4"
+            }
         >
             {/* `role="status"` fa di questa riga l'annuncio dell'esito per chi usa uno screen
                 reader: cambia da sola a ogni ricerca, filtro e cambio pagina, quindi è già la
@@ -108,9 +147,9 @@ const TablePagination = ({
             </p>
 
             {/* `empty:hidden` evita che il contenitore vuoto (pagina unica) si porti dietro un
-                gap in più sotto `sm`; da `sm` in su torna `empty:flex`, altrimenti la cella
+                gap in più in forma compatta; nella griglia resta visibile, altrimenti la cella
                 vuota sparisce dalla griglia e il selettore scivola nella colonna centrale. */}
-            <div className="flex shrink-0 justify-center empty:hidden sm:empty:flex">
+            <div className={isCompact ? "flex shrink-0 justify-center empty:hidden" : "flex shrink-0 justify-center"}>
                 {totalPages <= 1 ? null : isCompact ? (
                     // Solo le frecce e "pagina/totale": la lista numerata (fino a 7 pulsanti
                     // con centinaia di pagine) non ci sta su una riga sotto `sm` insieme a
@@ -181,7 +220,7 @@ const TablePagination = ({
                 )}
             </div>
 
-            <div className="flex shrink-0 justify-end empty:hidden sm:empty:flex">
+            <div className={isCompact ? "flex shrink-0 justify-end empty:hidden" : "flex shrink-0 justify-end"}>
                 {onPageSizeChange ? (
                     <RowsPerPageSelect
                         value={pageSize as TableRowsPerPageKey}

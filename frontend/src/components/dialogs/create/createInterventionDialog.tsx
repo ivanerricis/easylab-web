@@ -2,6 +2,7 @@ import CustomDialog from "@/components/dialogs/customDialog";
 import { FieldError, RequiredMark } from "@/components/form-field";
 import { fieldErrorAria, hasFormChanged } from "@/lib/formField";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
+import { findCustomerByText } from "@/lib/customerLookup";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import {
     InterventionCollaboratorField,
@@ -111,6 +112,9 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [errors, setErrors] = useState<FieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // La verifica del cliente su "Avanti" (vedi `checkCustomerExists`): finché è in corso il
+    // pulsante resta occupato, così un secondo tocco non la lancia due volte.
+    const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
     const isStepped = useIsMobile(640);
     const [step, setStep] = useState(0);
     // Il campo da mettere a fuoco quando il passo che lo contiene sarà montato: con un errore in
@@ -205,8 +209,39 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         document.getElementById(field)?.focus();
     };
 
+    /**
+     * Su telefono il cliente sta nel primo passo e "Salva" arriva tre passi dopo: un nome
+     * inesistente si scopriva solo lì. "Avanti" lo verifica subito, come nel nuovo report (vedi
+     * `checkCustomerExists` in `createReportDialog.tsx`): l'id dei suggerimenti se c'è, altrimenti
+     * la stessa ricerca sul server del salvataggio, tenendo l'id trovato. Restituisce il messaggio
+     * d'errore, o `undefined` se il cliente esiste.
+     */
+    const checkCustomerExists = async (): Promise<string | undefined> => {
+        const rawValue = formValues.customer;
+
+        if (customerIdByOption[rawValue] != null) {
+            return undefined;
+        }
+
+        setIsCheckingCustomer(true);
+        try {
+            const customer = await findCustomerByText(rawValue);
+
+            if (!customer) {
+                return "Seleziona un cliente esistente o creane uno nuovo.";
+            }
+
+            setCustomerIdByOption((prev) => ({ ...prev, [rawValue]: customer.id }));
+            return undefined;
+        } catch (error) {
+            return getApiErrorMessage(error, "Impossibile verificare il cliente");
+        } finally {
+            setIsCheckingCustomer(false);
+        }
+    };
+
     const handleConfirm = async () => {
-        if (isSubmitting) {
+        if (isSubmitting || isCheckingCustomer) {
             return;
         }
 
@@ -226,6 +261,12 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
 
             for (const field of interventionSteps[step].fields) {
                 stepErrors[field] = nextErrors[field];
+            }
+
+            // Il cliente compilato va anche verificato: solo a telefono, perché su desktop
+            // "Salva" è accanto al campo e la verifica la fa già il salvataggio.
+            if (interventionSteps[step].fields.includes("customer") && !stepErrors.customer) {
+                stepErrors.customer = await checkCustomerExists();
             }
 
             setErrors(stepErrors);
@@ -275,17 +316,30 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 isDirty={isDirty}
                 title="Nuovo intervento"
                 description="Inserisci i dati dell'intervento e conferma per salvare."
-                contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
-                confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
+                // Sotto `sm`, dove si procede a passi, il dialogo è ancorato in alto e ha
+                // un'altezza fissa: quella del passo più alto (44rem), o lo schermo meno 1rem per
+                // lato sui telefoni più bassi. Con l'altezza data dal contenuto ogni passo era alto
+                // diversamente (284–516px di campi) e "Avanti" cambiava posto fra un tocco e
+                // l'altro; così i campi scorrono dentro e i pulsanti restano fermi in fondo.
+                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
+                confirmLabel={
+                    isLastStep
+                        ? isSubmitting
+                            ? "Salvataggio..."
+                            : "Salva"
+                        : isCheckingCustomer
+                          ? "Verifica..."
+                          : "Avanti"
+                }
                 confirmIcon={isLastStep ? Save : undefined}
                 cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
                 onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
                 footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
-                cancelDisabled={isSubmitting}
-                confirmDisabled={isSubmitting}
+                cancelDisabled={isSubmitting || isCheckingCustomer}
+                confirmDisabled={isSubmitting || isCheckingCustomer}
                 content={
-                    <div className="grid max-h-[72vh] gap-4 overflow-y-auto py-1 pr-1">
+                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto py-1 pr-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
                         {isStepped ? (
                             <StepProgress steps={interventionSteps.map((item) => item.title)} current={step} />
                         ) : null}

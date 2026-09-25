@@ -37,7 +37,11 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
             description={description}
             content={
                 <div className="grid gap-2 py-2">
-                    <Label htmlFor={confirmInputId}>
+                    {/* `block`: `Label` è un flex con `gap-2`, e il testo attorno a "ELIMINA"
+                        diventava tre elementi flessibili, con 8px più lo spazio fra una parola e
+                        l'altra (sembrava un doppio spazio). `text-lg` come le etichette degli
+                        altri dialoghi, che accompagnano campi a 18px. */}
+                    <Label htmlFor={confirmInputId} className="block text-lg leading-snug">
                         Digita <span className="font-semibold">{deleteConfirmKeyword}</span> per confermare
                     </Label>
                     <Input

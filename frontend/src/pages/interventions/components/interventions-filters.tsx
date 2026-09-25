@@ -123,15 +123,23 @@ const InterventionsFilters = ({
                     {typeControl()}
                     {sortControl()}
 
-                    <DateRangeFilter
-                        dateFrom={dateFrom}
-                        onDateFromChange={onDateFromChange}
-                        dateTo={dateTo}
-                        onDateToChange={onDateToChange}
-                        onClearDates={onClearDates}
-                    />
+                    {/* Date e "Colonne" vanno a capo insieme, e il gruppo si allarga fino al bordo
+                        destro con "Colonne" in fondo (`ml-auto`). Prima erano due voci qualunque
+                        della riga: a 1440px con la barra laterale aperta mancavano pochi pixel e
+                        "Colonne" finiva da solo su una seconda riga, a sinistra. `flex-[1_0_auto]`
+                        e non `flex-1`: con base zero il gruppo si farebbe stringere sulla prima
+                        riga invece di andare a capo intero. */}
+                    <div className="flex flex-[1_0_auto] items-center gap-3">
+                        <DateRangeFilter
+                            dateFrom={dateFrom}
+                            onDateFromChange={onDateFromChange}
+                            dateTo={dateTo}
+                            onDateToChange={onDateToChange}
+                            onClearDates={onClearDates}
+                        />
 
-                    {columnsMenu}
+                        {columnsMenu ? <div className="ml-auto hidden sm:block">{columnsMenu}</div> : null}
+                    </div>
                 </div>
             )}
         </div>

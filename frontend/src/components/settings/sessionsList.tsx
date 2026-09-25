@@ -65,11 +65,6 @@ const SessionsList = ({
                                 {/* Il dispositivo per primo: è il dato con cui si riconosce
                                     la propria sessione fra più accessi dello stesso utente. */}
                                 {session.device ?? "Dispositivo sconosciuto"}
-                                {session.isCurrent ? (
-                                    <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                        (questa sessione)
-                                    </span>
-                                ) : null}
                             </span>
                             <span className="text-xs text-muted-foreground">
                                 {session.isCurrent
@@ -82,16 +77,25 @@ const SessionsList = ({
                                 {formatDateTime(session.expiresAt)}
                             </span>
                         </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={session.isCurrent || revokingId === session.id}
-                            onClick={() => onRevoke(session)}
-                        >
-                            <LogOut className="size-4" />
-                            Disconnetti
-                        </Button>
+                        {/* Sulla sessione in uso un'etichetta al posto di "Disconnetti": prima il
+                            pulsante c'era ma disabilitato, al 50% e senza spiegazione, e sembrava
+                            un guasto. Per chiudere questa sessione c'è "Esci" nel menu utente. */}
+                        {session.isCurrent ? (
+                            <span className="inline-flex h-8 items-center rounded-full bg-primary/10 px-3 text-xs font-medium text-primary-text">
+                                Questa sessione
+                            </span>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={revokingId === session.id}
+                                onClick={() => onRevoke(session)}
+                            >
+                                <LogOut className="size-4" />
+                                Disconnetti
+                            </Button>
+                        )}
                     </div>
                 );
             })}

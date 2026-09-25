@@ -49,6 +49,14 @@ type EntityCardListProps<T> = {
     /** Primo caricamento: schede-scheletro invece di un vuoto che poi salta. */
     isInitialLoading?: boolean;
     skeletonCardCount?: number;
+    /**
+     * Da quale larghezza le schede lasciano il posto alla tabella. Di serie `sm:hidden`, come
+     * `EntityTable`; i Log di Impostazioni lo spostano su una container query perché la loro
+     * tabella non ci sta in una sezione stretta. È una prop a sé e non un `className`: per
+     * mostrare le schede oltre `sm` da fuori servirebbe un `sm:flex`, che romperebbe lo stato
+     * vuoto (un blocco centrato, non un flex).
+     */
+    hiddenFromClassName?: string;
 };
 
 const cardClassName = "relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs";
@@ -194,6 +202,7 @@ const EntityCardList = <T,>({
     emptyMessage,
     isInitialLoading = false,
     skeletonCardCount = 3,
+    hiddenFromClassName = "sm:hidden",
 }: EntityCardListProps<T>) => {
     const idColumn = useMemo(() => columns.find((column) => column.key === idColumnKey), [columns]);
     const titleColumns = useMemo(() => columns.filter((column) => column.cardSlot === "title"), [columns]);
@@ -209,7 +218,7 @@ const EntityCardList = <T,>({
 
     if (isInitialLoading) {
         return (
-            <div className={cn("flex flex-col gap-3 sm:hidden", className)} aria-busy="true">
+            <div className={cn("flex flex-col gap-3", hiddenFromClassName, className)} aria-busy="true">
                 {Array.from({ length: skeletonCardCount }, (_, index) => (
                     <div key={`skeleton-${index}`} className={cn(cardClassName, "p-4")}>
                         <div className="flex items-start justify-between gap-3">
@@ -235,14 +244,14 @@ const EntityCardList = <T,>({
 
     if (rows.length === 0) {
         return (
-            <div className={cn("py-6 text-center text-sm text-muted-foreground sm:hidden", className)}>
+            <div className={cn("py-6 text-center text-sm text-muted-foreground", hiddenFromClassName, className)}>
                 {emptyMessage}
             </div>
         );
     }
 
     return (
-        <div className={cn("flex flex-col gap-3 sm:hidden", className)}>
+        <div className={cn("flex flex-col gap-3", hiddenFromClassName, className)}>
             {rows.map((row) => {
                 const rowKey = getRowKey(row);
 

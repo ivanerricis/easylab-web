@@ -185,13 +185,17 @@ const EmailSettingsPanel = () => {
             <SettingsCard
                 title="Email"
                 description="Configura il server SMTP usato per inviare gli interventi ai clienti."
+                contentClassName="@container"
             >
                 {isLoading ? (
                     <SettingsLoadingBox />
                 ) : (
                     <>
                         <SettingsGroup>
-                            <div className="flex items-center gap-3">
+                            {/* `items-start` e `leading-snug`, come nel dialogo di ripristino del
+                                backup: su un telefono l'etichetta va a capo, e con `leading-none`
+                                le righe si toccavano e la casella finiva a metà testo. */}
+                            <div className="flex items-start gap-3">
                                 <Checkbox
                                     id="emailEnabled"
                                     checked={formValues.enabled}
@@ -199,13 +203,18 @@ const EmailSettingsPanel = () => {
                                         setFormValues((prev) => ({ ...prev, enabled: Boolean(checked) }))
                                     }
                                 />
-                                <Label htmlFor="emailEnabled" className="cursor-pointer">
+                                <Label htmlFor="emailEnabled" className="cursor-pointer leading-snug">
                                     Abilita invio email ai clienti
                                 </Label>
                             </div>
                         </SettingsGroup>
 
-                        <div className="grid gap-3 xl:grid-cols-2">
+                        {/* I due gruppi affiancati solo con la card larga almeno 1024px: il
+                            breakpoint è della card, non dello schermo. Con `xl` a 1440px (barra
+                            laterale e menu delle impostazioni aperti) i gruppi si dividevano ~700px
+                            e ognuno li ridivideva in due colonne: sei campi larghi 164px, con
+                            host e indirizzo mittente tagliati. */}
+                        <div className="grid gap-3 @5xl:grid-cols-2">
                             <SettingsGroup title="Server SMTP">
                                 <SettingsFieldRow>
                                     <SettingsField>
@@ -237,7 +246,7 @@ const EmailSettingsPanel = () => {
                                     </SettingsField>
                                 </SettingsFieldRow>
 
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-start gap-3">
                                     <Checkbox
                                         id="emailSecure"
                                         checked={formValues.secure}
@@ -246,7 +255,7 @@ const EmailSettingsPanel = () => {
                                             setFormValues((prev) => ({ ...prev, secure: Boolean(checked) }))
                                         }
                                     />
-                                    <Label htmlFor="emailSecure" className="cursor-pointer">
+                                    <Label htmlFor="emailSecure" className="cursor-pointer leading-snug">
                                         Connessione sicura (TLS/SSL)
                                     </Label>
                                 </div>

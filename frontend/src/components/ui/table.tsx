@@ -20,12 +20,18 @@ function Table({
     );
 }
 
+/**
+ * Fondo e testo dell'intestazione vengono da `--table-header` e `--table-header-foreground`
+ * (index.css): il primario pieno con il testo quasi bianco si fermava a 4.18:1. La riga
+ * dell'intestazione non prende la tinta di hover di `TableRow` (`in-[thead]:hover:bg-transparent`):
+ * schiariva il fondo proprio sotto il testo bianco.
+ */
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     return (
         <thead
             data-slot="table-header"
             className={cn(
-                "sticky top-0 z-10 bg-primary *:*:text-background *:*:dark:text-foreground [&_tr]:border-b",
+                "sticky top-0 z-10 bg-table-header *:*:text-table-header-foreground [&_tr]:border-b",
                 className
             )}
             {...props}
@@ -52,7 +58,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
         <tr
             data-slot="table-row"
             className={cn(
-                "border-b-2 border-foreground/45 transition-colors duration-50 *:border-r *:border-foreground/45 hover:bg-muted/50 in-[thead]:border-primary-foreground/25 in-[thead]:*:border-primary-foreground/25 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted dark:border-foreground/30 dark:*:border-foreground/30",
+                "border-b-2 border-foreground/45 transition-colors duration-50 *:border-r *:border-foreground/45 hover:bg-muted/50 in-[thead]:border-primary-foreground/25 in-[thead]:*:border-primary-foreground/25 in-[thead]:hover:bg-transparent has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted dark:border-foreground/30 dark:*:border-foreground/30",
                 className
             )}
             {...props}

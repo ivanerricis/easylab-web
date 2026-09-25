@@ -16,14 +16,31 @@ type OpenEntityButtonProps = Omit<ComponentProps<typeof Button>, "children" | "a
  * Ctrl+clic o clic con la rotella per aprire la scheda in un'altra scheda del browser,
  * "Copia indirizzo link" dal menu del tasto destro — e un clic normale resta una navigazione
  * interna, senza ricaricare la pagina.
+ *
+ * L'aspetto è quello delle altre azioni di riga (Modifica, Stampa: vedi `reports-table.tsx`):
+ * fondo `bg-muted` e icona grigia che al passaggio diventa del colore dell'azione. Prima era un
+ * `outline` senza bordo, bianco su card e con l'icona nera, l'unico diverso della fila. Misura
+ * di serie `icon-lg`, quadrata come le vicine: con `lg` usciva più larga di loro.
  */
-const OpenEntityButton = ({ to, size = "lg", className, "aria-label": ariaLabel, ...props }: OpenEntityButtonProps) => {
+const OpenEntityButton = ({
+    to,
+    size = "icon-lg",
+    className,
+    "aria-label": ariaLabel,
+    ...props
+}: OpenEntityButtonProps) => {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button asChild variant="outline" size={size} className={cn("border-0", className)} {...props}>
+                <Button
+                    asChild
+                    variant="default"
+                    size={size}
+                    className={cn("bg-muted hover:bg-primary/20", className)}
+                    {...props}
+                >
                     <Link to={to} aria-label={ariaLabel}>
-                        <ExternalLink className="size-5" />
+                        <ExternalLink className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
                     </Link>
                 </Button>
             </TooltipTrigger>

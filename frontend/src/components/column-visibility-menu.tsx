@@ -53,7 +53,7 @@ const ColumnVisibilityMenu = ({
                     {hiddenCount > 0 ? (
                         <span
                             aria-hidden="true"
-                            className="rounded-full bg-primary/15 px-1.5 text-xs text-primary tabular-nums"
+                            className="rounded-full bg-primary/15 px-1.5 text-xs text-primary-text tabular-nums"
                         >
                             {hiddenCount}
                         </span>

@@ -26,35 +26,129 @@ type UseResizableColumnsOptions = {
      * all'arrivo dei dati sarebbero tutte troncate.
      */
     canMeasure: boolean;
+    /**
+     * Cambia quando cambiano le righe mostrate (di norma l'array delle righe stesso): a ogni
+     * cambio la tabella si rimisura e le colonne che ora non bastano si allargano. Vedi
+     * `growNaturalWidths`.
+     */
+    dataVersion?: unknown;
 };
 
 /**
- * Misura la larghezza che il browser ha dato alle colonne impaginando la tabella da sé.
+ * Misura la larghezza che il browser darebbe alle colonne impaginando la tabella da sé, alla
+ * larghezza piena del contenuto.
+ *
+ * Durante la lettura la tabella viene portata per un istante a `table-layout: auto` e
+ * `width: max-content`, senza le larghezze delle `<col>` né il `min-width`, e poi rimessa
+ * com'era; tutto in modo sincrono, quindi prima del paint e senza nessun salto visibile.
+ * Serve perché la tabella ha `w-full`: in `auto` il browser la stringe dentro il suo
+ * contenitore e le colonne che possono restringersi (un nome in `truncate`, una cella con un
+ * popover) nascevano già schiacciate, per poi restare così una volta congelate — "Roberto
+ * Lombar…" a 768px. A `max-content` ogni colonna misura quello che le serve, qualunque sia la
+ * larghezza della finestra; il fatto che così possa lavorare anche su una tabella già a
+ * larghezze fisse è ciò che permette di rimisurarla quando cambiano i dati (vedi
+ * `useResizableColumns`).
+ *
+ * Con `fitToContainer`, se a `max-content` la tabella ci sta nel contenitore si rilegge con la
+ * sua `w-full`: lì non c'è niente di schiacciato, e il browser distribuisce lo spazio avanzato
+ * su tutte le colonne come ha sempre fatto. Senza, su uno schermo largo tutto l'avanzo finiva
+ * alla colonna elastica: in Difetti a 1440px "Azioni" larga 667px, con i pulsanti lontani dal
+ * resto della riga. Solo per la prima misura: nelle rimisure a crescita (vedi
+ * `growNaturalWidths`) le colonne ridistribuite si sommerebbero a quelle già congelate.
  *
  * Torna `null` invece di zeri quando la tabella non è impaginata — nascosta da `sm:table` su
  * mobile, oppure non ancora in pagina: sono i casi in cui congelare le misure vorrebbe dire
  * congelare delle colonne larghe zero.
  */
-const measureNaturalWidths = (table: HTMLTableElement, columnKeys: string[]): Record<string, number> | null => {
+export const measureNaturalWidths = (
+    table: HTMLTableElement,
+    columnKeys: string[],
+    { fitToContainer = false }: { fitToContainer?: boolean } = {}
+): Record<string, number> | null => {
     const headCells = table.tHead?.rows[0]?.cells;
 
     if (!headCells || headCells.length !== columnKeys.length) {
         return null;
     }
 
-    const measured: Record<string, number> = {};
+    const cols = Array.from(table.querySelectorAll<HTMLTableColElement>(":scope > colgroup > col"));
+    const savedTableStyle = table.style.cssText;
+    const savedColWidths = cols.map((col) => col.style.width);
 
-    for (let index = 0; index < columnKeys.length; index += 1) {
-        const width = headCells[index].getBoundingClientRect().width;
+    table.style.tableLayout = "auto";
+    table.style.width = "max-content";
+    table.style.minWidth = "0";
+    cols.forEach((col) => {
+        col.style.width = "";
+    });
 
-        if (width <= 0) {
-            return null;
+    const readWidths = () => {
+        const measured: Record<string, number> = {};
+
+        for (let index = 0; index < columnKeys.length; index += 1) {
+            const width = headCells[index].getBoundingClientRect().width;
+
+            if (width <= 0) {
+                return null;
+            }
+
+            // Per eccesso: con `table-layout: fixed` mezzo pixel in meno basta a far comparire i
+            // puntini su un valore che nella misura ci stava per un soffio.
+            measured[columnKeys[index]] = Math.ceil(width);
         }
 
-        measured[columnKeys[index]] = Math.round(width);
+        return measured;
+    };
+
+    try {
+        const measured = readWidths();
+        const containerWidth = table.parentElement?.clientWidth ?? 0;
+
+        if (
+            measured &&
+            fitToContainer &&
+            containerWidth > 0 &&
+            Object.values(measured).reduce((total, width) => total + width, 0) <= containerWidth
+        ) {
+            table.style.width = "";
+            return readWidths();
+        }
+
+        return measured;
+    } finally {
+        table.style.cssText = savedTableStyle;
+        cols.forEach((col, index) => {
+            col.style.width = savedColWidths[index];
+        });
+    }
+};
+
+/**
+ * Le nuove misure dopo un cambio di dati: ogni colonna tiene la larghezza più grande fra quella
+ * che aveva e quella che le serve ora, e non si stringe mai. Torna `null` se nessuna colonna
+ * deve cambiare, così il chiamante non ridisegna niente.
+ *
+ * Solo in crescita perché la stabilità resta la regola (voce del 2026-09-10): una tabella che
+ * si allarga e si stringe a ogni cambio pagina è peggio di una colonna qualche pixel più larga
+ * del necessario. Ma una colonna misurata sulla prima pagina non può restare più stretta dei
+ * valori delle pagine dopo: gli ID a due cifre della prima pagina di Difetti diventavano "6…"
+ * sulla seconda, e "Creato il" perdeva l'ora appena una data aveva una cifra in più.
+ */
+export const growNaturalWidths = (
+    current: Record<string, number>,
+    measured: Record<string, number>
+): Record<string, number> | null => {
+    let changed = false;
+    const next = { ...current };
+
+    for (const [columnKey, width] of Object.entries(measured)) {
+        if (next[columnKey] === undefined || width > next[columnKey]) {
+            next[columnKey] = width;
+            changed = true;
+        }
     }
 
-    return measured;
+    return changed ? next : null;
 };
 
 /**
@@ -110,10 +204,11 @@ export const resolveWidthsToPersist = (
  * il browser ha deciso e solo allora si passa a `fixed` con quelle stesse misure. La misura
  * avviene in `useLayoutEffect`, cioè prima del paint, quindi non si vede nessun salto.
  *
- * Si misura solo con `canMeasure`, cioè quando ci sono righe vere. Come contropartita le
- * misure vengono dalla prima pagina di dati e poi restano ferme — che è anche il
- * comportamento voluto, perché colonne che ballano a ogni cambio pagina sono peggio di
- * colonne strette.
+ * Si misura solo con `canMeasure`, cioè quando ci sono righe vere. Le misure vengono dalla
+ * prima pagina di dati; quando i dati cambiano (`dataVersion`) la tabella si rimisura, ma le
+ * colonne possono solo allargarsi: colonne che ballano a ogni cambio pagina sono peggio di
+ * colonne un po' larghe, e colonne che troncano i valori delle pagine dopo sono peggio
+ * ancora. Vedi `growNaturalWidths`.
  *
  * Al primo trascinamento viene salvato il layout intero e non la sola colonna spostata: vedi
  * `resolveWidthsToPersist` per il perché.
@@ -123,6 +218,7 @@ export const useResizableColumns = ({
     columnKeys,
     elasticColumnKey,
     canMeasure,
+    dataVersion,
 }: UseResizableColumnsOptions) => {
     const tableRef = useRef<HTMLTableElement>(null);
     const [measuredWidths, setNaturalWidths] = useState<Record<string, number> | null>(null);
@@ -203,7 +299,7 @@ export const useResizableColumns = ({
             return;
         }
 
-        const measured = measureNaturalWidths(table, columnKeys);
+        const measured = measureNaturalWidths(table, columnKeys, { fitToContainer: true });
 
         if (measured) {
             applyNaturalWidths(measured);
@@ -217,6 +313,37 @@ export const useResizableColumns = ({
 
         tryMeasure();
     });
+
+    // Righe nuove (cambio pagina, ricerca, ordinamento): rimisura in crescita. Si salta quando
+    // ogni colonna ha una larghezza scelta dall'utente, perché sarebbe comunque quella a
+    // valere; e la prima misura resta al percorso sopra, che parte da una tabella in `auto`.
+    const measuredDataVersionRef = useRef<unknown>(undefined);
+
+    useLayoutEffect(() => {
+        const table = tableRef.current;
+        const previousDataVersion = measuredDataVersionRef.current;
+
+        measuredDataVersionRef.current = dataVersion;
+
+        if (!table || !canMeasure || !naturalWidths || previousDataVersion === dataVersion) {
+            return;
+        }
+
+        const everyColumnChosen = columnKeys.every(
+            (columnKey) => columnKey === elasticColumnKey || widthsRef.current[columnKey] !== undefined
+        );
+
+        if (everyColumnChosen) {
+            return;
+        }
+
+        const measured = measureNaturalWidths(table, columnKeys);
+        const grown = measured ? growNaturalWidths(naturalWidths, measured) : null;
+
+        if (grown) {
+            applyNaturalWidths(grown);
+        }
+    }, [applyNaturalWidths, canMeasure, columnKeys, dataVersion, elasticColumnKey, naturalWidths]);
 
     // La tabella può diventare misurabile senza che React ri-renderizzi: basta allargare la
     // finestra oltre `sm`, dove fino a un attimo prima c'erano le schede al suo posto.

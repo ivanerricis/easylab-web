@@ -30,14 +30,16 @@ const DetailStats = ({ items, mobileTitle }: { items: DetailStat[]; mobileTitle?
             card del riepilogo è la prima cosa sotto, il posto naturale per dire di cosa si tratta.
             È l'`h1` della pagina a quella larghezza, disegnato solo lì (vedi `hideTitleOnMobile`). */}
             {mobileTitle && isMobile ? (
-                <h1 className="px-4 pt-3.5 pb-1 text-lg font-bold tracking-tight wrap-break-word">{mobileTitle}</h1>
+                <h1 className="px-6 pt-3.5 pb-1 text-lg font-bold tracking-tight wrap-break-word">{mobileTitle}</h1>
             ) : null}
+            {/* `px-6` come il contenuto delle card delle sezioni sotto (`CardContent`): con `px-4`
+                etichette e valori partivano 8px più a sinistra di quelli delle sezioni. */}
             <dl className="divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-4 xl:divide-y-0">
                 {items.map((item) => (
                     <div
                         key={item.label}
                         data-slot="detail-stat"
-                        className="flex min-w-0 items-center justify-between gap-3 px-4 py-2.5 xl:flex-col xl:items-start xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-card xl:px-6 xl:py-5 xl:shadow-xs xl:ring-1 xl:ring-foreground/10"
+                        className="flex min-w-0 items-center justify-between gap-3 px-6 py-2.5 xl:flex-col xl:items-start xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-card xl:px-6 xl:py-5 xl:shadow-xs xl:ring-1 xl:ring-foreground/10"
                     >
                         <dt className="shrink-0 text-sm text-muted-foreground">{item.label}</dt>
                         <dd className="min-w-0 text-right text-sm font-semibold wrap-break-word xl:text-left xl:text-xl">

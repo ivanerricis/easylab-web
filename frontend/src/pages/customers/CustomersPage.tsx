@@ -255,6 +255,7 @@ const CustomersPage = () => {
                         sort={parseSortOption(sortOption)}
                         onSortChange={handleTableSortChange}
                         hiddenColumnKeys={hiddenColumnKeys}
+                        searchText={committedSearchText}
                         rows={customerRows}
                         onOpenCustomer={handleOpenCustomer}
                         onPrintCustomer={handlePrintCustomer}

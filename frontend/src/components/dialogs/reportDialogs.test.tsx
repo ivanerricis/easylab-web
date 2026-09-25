@@ -343,7 +343,9 @@ describe("CreateReportDialog", () => {
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
-            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+            // "Avanti" verifica il cliente sul server prima di passare oltre: il passo arriva
+            // dopo la risposta, non subito.
+            await pickSuggestion(await screen.findByLabelText(/^Difetto/), "schermo", "Schermo rotto");
             // "Indietro" torna al passo prima senza perdere quanto scritto.
             await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
             expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi");
@@ -358,12 +360,55 @@ describe("CreateReportDialog", () => {
             await waitFor(() => {
                 expect(onSubmit).toHaveBeenCalled();
             });
+            // L'id trovato dalla verifica su "Avanti" si tiene: il salvataggio non lo cerca di nuovo.
             expect(onSubmit.mock.calls[0][0]).toMatchObject({
                 customer: "Mario Rossi",
-                customerId: null,
+                customerId: 30,
                 deviceId: 10,
                 issueId: 20,
             });
+        });
+
+        it("un cliente che non esiste si ferma su Avanti, con l'errore sul campo", async () => {
+            renderDialog();
+            await waitFor(() => {
+                expect(listIssues).toHaveBeenCalled();
+            });
+            listCustomers.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 8, totalPages: 0 });
+
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Cliente Inventato");
+            await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByRole("alert")).toHaveTextContent(
+                "Seleziona un cliente esistente o creane uno nuovo."
+            );
+            expect(screen.getByText("Passo 1 di 3:")).toBeInTheDocument();
+            expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
+        });
+
+        it("il pulsante resta occupato mentre verifica il cliente", async () => {
+            renderDialog();
+            await waitFor(() => {
+                expect(listIssues).toHaveBeenCalled();
+            });
+
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+            await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+
+            let answer: (value: unknown) => void = () => {};
+            listCustomers.mockImplementation(
+                () =>
+                    new Promise((resolve) => {
+                        answer = resolve;
+                    })
+            );
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByRole("button", { name: "Verifica..." })).toBeDisabled();
+
+            answer({ items: customers, totalItems: 1, page: 1, pageSize: 1000, totalPages: 1 });
+            expect(await screen.findByLabelText(/^Difetto/)).toBeInTheDocument();
         });
     });
 });

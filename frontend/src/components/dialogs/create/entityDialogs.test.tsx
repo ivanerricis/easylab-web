@@ -291,7 +291,7 @@ describe("modifiche non salvate", () => {
         renderWithProviders(<CreateCustomerDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
         await userEvent.type(screen.getByLabelText(/^Nome/), "Mario");
-        await userEvent.click(screen.getByRole("button", { name: "Close" }));
+        await userEvent.click(screen.getByRole("button", { name: "Chiudi" }));
 
         expect(await screen.findByRole("dialog", { name: "Modifiche non salvate" })).toBeInTheDocument();
         expect(onOpenChange).not.toHaveBeenCalled();

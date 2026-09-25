@@ -22,7 +22,7 @@ export const MainLayout = () => {
                 arrivare alla tabella. Invisibile finché non riceve il focus. */}
             <a
                 href="#contenuto-principale"
-                className="sr-only z-50 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+                className="sr-only z-50 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground focus:outline-2 focus:outline-offset-2 focus:outline-focus-ring"
             >
                 Vai al contenuto
             </a>

@@ -15,6 +15,11 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   testo bianco su giallo a 1,91:1, serve una scelta fra due strade.
 - [Eventi del calendario con fondo tenue e striscia di stato](#eventi-del-calendario-con-fondo-tenue-e-striscia-di-stato):
   provato e annullato il 2026-09-25; qui la richiesta originale e cosa è emerso.
+- [Notifiche di sistema visibili e chiudibili da tutti](#notifiche-di-sistema-visibili-e-chiudibili-da-tutti):
+  un utente non admin legge gli avvisi di sicurezza e dei backup e può chiuderli per tutti.
+- [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
+  aree da toccare sotto i 44px, colonna Azioni fuori vista nelle tabelle larghe, proposte non
+  ancora decise.
 - Colonne ridimensionabili nelle tabelle di Impostazioni (utenti, log, backup, tema): sono le
   ultime tabelle scritte a mano fuori da `EntityTable`. Dal CHANGELOG del 2026-09-08; le schede
   di cliente, collaboratore e tecnico, citate nella stessa voce, sono state coperte il 09-10 e
@@ -284,6 +289,55 @@ sono. Se si riprende, questa è la richiesta di partenza, così come era stata s
 - Contrasti misurati così: testo 7,5–17:1, icona ≥ 4,95:1, in chiaro e scuro, anche in hover.
   La striscia gialla sul fondo chiaro resta a 1,7:1 (è solo un rinforzo).
 - Chiude anche la parte "calendario" della voce sul contrasto qui sopra.
+
+## Notifiche di sistema visibili e chiudibili da tutti
+
+*Trovato il 2026-09-25 durante la revisione visiva; non è un difetto grafico, è stato rimandato
+per farlo a parte.*
+
+**Il problema.** `GET /api/notifications` (`backend/src/routes/notifications.ts`) restituisce
+tutte le notifiche a qualunque utente autenticato, senza guardare il ruolo. Un utente non admin
+vede quindi avvisi pensati per l'amministratore: "Accesso da un nuovo dispositivo" con il nome
+utente e il tipo di dispositivo, i backup falliti, l'SMTP, `pg_dump` non trovato. Il link di
+quelle notifiche porta a sezioni di Impostazioni che lui non può aprire.
+
+In più la chiusura è condivisa per scelta (commento nella rotta: "vale per tutti gli utenti"):
+un non admin può chiudere un avviso di sicurezza o di un backup fallito prima che
+l'amministratore lo veda.
+
+**Strada proposta.** Le notifiche registrate da `recordNotification` sono tutte di sistema:
+lettura e chiusura riservate agli admin (`requireAdmin` sulle due rotte), e nel frontend la
+campanella nascosta o vuota per chi non lo è. Se in futuro serviranno notifiche per tutti,
+un campo `audience` sulla tabella.
+
+## Rimandati dalla revisione visiva del 2026-09-25
+
+*Le correzioni fatte sono nel CHANGELOG dello stesso giorno. Queste sono rimaste fuori per
+scelta.*
+
+- **Aree da toccare sotto i 44px su telefono.** Quasi ovunque: pulsanti da 36–40px, la X dei
+  dialoghi da 32px, le frecce della paginazione (42×36), il selettore delle righe per pagina
+  (57×32), i pulsanti `sm` di Impostazioni (32px). Deciso di non toccarle in quel giro: è una
+  scelta di misura di base dei pulsanti che cambia l'aspetto di tutta l'app, da fare in un
+  colpo solo e da riverificare ovunque.
+- **Colonna Azioni fuori vista nelle tabelle larghe.** Con la barra laterale aperta, report e
+  interventi sono più larghi del contenitore anche a 1440px (report: 1623px in 1160), e i
+  pulsanti di riga stanno in fondo allo scorrimento orizzontale. Una colonna Azioni fissa a
+  destra (`sticky`) è stata provata e tolta: non convinceva. Restano da valutare colonne
+  nascoste di serie (password, backup dati, alimentatore) o le azioni in un menu "⋯".
+- **Proposte non ancora decise:**
+  - ricerca globale e suggerimenti del cliente ordinati per rilevanza, mostrando il campo che
+    corrisponde (oggi con "rossi" escono prima clienti che corrispondono solo per l'email);
+  - conferma dell'invio email con l'indirizzo del destinatario;
+  - telefono ed email cliccabili (`tel:`, `mailto:`) nelle schede;
+  - negli interventi di consegna, "Ora inizio" e "Ora fine" vuote nel riepilogo;
+  - "Incassi mese" confronta un mese in corso con un mese intero (25 giorni contro 31);
+  - popup notifiche senza intestazione né "Rimuovi tutte";
+  - pagina di login senza logo, e con un nome diverso da quello della barra laterale.
+- **Pulizie lasciate dalla revisione.** I `--ring` scritti dalle preimpostazioni di colore in
+  `lib/theme.ts` non li usa più quasi nessuno (il focus usa `--focus-ring`). I dialoghi con un
+  `py-2`/`py-4` nel contenuto sommano quello spazio ai 16px che `CustomDialog` ora mette sotto
+  l'intestazione.
 
 ## Test sul database vero, seconda parte
 

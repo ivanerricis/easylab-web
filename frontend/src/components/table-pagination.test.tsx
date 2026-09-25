@@ -26,6 +26,35 @@ const renderPagination = (props: Partial<Parameters<typeof TablePagination>[0]> 
         />
     );
 
+describe("TablePagination: forma compatta in base al proprio spazio", () => {
+    /**
+     * A 768px di finestra con la barra laterale aperta il controllo è largo 488px: la soglia di
+     * finestra lo lasciava in forma estesa e "Visualizzati 1-10 di N" finiva schiacciato a zero.
+     */
+    it("in un contenitore stretto passa alla forma compatta anche su una finestra larga", () => {
+        setViewportWidth(1024);
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 488 } as DOMRect);
+
+        renderPagination();
+
+        expect(screen.getByRole("status")).toHaveTextContent(/^1-10 di 100$/);
+        expect(pageButtons()).toEqual([]);
+        expect(screen.getByText("1/10")).toBeInTheDocument();
+        vi.restoreAllMocks();
+    });
+
+    it("con spazio a sufficienza resta estesa", () => {
+        setViewportWidth(1024);
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 900 } as DOMRect);
+
+        renderPagination();
+
+        expect(screen.getByRole("status")).toHaveTextContent("Visualizzati 1-10 di 100");
+        expect(pageButtons()).toEqual([1, 2, 3, 10]);
+        vi.restoreAllMocks();
+    });
+});
+
 describe("TablePagination", () => {
     it("non disegna nulla quando non ci sono risultati", () => {
         const { container } = renderPagination({ totalItems: 0, totalPages: 0 });

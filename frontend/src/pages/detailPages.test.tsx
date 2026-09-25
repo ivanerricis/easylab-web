@@ -323,7 +323,8 @@ describe("InterventionPage", () => {
         ).toHaveAttribute("href", "/clients/30");
         expect(detailValue("Problema")).toBe("VPN non si collega");
         expect(detailValue("Note")).toBe("Chiamare dopo le 15");
-        expect(detailValue("Descrizione")).toBe("-");
+        // Lo stesso nome del campo nel modulo, non un generico "Descrizione".
+        expect(detailValue("Assistenza effettuata")).toBe("-");
         // Senza nome del collaboratore la pagina lo dice, invece di restare vuota.
         expect(detailValue("Collaboratore")).toBe("Collaboratore sconosciuto");
         expect(api.listCollaborators).not.toHaveBeenCalled();

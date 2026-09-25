@@ -317,7 +317,9 @@ describe("CreateInterventionDialog", () => {
             await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
             await chooseOption(/^Collaboratore/, "Luca Bianchi");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
-            expect(screen.getByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
+            // "Avanti" verifica il cliente sul server prima di passare oltre: il passo arriva
+            // dopo la risposta, non subito.
+            expect(await screen.findByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
             expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
 
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
@@ -330,13 +332,29 @@ describe("CreateInterventionDialog", () => {
             await waitFor(() => {
                 expect(onSubmit).toHaveBeenCalled();
             });
+            // L'id trovato dalla verifica su "Avanti" si tiene: il salvataggio non lo cerca di nuovo.
             expect(onSubmit.mock.calls[0][0]).toMatchObject({
                 customer: "Mario Rossi",
-                customerId: null,
+                customerId: 30,
                 collaboratorId: 40,
                 interventionDate: "2026-10-05",
                 price: 45,
             });
+        });
+
+        it("un cliente che non esiste si ferma su Avanti, con l'errore sul campo", async () => {
+            await renderDialog({ initialDate: "2026-10-05" });
+            listCustomers.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 8, totalPages: 0 });
+
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Cliente Inventato");
+            await chooseOption(/^Collaboratore/, "Luca Bianchi");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByRole("alert")).toHaveTextContent(
+                "Seleziona un cliente esistente o creane uno nuovo."
+            );
+            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
         });
     });
 });

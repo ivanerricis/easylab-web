@@ -56,7 +56,14 @@ const DatePickerField = ({
                     // quella regola non lo tocca. Nessun `!`: a differenza di `Input`, `Button`
                     // non ha un `md:text-sm` di base con cui competere. Alto 40px come gli altri campi
                     // dei dialoghi (vedi `CustomDialog`).
-                    className={cn("h-10 w-full justify-start gap-2 text-lg font-normal", className)}
+                    // `border-input`: il bordo dei campi, non quello (più chiaro) dei pulsanti
+                    // outline; il fondo in scuro (`bg-input/30`) è già quello dei campi, che ora
+                    // usano lo stesso. Senza data il testo è grigio come un segnaposto.
+                    className={cn(
+                        "h-10 w-full justify-start gap-2 border-input text-lg font-normal",
+                        !selectedDate && "text-muted-foreground",
+                        className
+                    )}
                 >
                     <CalendarDays className="size-4" />
                     <span className="truncate">{label}</span>

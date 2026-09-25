@@ -6,99 +6,121 @@
 html,
 body,
 #root {
-  height: 100%;
-  margin: 0;
+    height: 100%;
+    margin: 0;
 }
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: "Inter Variable", sans-serif;
-  /* Scala tipografica dell'app: cinque livelli con nome invece di misure sparse.
+    --font-heading: var(--font-sans);
+    --font-sans: "Inter Variable", sans-serif;
+    /* Scala tipografica dell'app: cinque livelli con nome invece di misure sparse.
      title = titolo di pagina, section = titolo di sezione/card, body = testo (text-sm
      di Tailwind, il default), label = etichette e dati secondari, caption = note
      e badge. Sotto 12px (0.75rem) non si scende: i vecchi 10px/11px erano illeggibili. */
-  --text-title: 1.5rem;
-  --text-title--line-height: 2rem;
-  --text-title--font-weight: 700;
-  --text-section: 1.125rem;
-  --text-section--line-height: 1.75rem;
-  --text-section--font-weight: 600;
-  --text-label: 0.8125rem;
-  --text-label--line-height: 1.25rem;
-  --text-caption: 0.75rem;
-  --text-caption--line-height: 1rem;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-action-print: var(--action-print);
-  --color-action-email: var(--action-email);
-  --color-status-red: var(--status-red);
-  --color-status-red-foreground: var(--status-red-foreground);
-  --color-status-yellow: var(--status-yellow);
-  --color-status-yellow-foreground: var(--status-yellow-foreground);
-  --color-status-green: var(--status-green);
-  --color-status-green-foreground: var(--status-green-foreground);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+    --text-title: 1.5rem;
+    --text-title--line-height: 2rem;
+    --text-title--font-weight: 700;
+    --text-section: 1.125rem;
+    --text-section--line-height: 1.75rem;
+    --text-section--font-weight: 600;
+    --text-label: 0.8125rem;
+    --text-label--line-height: 1.25rem;
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1rem;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-action-print: var(--action-print);
+    --color-action-email: var(--action-email);
+    --color-status-red: var(--status-red);
+    --color-status-red-foreground: var(--status-red-foreground);
+    --color-status-yellow: var(--status-yellow);
+    --color-status-yellow-foreground: var(--status-yellow-foreground);
+    --color-status-green: var(--status-green);
+    --color-status-green-foreground: var(--status-green-foreground);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-focus-ring: var(--focus-ring);
+    --color-primary-text: var(--primary-text);
+    --color-table-header: var(--table-header);
+    --color-table-header-foreground: var(--table-header-foreground);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-  /* Senza color-scheme il browser disegna i controlli nativi (icona del selettore
+    /* Senza color-scheme il browser disegna i controlli nativi (icona del selettore
      su date/time, frecce degli input numerici, scrollbar) sempre con la tavolozza
      chiara: in tema scuro restano glifi scuri su sfondo scuro, quindi invisibili. */
-  color-scheme: light;
-  --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
-  --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
-  /* Tinta dei neutri: un'unica manopola per tutta la scala di grigi. I grigi puri
+    color-scheme: light;
+    --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
+    --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
+    /* Tinta dei neutri: un'unica manopola per tutta la scala di grigi. I grigi puri
      (croma 0) facevano sembrare l'app un template; con una punta di blu (croma <= 0.015)
      restano neutri ma parlano la stessa lingua del primario. */
-  --neutral-hue: 250;
-  /* Lo sfondo pagina è un gradino più scuro delle card: le card si staccano per luminosità
+    --neutral-hue: 250;
+    /* Lo sfondo pagina è un gradino più scuro delle card: le card si staccano per luminosità
      invece che solo per il bordo. */
-  --background: oklch(0.95 0.01 var(--neutral-hue));
-  --foreground: oklch(0.17 0.02 var(--neutral-hue));
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.02 var(--neutral-hue));
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.02 var(--neutral-hue));
-  --primary: #2a75b9;
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  /* Le icone delle azioni di riga (stampa, email) erano scritte a mano nei componenti come
+    --background: oklch(0.95 0.01 var(--neutral-hue));
+    --foreground: oklch(0.17 0.02 var(--neutral-hue));
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.17 0.02 var(--neutral-hue));
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.17 0.02 var(--neutral-hue));
+    --primary: #2a75b9;
+    --primary-foreground: oklch(0.977 0.013 236.62);
+    /* Il primario usato come colore del testo (link, valori evidenziati, badge). Il blu del tema
+     da solo non regge il testo: 4.8:1 sul bianco ma 4.2:1 sullo sfondo pagina e sulle tinte
+     chiare, e sotto 3:1 in tema scuro. Qui è scurito verso il nero (in scuro schiarito verso il
+     bianco): è la correzione nata per la voce attiva della barra laterale (6.0:1 e 7.0:1),
+     ora un token perché serviva anche altrove e ognuno la riscriveva a mano. Con color-mix
+     segue il colore principale scelto in Impostazioni, che sovrascrive --primary. */
+    --primary-text: color-mix(in oklab, var(--primary) 85%, black);
+    /* Anello di focus: deve staccarsi almeno 3:1 sia dalle card sia dallo sfondo pagina (WCAG
+     1.4.11). Il vecchio --ring era un grigio chiaro, per giunta usato al 25-50%: 2.3-2.6:1.
+     È un token a parte e non --ring perché le preimpostazioni del colore principale
+     (lib/theme.ts) scrivono un proprio --ring chiaro, pensato come alone, che qui
+     tornerebbe sotto soglia. Il blu del testo ha già il contrasto giusto in entrambi i temi. */
+    --focus-ring: var(--primary-text);
+    /* Fondo dell'intestazione delle tabelle. Sul primario pieno il testo quasi bianco arrivava a
+     4.18:1, sotto il 4.5:1 del testo normale; scurito come il blu del testo, con il bianco
+     pieno sopra, supera 6:1. Uguale nei due temi, come prima era il primario. */
+    --table-header: color-mix(in oklab, var(--primary) 85%, black);
+    --table-header-foreground: oklch(1 0 0);
+    /* Le icone delle azioni di riga (stampa, email) erano scritte a mano nei componenti come
      text-yellow-400 e text-sky-500. Oltre a essere colori grezzi fuori dal sistema di token,
      su fondo chiaro non si vedevano: misurati, 1.57:1 il giallo e 2.71:1 l'azzurro, contro il
      3:1 che WCAG 1.4.11 chiede agli oggetti grafici (la soglia degli oggetti grafici, non i
@@ -107,118 +129,149 @@ body,
      In tema chiaro servono quindi più scuri: 3.26:1 e 4.05:1. Il giallo resta all'hue 85 e
      non scivola nell'arancione, per la stessa ragione spiegata sotto per le righe di stato.
      In tema scuro i valori originali vanno benissimo (12.68:1 e 7.33:1) e restano quelli. */
-  --action-print: oklch(0.65 0.15 85);
-  --action-email: oklch(0.58 0.16 237);
-  /* Colori di stato delle schede su mobile (striscia laterale, pallino e badge dello stato).
+    --action-print: oklch(0.65 0.15 85);
+    --action-email: oklch(0.58 0.16 237);
+    /* Colori di stato delle schede su mobile (striscia laterale, pallino e badge dello stato).
      Sono separati dai --table-row-*: quelli colorano un'intera riga e seguono l'intensità
      scelta in Impostazioni, questi disegnano solo un segno piccolo su fondo neutro.
      Il colore pieno serve alla striscia e al pallino; il -foreground è il testo del badge,
      che sta sul colore pieno al 12% e deve reggere 4.5:1: per questo in tema chiaro è molto
      più scuro del pieno. Il giallo resta all'hue 85, come per le righe, invece di scivolare
      nell'arancione della tavolozza Tailwind. */
-  --status-red: oklch(0.637 0.237 25.331);
-  --status-red-foreground: oklch(0.505 0.213 27.518);
-  --status-yellow: oklch(0.795 0.184 86.047);
-  --status-yellow-foreground: oklch(0.48 0.1 80);
-  --status-green: oklch(0.627 0.194 149.214);
-  --status-green-foreground: oklch(0.48 0.14 150);
-  --secondary: oklch(0.925 0.011 var(--neutral-hue));
-  --secondary-foreground: oklch(0.22 0.02 var(--neutral-hue));
-  --muted: oklch(0.925 0.011 var(--neutral-hue));
-  --muted-foreground: oklch(0.5 0.02 var(--neutral-hue));
-  --accent: oklch(0.925 0.011 var(--neutral-hue));
-  --accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.87 0.012 var(--neutral-hue));
-  --input: oklch(0.85 0.012 var(--neutral-hue));
-  --ring: oklch(0.705 0.03 var(--neutral-hue));
-  --chart-1: oklch(0.78 0.16 84);
-  --chart-2: oklch(0.72 0.18 152);
-  --chart-3: oklch(0.68 0.16 32);
-  --chart-4: oklch(0.64 0.15 195);
-  --chart-5: oklch(0.58 0.14 18);
-  /* 0.45rem: 5.8px su input e pulsanti (md), 7.2px (lg), 10px su card e dialog (xl).
+    --status-red: oklch(0.637 0.237 25.331);
+    --status-red-foreground: oklch(0.505 0.213 27.518);
+    --status-yellow: oklch(0.795 0.184 86.047);
+    --status-yellow-foreground: oklch(0.48 0.1 80);
+    --status-green: oklch(0.627 0.194 149.214);
+    --status-green-foreground: oklch(0.48 0.14 150);
+    --secondary: oklch(0.925 0.011 var(--neutral-hue));
+    --secondary-foreground: oklch(0.22 0.02 var(--neutral-hue));
+    --muted: oklch(0.925 0.011 var(--neutral-hue));
+    --muted-foreground: oklch(0.5 0.02 var(--neutral-hue));
+    --accent: oklch(0.925 0.011 var(--neutral-hue));
+    --accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.87 0.012 var(--neutral-hue));
+    --input: oklch(0.85 0.012 var(--neutral-hue));
+    --ring: oklch(0.705 0.03 var(--neutral-hue));
+    --chart-1: oklch(0.78 0.16 84);
+    --chart-2: oklch(0.72 0.18 152);
+    --chart-3: oklch(0.68 0.16 32);
+    --chart-4: oklch(0.64 0.15 195);
+    --chart-5: oklch(0.58 0.14 18);
+    /* 0.45rem: 5.8px su input e pulsanti (md), 7.2px (lg), 10px su card e dialog (xl).
      Con 0.3375rem le card avevano ~7px e sembravano rigide. */
-  --radius: 0.45rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.17 0.02 var(--neutral-hue));
-  --sidebar-primary: #2a75b9;
-  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-  --sidebar-accent: oklch(0.925 0.011 var(--neutral-hue));
-  --sidebar-accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
-  --sidebar-border: oklch(0.87 0.012 var(--neutral-hue));
-  --sidebar-ring: oklch(0.705 0.03 var(--neutral-hue));
+    --radius: 0.45rem;
+    --sidebar: oklch(1 0 0);
+    --sidebar-foreground: oklch(0.17 0.02 var(--neutral-hue));
+    --sidebar-primary: #2a75b9;
+    --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
+    --sidebar-accent: oklch(0.925 0.011 var(--neutral-hue));
+    --sidebar-accent-foreground: oklch(0.22 0.02 var(--neutral-hue));
+    --sidebar-border: oklch(0.87 0.012 var(--neutral-hue));
+    --sidebar-ring: var(--focus-ring);
 }
 
 .dark {
-  color-scheme: dark;
-  --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
-  --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
-  /* Quattro gradini di luminosità ben separati (sfondo 0.15, sidebar 0.19, card 0.225,
+    color-scheme: dark;
+    --picker-icon-time: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
+    --picker-icon-date: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4d4d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
+    /* Quattro gradini di luminosità ben separati (sfondo 0.15, sidebar 0.19, card 0.225,
      popover 0.265): prima card e sfondo distavano un solo passo e su schermi economici
      i livelli si fondevano. */
-  --background: oklch(0.15 0.012 var(--neutral-hue));
-  --foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --card: oklch(0.225 0.014 var(--neutral-hue));
-  --card-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --popover: oklch(0.265 0.015 var(--neutral-hue));
-  --popover-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --primary: #2a75b9;
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  /* Su fondo scuro i colori vividi originali (yellow-400 e sky-500) hanno già contrasto
+    --background: oklch(0.15 0.012 var(--neutral-hue));
+    --foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --card: oklch(0.225 0.014 var(--neutral-hue));
+    --card-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --popover: oklch(0.265 0.015 var(--neutral-hue));
+    --popover-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --primary: #2a75b9;
+    --primary-foreground: oklch(0.977 0.013 236.62);
+    /* In scuro il blu del testo va schiarito, non scurito: vedi il commento in :root.
+     --focus-ring e --table-header non si ripetono qui: definiti su :root, cioè sullo stesso
+     <html> che porta .dark, si ricalcolano da soli con i valori di questo blocco. */
+    --primary-text: color-mix(in oklab, var(--primary) 55%, white);
+    /* Su fondo scuro i colori vividi originali (yellow-400 e sky-500) hanno già contrasto
      abbondante: 12.68:1 e 7.33:1. */
-  --action-print: oklch(0.852 0.199 91.936);
-  --action-email: oklch(0.685 0.169 237.323);
-  --status-red: oklch(0.637 0.237 25.331);
-  --status-red-foreground: oklch(0.808 0.114 19.571);
-  --status-yellow: oklch(0.852 0.199 91.936);
-  --status-yellow-foreground: oklch(0.9 0.15 92);
-  --status-green: oklch(0.723 0.219 149.579);
-  --status-green-foreground: oklch(0.871 0.15 154.449);
-  --secondary: oklch(0.3 0.015 var(--neutral-hue));
-  --secondary-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --muted: oklch(0.3 0.015 var(--neutral-hue));
-  --muted-foreground: oklch(0.72 0.02 var(--neutral-hue));
-  --accent: oklch(0.3 0.015 var(--neutral-hue));
-  --accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 13%);
-  --input: oklch(1 0 0 / 17%);
-  --ring: oklch(0.6 0.03 var(--neutral-hue));
-  --chart-1: oklch(0.78 0.16 84);
-  --chart-2: oklch(0.72 0.18 152);
-  --chart-3: oklch(0.68 0.16 32);
-  --chart-4: oklch(0.64 0.15 195);
-  --chart-5: oklch(0.58 0.14 18);
-  --sidebar: oklch(0.19 0.013 var(--neutral-hue));
-  --sidebar-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --sidebar-primary: #2a75b9;
-  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
-  --sidebar-accent: oklch(0.3 0.015 var(--neutral-hue));
-  --sidebar-accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
-  --sidebar-border: oklch(1 0 0 / 13%);
-  --sidebar-ring: oklch(0.6 0.03 var(--neutral-hue));
+    --action-print: oklch(0.852 0.199 91.936);
+    --action-email: oklch(0.685 0.169 237.323);
+    --status-red: oklch(0.637 0.237 25.331);
+    --status-red-foreground: oklch(0.808 0.114 19.571);
+    --status-yellow: oklch(0.852 0.199 91.936);
+    --status-yellow-foreground: oklch(0.9 0.15 92);
+    --status-green: oklch(0.723 0.219 149.579);
+    --status-green-foreground: oklch(0.871 0.15 154.449);
+    --secondary: oklch(0.3 0.015 var(--neutral-hue));
+    --secondary-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --muted: oklch(0.3 0.015 var(--neutral-hue));
+    --muted-foreground: oklch(0.72 0.02 var(--neutral-hue));
+    --accent: oklch(0.3 0.015 var(--neutral-hue));
+    --accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 13%);
+    --input: oklch(1 0 0 / 17%);
+    --ring: oklch(0.6 0.03 var(--neutral-hue));
+    --chart-1: oklch(0.78 0.16 84);
+    --chart-2: oklch(0.72 0.18 152);
+    --chart-3: oklch(0.68 0.16 32);
+    --chart-4: oklch(0.64 0.15 195);
+    --chart-5: oklch(0.58 0.14 18);
+    --sidebar: oklch(0.19 0.013 var(--neutral-hue));
+    --sidebar-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --sidebar-primary: #2a75b9;
+    --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
+    --sidebar-accent: oklch(0.3 0.015 var(--neutral-hue));
+    --sidebar-accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
+    --sidebar-border: oklch(1 0 0 / 13%);
+    --sidebar-ring: var(--focus-ring);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/25;
-  }
+    * {
+        @apply border-border outline-focus-ring;
+    }
 
-  body {
-    @apply bg-background text-foreground;
-  }
+    /* Il focus di tutto ciò che non ne disegna uno suo (link, card cliccabili, contenitori che
+     scorrono). Prima era l'outline del browser tinto di --ring al 25%: su bianco quasi non
+     si vedeva. Le utility (outline-none, focus-visible:*) stanno in un layer successivo e
+     vincono comunque, quindi i componenti con un focus proprio non cambiano. */
+    :focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
 
-  html {
-    @apply font-sans;
-  }
+    body {
+        @apply bg-background text-foreground;
+    }
+
+    html {
+        @apply font-sans;
+    }
+}
+
+/* La ricetta di focus dei controlli (Button, Checkbox, card cliccabili): una linea di 2px nel
+   colore di --focus-ring, staccata di 2px dal bordo. Lo stacco serve perché questi controlli
+   possono essere pieni del primario (pulsante principale, casella spuntata): un anello
+   attaccato a un fondo dello stesso blu non si distinguerebbe dal pulsante stesso. È un
+   outline e non un box-shadow: lo spazio in mezzo resta trasparente e funziona su card,
+   pagina e dialoghi, mentre ring-offset dipinge lo stacco di un colore fisso.
+   `&:focus-visible` pesa più di `.outline-none`, quindi vince sull'outline-none di base dei
+   componenti a prescindere dall'ordine delle regole.
+   I campi (Input, Select, Textarea) usano lo stesso colore ma come bordo + anello attaccato
+   (box-shadow): InputGroup e altri lo spengono con `focus-visible:ring-0` per disegnarlo sul
+   contenitore, e un outline passerebbe sotto quell'override. */
+@utility focus-outline {
+    &:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
 }
 
 /* Edge/IE render their own reveal-password icon inside type="password" fields,
    overlapping our custom show/hide button and intercepting clicks. */
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
-  display: none;
+    display: none;
 }
 
 /* Chrome/Edge disegnano l'indicatore del selettore di data/ora come una piccola
@@ -230,19 +283,19 @@ input[type="password"]::-ms-clear {
    comportamento nativo. */
 input[type="time"],
 input[type="date"] {
-  position: relative;
-  padding-right: 2rem;
-  background-repeat: no-repeat;
-  background-position: right 0.625rem center;
-  background-size: 1rem 1rem;
+    position: relative;
+    padding-right: 2rem;
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 1rem 1rem;
 }
 
 input[type="time"] {
-  background-image: var(--picker-icon-time);
+    background-image: var(--picker-icon-time);
 }
 
 input[type="date"] {
-  background-image: var(--picker-icon-date);
+    background-image: var(--picker-icon-date);
 }
 
 /* L'indicatore non accetta né background-image né il dimensionamento implicito da
@@ -250,15 +303,15 @@ input[type="date"] {
    l'icona nativa e resta visibile quella disegnata sull'input qui sopra. */
 input[type="time"]::-webkit-calendar-picker-indicator,
 input[type="date"]::-webkit-calendar-picker-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  cursor: pointer;
-  opacity: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
 }
 
 /* Colori delle righe di stato delle tabelle.
@@ -276,152 +329,152 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    trasformerebbe in un senape. */
 :root,
 [data-table-row-intensity="default"] {
-  /* Stile predefinito "cella ID": la riga resta neutra e lo stato colora solo la cella
+    /* Stile predefinito "cella ID": la riga resta neutra e lo stato colora solo la cella
      dell'ID. Un elenco lungo di righe piene sembrava una macchia di colori. Le variabili dei
      colori pieni della riga sono trasparenti; la cella usa --table-row-id-*. */
-  --table-row-red: transparent;
-  --table-row-red-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
-  --table-row-yellow: transparent;
-  --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
-  --table-row-green: transparent;
-  --table-row-green-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
-  --table-row-foreground: var(--foreground);
-  --table-row-id-red: oklch(57.7% 0.245 27.325);
-  --table-row-id-yellow: oklch(79.5% 0.184 86.047);
-  --table-row-id-green: oklch(62.7% 0.194 149.214);
-  --table-row-id-foreground: oklch(1 0 0);
+    --table-row-red: transparent;
+    --table-row-red-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+    --table-row-yellow: transparent;
+    --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+    --table-row-green: transparent;
+    --table-row-green-hover: color-mix(in oklch, var(--foreground) 5%, transparent);
+    --table-row-foreground: var(--foreground);
+    --table-row-id-red: oklch(57.7% 0.245 27.325);
+    --table-row-id-yellow: oklch(79.5% 0.184 86.047);
+    --table-row-id-green: oklch(62.7% 0.194 149.214);
+    --table-row-id-foreground: oklch(1 0 0);
 }
 
 [data-table-row-intensity="medium"] {
-  --table-row-red: oklch(57.7% 0.245 27.325);
-  --table-row-red-hover: oklch(50.5% 0.213 27.518);
-  --table-row-yellow: oklch(79.5% 0.184 86.047);
-  --table-row-yellow-hover: oklch(72% 0.176 85);
-  --table-row-green: oklch(62.7% 0.194 149.214);
-  --table-row-green-hover: oklch(52.7% 0.154 150.069);
-  --table-row-foreground: oklch(1 0 0);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(57.7% 0.245 27.325);
+    --table-row-red-hover: oklch(50.5% 0.213 27.518);
+    --table-row-yellow: oklch(79.5% 0.184 86.047);
+    --table-row-yellow-hover: oklch(72% 0.176 85);
+    --table-row-green: oklch(62.7% 0.194 149.214);
+    --table-row-green-hover: oklch(52.7% 0.154 150.069);
+    --table-row-foreground: oklch(1 0 0);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 [data-table-row-intensity="soft"] {
-  --table-row-red: oklch(63.7% 0.237 25.331 / 30%);
-  --table-row-red-hover: oklch(63.7% 0.237 25.331 / 40%);
-  --table-row-yellow: oklch(85.2% 0.199 91.936 / 30%);
-  --table-row-yellow-hover: oklch(85.2% 0.199 91.936 / 40%);
-  --table-row-green: oklch(72.3% 0.219 149.579 / 30%);
-  --table-row-green-hover: oklch(72.3% 0.219 149.579 / 40%);
-  --table-row-foreground: var(--foreground);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(63.7% 0.237 25.331 / 30%);
+    --table-row-red-hover: oklch(63.7% 0.237 25.331 / 40%);
+    --table-row-yellow: oklch(85.2% 0.199 91.936 / 30%);
+    --table-row-yellow-hover: oklch(85.2% 0.199 91.936 / 40%);
+    --table-row-green: oklch(72.3% 0.219 149.579 / 30%);
+    --table-row-green-hover: oklch(72.3% 0.219 149.579 / 40%);
+    --table-row-foreground: var(--foreground);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 [data-table-row-intensity="strong"] {
-  --table-row-red: oklch(50.5% 0.213 27.518);
-  --table-row-red-hover: oklch(44.4% 0.177 26.899);
-  --table-row-yellow: oklch(72% 0.176 85);
-  --table-row-yellow-hover: oklch(65% 0.163 84);
-  --table-row-green: oklch(52.7% 0.154 150.069);
-  --table-row-green-hover: oklch(44.8% 0.119 151.328);
-  --table-row-foreground: oklch(1 0 0);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(50.5% 0.213 27.518);
+    --table-row-red-hover: oklch(44.4% 0.177 26.899);
+    --table-row-yellow: oklch(72% 0.176 85);
+    --table-row-yellow-hover: oklch(65% 0.163 84);
+    --table-row-green: oklch(52.7% 0.154 150.069);
+    --table-row-green-hover: oklch(44.8% 0.119 151.328);
+    --table-row-foreground: oklch(1 0 0);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 .dark,
 .dark[data-table-row-intensity="default"],
 .dark [data-table-row-intensity="default"] {
-  --table-row-red: transparent;
-  --table-row-red-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
-  --table-row-yellow: transparent;
-  --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
-  --table-row-green: transparent;
-  --table-row-green-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
-  --table-row-foreground: var(--foreground);
-  --table-row-id-red: oklch(50.5% 0.213 27.518);
-  --table-row-id-yellow: oklch(79.5% 0.184 86.047);
-  --table-row-id-green: oklch(52.7% 0.154 150.069);
-  --table-row-id-foreground: oklch(1 0 0);
+    --table-row-red: transparent;
+    --table-row-red-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+    --table-row-yellow: transparent;
+    --table-row-yellow-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+    --table-row-green: transparent;
+    --table-row-green-hover: color-mix(in oklch, var(--foreground) 8%, transparent);
+    --table-row-foreground: var(--foreground);
+    --table-row-id-red: oklch(50.5% 0.213 27.518);
+    --table-row-id-yellow: oklch(79.5% 0.184 86.047);
+    --table-row-id-green: oklch(52.7% 0.154 150.069);
+    --table-row-id-foreground: oklch(1 0 0);
 }
 
 .dark[data-table-row-intensity="medium"],
 .dark [data-table-row-intensity="medium"] {
-  --table-row-red: oklch(50.5% 0.213 27.518);
-  --table-row-red-hover: oklch(57.7% 0.245 27.325);
-  --table-row-yellow: oklch(79.5% 0.184 86.047);
-  --table-row-yellow-hover: oklch(85.2% 0.199 91.936);
-  --table-row-green: oklch(52.7% 0.154 150.069);
-  --table-row-green-hover: oklch(62.7% 0.194 149.214);
-  --table-row-foreground: oklch(1 0 0);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(50.5% 0.213 27.518);
+    --table-row-red-hover: oklch(57.7% 0.245 27.325);
+    --table-row-yellow: oklch(79.5% 0.184 86.047);
+    --table-row-yellow-hover: oklch(85.2% 0.199 91.936);
+    --table-row-green: oklch(52.7% 0.154 150.069);
+    --table-row-green-hover: oklch(62.7% 0.194 149.214);
+    --table-row-foreground: oklch(1 0 0);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 .dark[data-table-row-intensity="soft"],
 .dark [data-table-row-intensity="soft"] {
-  --table-row-red: oklch(63.7% 0.237 25.331 / 15%);
-  --table-row-red-hover: oklch(63.7% 0.237 25.331 / 20%);
-  --table-row-yellow: oklch(85.2% 0.199 91.936 / 15%);
-  --table-row-yellow-hover: oklch(85.2% 0.199 91.936 / 20%);
-  --table-row-green: oklch(72.3% 0.219 149.579 / 15%);
-  --table-row-green-hover: oklch(72.3% 0.219 149.579 / 20%);
-  --table-row-foreground: var(--foreground);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(63.7% 0.237 25.331 / 15%);
+    --table-row-red-hover: oklch(63.7% 0.237 25.331 / 20%);
+    --table-row-yellow: oklch(85.2% 0.199 91.936 / 15%);
+    --table-row-yellow-hover: oklch(85.2% 0.199 91.936 / 20%);
+    --table-row-green: oklch(72.3% 0.219 149.579 / 15%);
+    --table-row-green-hover: oklch(72.3% 0.219 149.579 / 20%);
+    --table-row-foreground: var(--foreground);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 .dark[data-table-row-intensity="strong"],
 .dark [data-table-row-intensity="strong"] {
-  --table-row-red: oklch(44.4% 0.177 26.899);
-  --table-row-red-hover: oklch(50.5% 0.213 27.518);
-  --table-row-yellow: oklch(72% 0.176 85);
-  --table-row-yellow-hover: oklch(79.5% 0.184 86.047);
-  --table-row-green: oklch(44.8% 0.119 151.328);
-  --table-row-green-hover: oklch(52.7% 0.154 150.069);
-  --table-row-foreground: oklch(1 0 0);
-  --table-row-id-red: initial;
-  --table-row-id-yellow: initial;
-  --table-row-id-green: initial;
-  --table-row-id-foreground: initial;
+    --table-row-red: oklch(44.4% 0.177 26.899);
+    --table-row-red-hover: oklch(50.5% 0.213 27.518);
+    --table-row-yellow: oklch(72% 0.176 85);
+    --table-row-yellow-hover: oklch(79.5% 0.184 86.047);
+    --table-row-green: oklch(44.8% 0.119 151.328);
+    --table-row-green-hover: oklch(52.7% 0.154 150.069);
+    --table-row-foreground: oklch(1 0 0);
+    --table-row-id-red: initial;
+    --table-row-id-yellow: initial;
+    --table-row-id-green: initial;
+    --table-row-id-foreground: initial;
 }
 
 /* Fuori da @layer di proposito: le utility Tailwind della riga (hover:bg-muted/50 su
    TableRow) stanno in un layer, e il CSS senza layer le sovrascrive comunque. */
 tr[data-status-color] {
-  background-color: var(--table-row-bg);
-  color: var(--table-row-foreground);
+    background-color: var(--table-row-bg);
+    color: var(--table-row-foreground);
 }
 
 tr[data-status-color]:hover {
-  background-color: var(--table-row-bg-hover);
+    background-color: var(--table-row-bg-hover);
 }
 
 tr[data-status-color="red"] {
-  --table-row-bg: var(--table-row-red);
-  --table-row-bg-hover: var(--table-row-red-hover);
-  --table-row-id-bg: var(--table-row-id-red);
+    --table-row-bg: var(--table-row-red);
+    --table-row-bg-hover: var(--table-row-red-hover);
+    --table-row-id-bg: var(--table-row-id-red);
 }
 
 tr[data-status-color="yellow"] {
-  --table-row-bg: var(--table-row-yellow);
-  --table-row-bg-hover: var(--table-row-yellow-hover);
-  --table-row-id-bg: var(--table-row-id-yellow);
+    --table-row-bg: var(--table-row-yellow);
+    --table-row-bg-hover: var(--table-row-yellow-hover);
+    --table-row-id-bg: var(--table-row-id-yellow);
 }
 
 tr[data-status-color="green"] {
-  --table-row-bg: var(--table-row-green);
-  --table-row-bg-hover: var(--table-row-green-hover);
-  --table-row-id-bg: var(--table-row-id-green);
+    --table-row-bg: var(--table-row-green);
+    --table-row-bg-hover: var(--table-row-green-hover);
+    --table-row-id-bg: var(--table-row-id-green);
 }
 
 /* Nello stile predefinito la riga resta neutra e a colorarsi è solo la cella ID (la prima):
@@ -429,9 +482,9 @@ tr[data-status-color="green"] {
    variabili --table-row-id-* sono `initial` (valore non valido), quindi scattano i fallback
    qui sotto e la cella non fa niente di suo. */
 tr[data-status-color] > :first-child {
-  background-color: var(--table-row-id-bg, transparent);
-  color: var(--table-row-id-foreground, inherit);
-  font-weight: 600;
+    background-color: var(--table-row-id-bg, transparent);
+    color: var(--table-row-id-foreground, inherit);
+    font-weight: 600;
 }
 
 /* Densità delle tabelle: l'attributo sta su <html> (scritto da applyTableDensity in
@@ -439,24 +492,24 @@ tr[data-status-color] > :first-child {
    di Tailwind sulle stesse celle, esattamente come per i colori di stato sopra. */
 [data-table-density="compact"] [data-slot="table-cell"],
 [data-table-density="compact"] [data-slot="table-head"] {
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
 }
 
 [data-table-density="comfortable"] [data-slot="table-cell"],
 [data-table-density="comfortable"] [data-slot="table-head"] {
-  padding-top: 0.875rem;
-  padding-bottom: 0.875rem;
+    padding-top: 0.875rem;
+    padding-bottom: 0.875rem;
 }
 
 /* Dimensione testo: scala l'intera app perché Tailwind usa unità rem legate al
    font-size di <html>, quindi basta questa regola invece di toccare ogni componente. */
 html[data-font-size="sm"] {
-  font-size: 14px;
+    font-size: 14px;
 }
 
 html[data-font-size="lg"] {
-  font-size: 18px;
+    font-size: 18px;
 }
 /* Chrome/Edge aggiungono una loro X dentro input[type="search"], che si sommerebbe al
    pulsante di pulizia disegnato da search-input.tsx: due X di fila, di cui una fuori
@@ -464,8 +517,8 @@ html[data-font-size="lg"] {
    quello che descrive il campo (e attiva la tastiera con "Cerca" su mobile). */
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration {
-  -webkit-appearance: none;
-  appearance: none;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 /* Chi ha chiesto al sistema operativo di ridurre le animazioni le riceve quasi azzerate:
@@ -474,16 +527,16 @@ input[type="search"]::-webkit-search-decoration {
    animationend/transitionend continuano a scattare, e il codice che li aspetta non si
    blocca. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 
-  /* L'eccezione sono gli indicatori di caricamento: lì la rotazione non è decorazione,
+    /* L'eccezione sono gli indicatori di caricamento: lì la rotazione non è decorazione,
      è l'unica cosa che distingue "sto lavorando" da "sono bloccato". Restano girando,
      più lentamente. Motion ridotto vuol dire togliere il movimento inutile, non
      l'informazione. La classe `animate-spin` è nell'elenco insieme all'attributo
@@ -492,10 +545,10 @@ input[type="search"]::-webkit-search-decoration {
      immobile proprio mentre l'app diceva di non chiudere la pagina. I discendenti di
      `[data-slot="spinner"]` perché la luna di `Spinner` (react-spinners) anima degli
      elementi figli, non il contenitore marcato. */
-  [data-slot="spinner"],
-  [data-slot="spinner"] *,
-  .animate-spin {
-    animation-duration: 1.5s !important;
-    animation-iteration-count: infinite !important;
-  }
+    [data-slot="spinner"],
+    [data-slot="spinner"] *,
+    .animate-spin {
+        animation-duration: 1.5s !important;
+        animation-iteration-count: infinite !important;
+    }
 }

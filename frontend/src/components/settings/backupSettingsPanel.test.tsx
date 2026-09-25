@@ -84,8 +84,13 @@ const renderPanel = async () => {
             <BackupSettingsPanel />
         </AuthProviderContext.Provider>
     );
-    await screen.findByRole("button", { name: "Ripristina db-backup-1.tar.gz" });
+    await within(await screen.findByRole("table")).findByRole("button", { name: "Ripristina db-backup-1.tar.gz" });
 };
+
+// Il pulsante c'è due volte, in tabella e nella scheda per il telefono (nascosta via CSS, che
+// jsdom non applica): i test usano quello della tabella.
+const restoreDumpButton = () =>
+    within(screen.getByRole("table")).getByRole("button", { name: "Ripristina db-backup-1.tar.gz" });
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -102,7 +107,7 @@ describe("BackupSettingsPanel", () => {
     it("elenca i dump con la loro dimensione", async () => {
         await renderPanel();
 
-        const row = screen.getByText("db-backup-1.tar.gz").closest("tr") as HTMLElement;
+        const row = within(screen.getByRole("table")).getByText("db-backup-1.tar.gz").closest("tr") as HTMLElement;
         expect(within(row).getByText("2.0 KB")).toBeInTheDocument();
     });
 
@@ -120,7 +125,7 @@ describe("BackupSettingsPanel", () => {
     it("ripristina un dump solo dopo aver scritto RESTORE e la password", async () => {
         await renderPanel();
 
-        await userEvent.click(screen.getByRole("button", { name: "Ripristina db-backup-1.tar.gz" }));
+        await userEvent.click(restoreDumpButton());
         const dialog = screen.getByRole("dialog", { name: "Conferma ripristino database" });
         expect(dialog).toHaveAccessibleDescription(expect.stringContaining('"db-backup-1.tar.gz"'));
 
@@ -156,7 +161,7 @@ describe("BackupSettingsPanel", () => {
         const file = new File(["dump"], "archivio.tar.gz", { type: "application/gzip" });
         await userEvent.upload(screen.getByLabelText("File .tar.gz o .sql"), file);
 
-        expect(screen.getByText(/File selezionato: archivio\.tar\.gz/)).toBeInTheDocument();
+        expect(screen.getByText(/archivio\.tar\.gz/)).toBeInTheDocument();
         await userEvent.click(restoreFromFile);
 
         const dialog = screen.getByRole("dialog", { name: "Conferma ripristino database" });
@@ -173,7 +178,7 @@ describe("BackupSettingsPanel", () => {
     it("annullando la conferma non ripristina nulla", async () => {
         await renderPanel();
 
-        await userEvent.click(screen.getByRole("button", { name: "Ripristina db-backup-1.tar.gz" }));
+        await userEvent.click(restoreDumpButton());
         await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Annulla" }));
 
         await waitFor(() => {

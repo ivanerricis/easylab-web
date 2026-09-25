@@ -136,10 +136,15 @@ const SettingsPage = () => {
         );
     };
 
+    // Il menu laterale (320px) compare solo da `xl`; sotto c'è il selettore a tendina. Prima il
+    // cambio era a `sm`, ma la barra laterale dell'app resta aperta da `md` in su (scelta
+    // dell'utente): fra 640 e ~1280px, tolti barra e menu, alla sezione restavano 250–600px e
+    // le opzioni del tema si leggevano "Chiar", "Scur". La sezione è un `@container`, così le
+    // griglie al suo interno si regolano sullo spazio che hanno davvero e non sulla finestra.
     return (
-        <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto sm:flex-row sm:overflow-visible">
+        <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto xl:flex-row xl:overflow-visible">
             <Select value={activeSection} onValueChange={(value) => setActiveSection(value as SettingsSectionKey)}>
-                <SelectTrigger className="w-full sm:hidden">
+                <SelectTrigger className="w-full xl:hidden">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,7 +161,9 @@ const SettingsPage = () => {
                 </SelectContent>
             </Select>
 
-            <aside className="hidden w-full shrink-0 flex-col gap-4 overflow-y-auto rounded-2xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:flex sm:max-w-xs">
+            {/* `self-start` e `max-h-full`: alto quanto le sue voci, non quanto la pagina. Stirato
+                dal flex, per chi non è amministratore (due voci) era una card con ~600px vuoti. */}
+            <aside className="hidden max-h-full w-full shrink-0 flex-col gap-4 self-start overflow-y-auto rounded-2xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:flex xl:max-w-xs">
                 <div className="grid gap-1.5">
                     {visibleSettingsSections.map((section) => {
                         const Icon = section.icon;
@@ -186,7 +193,7 @@ const SettingsPage = () => {
                 </div>
             </aside>
 
-            <section className="min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-card/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
+            <section className="@container min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-card/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
                 {sectionContent[activeSection]}
             </section>
         </div>

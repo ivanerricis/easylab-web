@@ -1,4 +1,5 @@
 import EntityTable from "@/components/entity-table";
+import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
 import OpenEntityButton from "@/components/open-entity-button";
 import { entityPaths } from "@/lib/entityPaths";
@@ -23,6 +24,12 @@ type ReportsTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /**
+     * Ricerca e filtri in vigore, per dire perché la lista è vuota: vedi
+     * `resolveEmptyListMessage`.
+     */
+    searchText?: string;
+    hasActiveFilters?: boolean;
 };
 
 // Sfondo e testo li decide index.css in base a data-status-color e all'intensità scelta
@@ -43,6 +50,8 @@ const ReportsTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    searchText,
+    hasActiveFilters,
 }: ReportsTableProps) => {
     const renderRowActions = (row: ReportDto) => (
         <>
@@ -82,7 +91,12 @@ const ReportsTable = ({
             columns={columns}
             rows={rows}
             getRowKey={(row) => row.id}
-            emptyMessage="Nessun report disponibile."
+            emptyMessage={resolveEmptyListMessage({
+                emptyMessage: "Nessun report disponibile.",
+                searchText,
+                hasActiveFilters,
+                filteredMessage: "Nessun report corrisponde ai filtri.",
+            })}
             renderRowActions={renderRowActions}
             getRowStatusColor={getStatusColor}
             onRowOpen={(row) => onOpenReport(row.id)}

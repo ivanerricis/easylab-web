@@ -11,7 +11,10 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
 
     return (
         <SettingsGroup title="Pianificazione">
-            <div className="flex items-center gap-3">
+            {/* `items-start` e `leading-snug` sulle caselle, come nel dialogo di ripristino: su un
+                telefono le etichette vanno a capo, e con `leading-none` le righe si toccavano e la
+                casella finiva a metà testo. */}
+            <div className="flex items-start gap-3">
                 <Checkbox
                     id="autoEnabled"
                     checked={formValues.autoEnabled}
@@ -22,7 +25,7 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                         }))
                     }
                 />
-                <Label htmlFor="autoEnabled" className="cursor-pointer">
+                <Label htmlFor="autoEnabled" className="cursor-pointer leading-snug">
                     Esegui dump in automatico
                 </Label>
             </div>
@@ -84,7 +87,7 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
             </div>
 
             <div className="grid gap-2">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                     <Checkbox
                         id="notifyEmailOnFailure"
                         checked={formValues.notifyEmailOnFailure}
@@ -98,7 +101,7 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                     />
                     <Label
                         htmlFor="notifyEmailOnFailure"
-                        className={cn("cursor-pointer", !emailConfigured && "text-muted-foreground")}
+                        className={cn("cursor-pointer leading-snug", !emailConfigured && "text-muted-foreground")}
                     >
                         Invia una email se il backup automatico non va a buon fine
                     </Label>

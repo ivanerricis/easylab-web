@@ -21,6 +21,12 @@ type DateRangeFilterProps = {
      * occupano una riga sola invece di due.
      */
     layout?: "inline" | "stacked";
+    /**
+     * Le etichette visibili dei due campi nel layout `stacked` (di serie "Da" e "A"). In
+     * Esportazione diventano "Dal"/"Al", e fanno da etichette della riga di filtri insieme a
+     * "Stato" e "Tipo". Il nome accessibile resta "Data di inizio"/"Data di fine".
+     */
+    stackedLabels?: { from: string; to: string };
 };
 
 /**
@@ -39,13 +45,14 @@ const DateRangeFilter = ({
     onDateToChange,
     onClearDates,
     layout = "inline",
+    stackedLabels = { from: "Da", to: "A" },
 }: DateRangeFilterProps) => {
     if (layout === "stacked") {
         return (
             <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-3">
                     <label className="grid gap-1.5 text-sm font-medium">
-                        Da
+                        {stackedLabels.from}
                         <Input
                             type="date"
                             aria-label="Data di inizio"
@@ -56,7 +63,7 @@ const DateRangeFilter = ({
                         />
                     </label>
                     <label className="grid gap-1.5 text-sm font-medium">
-                        A
+                        {stackedLabels.to}
                         <Input
                             type="date"
                             aria-label="Data di fine"

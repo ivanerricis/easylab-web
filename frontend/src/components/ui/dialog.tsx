@@ -39,10 +39,42 @@ function DialogContent({
     className,
     children,
     showCloseButton = true,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
     ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
     showCloseButton?: boolean;
 }) {
+    // Alla chiusura Radix riporta il focus sul `DialogTrigger`; ma nell'app quasi tutti i
+    // dialoghi sono controllati (`open` + un pulsante qualunque che lo apre), non c'è un trigger
+    // e il focus finiva sul `body`: chi usa la tastiera ripartiva dall'inizio della pagina.
+    // Qui si ricorda l'elemento che aveva il focus all'apertura e ci si torna, se esiste ancora.
+    // Si legge in `onOpenAutoFocus`, che Radix chiama prima di spostare il focus nel dialogo, e
+    // non al render: questo componente si disegna anche a dialogo chiuso, e al primo render il
+    // focus era ancora sul `body`. Se l'elemento nel frattempo è sparito (una voce di un menu
+    // che si è chiuso) resta il comportamento di Radix.
+    const returnFocusRef = React.useRef<Element | null>(null);
+
+    const handleOpenAutoFocus = (event: Event) => {
+        returnFocusRef.current = document.activeElement;
+        onOpenAutoFocus?.(event);
+    };
+
+    const handleCloseAutoFocus = (event: Event) => {
+        onCloseAutoFocus?.(event);
+
+        if (event.defaultPrevented) {
+            return;
+        }
+
+        const target = returnFocusRef.current;
+
+        if (target instanceof HTMLElement && target !== document.body && target.isConnected) {
+            event.preventDefault();
+            target.focus({ preventScroll: true });
+        }
+    };
+
     return (
         <DialogPortal>
             <DialogOverlay />
@@ -52,6 +84,8 @@ function DialogContent({
                     "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
                     className
                 )}
+                onOpenAutoFocus={handleOpenAutoFocus}
+                onCloseAutoFocus={handleCloseAutoFocus}
                 {...props}
             >
                 {children}
@@ -61,7 +95,7 @@ function DialogContent({
                             <DialogPrimitive.Close data-slot="dialog-close" asChild>
                                 <Button variant="ghost" className="absolute top-4 right-4" size="icon-sm">
                                     <XIcon />
-                                    <span className="sr-only">Close</span>
+                                    <span className="sr-only">Chiudi</span>
                                 </Button>
                             </DialogPrimitive.Close>
                         </TooltipTrigger>
@@ -94,7 +128,7 @@ function DialogFooter({
             {children}
             {showCloseButton && (
                 <DialogPrimitive.Close asChild>
-                    <Button variant="outline">Close</Button>
+                    <Button variant="outline">Chiudi</Button>
                 </DialogPrimitive.Close>
             )}
         </div>

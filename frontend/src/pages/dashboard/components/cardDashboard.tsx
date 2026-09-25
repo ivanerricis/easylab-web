@@ -19,12 +19,21 @@ type Props = Readonly<{
  * "Programmati" spingeva l'icona fuori dal bordo interno (a 320px fuori dalla scheda) e
  * "Incassi mese" veniva troncato fino a 375px. Da `sm` in su le schede sono larghe almeno
  * 14rem e l'icona torna in alto a destra.
+ *
+ * Le varianti `sm:@max-[80rem]:` rimpiccioliscono le schede quando non stanno tutte su una
+ * riga, cioè quando la finestra non è a tutto schermo su un monitor grande (il contenitore è in
+ * `DashboardPage`): su due o tre righe, alte 94px l'una, si prendevano 200–340px e al
+ * calendario ne restavano 400 a 1024×768 e 1280×800. Più strette di padding, etichetta a 14px
+ * e numero a 20px scendono a circa 70px per riga. A tutto schermo (sei in riga) e su telefono
+ * restano come sono.
  */
 export const dashboardCardLayoutClassName =
-    "grid w-full flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1 gap-y-0.5 rounded-lg p-2 shadow sm:min-w-56 sm:items-start sm:gap-y-1 sm:p-4";
-export const dashboardCardLabelClassName = "col-span-2 text-xs wrap-break-word sm:col-span-1 sm:text-base";
-export const dashboardCardIconClassName = "col-start-2 row-start-2 size-4 shrink-0 sm:row-start-1 sm:size-5";
-export const dashboardCardValueClassName = "row-start-2 text-lg font-bold sm:text-2xl";
+    "grid w-full flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1 gap-y-0.5 rounded-lg p-2 shadow sm:min-w-56 sm:items-start sm:gap-y-1 sm:p-4 sm:@max-[80rem]:gap-y-0.5 sm:@max-[80rem]:px-3.5 sm:@max-[80rem]:py-2.5";
+export const dashboardCardLabelClassName =
+    "col-span-2 text-xs wrap-break-word sm:col-span-1 sm:text-base sm:@max-[80rem]:text-sm";
+export const dashboardCardIconClassName =
+    "col-start-2 row-start-2 size-4 shrink-0 sm:row-start-1 sm:size-5 sm:@max-[80rem]:size-4";
+export const dashboardCardValueClassName = "row-start-2 text-lg font-bold sm:text-2xl sm:@max-[80rem]:text-xl";
 
 const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClick }: Props) => {
     const isInteractive = onClick != null;
@@ -34,7 +43,9 @@ const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClic
             className={cn(
                 dashboardCardLayoutClassName,
                 "border bg-card",
-                isInteractive && "cursor-pointer *:*:cursor-pointer *:cursor-pointer hover:bg-accent/35"
+                // `focus-outline`: lo stesso focus dei pulsanti (index.css). Senza, la card, che
+                // è un `role="button"` raggiungibile col Tab, mostrava l'outline del browser.
+                isInteractive && "cursor-pointer focus-outline *:*:cursor-pointer *:cursor-pointer hover:bg-accent/35"
             )}
             onClick={onClick}
             role={isInteractive ? "button" : undefined}

@@ -1,6 +1,19 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveWidthsToPersist, useResizableColumns } from "./useResizableColumns";
+import { growNaturalWidths, resolveWidthsToPersist, useResizableColumns } from "./useResizableColumns";
+
+describe("growNaturalWidths", () => {
+    it("allarga le colonne che ora non bastano e non stringe le altre", () => {
+        expect(growNaturalWidths({ id: 44, customer: 200 }, { id: 58, customer: 150 })).toEqual({
+            id: 58,
+            customer: 200,
+        });
+    });
+
+    it("torna null quando nessuna colonna deve cambiare, così non si ridisegna niente", () => {
+        expect(growNaturalWidths({ id: 58, customer: 200 }, { id: 50, customer: 200 })).toBeNull();
+    });
+});
 
 describe("resolveWidthsToPersist", () => {
     const columnKeys = ["id", "customer", "device", "actions"];
@@ -62,12 +75,13 @@ let naturalWidths: Record<string, number>;
 
 const storageKey = "easylab-web-table-column-widths:prova";
 
-const Harness = ({ canMeasure = true }: { canMeasure?: boolean }) => {
+const Harness = ({ canMeasure = true, dataVersion }: { canMeasure?: boolean; dataVersion?: unknown }) => {
     const { tableRef, isResizable, getColumnWidth, getResizeHandleProps, tableStyle } = useResizableColumns({
         tableKey: "prova",
         columnKeys,
         elasticColumnKey: "actions",
         canMeasure,
+        dataVersion,
     });
 
     return (
@@ -156,6 +170,101 @@ describe("useResizableColumns: misura", () => {
         expect(widthOf("customer")).toBe(320);
         expect(widthOf("device")).toBe(140);
         expect(screen.getByTestId("tabella").style.minWidth).toBe("700px");
+    });
+});
+
+describe("useResizableColumns: misura a larghezza piena", () => {
+    /**
+     * La tabella ha `w-full`: misurata così com'è, il browser la stringeva nel contenitore e le
+     * colonne restringibili nascevano già troncate. Durante la lettura deve essere a
+     * `max-content` e in `auto`, e subito dopo tornare com'era.
+     */
+    it("legge le larghezze con la tabella a max-content e poi rimette lo stile di prima", () => {
+        const seen: string[] = [];
+        vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+            const table = this.closest("table");
+            seen.push(`${table?.style.width}|${table?.style.tableLayout}`);
+            return { width: naturalWidths[this.dataset.key ?? ""] ?? 0 } as DOMRect;
+        });
+
+        render(<Harness />);
+
+        expect(new Set(seen)).toEqual(new Set(["max-content|auto"]));
+        const table = screen.getByTestId("tabella");
+        expect(table.style.width).toBe("");
+        expect(table.style.tableLayout).toBe("fixed");
+    });
+
+    /** Su uno schermo largo l'avanzo non deve finire tutto alla colonna "Azioni". */
+    it("se a max-content la tabella ci sta, tiene le larghezze distribuite dal browser", () => {
+        const containerWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1000);
+        vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+            const isFullWidth = this.closest("table")?.style.width === "";
+            const width = naturalWidths[this.dataset.key ?? ""] ?? 0;
+            return { width: isFullWidth ? width * 1.5 : width } as DOMRect;
+        });
+
+        render(<Harness />);
+
+        expect(widthOf("customer")).toBe(300);
+        containerWidth.mockRestore();
+    });
+
+    it("se a max-content non ci sta, tiene le larghezze piene del contenuto", () => {
+        const containerWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+        vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+            const isFullWidth = this.closest("table")?.style.width === "";
+            const width = naturalWidths[this.dataset.key ?? ""] ?? 0;
+            return { width: isFullWidth ? width / 2 : width } as DOMRect;
+        });
+
+        render(<Harness />);
+
+        expect(widthOf("customer")).toBe(200);
+        containerWidth.mockRestore();
+    });
+
+    it("arrotonda per eccesso, perché mezzo pixel in meno fa già comparire i puntini", () => {
+        naturalWidths = { id: 57.2, customer: 200, device: 140, actions: 180 };
+
+        render(<Harness />);
+
+        expect(widthOf("id")).toBe(58);
+    });
+});
+
+describe("useResizableColumns: cambio dei dati", () => {
+    /** Gli ID a due cifre della prima pagina diventavano "6…" alla seconda. */
+    it("con righe nuove allarga le colonne che non bastano più, senza stringere le altre", () => {
+        const { rerender } = render(<Harness dataVersion="pagina-1" />);
+        expect(widthOf("id")).toBe(60);
+
+        naturalWidths = { id: 72, customer: 150, device: 140, actions: 180 };
+        rerender(<Harness dataVersion="pagina-2" />);
+
+        expect(widthOf("id")).toBe(72);
+        expect(widthOf("customer")).toBe(200);
+        expect(screen.getByTestId("tabella").style.minWidth).toBe("592px");
+    });
+
+    it("senza righe nuove non rimisura", () => {
+        const { rerender } = render(<Harness dataVersion="pagina-1" />);
+
+        naturalWidths = { id: 72, customer: 250, device: 140, actions: 180 };
+        rerender(<Harness dataVersion="pagina-1" />);
+
+        expect(widthOf("id")).toBe(60);
+    });
+
+    it("le larghezze scelte dall'utente restano quelle, anche se il contenuto cresce", () => {
+        localStorage.setItem(storageKey, JSON.stringify({ id: 60, customer: 180, device: 140 }));
+        const { rerender } = render(<Harness dataVersion="pagina-1" />);
+
+        naturalWidths = { id: 72, customer: 250, device: 160, actions: 180 };
+        rerender(<Harness dataVersion="pagina-2" />);
+
+        expect(widthOf("id")).toBe(60);
+        expect(widthOf("customer")).toBe(180);
     });
 });
 

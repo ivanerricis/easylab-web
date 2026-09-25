@@ -52,16 +52,27 @@ export const SettingsCard = ({
         >
             {/* Il layout a due colonne di CardHeader (via CardAction) manda l'azione fuori
                 dalla card quando il testo dei pulsanti non ci sta accanto al titolo: qui la
-                riga è nostra, quindi sotto `sm` scende sotto invece di sovrapporsi. */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                riga è nostra, quindi in una sezione stretta scende sotto invece di sovrapporsi.
+                Si decide sulla larghezza della sezione (`@container` in SettingsPage) e non
+                dello schermo: a 768px con la barra laterale aperta la sezione è larga circa
+                440px, e con `sm` i pulsanti dei Log ("Scarica log selezionato") uscivano dalla
+                card. */}
+            <div className="flex flex-col gap-2 @2xl:flex-row @2xl:items-start @2xl:justify-between">
                 <div className="flex flex-col gap-1">
-                    <CardTitle>{title}</CardTitle>
+                    {/* 18px/600, i valori di `text-section` ("titolo di sezione/card" nella scala
+                        di index.css): a 14px/500 il titolo della card pesava meno dei titoli dei
+                        `SettingsGroup` che contiene (14px/600). Scritto come `text-lg` e non come
+                        `text-section` perché tailwind-merge non conosce le misure con nome, prende
+                        `text-section` per un colore e non toglie il `text-sm` di CardTitle. */}
+                    <CardTitle className="text-lg font-semibold group-data-[size=sm]/card:text-lg">{title}</CardTitle>
                     {description ? <CardDescription>{description}</CardDescription> : null}
                 </div>
-                {action ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{action}</div> : null}
+                {action ? <div className="flex flex-wrap items-center gap-2 @2xl:shrink-0">{action}</div> : null}
             </div>
         </CardHeader>
-        <CardContent className={cn("grid gap-3 pt-4", contentClassName)}>{children}</CardContent>
+        {/* Nessun `pt` qui: lo spazio sotto il bordo dell'header lo dà già il `gap-4` della
+            card. Con anche `pt-4` erano 32px sotto il bordo contro i 16px sopra e in fondo. */}
+        <CardContent className={cn("grid gap-3", contentClassName)}>{children}</CardContent>
     </Card>
 );
 
@@ -129,7 +140,7 @@ export const SettingsTile = ({
 }) => (
     <div className="grid content-start gap-1 rounded-md border border-primary/15 bg-muted/20 p-3">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className={cn("text-sm font-semibold", highlight && "text-primary")}>{value}</span>
+        <span className={cn("text-sm font-semibold", highlight && "text-primary-text")}>{value}</span>
         {status ? <SettingsStatusBadge status={status} /> : null}
     </div>
 );

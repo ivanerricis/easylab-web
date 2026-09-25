@@ -81,6 +81,12 @@ describe("UsersSettingsSection", () => {
         return cell.closest("tr") as HTMLElement;
     };
 
+    /** In tabella le azioni diverse da "Sessioni" stanno nel menu "⋯" della riga. */
+    const openActionsMenu = async (username: string) => {
+        await userEvent.click(within(rowOf(username)).getByRole("button", { name: `Altre azioni per ${username}` }));
+        return within(await screen.findByRole("menu"));
+    };
+
     beforeEach(() => {
         api.listUsers.mockResolvedValue([admin, luigi]);
     });
@@ -93,17 +99,19 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        const own = within(rowOf("admin"));
-        expect(own.getByText("(tu)")).toBeInTheDocument();
-        expect(own.getByRole("button", { name: "Disattiva 2FA" })).toBeInTheDocument();
-        expect(own.queryByRole("button", { name: "Rigenera password" })).not.toBeInTheDocument();
-        expect(own.queryByRole("button", { name: "Disabilita" })).not.toBeInTheDocument();
-        expect(own.queryByRole("button", { name: "Elimina" })).not.toBeInTheDocument();
+        expect(within(rowOf("admin")).getByText("(tu)")).toBeInTheDocument();
+        const own = await openActionsMenu("admin");
+        expect(own.getByRole("menuitem", { name: "Disattiva 2FA" })).toBeInTheDocument();
+        expect(own.queryByRole("menuitem", { name: "Rigenera password" })).not.toBeInTheDocument();
+        expect(own.queryByRole("menuitem", { name: "Disabilita" })).not.toBeInTheDocument();
+        expect(own.queryByRole("menuitem", { name: "Elimina" })).not.toBeInTheDocument();
+        await userEvent.keyboard("{Escape}");
 
-        const other = within(rowOf("luigi"));
-        expect(other.getByRole("button", { name: "Rigenera password" })).toBeInTheDocument();
-        expect(other.getByRole("button", { name: "Disabilita" })).toBeInTheDocument();
-        expect(other.queryByRole("button", { name: "Disattiva 2FA" })).not.toBeInTheDocument();
+        const other = await openActionsMenu("luigi");
+        expect(other.getByRole("menuitem", { name: "Rigenera password" })).toBeInTheDocument();
+        expect(other.getByRole("menuitem", { name: "Disabilita" })).toBeInTheDocument();
+        expect(other.getByRole("menuitem", { name: "Elimina" })).toBeInTheDocument();
+        expect(other.queryByRole("menuitem", { name: "Disattiva 2FA" })).not.toBeInTheDocument();
     });
 
     it("togliere la propria 2FA richiede la password, quella di un altro no", async () => {
@@ -111,7 +119,7 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        await userEvent.click(within(rowOf("admin")).getByRole("button", { name: "Disattiva 2FA" }));
+        await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
         const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
         await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
         expect(toast.error).toHaveBeenCalledWith("Inserisci la tua password");
@@ -130,7 +138,7 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Rigenera password" }));
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Rigenera password" }));
         await userEvent.click(
             within(screen.getByRole("dialog", { name: "Rigenera password" })).getByRole("button", { name: "Rigenera" })
         );
@@ -146,7 +154,7 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Disabilita" }));
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Disabilita" }));
         await userEvent.click(
             within(screen.getByRole("dialog", { name: "Disabilita account" })).getByRole("button", {
                 name: "Disabilita",
@@ -156,12 +164,12 @@ describe("UsersSettingsSection", () => {
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith('Account "luigi" disabilitato');
         });
-        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Riabilita" }));
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Riabilita" }));
 
         await waitFor(() => {
             expect(api.enableUser).toHaveBeenCalledWith(2);
         });
-        expect(within(rowOf("luigi")).getByRole("button", { name: "Disabilita" })).toBeInTheDocument();
+        expect((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Disabilita" })).toBeInTheDocument();
     });
 
     it("elimina un utente dall'elenco dopo la conferma", async () => {
@@ -169,7 +177,7 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Elimina" }));
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Elimina" }));
         const dialog = screen.getByRole("dialog", { name: "Elimina utente" });
         await userEvent.type(within(dialog).getByLabelText("Digita ELIMINA per confermare"), "ELIMINA");
         await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
@@ -210,14 +218,15 @@ describe("UsersSettingsSection", () => {
         const dialog = screen.getByRole("dialog", { name: "Sessioni attive" });
         expect(api.listUserSessions).toHaveBeenCalledWith(2);
 
-        await within(dialog).findByText("(questa sessione)");
+        await within(dialog).findByText("Questa sessione");
         within(dialog).getByText("Chrome su Windows");
         within(dialog).getByText("Dispositivo sconosciuto");
         within(dialog).getByText("In uso adesso");
         within(dialog).getByText("Ultimo utilizzo 3 giorni fa (inattiva)");
+        // Sulla sessione in uso nessun "Disconnetti", solo l'etichetta: il pulsante è uno.
         const disconnectButtons = within(dialog).getAllByRole("button", { name: "Disconnetti" });
-        expect(disconnectButtons[0]).toBeDisabled();
-        await userEvent.click(disconnectButtons[1]);
+        expect(disconnectButtons).toHaveLength(1);
+        await userEvent.click(disconnectButtons[0]);
 
         const confirmDialog = await screen.findByRole("dialog", { name: "Disconnetti sessione" });
         await userEvent.click(within(confirmDialog).getByRole("button", { name: "Disconnetti" }));
@@ -398,7 +407,10 @@ describe("SecuritySettingsSection", () => {
         ]);
         renderWithUser(<SecuritySettingsSection />, admin);
 
-        expect(await screen.findByText("Nome utente o password non validi")).toBeInTheDocument();
+        // Due volte, in tabella e nella scheda per il telefono (nascosta via CSS, che jsdom non
+        // applica).
+        expect(await screen.findAllByText("Nome utente o password non validi")).toHaveLength(2);
+        expect(within(screen.getByRole("table")).getByText("Nome utente o password non validi")).toBeInTheDocument();
         expect(api.listRecentFailedLogins).toHaveBeenCalled();
     });
 

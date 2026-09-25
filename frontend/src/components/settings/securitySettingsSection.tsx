@@ -10,6 +10,7 @@ import TwoFactorConfirmDialog from "@/components/dialogs/settings/twoFactorConfi
 import TwoFactorSetupDialog from "@/components/dialogs/settings/twoFactorSetupDialog";
 import RefreshButton from "@/components/refresh-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
 import {
     disableTwoFactor,
     getApiErrorMessage,
@@ -24,6 +25,22 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
 import { cn, formatDateTime } from "@/lib/utils";
+
+/**
+ * I tentativi falliti in forma di scheda sotto `sm`, dove la tabella a quattro colonne lasciava
+ * fuori schermo l'errore, cioè il motivo del rifiuto.
+ */
+const failedLoginCardColumns: EntityCardColumn<LogEntryDto>[] = [
+    { key: "timestamp", header: "Data e ora", render: (entry) => formatDateTime(entry.timestamp), cardSlot: "title" },
+    { key: "ip", header: "IP", render: (entry) => entry.ip },
+    { key: "user", header: "Utente", render: (entry) => entry.user },
+    {
+        key: "error",
+        header: "Errore",
+        render: (entry) => <span className="text-destructive">{entry.error ?? "-"}</span>,
+        cardSlot: "wide",
+    },
+];
 
 /**
  * La sezione "Sicurezza" delle impostazioni: riguarda il proprio account, non il laboratorio,
@@ -303,28 +320,36 @@ const SecuritySettingsSection = () => {
                     ) : !failedLogins || failedLogins.length === 0 ? (
                         <SettingsEmptyBox>Nessun accesso fallito negli ultimi giorni.</SettingsEmptyBox>
                     ) : (
-                        <Table containerClassName="max-h-64 overflow-y-auto">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Data e ora</TableHead>
-                                    <TableHead>IP</TableHead>
-                                    <TableHead>Utente</TableHead>
-                                    <TableHead>Errore</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {failedLogins.map((entry, index) => (
-                                    <TableRow key={`${entry.timestamp}-${index}`}>
-                                        <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
-                                        <TableCell>{entry.ip}</TableCell>
-                                        <TableCell>{entry.user}</TableCell>
-                                        <TableCell className="whitespace-normal text-destructive">
-                                            {entry.error ?? ""}
-                                        </TableCell>
+                        <>
+                            <Table containerClassName="hidden max-h-64 overflow-y-auto sm:block">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Data e ora</TableHead>
+                                        <TableHead>IP</TableHead>
+                                        <TableHead>Utente</TableHead>
+                                        <TableHead>Errore</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {failedLogins.map((entry, index) => (
+                                        <TableRow key={`${entry.timestamp}-${index}`}>
+                                            <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
+                                            <TableCell>{entry.ip}</TableCell>
+                                            <TableCell>{entry.user}</TableCell>
+                                            <TableCell className="whitespace-normal text-destructive">
+                                                {entry.error ?? ""}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            <EntityCardList
+                                columns={failedLoginCardColumns}
+                                rows={failedLogins}
+                                getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.user}`}
+                                emptyMessage="Nessun accesso fallito negli ultimi giorni."
+                            />
+                        </>
                     )}
                 </SettingsCard>
             ) : null}

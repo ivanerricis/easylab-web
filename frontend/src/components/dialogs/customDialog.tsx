@@ -142,8 +142,13 @@ const CustomDialog = ({
                     bloccavano l'invio con il fumetto "Compila questo campo" — e i messaggi
                     scritti per quei casi non comparivano mai.
                 */}
+                {/* Colonna flex: di solito non cambia niente (il form è alto quanto il contenuto),
+                    ma quando un dialogo ha un'altezza fissa (i dialoghi a passi su telefono) il
+                    contenuto può prendere lo spazio che resta e scorrere, con i pulsanti fermi in
+                    fondo. */}
                 <form
                     noValidate
+                    className="flex min-h-0 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
                         onConfirm?.();
@@ -163,7 +168,10 @@ const CustomDialog = ({
                         }
                     }}
                 >
-                    <DialogHeader>
+                    {/* `mb-4`: il form non è una griglia, quindi il `gap` di DialogContent non
+                        arriva fra intestazione e contenuto, e la prima etichetta stava attaccata
+                        al titolo (0px). Alcuni contenuti aggiungono un loro `py-*`, che si somma. */}
+                    <DialogHeader className="mb-4">
                         {title ? <DialogTitle className="text-lg font-semibold">{title}</DialogTitle> : null}
                         {description ? <DialogDescription>{description}</DialogDescription> : null}
                     </DialogHeader>

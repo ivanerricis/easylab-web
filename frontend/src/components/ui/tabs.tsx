@@ -17,7 +17,11 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
     return (
         <TabsPrimitive.List
             data-slot="tabs-list"
-            className={cn("inline-flex h-10 w-fit items-stretch justify-center", className)}
+            // Griglia a colonne uguali e non flex: con la lista `w-fit` il `flex-1` delle voci non
+            // le pareggiava (il browser dà a ciascuna la sua larghezza di contenuto, e "Report"
+            // restava 19px più stretta di "Interventi"). `auto-cols-fr` in un contenitore largo
+            // quanto il contenuto fa tutte le colonne larghe quanto la voce più lunga.
+            className={cn("inline-grid h-10 w-fit auto-cols-fr grid-flow-col items-stretch", className)}
             {...props}
         />
     );
@@ -28,7 +32,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         <TabsPrimitive.Trigger
             data-slot="tabs-trigger"
             className={cn(
-                "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-none border border-border bg-card px-3 text-sm font-medium whitespace-nowrap text-foreground transition-colors outline-none not-first:-ml-px first:rounded-l-md last:rounded-r-md hover:bg-muted focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:data-[state=active]:border-primary dark:data-[state=active]:bg-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+                "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-none border border-border bg-card px-3 text-sm font-medium whitespace-nowrap text-foreground focus-outline transition-colors outline-none not-first:-ml-px first:rounded-l-md last:rounded-r-md hover:bg-muted focus-visible:z-10 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:data-[state=active]:border-primary dark:data-[state=active]:bg-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
                 className
             )}
             {...props}

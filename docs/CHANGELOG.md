@@ -11,6 +11,112 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-25 — Revisione visiva: focus, tabelle, Impostazioni, dashboard e dialoghi
+
+Una revisione visiva fatta con Playwright ha raccolto circa 90 segnalazioni:
+- larghezze 390, 768, 1024 e 1440px, tema chiaro e scuro;
+- tutte le pagine, comprese le sezioni admin di Impostazioni.
+
+Qui ci sono le correzioni di tre gruppi: i problemi comuni a più pagine, i difetti delle singole pagine e le rifiniture. Quello che è rimasto fuori per scelta è in [BACKLOG](BACKLOG.md). Molte segnalazioni avevano la stessa causa in un componente di base, quindi la correzione sta lì.
+
+**Contrasti e token (`index.css`, `components/ui/*`).**
+- **Focus.** L'anello era un grigio al 25–50% (`ring-ring/25` e `/50`, più `outline-ring/25` globale).
+  - Contrasto misurato: 1,2–2,1:1 contro card e pagina, sotto il 3:1 che WCAG 1.4.11 chiede agli indicatori di focus.
+  - Ora c'è un token `--focus-ring`, lo stesso blu del testo: 5,95–6,87:1 in chiaro, 6,98–8,96:1 in scuro.
+  - Il token è separato da `--ring` perché le preimpostazioni di colore scrivono un loro `--ring` chiaro.
+  - La ricetta è una sola:
+    - pulsanti, caselle e card cliccabili hanno una linea di 2px staccata di 2px (utility `focus-outline`): su un pulsante pieno del primario un anello attaccato non si vedrebbe;
+    - i campi hanno bordo più anello attaccato;
+    - una regola `:focus-visible` di base copre link e contenitori.
+  - Sono passati allo stesso colore anche la ricerca nelle barre dei filtri, le schede, il calendarietto, il codice 2FA e il selettore di opzioni.
+- **Blu del testo.** Nuovo token `--primary-text` (`text-primary-text`): il primario scurito in chiaro e schiarito in scuro.
+  - Nasce dalla barra laterale, dove prima era scritto a mano.
+  - Lo usano ora il link del cliente (anche nel titolo delle schede su telefono), "Incassi mese", "+N altri" del calendario, i badge e i valori evidenziati.
+  - Contrasto: da 3,54–4,18:1 a 5,6:1 o più.
+- **Intestazione delle tabelle.** Fondo `--table-header` (il primario scurito) con testo bianco: da 4,18:1 a 6,87:1 in entrambi i temi. Tolta anche la tinta di hover sotto il testo bianco.
+- **Tema scuro.**
+  - Il bordo rosso degli errori è pieno invece che al 50%: da 2,3 a 5,3–5,9:1.
+  - I campi hanno un solo fondo, `bg-input/30`; il selettore di data, prima diverso dagli altri, lo usa anche lui.
+  - I giorni fuori mese del calendario usano `--muted-foreground` invece di `#999`: da 2,3 a 4,8:1.
+- **Tabs.** Le voci ("Report" / "Interventi" nelle schede) erano larghe 70,6 e 89,5px: con la lista `w-fit`, il `flex-1` non le pareggiava. Ora la lista è una griglia a colonne uguali.
+
+**Dialoghi.**
+- **Spazi in `CustomDialog`:** 16px fra intestazione e contenuto. Prima erano 0px e la prima etichetta toccava la descrizione.
+- **La X** viene letta dagli screen reader come "Chiudi".
+- **Il focus torna a chi ha aperto il dialogo.**
+  - Radix lo riporta al `DialogTrigger`, ma i dialoghi dell'app sono controllati e si aprono da un pulsante qualunque: il focus finiva sul `body`, e chi usa la tastiera ripartiva da capo.
+  - Ora `DialogContent` ricorda l'elemento attivo in `onOpenAutoFocus` e ci torna alla chiusura.
+  - Test in `customDialog.test.tsx`.
+- **Nuovo report / nuovo intervento su telefono (a passi).**
+  - "Avanti" verifica subito che il cliente esista: prima l'id scelto dai suggerimenti, poi `findCustomerByText`. Prima l'errore arrivava solo al salvataggio, tre passi dopo.
+  - Il dialogo ha un'altezza fissa: quella del passo più alto, o lo schermo meno 1rem sui telefoni bassi. I passi erano alti da 284 a 516px e "Avanti" cambiava posto a ogni tocco.
+  - Ora i campi scorrono dentro il dialogo e i pulsanti restano fermi. Misurato: stessa posizione in tutti i passi, a 844 e a 667px di altezza.
+- **Altre correzioni:**
+  - nei suggerimenti del cliente il telefono ha una riga sua (prima si spezzava a metà numero);
+  - nella modifica report su telefono i campi sono più larghi, 320px invece di 268;
+  - "Digita ELIMINA" non ha più i doppi spazi, che venivano dal `gap` della `Label`.
+
+**Tabelle e liste.**
+- **Larghezze delle colonne** (`useResizableColumns`).
+  - Prima le colonne si misuravano nel layout automatico, già schiacciato dal contenitore, e si congelavano sulla prima pagina: ID "2…" a 768px, "Creato il" senza ora, celle tagliate dalla seconda pagina in poi.
+  - Ora la misura avviene per un istante a `width: max-content`. Quando la tabella ci sta, si tiene la distribuzione di `w-full`.
+  - La misura si ripete quando cambiano le righe, ma solo per allargare le colonne, per la regola di stabilità del 2026-09-10.
+  - L'ID ha un minimo di `5ch` con `tabular-nums`: 62px, contro i 34–59 di prima.
+  - Celle troncate misurate: da 4–5 per pagina a 0.
+- **Paginazione.** La forma compatta si sceglie sulla larghezza della paginazione stessa, non su quella della finestra. A 768px "Visualizzati 1-10 di N" era largo 0,6px.
+- **Lista vuota.** Il messaggio nomina ricerca e filtri (`lib/emptyListMessage.ts`) invece di dire "Nessun report disponibile." con un filtro attivo, ed è centrato nella parte visibile.
+- **Rifiniture:**
+  - il testo del difetto finisce con i puntini (`HoverDetailCell`);
+  - la riga senza azioni è alta come le altre;
+  - il pulsante "Apri" è uguale alle altre azioni di riga;
+  - l'icona email è la stessa in lista e in scheda.
+
+**Impostazioni.**
+- **Layout sulla larghezza della sezione.** La sezione è un `@container`:
+  - il menu laterale da 320px compare da 1280px, sotto c'è il selettore a tendina;
+  - griglie del tema, card (titolo e pulsanti sulla stessa riga) e Log decidono sulla larghezza della sezione, non dello schermo.
+
+  Prima, a 768px con la barra laterale aperta, il contenuto era largo 152px e le opzioni si leggevano "Chiar", "Scur".
+- **Utenti:** in riga restano "Sessioni" e un menu "⋯" per il resto. Anche a 1440 la colonna Azioni usciva dalla card.
+- **Schede quando la sezione è stretta:** Log, tentativi di accesso falliti e archivio dump. Usano `EntityCardList`, con la nuova prop `hiddenFromClassName`.
+- **Log:** alti quanto il contenuto, con i controlli dell'intestazione alla stessa altezza.
+- **Esportazione:** periodo su due colonne, controlli tutti a 40px.
+- **Email:** campi da 164 a 352px a 1440.
+- **Rifiniture:**
+  - le caselle di spunta hanno l'etichetta su più righe leggibile;
+  - i selettori di file sono nello stile dell'app;
+  - sulla sessione in uso c'è "Questa sessione" invece di un "Disconnetti" disabilitato.
+- **Card:** titolo a 18px/600, perché a 14px/500 pesava meno dei gruppi che contiene; 16px sotto l'intestazione invece di 32.
+
+**Dashboard e pagine.**
+- **Schede dei numeri.** Stanno in una griglia a 2, 3 o 6 colonne che segue il contenitore: stessa altezza per riga, mai una scheda sola su una riga.
+  - Quando non stanno tutte su una riga (finestra non a tutto schermo) sono più compatte: 72px invece di 94.
+- **Calendario.** Prima aveva un'altezza fissa (`100vh - 16rem`) che ignorava le schede. Ora prende lo spazio che resta: a 1280×800 prima era tagliato in fondo, ora si vede intero senza scorrere.
+- **"Incassi mese".** Gli importi delle barre sono sempre in forma breve ("345k"): la colonna è larga circa 60px anche su desktop e si leggeva "344.76…".
+- **Descrizione sotto il titolo delle pagine:** compare solo da 1024px.
+- **Rifiniture:**
+  - collaboratore e tecnico su telefono hanno il nome nella card dei dati, come il cliente;
+  - il popup delle notifiche sta dentro lo schermo a 390px;
+  - la ricerca globale ha una X per chiuderla su telefono;
+  - nella scheda intervento il campo descrizione ha lo stesso nome che ha nel modulo.
+
+**Verifica.**
+- 763 test del frontend, typecheck, eslint e prettier.
+- Confronto prima/dopo con Playwright alle quattro larghezze, nei due temi.
+- Contrasti misurati nel browser, convertendo i colori calcolati con un canvas.
+
+**File principali:**
+- `frontend/src/index.css`
+- `components/ui/{button,input,select,textarea,checkbox,dialog,table,tabs,sidebar,input-group}.tsx`
+- `components/dialogs/customDialog.tsx` e `components/dialogs/create/*`
+- `components/entity-table.tsx`, `components/entity-card-list.tsx`, `components/table-pagination.tsx`
+- `hooks/useResizableColumns.ts`
+- `components/settings/*` e `pages/settings/SettingsPage.tsx`
+- `pages/dashboard/*`
+- `lib/emptyListMessage.ts`
+
+---
+
 ## 2026-09-25 — Aggiornamenti delle dipendenze del backend
 
 Unite due pull request di Dependabot (#12 e #11); la #13, del frontend, resta aperta.

@@ -11,6 +11,29 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-25 — Aggiornamenti delle dipendenze del backend
+
+Unite due pull request di Dependabot (#12 e #11); la #13, del frontend, resta aperta.
+
+- **dotenv 17 → 18 (#12).** Versione maggiore: l'unico cambiamento che poteva toccarci era la
+  rimozione del caricamento con `node -r dotenv/config`, che non usiamo. `import "dotenv/config"`
+  (in `src/index.ts` e `drizzle.config.ts`) esiste ancora nella 18. In produzione il backend
+  riceve le variabili da `docker-compose.yml` (`environment:`), non da un `.env` nel container,
+  quindi la libreria lì non carica niente. Verificato in sviluppo: il backend riparte con la 18
+  e risponde. Novità della 18 non usate: il messaggio "injected env" va su stderr invece che su
+  stdout.
+- **Strumenti di sviluppo del backend (#11):** `@types/node`, `@types/nodemailer`, eslint,
+  prettier. Nella CI della pull request era fallito `backupKey.test.ts` ("genera una chiave al
+  primo utilizzo"): non per l'aggiornamento, ma perché quel test legge e scrive il vero
+  `data/backup.key`, che altri file di test creano e cancellano in parallelo (lo dice il
+  commento nello stesso file). Rilanciato, è passato. Il test resta instabile finché non usa un
+  percorso suo.
+- **Non unita: #13 (dipendenze del frontend).** Contiene jsdom 30.0 → 30.1, con cui nei test i
+  menu di Radix (select, dropdown) non si aprono più: 12 test falliti, non un difetto dell'app.
+  Gli altri aggiornamenti del gruppo sono minori; jsdom va escluso dal gruppo o affrontato a parte.
+
+---
+
 ## 2026-09-24 — Voci a righe in tutte le schede, errori dentro il layout, rifiniture
 
 - **Voci a righe in tutte le schede.** Lo schema della scheda report (etichetta a sinistra, valore

@@ -1,3 +1,4 @@
+import { brandLogoUrl, brandName, brandSubtitle } from "@/lib/brand";
 import {
     Sidebar,
     SidebarContent,
@@ -67,7 +68,6 @@ const menuButtonClassName =
 const MainSidebar = () => {
     const { pathname } = useLocation();
     const { setOpenMobile } = useSidebar();
-    const logoUrl = import.meta.env.VITE_LOGO_URL ?? "http://localhost:3000/assets/logo.jpg";
     const isSettingsActive = pathname.startsWith("/settings");
 
     // Su mobile la barra è un pannello sopra la pagina: scelta una voce, si chiude.
@@ -80,12 +80,12 @@ const MainSidebar = () => {
             <SidebarHeader className="h-13 justify-center border-b border-sidebar-border px-3 py-0 group-data-[collapsible=icon]:px-2">
                 <SidebarMenuItem className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
                     <div className="flex size-8 items-center justify-center overflow-hidden rounded-sm border border-sidebar-border bg-background group-data-[collapsible=icon]:size-9">
-                        <img src={logoUrl} alt="Logo laboratorio" className="size-full object-cover" />
+                        <img src={brandLogoUrl} alt="Logo laboratorio" className="size-full object-cover" />
                     </div>
 
                     <div className="grid leading-tight group-data-[collapsible=icon]:hidden">
-                        <span className="text-sm font-semibold text-sidebar-foreground">FutureOffice</span>
-                        <span className="text-xs text-sidebar-foreground/70">Laboratorio</span>
+                        <span className="text-sm font-semibold text-sidebar-foreground">{brandName}</span>
+                        <span className="text-xs text-sidebar-foreground/70">{brandSubtitle}</span>
                     </div>
                 </SidebarMenuItem>
             </SidebarHeader>

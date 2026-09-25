@@ -1,5 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
@@ -11,6 +11,27 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
+import { brandLogoUrl, brandName, brandSubtitle } from "@/lib/brand";
+
+/**
+ * Il contenitore delle due schede (password e codice): il marchio del laboratorio sopra la card,
+ * lo stesso della barra laterale, così chi entra vede lo stesso nome e lo stesso logo prima e
+ * dopo l'accesso. Prima la pagina non aveva né logo né nome, e il testo diceva "EasyLab". È un
+ * `<main>`: la pagina ne era priva, e i lettori di schermo non avevano un punto d'arrivo.
+ */
+const LoginShell = ({ children }: { children: ReactNode }) => (
+    <main className="flex min-h-svh w-full flex-col items-center justify-center gap-6 px-4 py-8">
+        <div className="flex flex-col items-center gap-3">
+            {/* `alt` vuoto: il nome è scritto subito sotto, ripeterlo non aggiunge niente. */}
+            <img src={brandLogoUrl} alt="" className="size-14 rounded-lg border bg-background object-cover shadow-sm" />
+            <div className="text-center leading-tight">
+                <p className="text-lg font-semibold">{brandName}</p>
+                <p className="text-sm text-muted-foreground">{brandSubtitle}</p>
+            </div>
+        </div>
+        {children}
+    </main>
+);
 
 /**
  * Il challenge vive qui e non nel contesto di autenticazione: non è una sessione, è uno
@@ -105,10 +126,12 @@ const LoginPage = () => {
 
     if (challengeId) {
         return (
-            <div className="flex h-svh w-full items-center justify-center px-4">
+            <LoginShell>
                 <Card className="w-full max-w-sm">
                     <CardHeader>
-                        <CardTitle className="text-2xl">Verifica in due passaggi</CardTitle>
+                        <CardTitle className="text-2xl">
+                            <h1>Verifica in due passaggi</h1>
+                        </CardTitle>
                         <CardDescription>
                             {isUsingRecoveryCode
                                 ? "Inserisci uno dei codici di recupero salvati quando hai attivato la verifica."
@@ -198,16 +221,18 @@ const LoginPage = () => {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </LoginShell>
         );
     }
 
     return (
-        <div className="flex h-svh w-full items-center justify-center px-4">
+        <LoginShell>
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Accedi</CardTitle>
-                    <CardDescription>Inserisci le tue credenziali per accedere a EasyLab.</CardDescription>
+                    <CardTitle className="text-2xl">
+                        <h1>Accedi</h1>
+                    </CardTitle>
+                    <CardDescription>Inserisci le tue credenziali per accedere.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form
@@ -260,7 +285,7 @@ const LoginPage = () => {
                     </form>
                 </CardContent>
             </Card>
-        </div>
+        </LoginShell>
     );
 };
 

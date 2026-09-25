@@ -101,4 +101,25 @@ describe("NotificationsMenu", () => {
         expect(navigate).not.toHaveBeenCalled();
         expect(screen.queryByText("Backup fallito")).not.toBeInTheDocument();
     });
+
+    it("rimuove tutte le voci insieme, ognuna con la chiusura della sua sorgente", async () => {
+        serverLoad.mockResolvedValue([
+            { id: "7", title: "Backup fallito" },
+            { id: "8", title: "SMTP non raggiungibile" },
+        ]);
+        remindersLoad.mockResolvedValue([{ id: "i-1", title: "Mario Rossi" }]);
+        renderWithProviders(<NotificationsMenu />);
+        await screen.findByText("3");
+
+        await openMenu();
+        await userEvent.click(screen.getByRole("menuitem", { name: "Rimuovi tutte" }));
+
+        expect(serverDismiss).toHaveBeenCalledWith("7");
+        expect(serverDismiss).toHaveBeenCalledWith("8");
+        expect(screen.queryByText("Backup fallito")).not.toBeInTheDocument();
+        expect(screen.queryByText("Mario Rossi")).not.toBeInTheDocument();
+        // Il pannello resta aperto e dice che non c'è più niente; il pulsante sparisce.
+        expect(screen.getByText("Nessun intervento in programma per oggi.")).toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "Rimuovi tutte" })).not.toBeInTheDocument();
+    });
 });

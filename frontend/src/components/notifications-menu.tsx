@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 export function NotificationsMenu() {
     const navigate = useNavigate();
-    const { sections, badgeCount, dismiss } = useNotifications();
+    const { sections, badgeCount, dismiss, dismissAll, totalCount } = useNotifications();
 
     const handleDismiss = (event: MouseEvent, sourceKey: string, notificationId: string) => {
         event.stopPropagation();
@@ -45,6 +45,24 @@ export function NotificationsMenu() {
                 pannello da 384px ancorato al campanello usciva a sinistra. `collisionPadding`
                 tiene lo stesso margine quando Radix lo sposta per farlo stare. */}
             <DropdownMenuContent align="end" collisionPadding={8} className="w-[min(24rem,calc(100vw-1rem))]">
+                {/* Intestazione con il nome del pannello e, se c'è qualcosa, "Rimuovi tutte". È una
+                    voce del menu, così si raggiunge con le frecce come le altre; `preventDefault`
+                    su `onSelect` tiene il pannello aperto, che mostra subito "Nessuna notifica". */}
+                <div className="flex items-center justify-between gap-2 pr-1">
+                    <DropdownMenuLabel className="text-sm font-semibold text-foreground">Notifiche</DropdownMenuLabel>
+                    {totalCount > 0 ? (
+                        <DropdownMenuItem
+                            className="text-xs text-muted-foreground"
+                            onSelect={(event) => {
+                                event.preventDefault();
+                                dismissAll();
+                            }}
+                        >
+                            Rimuovi tutte
+                        </DropdownMenuItem>
+                    ) : null}
+                </div>
+                <DropdownMenuSeparator />
                 {sections.length === 0 ? (
                     <div className="px-3 py-4 text-center text-sm text-muted-foreground">Nessuna notifica.</div>
                 ) : (

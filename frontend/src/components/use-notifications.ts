@@ -130,6 +130,17 @@ export const useNotifications = (sources: NotificationSource[] = notificationSou
         };
     });
 
+    // "Rimuovi tutte": la stessa chiusura della X, voce per voce, così ogni sorgente la gestisce a
+    // modo suo (il server per gli avvisi di sistema, il browser per gli interventi di oggi).
+    // Con sei o più avvisi prima bisognava chiuderli uno alla volta.
+    const dismissAll = () => {
+        for (const section of sections) {
+            for (const notification of section.notifications) {
+                dismiss(section.source.key, notification.id);
+            }
+        }
+    };
+
     return {
         // Una sezione senza voci compare solo se ha qualcosa da dire al posto dell'elenco.
         sections: sections.filter((section) => section.notifications.length > 0 || section.source.emptyLabel),
@@ -138,5 +149,7 @@ export const useNotifications = (sources: NotificationSource[] = notificationSou
             0
         ),
         dismiss,
+        dismissAll,
+        totalCount: sections.reduce((total, section) => total + section.notifications.length, 0),
     };
 };

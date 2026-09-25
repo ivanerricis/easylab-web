@@ -11,6 +11,44 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-25 — Notifiche, pagina di accesso, confronto degli incassi e due pulizie
+
+Quattro voci rimaste dalla revisione visiva dello stesso giorno (erano in [BACKLOG](BACKLOG.md)).
+
+- **"Rimuovi tutte" nelle notifiche.** Con sei o più avvisi si chiudevano con una X da 24px alla
+  volta. Il pannello ora ha un'intestazione "Notifiche" e, se c'è qualcosa, "Rimuovi tutte":
+  riusa la chiusura di ogni voce (`dismissAll` in `use-notifications.ts`), quindi gli avvisi di
+  sistema si chiudono sul server e gli interventi di oggi nel browser, come con la X. È una voce
+  del menu, raggiungibile con le frecce, e il pannello resta aperto. Attenzione: finché resta
+  aperto il punto delle notifiche di sistema visibili a tutti (BACKLOG), anche un non admin può
+  chiudere tutti gli avvisi per tutti.
+- **Logo e nome nella pagina di accesso.** La pagina non aveva logo e diceva "EasyLab", mentre
+  dopo l'accesso la barra laterale dice "FutureOffice · Laboratorio". Nome, sottotitolo e logo
+  stanno ora in `lib/brand.ts`, usato da barra laterale e login; il logo è servito dal backend
+  senza autenticazione, quindi si vede anche prima di entrare. Il titolo delle schede del
+  browser resta sul nome del prodotto. La pagina ha anche un `<main>` e un `h1`, che mancavano.
+- **"Incassi mese" confronta gli stessi giorni.** Il mese in corso si confrontava con l'intero
+  mese precedente: il 25 settembre, 25 giorni contro 31, e il calo usciva quasi sempre (misurato
+  sui dati di sviluppo: "-24% rispetto ad agosto", che sugli stessi giorni è "+6%"). Per il mese
+  in corso `getReportStats` restituisce anche `previousMonthToDate`, l'incasso del mese prima dal
+  1 allo stesso giorno del laboratorio (al suo ultimo giorno se è più corto: il 31 marzo contro
+  il 28 febbraio), e la dashboard scrive "rispetto ai primi 25 giorni di agosto". I mesi già
+  chiusi si confrontano ancora con il mese intero. Test su database vero in
+  `report.db.test.ts` (giorno compreso, mese più corto, mese chiuso) e sulla dashboard.
+- **Pulizie.** Le preimpostazioni di colore non scrivono più un loro `--ring`, che nessun
+  componente leggeva più: `--ring` ora rimanda a `--focus-ring`, così un componente shadcn
+  aggiunto in futuro con `ring-ring` ha già un focus visibile. I dodici dialoghi che avevano un
+  `py-2`/`py-4` sulla radice del contenuto lo sommavano ai 16px che `CustomDialog` mette sotto
+  l'intestazione (20–32px): ora hanno solo il padding in fondo, e lo spazio è 16px ovunque.
+
+File: `frontend/src/components/{notifications-menu,use-notifications,main-sidebar}.tsx`,
+`frontend/src/lib/brand.ts`, `frontend/src/pages/auth/LoginPage.tsx`,
+`frontend/src/pages/dashboard/DashboardPage.tsx`, `frontend/src/lib/api/reports.ts`,
+`frontend/src/lib/theme.ts`, `frontend/src/index.css`, i dialoghi in `components/dialogs/*`,
+`backend/src/db/queries/{report,timeZone}.ts`.
+
+---
+
 ## 2026-09-25 — Revisione visiva: focus, tabelle, Impostazioni, dashboard e dialoghi
 
 Una revisione visiva fatta con Playwright ha raccolto circa 90 segnalazioni:

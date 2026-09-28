@@ -144,6 +144,9 @@ describe("LoginPage", () => {
 
         expect(await screen.findByLabelText("Nome utente")).toBeInTheDocument();
         expect(screen.queryByLabelText("Codice di verifica")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
+            "Troppi codici errati. Ripeti l'accesso."
+        );
     });
 
     it("permette di passare a un codice di recupero", async () => {
@@ -183,5 +186,35 @@ describe("LoginPage", () => {
         await waitFor(() => {
             expect(screen.getByLabelText("Codice di verifica")).toHaveFocus();
         });
+        expect(screen.getByLabelText("Codice di verifica")).toHaveAccessibleDescription("Codice non valido");
+    });
+
+    it("segnala sotto ciascun campo quello che manca, senza chiamare il server", async () => {
+        renderLoginPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /Accedi/ }));
+
+        expect(screen.getByLabelText("Nome utente")).toHaveAccessibleDescription("Inserisci il nome utente");
+        expect(screen.getByLabelText("Password")).toHaveAccessibleDescription("Inserisci la password");
+        expect(screen.getByLabelText("Nome utente")).toHaveFocus();
+        expect(login).not.toHaveBeenCalled();
+    });
+
+    it("mostra il rifiuto del server sotto la password e lo toglie quando si riscrive", async () => {
+        login.mockRejectedValue(buildAxiosError("Credenziali non valide", 401));
+
+        renderLoginPage();
+        await submitCredentials();
+
+        const passwordInput = await screen.findByLabelText("Password");
+        await waitFor(() => {
+            expect(passwordInput).toHaveAccessibleDescription("Credenziali non valide");
+        });
+        expect(passwordInput).toHaveAttribute("aria-invalid", "true");
+
+        await userEvent.type(passwordInput, "x");
+
+        expect(passwordInput).not.toHaveAttribute("aria-invalid");
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 });

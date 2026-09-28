@@ -1,12 +1,13 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { type ReactNode, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { ArrowLeft, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { FieldError } from "@/components/form-field";
+import { fieldProps } from "@/lib/formField";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
@@ -18,13 +19,18 @@ import { brandLogoUrl, brandName, brandSubtitle } from "@/lib/brand";
  * lo stesso della barra laterale, così chi entra vede lo stesso nome e lo stesso logo prima e
  * dopo l'accesso. Prima la pagina non aveva né logo né nome, e il testo diceva "EasyLab". È un
  * `<main>`: la pagina ne era priva, e i lettori di schermo non avevano un punto d'arrivo.
+ *
+ * Il titolo della scheda ("Accedi", "Verifica in due passaggi") e il sottotitolo non si vedono
+ * più: ripetevano il bottone e le etichette dei campi, e il marchio basta a dire dove si è. Il
+ * titolo resta per i lettori di schermo, come `<h1>` nascosto.
  */
-const LoginShell = ({ children }: { children: ReactNode }) => (
+const LoginShell = ({ title, children }: { title: string; children: ReactNode }) => (
     <main className="flex min-h-svh w-full flex-col items-center justify-center gap-6 px-4 py-8">
-        <div className="flex flex-col items-center gap-3">
-            {/* `alt` vuoto: il nome è scritto subito sotto, ripeterlo non aggiunge niente. */}
+        <h1 className="sr-only">{title}</h1>
+        <div className="flex items-center gap-3">
+            {/* `alt` vuoto: il nome è scritto subito accanto, ripeterlo non aggiunge niente. */}
             <img src={brandLogoUrl} alt="" className="size-14 rounded-lg border bg-background object-cover shadow-sm" />
-            <div className="text-center leading-tight">
+            <div className="leading-tight">
                 <p className="text-lg font-semibold">{brandName}</p>
                 <p className="text-sm text-muted-foreground">{brandSubtitle}</p>
             </div>
@@ -54,16 +60,26 @@ const LoginPage = () => {
     const [isUsingRecoveryCode, setIsUsingRecoveryCode] = useState(false);
     const codeInputRef = useRef<HTMLInputElement>(null);
 
+    // Gli errori stanno sotto il campo che riguardano, come nei dialoghi (vedi `FormField`).
+    // Qui anche il rifiuto del server: sulla pagina di accesso è l'errore più comune ("password
+    // errata"), e un toast che sparisce da solo si perdeva. Va sotto la password perché il
+    // server, di proposito, non dice quale delle due credenziali sia sbagliata.
+    const [usernameError, setUsernameError] = useState<string>();
+    const [passwordError, setPasswordError] = useState<string>();
+    const [codeError, setCodeError] = useState<string>();
+
     const goToApp = () => {
         const state = location.state as { from?: { pathname: string } } | null;
         navigate(state?.from?.pathname ?? "/dashboard", { replace: true });
     };
 
-    const backToCredentials = () => {
+    const backToCredentials = (reason?: string) => {
         setChallengeId(null);
         setCode("");
+        setCodeError(undefined);
         setIsUsingRecoveryCode(false);
         setPassword("");
+        setPasswordError(reason);
     };
 
     const handleCredentialsSubmit = async () => {
@@ -71,8 +87,13 @@ const LoginPage = () => {
             return;
         }
 
-        if (!username.trim() || !password) {
-            toast.error("Inserisci nome utente e password");
+        const nextUsernameError = username.trim() ? undefined : "Inserisci il nome utente";
+        const nextPasswordError = password ? undefined : "Inserisci la password";
+        setUsernameError(nextUsernameError);
+        setPasswordError(nextPasswordError);
+
+        if (nextUsernameError || nextPasswordError) {
+            document.getElementById(nextUsernameError ? "loginUsername" : "loginPassword")?.focus();
             return;
         }
 
@@ -87,7 +108,9 @@ const LoginPage = () => {
 
             goToApp();
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Accesso non riuscito"));
+            setPasswordError(getApiErrorMessage(error, "Accesso non riuscito"));
+            setPassword("");
+            document.getElementById("loginPassword")?.focus();
         } finally {
             setIsSubmitting(false);
         }
@@ -99,7 +122,8 @@ const LoginPage = () => {
         }
 
         if (!code.trim()) {
-            toast.error(isUsingRecoveryCode ? "Inserisci un codice di recupero" : "Inserisci il codice di verifica");
+            setCodeError(isUsingRecoveryCode ? "Inserisci un codice di recupero" : "Inserisci il codice di verifica");
+            codeInputRef.current?.focus();
             return;
         }
 
@@ -108,14 +132,16 @@ const LoginPage = () => {
             await completeTwoFactorLogin(challengeId, code.trim());
             goToApp();
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Verifica non riuscita"));
+            const message = getApiErrorMessage(error, "Verifica non riuscita");
             setCode("");
 
             // 410 = il challenge non esiste più, per scadenza o per troppi codici errati.
-            // Insistere sul codice non porterebbe da nessuna parte: si riparte dalla password.
+            // Insistere sul codice non porterebbe da nessuna parte: si riparte dalla password,
+            // e il motivo compare sotto la password, dove ora si trova l'utente.
             if (getApiErrorStatus(error) === 410) {
-                backToCredentials();
+                backToCredentials(message);
             } else {
+                setCodeError(message);
                 // Il clic su "Verifica" ha lasciato il focus sul bottone.
                 codeInputRef.current?.focus();
             }
@@ -126,18 +152,8 @@ const LoginPage = () => {
 
     if (challengeId) {
         return (
-            <LoginShell>
+            <LoginShell title="Verifica in due passaggi">
                 <Card className="w-full max-w-sm">
-                    <CardHeader>
-                        <CardTitle className="text-2xl">
-                            <h1>Verifica in due passaggi</h1>
-                        </CardTitle>
-                        <CardDescription>
-                            {isUsingRecoveryCode
-                                ? "Inserisci uno dei codici di recupero salvati quando hai attivato la verifica."
-                                : "Inserisci il codice a 6 cifre generato dalla tua app di autenticazione."}
-                        </CardDescription>
-                    </CardHeader>
                     <CardContent>
                         <form
                             className="grid gap-4"
@@ -159,7 +175,7 @@ const LoginPage = () => {
                                         // tolto dal clic sul link.
                                         key="recovery"
                                         ref={codeInputRef}
-                                        id="loginCode"
+                                        {...fieldProps("loginCode", { error: codeError })}
                                         // `one-time-code` è ciò che permette a iOS e Android di
                                         // proporre il codice senza farlo ricopiare a mano.
                                         autoComplete="one-time-code"
@@ -168,31 +184,41 @@ const LoginPage = () => {
                                         autoFocus
                                         className="text-center font-mono text-lg tracking-widest"
                                         value={code}
-                                        onChange={(event) => setCode(event.target.value)}
+                                        onChange={(event) => {
+                                            setCode(event.target.value);
+                                            setCodeError(undefined);
+                                        }}
                                     />
                                 ) : (
                                     <InputOTP
                                         key="totp"
                                         ref={codeInputRef}
-                                        id="loginCode"
+                                        {...fieldProps("loginCode", { error: codeError })}
                                         autoComplete="one-time-code"
                                         maxLength={6}
                                         pattern={REGEXP_ONLY_DIGITS}
                                         autoFocus
                                         containerClassName="justify-center"
                                         value={code}
-                                        onChange={setCode}
+                                        onChange={(value) => {
+                                            setCode(value);
+                                            setCodeError(undefined);
+                                        }}
                                     >
                                         <InputOTPGroup>
-                                            <InputOTPSlot index={0} />
-                                            <InputOTPSlot index={1} />
-                                            <InputOTPSlot index={2} />
-                                            <InputOTPSlot index={3} />
-                                            <InputOTPSlot index={4} />
-                                            <InputOTPSlot index={5} />
+                                            {/* Le caselle sono `div` disegnati sopra l'input vero,
+                                                che è invisibile: il bordo rosso va chiesto a loro. */}
+                                            {[0, 1, 2, 3, 4, 5].map((index) => (
+                                                <InputOTPSlot
+                                                    key={index}
+                                                    index={index}
+                                                    aria-invalid={codeError ? true : undefined}
+                                                />
+                                            ))}
                                         </InputOTPGroup>
                                     </InputOTP>
                                 )}
+                                <FieldError id="loginCode" error={codeError} />
                             </div>
 
                             <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
@@ -207,6 +233,7 @@ const LoginPage = () => {
                                 onClick={() => {
                                     setIsUsingRecoveryCode((prev) => !prev);
                                     setCode("");
+                                    setCodeError(undefined);
                                 }}
                             >
                                 {isUsingRecoveryCode
@@ -214,7 +241,7 @@ const LoginPage = () => {
                                     : "Usa un codice di recupero"}
                             </Button>
 
-                            <Button type="button" variant="ghost" size="sm" onClick={backToCredentials}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => backToCredentials()}>
                                 <ArrowLeft className="size-4" />
                                 Torna indietro
                             </Button>
@@ -226,14 +253,8 @@ const LoginPage = () => {
     }
 
     return (
-        <LoginShell>
+        <LoginShell title="Accedi">
             <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className="text-2xl">
-                        <h1>Accedi</h1>
-                    </CardTitle>
-                    <CardDescription>Inserisci le tue credenziali per accedere.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <form
                         className="grid gap-4"
@@ -245,23 +266,30 @@ const LoginPage = () => {
                         <div className="grid gap-2">
                             <Label htmlFor="loginUsername">Nome utente</Label>
                             <Input
-                                id="loginUsername"
+                                {...fieldProps("loginUsername", { error: usernameError })}
                                 autoComplete="username"
                                 autoFocus
                                 value={username}
-                                onChange={(event) => setUsername(event.target.value)}
+                                onChange={(event) => {
+                                    setUsername(event.target.value);
+                                    setUsernameError(undefined);
+                                }}
                             />
+                            <FieldError id="loginUsername" error={usernameError} />
                         </div>
 
                         <div className="grid gap-2">
                             <Label htmlFor="loginPassword">Password</Label>
                             <div className="relative">
                                 <Input
-                                    id="loginPassword"
+                                    {...fieldProps("loginPassword", { error: passwordError })}
                                     type={isPasswordVisible ? "text" : "password"}
                                     autoComplete="current-password"
                                     value={password}
-                                    onChange={(event) => setPassword(event.target.value)}
+                                    onChange={(event) => {
+                                        setPassword(event.target.value);
+                                        setPasswordError(undefined);
+                                    }}
                                     className="pr-9"
                                 />
                                 <div className="absolute inset-y-0 right-1.5 flex items-center">
@@ -276,6 +304,7 @@ const LoginPage = () => {
                                     </Button>
                                 </div>
                             </div>
+                            <FieldError id="loginPassword" error={passwordError} />
                         </div>
 
                         <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>

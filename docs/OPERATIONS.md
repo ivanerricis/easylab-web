@@ -10,7 +10,7 @@ Ogni utente può attivarla per sé da **Impostazioni > Sicurezza**: da quel mome
 
 **Attivazione.** Impostazioni > Sicurezza > Attiva: si conferma la propria password, si inquadra il QR (o si copia il codice mostrato accanto, per chi lo inserisce a mano), e si digita il codice che l'app genera. Alla fine compaiono **otto codici di recupero**, mostrati una volta sola: vanno stampati o salvati in un posto sicuro **diverso dal telefono**, perché servono proprio quando il telefono non c'è. In tabella ne resta solo l'hash, quindi nessuno — amministratore incluso — può rimostrarli.
 
-**Se perdi il telefono.** Al login, "Usa un codice di recupero" e si inserisce uno degli otto: vale una volta sola, e conviene rigenerare il blocco (Impostazioni > Sicurezza > Rigenera codici di recupero) appena si torna operativi. Finiti anche quelli, un amministratore sblocca l'account da **Impostazioni > Utenti > Disattiva 2FA**; l'operazione compare nel registro azioni e non gli mostra mai il segreto.
+**Se perdi il telefono.** Al login, "Usa un codice di recupero" e si inserisce uno degli otto: vale una volta sola, e conviene rigenerare il blocco (Impostazioni > Sicurezza > Rigenera codici di recupero) appena si torna operativi. Finiti anche quelli, un amministratore sblocca l'account da **Impostazioni > Utenti**, menu "⋯" dell'utente > **Disattiva 2FA**; l'operazione compare nel registro azioni e non gli mostra mai il segreto.
 
 **Se a restare fuori è l'unico amministratore**, l'unica via è la riga di comando sulla macchina: vedi [Reset password utente](#reset-password-utente) con `--reset-2fa`.
 

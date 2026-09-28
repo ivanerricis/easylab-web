@@ -27,8 +27,9 @@ import TimeZoneField from "@/components/settings/timeZoneField";
 import SettingsFileInput from "@/components/settings/settingsFileInput";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
 import { formatDateTime } from "@/lib/utils";
+import { brandLogoUrl } from "@/lib/brand";
+import BrandLogo from "@/components/brand-logo";
 
-const logoAssetUrl = import.meta.env.VITE_LOGO_URL ?? "http://localhost:3000/assets/logo.jpg";
 const maxLogoSizeBytes = 5 * 1024 * 1024;
 
 const defaultForm: CompanySettingsInput = {
@@ -182,7 +183,7 @@ const CompanySettingsPanel = () => {
         }
     };
 
-    const logoPreviewSrc = `${logoAssetUrl}?v=${encodeURIComponent(logoUpdatedAt ?? "default")}`;
+    const logoPreviewSrc = `${brandLogoUrl}?v=${encodeURIComponent(logoUpdatedAt ?? "default")}`;
 
     return (
         <SettingsSection>
@@ -297,7 +298,7 @@ const CompanySettingsPanel = () => {
                         <SettingsGroup title="Logo attuale">
                             <div className="flex items-center gap-4">
                                 <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/15 bg-background">
-                                    <img src={logoPreviewSrc} alt="Logo attuale" className="size-full object-contain" />
+                                    <BrandLogo src={logoPreviewSrc} alt="Logo attuale" className="object-contain" />
                                 </div>
                                 <div className="grid gap-1 text-sm text-muted-foreground">
                                     <p>{hasCustomLogo ? "Logo personalizzato attivo" : "Logo predefinito attivo"}</p>

@@ -1,4 +1,5 @@
-import { brandLogoUrl, brandName, brandSubtitle } from "@/lib/brand";
+import { brandName, brandSubtitle } from "@/lib/brand";
+import BrandLogo from "@/components/brand-logo";
 import {
     Sidebar,
     SidebarContent,
@@ -80,7 +81,7 @@ const MainSidebar = () => {
             <SidebarHeader className="h-13 justify-center border-b border-sidebar-border px-3 py-0 group-data-[collapsible=icon]:px-2">
                 <SidebarMenuItem className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
                     <div className="flex size-8 items-center justify-center overflow-hidden rounded-sm border border-sidebar-border bg-background group-data-[collapsible=icon]:size-9">
-                        <img src={brandLogoUrl} alt="Logo laboratorio" className="size-full object-cover" />
+                        <BrandLogo alt="Logo laboratorio" className="object-cover" />
                     </div>
 
                     <div className="grid leading-tight group-data-[collapsible=icon]:hidden">

@@ -12,7 +12,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
 import { useAuth } from "@/components/use-auth";
-import { brandLogoUrl, brandName, brandSubtitle } from "@/lib/brand";
+import { brandName, brandSubtitle } from "@/lib/brand";
+import BrandLogo from "@/components/brand-logo";
 
 /**
  * Il contenitore delle due schede (password e codice): il marchio del laboratorio sopra la card,
@@ -29,7 +30,9 @@ const LoginShell = ({ title, children }: { title: string; children: ReactNode })
         <h1 className="sr-only">{title}</h1>
         <div className="flex items-center gap-3">
             {/* `alt` vuoto: il nome è scritto subito accanto, ripeterlo non aggiunge niente. */}
-            <img src={brandLogoUrl} alt="" className="size-14 rounded-lg border bg-background object-cover shadow-sm" />
+            <div className="size-14 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm">
+                <BrandLogo alt="" className="object-cover" />
+            </div>
             <div className="leading-tight">
                 <p className="text-lg font-semibold">{brandName}</p>
                 <p className="text-sm text-muted-foreground">{brandSubtitle}</p>

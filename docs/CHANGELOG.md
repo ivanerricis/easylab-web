@@ -93,6 +93,11 @@ una ventina di differenze; sono state corrette tutte, salvo le tre tabelle annot
   da sola: senza descrizione titolo e pulsanti stanno sulla stessa riga anche su telefono. La
   pagina ha un `h1` nascosto, come le altre.
 
+- **Avviso email dei backup bloccato acceso.** Se era stato salvato acceso e poi l'invio email
+  veniva disattivato, la casella restava spuntata ma disabilitata, e il salvataggio era
+  rifiutato con un errore che non si poteva correggere. Ora senza email la casella si può solo
+  spegnere; spenta, si blocca.
+
 Non fatto: le tabelle di Utenti, tentativi falliti, Log e dump restano scritte a mano. Passarle a
 `EntityTable` richiede prima che questa sappia cambiare tabella/schede sulla larghezza del
 contenitore (annotato in [BACKLOG](BACKLOG.md)).

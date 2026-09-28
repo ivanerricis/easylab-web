@@ -316,4 +316,25 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
             );
         });
     });
+
+    /** Salvato acceso quando l'email c'era, poi l'email è stata tolta: va almeno spento. */
+    it("l'avviso rimasto acceso senza email si può spegnere, e poi si blocca", async () => {
+        api.getBackupSettings.mockResolvedValue({ ...settings, notifyEmailOnFailure: true });
+        api.updateBackupSettings.mockResolvedValue({ ...settings, restoreSecretsToReconfigure: [] });
+        await renderPanel();
+
+        const checkbox = screen.getByLabelText("Invia una email se il backup automatico non va a buon fine");
+        expect(checkbox).toBeEnabled();
+
+        await userEvent.click(checkbox);
+        expect(checkbox).not.toBeChecked();
+        expect(checkbox).toBeDisabled();
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+        await waitFor(() => {
+            expect(api.updateBackupSettings).toHaveBeenCalledWith(
+                expect.objectContaining({ notifyEmailOnFailure: false })
+            );
+        });
+    });
 });

@@ -82,17 +82,24 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
             </div>
 
             <div className="grid gap-2">
+                {/* Senza email configurata l'avviso non si può accendere, ma deve potersi spegnere:
+                    se era stato salvato acceso e poi l'invio email è stato disattivato, la casella
+                    restava spuntata e bloccata, e il salvataggio rifiutato per un errore che non
+                    si poteva correggere. Spenta, si blocca. */}
                 <div className="flex items-start gap-3">
                     <Checkbox
                         id="notifyEmailOnFailure"
                         {...fieldErrorAria("notifyEmailOnFailure", errors.notifyEmailOnFailure)}
                         checked={formValues.notifyEmailOnFailure}
-                        disabled={!emailConfigured}
+                        disabled={!emailConfigured && !formValues.notifyEmailOnFailure}
                         onCheckedChange={(checked) => changeFormValues({ notifyEmailOnFailure: Boolean(checked) })}
                     />
                     <Label
                         htmlFor="notifyEmailOnFailure"
-                        className={cn("cursor-pointer leading-snug", !emailConfigured && "text-muted-foreground")}
+                        className={cn(
+                            "cursor-pointer leading-snug",
+                            !emailConfigured && !formValues.notifyEmailOnFailure && "text-muted-foreground"
+                        )}
                     >
                         Invia una email se il backup automatico non va a buon fine
                     </Label>

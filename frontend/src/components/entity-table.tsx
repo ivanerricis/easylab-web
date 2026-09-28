@@ -16,6 +16,8 @@ export type EntityColumn<TRow> = {
     render: (row: TRow) => ReactNode;
     /** Dove va la colonna nella scheda su mobile: vedi `EntityCardSlot`. */
     cardSlot?: EntityCardSlot;
+    /** Nella scheda su mobile si vede solo aprendola: vedi `EntityCardColumn`. */
+    cardCollapsed?: boolean;
     /**
      * Il campo `sortBy` dell'API che ordina per questa colonna. Solo le colonne che il server
      * sa ordinare ce l'hanno: un'intestazione cliccabile che non fa niente sarebbe peggio di

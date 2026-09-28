@@ -1,7 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, useId, useMemo, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import StatusBadge from "@/components/status-badge";
+import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { isStatusColor, statusStyles } from "@/lib/statusColors";
 
 /**
@@ -13,10 +15,13 @@ import { isStatusColor, statusStyles } from "@/lib/statusColors";
  * - `title`: il titolo della scheda. Più colonne `title` si leggono una di seguito all'altra
  *   (nome e cognome).
  * - `badge`: lo stato, in un badge in alto a destra colorato come la riga della tabella.
- * - `wide`: un valore che tende a essere lungo (difetto, email) e prende tutta la larghezza
- *   invece di andare a capo tre volte in mezza scheda.
+ * - `wide`: un valore che tende a essere lungo (difetto, email): va sotto la sua etichetta,
+ *   allineato a sinistra, invece di andare a capo tre volte stretto a destra dell'etichetta.
  *
- * Le colonne senza posto sono i dettagli, su due colonne.
+ * Le colonne senza posto sono i dettagli, una riga ciascuna: etichetta a sinistra, valore a
+ * destra, linea sottile fra le righe. È lo schema delle schede di dettaglio (`DetailGrid
+ * layout="rows"`), usato qui tale e quale: la lista e la scheda che si apre toccandone una voce
+ * si leggono allo stesso modo.
  */
 export type EntityCardSlot = "title" | "badge" | "wide";
 
@@ -25,11 +30,18 @@ export type EntityCardColumn<T> = {
     header: string;
     render: (row: T) => ReactNode;
     cardSlot?: EntityCardSlot;
+    /**
+     * Un dettaglio secondario, che nella scheda si vede solo aprendola. La scheda di un report
+     * aveva otto righe e superava l'altezza di un telefono: in una lista si cerca il cliente, il
+     * dispositivo e il difetto, il resto serve solo a volte. Il comando per aprirla c'è solo se
+     * la lista ha almeno una colonna così.
+     */
+    cardCollapsed?: boolean;
 };
 
 /**
  * La colonna dell'ID non è un dettaglio come gli altri: è un riferimento ("il report 3174"),
- * quindi va sotto il titolo come `#3174` invece di occupare una riga intera. Tutte le liste
+ * quindi va sopra il titolo come `#3174` invece di occupare una riga intera. Tutte le liste
  * dell'app ce l'hanno con questa chiave, come "actions" per i pulsanti in `EntityTable`.
  */
 const idColumnKey = "id";
@@ -68,7 +80,7 @@ type EntityCardProps<T> = {
     titleColumns: EntityCardColumn<T>[];
     badgeColumn?: EntityCardColumn<T>;
     detailColumns: EntityCardColumn<T>[];
-    showIdBelowTitle: boolean;
+    showIdAboveTitle: boolean;
     statusColor?: string;
     renderActions?: (row: T) => ReactNode;
 };
@@ -89,7 +101,7 @@ const areCardPropsEqual = (prev: EntityCardProps<unknown>, next: EntityCardProps
     prev.titleColumns === next.titleColumns &&
     prev.badgeColumn === next.badgeColumn &&
     prev.detailColumns === next.detailColumns &&
-    prev.showIdBelowTitle === next.showIdBelowTitle &&
+    prev.showIdAboveTitle === next.showIdAboveTitle &&
     prev.statusColor === next.statusColor;
 
 /**
@@ -105,7 +117,7 @@ const EntityCardImpl = <T,>({
     titleColumns,
     badgeColumn,
     detailColumns,
-    showIdBelowTitle,
+    showIdAboveTitle,
     statusColor,
     renderActions,
 }: EntityCardProps<T>) => {
@@ -114,6 +126,10 @@ const EntityCardImpl = <T,>({
     // commento lì per il perché non è un ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const actionsNode = useMemo(() => renderActions?.(row), [row]);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const detailsId = useId();
+    const hiddenCount = detailColumns.filter((column) => column.cardCollapsed).length;
+    const visibleDetailColumns = isExpanded ? detailColumns : detailColumns.filter((column) => !column.cardCollapsed);
 
     const renderTitle = () => {
         const parts = titleColumns
@@ -129,7 +145,7 @@ const EntityCardImpl = <T,>({
             ));
         }
 
-        // Senza una colonna titolo la scheda si chiama col suo ID, che allora non si ripete sotto.
+        // Senza una colonna titolo la scheda si chiama col suo ID, che allora non si ripete sopra.
         return idColumn ? `#${String(idColumn.render(row))}` : null;
     };
 
@@ -140,11 +156,16 @@ const EntityCardImpl = <T,>({
             ) : null}
 
             <div className="flex items-start justify-between gap-3 px-4 pt-3.5">
-                <div className="min-w-0">
-                    <h3 className="text-base leading-snug font-semibold break-words">{renderTitle()}</h3>
-                    {showIdBelowTitle ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">#{idColumn?.render(row)}</p>
+                <div className="flex min-w-0 flex-col items-start">
+                    {/* Il numero sopra il nome, in una pillola nel colore del testo: piccolo e
+                        grigio sotto il nome si perdeva, ed è ciò che si cerca per primo quando
+                        il cliente al telefono dice "il report 3174". */}
+                    {showIdAboveTitle ? (
+                        <p className="mb-1 rounded-md bg-muted px-1.5 py-0.5 text-sm font-semibold text-foreground tabular-nums">
+                            #{idColumn?.render(row)}
+                        </p>
                     ) : null}
+                    <h3 className="text-base leading-snug font-semibold break-words">{renderTitle()}</h3>
                 </div>
                 {badgeColumn ? (
                     <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>
@@ -154,18 +175,46 @@ const EntityCardImpl = <T,>({
                 ) : null}
             </div>
 
-            {detailColumns.length > 0 ? (
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-4 pt-3 pb-3.5">
-                    {detailColumns.map((column) => (
-                        <div key={column.key} className={cn("min-w-0", column.cardSlot === "wide" && "col-span-2")}>
-                            <dt className="text-xs text-muted-foreground">{column.header}</dt>
-                            <dd className="mt-0.5 text-sm font-medium break-words">{column.render(row)}</dd>
-                        </div>
-                    ))}
-                </dl>
+            {visibleDetailColumns.length > 0 ? (
+                // Prima i dettagli erano su due colonne, etichetta sopra e valore sotto (CHANGELOG
+                // 2026-09-10): le righe etichetta/valore di allora mandavano a capo i valori lunghi
+                // allineati a destra. Qui quel problema lo risolve `wide` → `longText`, che mette il
+                // valore sotto l'etichetta, come fanno problema e note nella scheda report.
+                <div id={detailsId} className={cn("px-4 pt-2", hiddenCount > 0 ? "pb-1" : "pb-2.5")}>
+                    <DetailGrid layout="rows">
+                        {visibleDetailColumns.map((column) => (
+                            <DetailItem
+                                key={column.key}
+                                label={column.header}
+                                value={column.render(row)}
+                                longText={column.cardSlot === "wide"}
+                            />
+                        ))}
+                    </DetailGrid>
+                </div>
             ) : (
                 <div className="pb-3.5" />
             )}
+
+            {hiddenCount > 0 ? (
+                // Stessa freccia della card dei dati nella scheda cliente, ma con il testo: in
+                // una lista di schede una freccia sola in fondo non si capisce a cosa si riferisca.
+                // Le righe nascoste non sono nel DOM, non solo nascoste col CSS: le schede ci
+                // sono solo su telefono, e lì da chiuse non devono esserci per nessuno.
+                <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={detailsId}
+                    onClick={() => setIsExpanded((expanded) => !expanded)}
+                    className={cn(
+                        "flex w-full items-center justify-center gap-1.5 px-4 pb-2.5 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline",
+                        "min-h-10"
+                    )}
+                >
+                    {isExpanded ? "Meno dettagli" : `Altri dettagli (${hiddenCount})`}
+                    <ChevronDown className={cn("size-4 transition-transform", isExpanded && "rotate-180")} />
+                </button>
+            ) : null}
 
             {renderActions ? (
                 // I pulsanti si dividono la larghezza della scheda: su un telefono sono l'unico
@@ -214,7 +263,7 @@ const EntityCardList = <T,>({
             ),
         [columns, idColumn]
     );
-    const showIdBelowTitle = idColumn != null && titleColumns.length > 0;
+    const showIdAboveTitle = idColumn != null && titleColumns.length > 0;
 
     if (isInitialLoading) {
         return (
@@ -223,16 +272,16 @@ const EntityCardList = <T,>({
                     <div key={`skeleton-${index}`} className={cn(cardClassName, "p-4")}>
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex flex-1 flex-col gap-1.5">
+                                <Skeleton className="h-6 w-14" />
                                 <Skeleton className="h-5 w-2/3" />
-                                <Skeleton className="h-3 w-12" />
                             </div>
                             <Skeleton className="h-5 w-20 rounded-full" />
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                        <div className="mt-2 divide-y">
                             {Array.from({ length: 4 }, (_, cellIndex) => (
-                                <div key={cellIndex} className="flex flex-col gap-1.5">
-                                    <Skeleton className="h-3 w-1/2" />
-                                    <Skeleton className="h-4 w-4/5" />
+                                <div key={cellIndex} className="flex items-center justify-between gap-4 py-3">
+                                    <Skeleton className="h-3.5 w-1/4" />
+                                    <Skeleton className="h-4 w-2/5" />
                                 </div>
                             ))}
                         </div>
@@ -264,7 +313,7 @@ const EntityCardList = <T,>({
                         titleColumns={titleColumns}
                         badgeColumn={badgeColumn}
                         detailColumns={detailColumns}
-                        showIdBelowTitle={showIdBelowTitle}
+                        showIdAboveTitle={showIdAboveTitle}
                         statusColor={getStatusColor?.(row)}
                         renderActions={renderActions}
                     />

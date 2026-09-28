@@ -222,7 +222,7 @@ describe("EntityCardList", () => {
             />
         );
 
-    it("compone il titolo con le colonne 'title' e mette l'ID sotto", () => {
+    it("compone il titolo con le colonne 'title' e mette l'ID sopra", () => {
         renderCards();
         const [mario, anna] = screen.getAllByRole("article");
 
@@ -247,6 +247,32 @@ describe("EntityCardList", () => {
         expect(within(mario).getByText("Email")).toBeInTheDocument();
         expect(within(mario).getByText("mario@example.com")).toBeInTheDocument();
         expect(within(mario).getByRole("button", { name: "Apri 1" })).toBeInTheDocument();
+    });
+
+    it("nasconde i dettagli secondari finché la scheda non si apre", () => {
+        renderCards({
+            columns: [
+                ...columns.filter((column) => column.key !== "actions"),
+                { key: "note", header: "Note", cardCollapsed: true, render: () => "da richiamare" },
+            ],
+        });
+        const [mario] = screen.getAllByRole("article");
+        const toggle = within(mario).getByRole("button", { name: "Altri dettagli (1)" });
+
+        expect(within(mario).queryByText("da richiamare")).not.toBeInTheDocument();
+        expect(within(mario).getByText("mario@example.com")).toBeInTheDocument();
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+        fireEvent.click(toggle);
+
+        expect(within(mario).getByText("da richiamare")).toBeInTheDocument();
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("senza dettagli secondari non mostra il comando per aprire la scheda", () => {
+        renderCards();
+
+        expect(screen.queryByRole("button", { name: /dettagli/ })).not.toBeInTheDocument();
     });
 
     it("senza colonne titolo intitola la scheda con l'ID", () => {

@@ -54,26 +54,31 @@ export const reportColumns: ReportColumn[] = [
     {
         key: "password",
         header: "Password",
+        cardCollapsed: true,
         render: (row) => row.password ?? "-",
     },
     {
         key: "dataBackup",
         header: "Backup dati",
+        cardCollapsed: true,
         render: (row) => formatYesNo(row.dataBackup),
     },
     {
         key: "charger",
         header: "Alimentatore",
+        cardCollapsed: true,
         render: (row) => formatYesNo(row.charger),
     },
     {
         key: "totalPrice",
         header: "Prezzo totale",
+        cardCollapsed: true,
         render: (row) => formatEuro(row.totalPrice),
     },
     {
         key: "createdAt",
         header: "Creato il",
+        cardCollapsed: true,
         sortKey: "createdAt",
         defaultSortDirection: "desc",
         render: (row) => formatDateTime(row.createdAt),

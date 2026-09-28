@@ -20,10 +20,11 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 - [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
   aree da toccare sotto i 44px, colonna Azioni fuori vista nelle tabelle larghe, alcune
   proposte non ancora decise.
-- Colonne ridimensionabili nelle tabelle di Impostazioni (utenti, log, backup, tema): sono le
-  ultime tabelle scritte a mano fuori da `EntityTable`. Dal CHANGELOG del 2026-09-08; le schede
-  di cliente, collaboratore e tecnico, citate nella stessa voce, sono state coperte il 09-10 e
-  il 09-11.
+- Tabelle di Impostazioni (utenti, tentativi falliti, log, dump) ancora scritte a mano fuori da
+  `EntityTable`: niente colonne ridimensionabili (CHANGELOG del 2026-09-08). Dal 2026-09-28 le
+  loro schede su telefono sono già `EntityCardList`; per passare anche le tabelle serve prima
+  un'opzione di `EntityTable` per cambiare tabella/schede sulla larghezza del contenitore (`@xl`)
+  invece che a `sm`, e per i Log la colorazione della sola cella di stato invece della riga.
 - Proposte dalla revisione dell'interfaccia del 2026-09-16, da decidere se farle (quelle scelte
   subito sono nel CHANGELOG dello stesso giorno):
   - **Password del dispositivo in chiaro.** La lista report ha una colonna Password, e la
@@ -317,7 +318,7 @@ scelta.*
 
 - **Aree da toccare sotto i 44px su telefono.** Quasi ovunque: pulsanti da 36–40px, la X dei
   dialoghi da 32px, le frecce della paginazione (42×36), il selettore delle righe per pagina
-  (57×32), i pulsanti `sm` di Impostazioni (32px). Deciso di non toccarle in quel giro: è una
+  (57×32). Deciso di non toccarle in quel giro: è una
   scelta di misura di base dei pulsanti che cambia l'aspetto di tutta l'app, da fare in un
   colpo solo e da riverificare ovunque.
 - **Colonna Azioni fuori vista nelle tabelle larghe.** Con la barra laterale aperta, report e

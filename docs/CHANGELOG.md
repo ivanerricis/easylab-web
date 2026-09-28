@@ -11,6 +11,97 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-28 — Schede delle liste su mobile a righe, schede report apribili, numero più visibile
+
+- **Dettagli a righe nelle schede delle liste.** Le schede che su telefono sostituiscono le
+  tabelle (`EntityCardList`) avevano i dettagli su due colonne, etichetta sopra e valore sotto
+  (CHANGELOG 2026-09-10). Ora usano lo schema della scheda report: una riga per voce, etichetta a
+  sinistra e valore a destra, linea sottile fra le righe. Il 10/09 le righe erano state tolte
+  perché i valori lunghi andavano a capo stretti a destra; adesso le colonne `wide` (difetto,
+  email, azione ed errore dei log) diventano `longText` e vanno sotto l'etichetta, allineate a
+  sinistra, come problema e note nella scheda report. Le schede riusano `DetailGrid layout="rows"`
+  e `DetailItem`, non una copia: lista e scheda di dettaglio si leggono allo stesso modo per
+  costruzione. Striscia di stato a sinistra e badge restano (report, interventi, log). Anche lo
+  scheletro di caricamento è a righe, e la scheda utenti delle impostazioni, scritta a mano, usa
+  le stesse righe.
+- **Schede dei report apribili.** Con otto righe una scheda report superava l'altezza di un
+  telefono. Nuova opzione di colonna `cardCollapsed`: quelle voci si vedono solo toccando "Altri
+  dettagli (n)" in fondo alla scheda (`aria-expanded`), come la card dei dati nella scheda
+  cliente. Per i report restano visibili telefono, dispositivo e difetto; password, backup,
+  alimentatore, prezzo e data stanno dietro il comando. Da chiusa la scheda passa da ~470px a
+  ~290px (misurato a 390px). Le righe nascoste non sono nel DOM.
+- **Numero più visibile nelle schede.** `#3174` era in 12px grigio sotto il nome e si perdeva, ma
+  è ciò che si cerca per primo quando il cliente cita "il report 3174". Ora sta sopra il nome in
+  una pillola grigia, 14px in grassetto nel colore del testo, in tutte le liste (è
+  `EntityCardList`); lo scheletro di caricamento segue lo stesso ordine.
+
+File: `frontend/src/components/{entity-card-list,entity-table}.tsx` e il test,
+`frontend/src/pages/reports/components/report-columns.tsx`.
+
+---
+
+## 2026-09-28 — Impostazioni allineate al resto dell'app
+
+Un controllo di tutta la sezione contro gli schemi delle altre pagine e dei dialoghi ha trovato
+una ventina di differenze; sono state corrette tutte, salvo le tre tabelle annotate in fondo.
+
+- **Errori sotto i campi.** Nei dialoghi (cambio password, nuovo utente, attivazione e conferma
+  della 2FA, chiave e ripristino dei backup) e nei moduli Azienda, Email e Backup la validazione
+  era `toast.error`, che il resto dell'app aveva già abbandonato (vedi `FormField`). Ora
+  `FormField`/`FieldError` con `fieldProps`: errore sotto il campo, focus sul primo sbagliato,
+  sparisce quando si corregge. Anche password o codice rifiutati dal server (400, 429 per i troppi
+  tentativi: `isFieldRejection` in `lib/api/errors.ts`) vanno sotto il campo, come nel login;
+  rete ed errori del server restano toast. Nella conferma della 2FA il messaggio va sotto il campo
+  che nomina ("La password…" / "Il codice…"): il server controlla prima l'una e poi l'altro.
+- **Etichette e asterischi.** Le etichette dei dialoghi delle impostazioni erano a 14px, sotto i
+  18px di tutti gli altri dialoghi e del testo nei loro stessi campi. I campi obbligatori hanno
+  l'asterisco; quelli obbligatori solo a una condizione (Email con l'invio attivo, NAS con la copia
+  attiva, password solo se non ancora salvata) lo mostrano solo allora.
+- **Chiusura con dati scritti.** Cambio password, nuovo utente, conferma 2FA e ripristino passano
+  `isDirty`: un Esc per sbaglio chiedeva nulla e buttava le password digitate.
+- **Requisiti della password neutri all'apertura.** Nel cambio password la lista dei requisiti
+  partiva tutta rossa prima di aver scritto qualcosa; ora è grigia finché non si scrive.
+- **Liste su larghezza della sezione.** Utenti, tentativi di accesso falliti e dump sul server
+  passavano da tabella a schede a `sm` (la finestra), ma a 768px con la barra laterale aperta la
+  sezione è larga ~490px: ora `@xl` sulla sezione, come i Log. Lo stesso per le righe di campi
+  affiancati e le tessere (`SettingsFieldRow`, `SettingsTileGrid`, la configurazione backup).
+- **Utenti e tentativi falliti con `EntityCardList`.** Le schede su telefono sono quelle di tutte
+  le liste: utente disabilitato con la striscia rossa (e riga rossa in tabella), azioni "Sessioni"
+  e "⋯" larghe quanto la scheda. La tabella resta scritta a mano: `EntityTable` passa da tabella a
+  schede solo a `sm` e non ha un'opzione per la larghezza della sezione. Card rinominata
+  "Account" (la sezione si chiama già Utenti), come "Dati aziendali" in Azienda.
+- **Un solo stile per badge, caricamenti e avvisi.** Stato dei backup, stato della 2FA,
+  "Questa sessione" e i contrassegni degli utenti usano `StatusBadge` (erano quattro pillole
+  diverse). `SettingsLoadingBox` mostra scheletri invece di un riquadro tratteggiato con la
+  scritta, e Log, sessioni e tabelle lo usano tutti; i vuoti nelle tabelle sono il messaggio
+  centrato di `EntityTable`. Nuovo `SettingsWarningNote` per i due riquadri gialli copiati a mano
+  (aggiornamento, ripristino).
+- **Pulsanti.** Tutte le azioni delle card hanno l'icona e la misura normale (alcune erano `sm`);
+  i salvataggi sono "Salva" con l'icona `Save` come nei dialoghi (prima anche "Salva
+  impostazioni"). "Ripristina predefiniti" del Tema, da solo sopra le card, ora ha una sua card.
+  Le conferme senza icona (ripristino del logo, disconnessione di una sessione, chiave di backup)
+  l'hanno; "Continuare?" tolto dalla conferma dell'aggiornamento.
+- **Coppie etichetta/valore a righe.** Stato e codici di recupero della 2FA, percorso dell'ultimo
+  dump, cartella dei dump, ultimo ripristino e ultimo backup usano `DetailGrid layout="rows"` come
+  le schede di dettaglio.
+- **Meno cornici e meno testo.** La sezione non è più una scatola intorno alle card (erano tre
+  livelli di bordo: sezione, card, riquadro). Tolte le descrizioni che ripetevano la voce del menu
+  (Email, Aggiornamenti, Log, Stato backup, la prima frase di Clienti in Esportazione). Su telefono
+  le altre descrizioni di `SettingsCard` e `SettingsGroup` sono nascoste; restano, con
+  `keepDescriptionOnMobile`, quelle che avvertono di qualcosa (chiave di backup, dump sul server,
+  ripristino da file, "senza filtri esce l'archivio intero"). L'intestazione della card va a capo
+  da sola: senza descrizione titolo e pulsanti stanno sulla stessa riga anche su telefono. La
+  pagina ha un `h1` nascosto, come le altre.
+
+Non fatto: le tabelle di Utenti, tentativi falliti, Log e dump restano scritte a mano. Passarle a
+`EntityTable` richiede prima che questa sappia cambiare tabella/schede sulla larghezza del
+contenitore (annotato in [BACKLOG](BACKLOG.md)).
+
+File: `frontend/src/components/settings/**`, `frontend/src/components/dialogs/settings/**`,
+`frontend/src/pages/settings/SettingsPage.tsx`, `frontend/src/lib/api/errors.ts` e i test.
+
+---
+
 ## 2026-09-28 — Pagina di accesso: marchio accanto al logo, errori sotto i campi, segnaposto del logo
 
 - **Niente titolo e sottotitolo nella card.** "Accedi" / "Inserisci le tue credenziali" e

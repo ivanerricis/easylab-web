@@ -10,9 +10,12 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
+import { SettingsCard, SettingsSection } from "@/components/settings/settingsUi";
+import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
+import FormField from "@/components/form-field";
+import StatusBadge from "@/components/status-badge";
 import CustomDialog from "@/components/dialogs/customDialog";
 import RefreshButton from "@/components/refresh-button";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
@@ -25,13 +28,21 @@ import {
     disableUserTwoFactor,
     enableUser,
     getApiErrorMessage,
+    getApiErrorStatus,
     listUsers,
     regeneratePassword,
     type CreatedUserResult,
     type UserDto,
 } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { fieldProps } from "@/lib/formField";
+import type { StatusColor } from "@/lib/statusColors";
+import { cn, formatDateTime } from "@/lib/utils";
 import { useAuth } from "@/components/use-auth";
+
+/** Rosso per un account disabilitato: tinta della riga in tabella, striscia della scheda. */
+const getUserStatusColor = (user: UserDto): StatusColor | undefined => (user.active ? undefined : "red");
+
+const ownTwoFactorResetPasswordId = "ownTwoFactorResetPassword";
 
 const UsersSettingsSection = () => {
     const { user: currentUser } = useAuth();
@@ -48,6 +59,9 @@ const UsersSettingsSection = () => {
     const [userPendingTwoFactorReset, setUserPendingTwoFactorReset] = useState<UserDto | null>(null);
     const [isResettingTwoFactor, setIsResettingTwoFactor] = useState(false);
     const [twoFactorResetPassword, setTwoFactorResetPassword] = useState("");
+    // Sotto il campo e non in un toast, come nella pagina di accesso: anche il rifiuto del server
+    // per password sbagliata, che è l'errore più probabile qui e riguarda proprio quel campo.
+    const [twoFactorResetPasswordError, setTwoFactorResetPasswordError] = useState<string>();
     const [userViewingSessions, setUserViewingSessions] = useState<UserDto | null>(null);
     const isResettingOwnTwoFactor =
         userPendingTwoFactorReset != null && userPendingTwoFactorReset.id === currentUser?.id;
@@ -55,6 +69,7 @@ const UsersSettingsSection = () => {
     const closeTwoFactorReset = () => {
         setUserPendingTwoFactorReset(null);
         setTwoFactorResetPassword("");
+        setTwoFactorResetPasswordError(undefined);
     };
 
     const loadUsers = async () => {
@@ -159,7 +174,8 @@ const UsersSettingsSection = () => {
         }
 
         if (isResettingOwnTwoFactor && !twoFactorResetPassword) {
-            toast.error("Inserisci la tua password");
+            setTwoFactorResetPasswordError("Inserisci la tua password");
+            document.getElementById(ownTwoFactorResetPasswordId)?.focus();
             return;
         }
 
@@ -173,7 +189,16 @@ const UsersSettingsSection = () => {
             closeTwoFactorReset();
             toast.success(`Verifica in due passaggi disattivata per "${updated.username}"`);
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi"));
+            const message = getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi");
+
+            // Sul proprio account un 400 è la password rifiutata (vedi `assertOwnPassword` nel
+            // backend): va sotto il campo. Gli altri errori (rete, permessi) non sono del campo.
+            if (isResettingOwnTwoFactor && getApiErrorStatus(error) === 400) {
+                setTwoFactorResetPasswordError(message);
+                document.getElementById(ownTwoFactorResetPasswordId)?.focus();
+            } else {
+                toast.error(message);
+            }
         } finally {
             setIsResettingTwoFactor(false);
         }
@@ -197,75 +222,63 @@ const UsersSettingsSection = () => {
         };
     };
 
-    const renderUserActionButtons = (user: UserDto) => {
-        const actions = getUserActions(user);
+    /**
+     * I contrassegni dell'utente, uguali in tabella e nella scheda. In tabella erano testo tra
+     * parentesi ("(tu) (admin) (2FA)") e nella scheda pillole: la stessa informazione in due
+     * forme, e le parentesi accanto al nome si leggevano come parte di esso. Sono `StatusBadge`,
+     * la pillola degli stati delle liste: neutri, tranne "disabilitato" in rosso come la striscia
+     * della scheda e la tinta della riga.
+     */
+    const renderUserFlags = (user: UserDto) => {
+        const flags: { label: string; color?: StatusColor }[] = [
+            user.id === currentUser?.id ? { label: "tu" } : null,
+            user.isAdmin ? { label: "admin" } : null,
+            !user.active ? { label: "disabilitato", color: "red" as const } : null,
+            user.twoFactorEnabled ? { label: "2FA" } : null,
+        ].filter((flag) => flag !== null);
+
+        if (flags.length === 0) {
+            return null;
+        }
 
         return (
-            <>
-                <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
-                    <Monitor className="size-4" />
-                    Sessioni
-                </Button>
-                {actions.canRegenerate ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingRegeneration(user)}>
-                        <KeyRound className="size-4" />
-                        Rigenera password
-                    </Button>
-                ) : null}
-                {actions.canResetTwoFactor ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setUserPendingTwoFactorReset(user)}
-                    >
-                        <ShieldOff className="size-4" />
-                        Disattiva 2FA
-                    </Button>
-                ) : null}
-                {actions.canToggleActive ? (
-                    user.active ? (
-                        <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingDisable(user)}>
-                            <UserX className="size-4" />
-                            Disabilita
-                        </Button>
-                    ) : (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isTogglingActive}
-                            onClick={() => void handleEnable(user)}
-                        >
-                            <ShieldCheck className="size-4" />
-                            Riabilita
-                        </Button>
-                    )
-                ) : null}
-                {actions.canDelete ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setUserPendingDelete(user)}>
-                        <Trash2 className="size-4" />
-                        Elimina
-                    </Button>
-                ) : null}
-            </>
+            <span className="flex flex-wrap gap-1.5">
+                {flags.map((flag) => (
+                    <StatusBadge key={flag.label} color={flag.color}>
+                        {flag.label}
+                    </StatusBadge>
+                ))}
+            </span>
         );
     };
 
+    /** Nome e contrassegni insieme: il titolo della scheda e la prima cella della tabella. */
+    const renderUserTitle = (user: UserDto) => (
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {user.username}
+            {renderUserFlags(user)}
+        </span>
+    );
+
     /**
-     * In tabella restano in riga solo "Sessioni", l'azione di consultazione, e un menu "⋯" per
-     * le altre quattro. Con tutti i pulsanti affiancati la colonna Azioni sfondava la tabella
+     * Restano in riga solo "Sessioni", l'azione di consultazione, e un menu "⋯" per le altre
+     * quattro, in tabella e nella scheda su telefono. Con tutti i pulsanti affiancati la colonna Azioni sfondava la tabella
      * anche a 1440px ("Disat…", "Elimina" tagliato fuori), e sono comunque azioni rare, quasi
-     * tutte confermate da un dialogo: un clic in più non pesa.
+     * tutte confermate da un dialogo: un clic in più non pesa. Nella scheda erano invece tutti
+     * in vista, e a capo in righe diverse per ogni utente ("Sessioni" da solo, poi "Rigenera
+     * password", poi "Disabilita" ed "Elimina"): due utenti non si somigliavano più.
+     *
+     * `inCard`: nella scheda i due pulsanti si dividono la fascia in fondo (`EntityCardList`), e
+     * il segnaposto del menu che manca lascerebbe mezza fascia vuota invece di incolonnare.
      */
-    const renderUserActionsMenu = (user: UserDto) => {
+    const renderUserActionsMenu = (user: UserDto, inCard = false) => {
         const actions = getUserActions(user);
         const hasMenuActions =
             actions.canRegenerate || actions.canResetTwoFactor || actions.canToggleActive || actions.canDelete;
 
         return (
             <>
-                <Button type="button" variant="outline" size="sm" onClick={() => setUserViewingSessions(user)}>
+                <Button type="button" variant="outline" onClick={() => setUserViewingSessions(user)}>
                     <Monitor className="size-4" />
                     Sessioni
                 </Button>
@@ -275,13 +288,13 @@ const UsersSettingsSection = () => {
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="icon-sm"
+                                size="icon"
                                 aria-label={`Altre azioni per ${user.username}`}
                             >
                                 <Ellipsis className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        {/* `w-auto`: di serie il menu è largo quanto il trigger, qui un'icona da 32px. */}
+                        {/* `w-auto`: di serie il menu è largo quanto il trigger, qui un'icona da 36px. */}
                         <DropdownMenuContent align="end" className="w-auto min-w-48">
                             {actions.canRegenerate ? (
                                 <DropdownMenuItem onSelect={() => setUserPendingRegeneration(user)}>
@@ -322,20 +335,34 @@ const UsersSettingsSection = () => {
                             ) : null}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                ) : (
+                ) : inCard ? null : (
                     // Tiene il posto del menu, così "Sessioni" resta incolonnato con le altre
                     // righe anche sul proprio account senza 2FA, che non ha altre azioni.
-                    <span aria-hidden="true" className="size-8 shrink-0" />
+                    <span aria-hidden="true" className="size-9 shrink-0" />
                 )}
             </>
         );
     };
 
+    /**
+     * Le schede sono quelle di `EntityCardList`, come nelle altre liste: striscia rossa per gli
+     * account disabilitati e fascia dei pulsanti larga quanto la scheda, con bersagli da 44px.
+     * `EntityTable` invece no: passa alla tabella a `sm` dello schermo, mentre qui conta la
+     * larghezza della sezione (vedi sotto), e le sue colonne ridimensionabili con le larghezze
+     * salvate non servono a tre colonne.
+     */
+    const userCardColumns: EntityCardColumn<UserDto>[] = [
+        { key: "username", header: "Nome utente", render: renderUserTitle, cardSlot: "title" },
+        { key: "createdAt", header: "Creato il", render: (user) => formatDateTime(user.createdAt) },
+    ];
+    const isInitialLoading = isLoading && users.length === 0;
+    const refetchingClassName = isLoading && !isInitialLoading ? "opacity-60 transition-opacity" : undefined;
+
     return (
         <SettingsSection>
+            {/* "Account" e non "Utenti": era il nome della sezione, ripetuto subito sotto. */}
             <SettingsCard
-                title="Utenti"
-                description="Gestisci gli account che possono accedere all'applicazione."
+                title="Account"
                 action={
                     <>
                         <RefreshButton
@@ -351,108 +378,77 @@ const UsersSettingsSection = () => {
                     </>
                 }
             >
-                {isLoading ? (
-                    <SettingsLoadingBox label="Caricamento utenti..." />
-                ) : (
-                    <>
-                        <Table containerClassName="hidden sm:block">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Nome utente</TableHead>
-                                    <TableHead>Creato il</TableHead>
-                                    <TableHead className="text-right">Azioni</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {users.map((user) => (
-                                    <TableRow key={user.id}>
-                                        {/* Nome, contrassegni e data vanno a capo invece di stare su una
-                                            riga sola: a 768px, con la barra laterale aperta, la tabella
-                                            ha ~400px, e "claude_visual_check" più la data intera
-                                            spingevano il menu delle azioni fuori dalla card. */}
-                                        <TableCell className="font-medium [overflow-wrap:anywhere] whitespace-normal">
-                                            {user.username}
-                                            {user.id === currentUser?.id ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(tu)</span>
-                                            ) : null}
-                                            {user.isAdmin ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(admin)</span>
-                                            ) : null}
-                                            {!user.active ? (
-                                                <span className="ml-2 text-xs text-destructive">(disabilitato)</span>
-                                            ) : null}
-                                            {user.twoFactorEnabled ? (
-                                                <span className="ml-2 text-xs text-muted-foreground">(2FA)</span>
-                                            ) : null}
-                                        </TableCell>
-                                        <TableCell className="whitespace-normal">
-                                            {formatDateTime(user.createdAt)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {renderUserActionsMenu(user)}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                {/* Tabella e schede si scambiano sulla larghezza della sezione (`@container` in
+                    SettingsPage), non dello schermo, come nei Log: a 768px con la barra laterale
+                    aperta la sezione è larga circa 440px, e con `sm:` la tabella c'era già, con
+                    nome, contrassegni e data che spingevano il menu delle azioni contro il bordo. */}
+                <Table containerClassName="hidden @xl:block" aria-busy={isLoading} className={refetchingClassName}>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome utente</TableHead>
+                            <TableHead>Creato il</TableHead>
+                            <TableHead className="text-right">Azioni</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {/* Righe-scheletro come in EntityTable, solo al primo caricamento: a una
+                            ricarica le righe restano leggibili, appena attenuate. */}
+                        {isInitialLoading
+                            ? Array.from({ length: 3 }, (_, rowIndex) => (
+                                  <TableRow key={`skeleton-${rowIndex}`} aria-hidden={rowIndex > 0}>
+                                      <TableCell>
+                                          {rowIndex === 0 ? (
+                                              <span className="sr-only">Caricamento utenti...</span>
+                                          ) : null}
+                                          <Skeleton aria-hidden="true" className="h-4 w-full" />
+                                      </TableCell>
+                                      <TableCell>
+                                          <Skeleton aria-hidden="true" className="h-4 w-full" />
+                                      </TableCell>
+                                      <TableCell>
+                                          <Skeleton aria-hidden="true" className="ml-auto h-9 w-36" />
+                                      </TableCell>
+                                  </TableRow>
+                              ))
+                            : users.map((user) => (
+                                  // Tinta rossa per gli account disabilitati, come la striscia della
+                                  // scheda: lo stesso `data-status-color` di EntityTable (index.css).
+                                  <TableRow key={user.id} data-status-color={getUserStatusColor(user)}>
+                                      {/* Nome, contrassegni e data vanno a capo invece di stare su una
+                                          riga sola: in una sezione stretta "claude_visual_check" più la
+                                          data intera spingevano il menu delle azioni fuori dalla card. */}
+                                      <TableCell className="font-medium [overflow-wrap:anywhere] whitespace-normal">
+                                          {renderUserTitle(user)}
+                                      </TableCell>
+                                      <TableCell className="whitespace-normal">
+                                          {formatDateTime(user.createdAt)}
+                                      </TableCell>
+                                      {/* Colori neutri nella cella delle azioni, come in EntityTable:
+                                          la tinta della riga non deve colorare i pulsanti. */}
+                                      <TableCell
+                                          className={cn("text-right", !user.active && "bg-card text-foreground")}
+                                      >
+                                          <div className="flex items-center justify-end gap-2">
+                                              {renderUserActionsMenu(user)}
+                                          </div>
+                                      </TableCell>
+                                  </TableRow>
+                              ))}
+                    </TableBody>
+                </Table>
 
-                        <div className="flex flex-col gap-3 sm:hidden">
-                            {users.map((user) => (
-                                // Stesso aspetto delle schede di `EntityCardList`, che qui non si
-                                // usa perché i pulsanti sono con testo e vanno a capo invece di
-                                // dividersi la larghezza.
-                                <article
-                                    key={user.id}
-                                    className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs"
-                                >
-                                    <div className="px-4 pt-3.5 pb-3.5">
-                                        <h3 className="text-base leading-snug font-semibold break-words">
-                                            {user.username}
-                                        </h3>
-                                        {user.id === currentUser?.id ||
-                                        user.isAdmin ||
-                                        !user.active ||
-                                        user.twoFactorEnabled ? (
-                                            <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-medium">
-                                                {user.id === currentUser?.id ? (
-                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                                                        tu
-                                                    </span>
-                                                ) : null}
-                                                {user.isAdmin ? (
-                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                                                        admin
-                                                    </span>
-                                                ) : null}
-                                                {!user.active ? (
-                                                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">
-                                                        disabilitato
-                                                    </span>
-                                                ) : null}
-                                                {user.twoFactorEnabled ? (
-                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                                                        2FA
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
-                                        <dl className="mt-3">
-                                            <dt className="text-xs text-muted-foreground">Creato il</dt>
-                                            <dd className="mt-0.5 text-sm font-medium">
-                                                {formatDateTime(user.createdAt)}
-                                            </dd>
-                                        </dl>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2 border-t bg-muted/40 px-3 py-2.5">
-                                        {renderUserActionButtons(user)}
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    </>
-                )}
+                <EntityCardList
+                    hiddenFromClassName="@xl:hidden"
+                    className={refetchingClassName}
+                    columns={userCardColumns}
+                    rows={users}
+                    getRowKey={(user) => user.id}
+                    getStatusColor={getUserStatusColor}
+                    renderActions={(user) => renderUserActionsMenu(user, true)}
+                    emptyMessage="Nessun utente."
+                    isInitialLoading={isInitialLoading}
+                    skeletonCardCount={2}
+                />
             </SettingsCard>
 
             <CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} onCreated={handleUserCreated} />
@@ -536,18 +532,30 @@ const UsersSettingsSection = () => {
                 }
                 content={
                     isResettingOwnTwoFactor ? (
-                        <div className="grid gap-2 pb-2">
-                            <Label htmlFor="ownTwoFactorResetPassword">Password</Label>
+                        <FormField
+                            id={ownTwoFactorResetPasswordId}
+                            label="Password"
+                            required
+                            error={twoFactorResetPasswordError}
+                            className="pb-2"
+                        >
                             <Input
-                                id="ownTwoFactorResetPassword"
+                                {...fieldProps(ownTwoFactorResetPasswordId, {
+                                    error: twoFactorResetPasswordError,
+                                    required: true,
+                                })}
                                 type="password"
                                 autoComplete="current-password"
                                 value={twoFactorResetPassword}
-                                onChange={(event) => setTwoFactorResetPassword(event.target.value)}
+                                onChange={(event) => {
+                                    setTwoFactorResetPassword(event.target.value);
+                                    setTwoFactorResetPasswordError(undefined);
+                                }}
                             />
-                        </div>
+                        </FormField>
                     ) : undefined
                 }
+                isDirty={twoFactorResetPassword !== ""}
                 destructive
                 confirmLabel={isResettingTwoFactor ? "Disattivazione..." : "Disattiva"}
                 confirmIcon={ShieldOff}

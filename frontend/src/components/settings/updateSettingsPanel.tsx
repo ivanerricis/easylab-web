@@ -9,9 +9,11 @@ import {
     SettingsStatusBadge,
     SettingsTile,
     SettingsTileGrid,
+    SettingsWarningNote,
     type SettingsRunStatus,
 } from "@/components/settings/settingsUi";
 import CustomDialog from "@/components/dialogs/customDialog";
+import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { useBusyGuard } from "@/components/use-busy-guard";
 import {
     checkForUpdates,
@@ -21,8 +23,8 @@ import {
     runUpdateNow,
     type UpdateStatusDto,
 } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
-import { Download } from "lucide-react";
+import { cn, formatDateTime } from "@/lib/utils";
+import { Download, RefreshCw } from "lucide-react";
 
 const POLL_INTERVAL_MS = 3000;
 const CHECK_MAX_ATTEMPTS = 20; // ~1 minute
@@ -240,10 +242,10 @@ const UpdateSettingsPanel = () => {
         <SettingsSection>
             <SettingsCard
                 title="Stato aggiornamenti"
-                description="Verifica e applica gli aggiornamenti dell'applicazione sul server."
                 action={
                     <>
                         <Button type="button" variant="outline" disabled={isBusy} onClick={() => void handleCheck()}>
+                            <RefreshCw className={cn("size-4", isChecking && "animate-spin")} />
                             {isChecking ? "Verifica in corso..." : "Verifica aggiornamenti"}
                         </Button>
                         <Button
@@ -251,6 +253,7 @@ const UpdateSettingsPanel = () => {
                             disabled={isBusy || !status?.updateAvailable}
                             onClick={() => void handleOpenConfirm()}
                         >
+                            <Download className="size-4" />
                             {isUpdating ? "Aggiornamento in corso..." : "Aggiorna adesso"}
                         </Button>
                     </>
@@ -295,29 +298,32 @@ const UpdateSettingsPanel = () => {
                 open={isConfirmOpen}
                 onOpenChange={setIsConfirmOpen}
                 title="Aggiorna applicazione"
-                description="I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile. Continuare?"
+                description="I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile."
                 content={
-                    <div className="grid gap-2 rounded-md border border-status-yellow/40 bg-status-yellow/10 p-3 text-sm">
-                        <p className="font-medium">Esegui un backup prima di aggiornare</p>
+                    <SettingsWarningNote title="Esegui un backup prima di aggiornare">
                         <p className="text-muted-foreground">
                             L&apos;aggiornamento può applicare modifiche al database che non si annullano da sole. Se
                             qualcosa va storto, il backup è l&apos;unico modo per tornare indietro: lo esegui da
                             Impostazioni &gt; Backup.
                         </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-muted-foreground">Ultimo backup:</span>
-                            {isLoadingLastBackup ? (
-                                <span className="text-muted-foreground">verifica in corso...</span>
-                            ) : lastBackup ? (
-                                <>
-                                    <span className="font-medium">{formatDateTime(lastBackup.at)}</span>
-                                    <SettingsStatusBadge status={lastBackup.status} />
-                                </>
-                            ) : (
-                                <span className="font-medium">non disponibile</span>
-                            )}
-                        </div>
-                    </div>
+                        <DetailGrid layout="rows">
+                            <DetailItem
+                                label="Ultimo backup"
+                                value={
+                                    isLoadingLastBackup ? (
+                                        <span className="font-normal text-muted-foreground">verifica in corso...</span>
+                                    ) : lastBackup ? (
+                                        <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                                            {formatDateTime(lastBackup.at)}
+                                            <SettingsStatusBadge status={lastBackup.status} />
+                                        </span>
+                                    ) : (
+                                        "non disponibile"
+                                    )
+                                }
+                            />
+                        </DetailGrid>
+                    </SettingsWarningNote>
                 }
                 confirmLabel="Aggiorna adesso"
                 confirmIcon={Download}

@@ -2,11 +2,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
 import CopyableValue from "@/components/dialogs/settings/copyableValue";
-import { RequiredMark } from "@/components/form-field";
+import FormField from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { Label } from "@/components/ui/label";
-import { enableTwoFactor, getApiErrorMessage, startTwoFactorSetup } from "@/lib/api";
+import { enableTwoFactor, getApiErrorMessage, isFieldRejection, startTwoFactorSetup } from "@/lib/api";
+import { fieldProps } from "@/lib/formField";
 import { ShieldCheck } from "lucide-react";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
 
@@ -30,6 +30,8 @@ type Setup = { secretBase32: string; qrDataUrl: string };
 const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
     const [password, setPassword] = useState("");
     const [code, setCode] = useState("");
+    const [passwordError, setPasswordError] = useState<string>();
+    const [codeError, setCodeError] = useState<string>();
     const [setup, setSetup] = useState<Setup | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,13 +40,16 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             setPassword("");
             setCode("");
             setSetup(null);
+            setPasswordError(undefined);
+            setCodeError(undefined);
         }
         onOpenChange(nextOpen);
     };
 
     const handlePasswordStep = async () => {
         if (!password) {
-            toast.error("Inserisci la tua password");
+            setPasswordError("Inserisci la tua password");
+            document.getElementById("twoFactorPassword")?.focus();
             return;
         }
 
@@ -53,7 +58,14 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             const result = await startTwoFactorSetup(password);
             setSetup({ secretBase32: result.secretBase32, qrDataUrl: result.qrDataUrl });
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile avviare la configurazione"));
+            const message = getApiErrorMessage(error, "Impossibile avviare la configurazione");
+
+            if (isFieldRejection(error)) {
+                setPasswordError(message);
+                document.getElementById("twoFactorPassword")?.focus();
+            } else {
+                toast.error(message);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -61,7 +73,8 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
 
     const handleCodeStep = async () => {
         if (!code.trim()) {
-            toast.error("Inserisci il codice generato dall'app");
+            setCodeError("Inserisci il codice generato dall'app");
+            document.getElementById("twoFactorConfirmCode")?.focus();
             return;
         }
 
@@ -72,8 +85,16 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             handleOpenChange(false);
             onEnabled(recoveryCodes);
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Codice non valido"));
+            const message = getApiErrorMessage(error, "Codice non valido");
             setCode("");
+
+            if (isFieldRejection(error)) {
+                setCodeError(message);
+                // Il clic su "Attiva" ha lasciato il focus sul bottone: si riprova dal campo.
+                document.getElementById("twoFactorConfirmCode")?.focus();
+            } else {
+                toast.error(message);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -93,19 +114,18 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                 onConfirm={() => void handlePasswordStep()}
                 preventOutsideClose
                 content={
-                    <div className="grid gap-2 pb-2">
-                        <Label htmlFor="twoFactorPassword">
-                            Password
-                            <RequiredMark />
-                        </Label>
+                    <FormField id="twoFactorPassword" label="Password" required error={passwordError} className="pb-2">
                         <Input
-                            id="twoFactorPassword"
+                            {...fieldProps("twoFactorPassword", { error: passwordError, required: true })}
                             type="password"
                             autoComplete="current-password"
                             value={password}
-                            onChange={(event) => setPassword(event.target.value)}
+                            onChange={(event) => {
+                                setPassword(event.target.value);
+                                setPasswordError(undefined);
+                            }}
                         />
-                    </div>
+                    </FormField>
                 }
             />
         );
@@ -142,30 +162,32 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
                         errorMessage="Impossibile copiare il codice"
                     />
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmCode">
-                            Codice di verifica
-                            <RequiredMark />
-                        </Label>
+                    <FormField id="twoFactorConfirmCode" label="Codice di verifica" required error={codeError}>
                         <InputOTP
-                            id="twoFactorConfirmCode"
+                            {...fieldProps("twoFactorConfirmCode", { error: codeError, required: true })}
                             autoComplete="one-time-code"
                             maxLength={6}
                             pattern={REGEXP_ONLY_DIGITS}
                             containerClassName="justify-center"
                             value={code}
-                            onChange={setCode}
+                            onChange={(value) => {
+                                setCode(value);
+                                setCodeError(undefined);
+                            }}
                         >
                             <InputOTPGroup>
-                                <InputOTPSlot index={0} />
-                                <InputOTPSlot index={1} />
-                                <InputOTPSlot index={2} />
-                                <InputOTPSlot index={3} />
-                                <InputOTPSlot index={4} />
-                                <InputOTPSlot index={5} />
+                                {/* Le caselle sono `div` disegnati sopra l'input vero, che è
+                                    invisibile: il bordo rosso va chiesto a loro. */}
+                                {[0, 1, 2, 3, 4, 5].map((index) => (
+                                    <InputOTPSlot
+                                        key={index}
+                                        index={index}
+                                        aria-invalid={codeError ? true : undefined}
+                                    />
+                                ))}
                             </InputOTPGroup>
                         </InputOTP>
-                    </div>
+                    </FormField>
                 </div>
             }
         />

@@ -138,7 +138,7 @@ describe("BackupSettingsPanel", () => {
         // Parola giusta ma senza password: ancora bloccato.
         expect(confirm).toBeDisabled();
 
-        await userEvent.type(within(dialog).getByLabelText("La tua password"), "segreta");
+        await userEvent.type(within(dialog).getByLabelText(/^La tua password/), "segreta");
         await userEvent.click(within(dialog).getByLabelText(/Svuota lo schema/));
         await userEvent.click(confirm);
 
@@ -167,7 +167,7 @@ describe("BackupSettingsPanel", () => {
         const dialog = screen.getByRole("dialog", { name: "Conferma ripristino database" });
         expect(dialog).toHaveAccessibleDescription(expect.stringContaining('"archivio.tar.gz"'));
         await userEvent.type(within(dialog).getByLabelText(/per confermare/), "RESTORE");
-        await userEvent.type(within(dialog).getByLabelText("La tua password"), "segreta");
+        await userEvent.type(within(dialog).getByLabelText(/^La tua password/), "segreta");
         await userEvent.click(within(dialog).getByRole("button", { name: "Ripristina" }));
 
         await waitFor(() => {
@@ -199,13 +199,15 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
 
     const fillNasFields = async () => {
         await userEvent.click(screen.getByLabelText("Copia ogni backup su una condivisione SMB/CIFS"));
-        change("Host / IP del NAS", " nas.locale ");
-        change("Nome condivisione", "backup");
+        // Con la copia attiva host, condivisione, utente e password hanno l'asterisco
+        // (`RequiredMark`), che è parte del testo dell'etichetta: da qui le espressioni regolari.
+        change(/^Host \/ IP del NAS/, " nas.locale ");
+        change(/^Nome condivisione/, "backup");
         change("Sottocartella (opzionale)", "laboratorio");
         change("Porta", "1445");
         change("Dominio/Workgroup (opzionale)", "UFFICIO");
-        change("Utente", "utente-nas");
-        change("Password", "segreta");
+        change(/^Utente/, "utente-nas");
+        change(/^Password/, "segreta");
     };
 
     it("i campi del NAS restano disattivati finché la copia non viene attivata", async () => {
@@ -216,7 +218,7 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
 
         await userEvent.click(screen.getByLabelText("Copia ogni backup su una condivisione SMB/CIFS"));
 
-        expect(screen.getByLabelText("Host / IP del NAS")).toBeEnabled();
+        expect(screen.getByLabelText("Host / IP del NAS*(obbligatorio)")).toBeEnabled();
         expect(screen.getByRole("button", { name: "Testa connessione" })).toBeEnabled();
     });
 
@@ -229,7 +231,7 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
         change("Orario", "03:30");
         change("Numero di backup da mantenere", "7");
         await fillNasFields();
-        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
             expect(api.updateBackupSettings).toHaveBeenCalledWith(
@@ -271,6 +273,30 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
         });
     });
 
+    /** Gli errori stanno sotto il loro campo, letti insieme a lui; il primo sbagliato ha il focus. */
+    it("mostra gli errori del NAS sotto i campi e li toglie correggendoli", async () => {
+        await renderPanel();
+
+        await userEvent.click(screen.getByLabelText("Copia ogni backup su una condivisione SMB/CIFS"));
+        change(/^Nome condivisione/, "backup");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        const host = screen.getByLabelText(/^Host \/ IP del NAS/);
+        expect(host).toHaveAccessibleDescription("Specifica l'host del NAS");
+        expect(host).toHaveAttribute("aria-invalid", "true");
+        expect(host).toHaveFocus();
+        expect(screen.getByLabelText(/^Utente/)).toHaveAccessibleDescription("Specifica l'utente del NAS");
+        expect(screen.getByLabelText(/^Password/)).toHaveAccessibleDescription(
+            "Specifica una password per la connessione al NAS"
+        );
+        expect(screen.getByLabelText(/^Nome condivisione/)).not.toHaveAccessibleDescription();
+        expect(api.updateBackupSettings).not.toHaveBeenCalled();
+
+        change(/^Host \/ IP del NAS/, "nas.locale");
+        expect(host).not.toHaveAccessibleDescription();
+        expect(host).not.toHaveAttribute("aria-invalid");
+    });
+
     /** Senza email configurata l'avviso non partirebbe: la casella resta spenta e lo spiega. */
     it("l'avviso email si può attivare solo con l'invio email configurato", async () => {
         await renderPanel();
@@ -282,7 +308,7 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
         await renderPanel();
 
         await userEvent.click(screen.getByLabelText("Invia una email se il backup automatico non va a buon fine"));
-        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
             expect(api.updateBackupSettings).toHaveBeenCalledWith(

@@ -121,7 +121,11 @@ const ExportButton = ({ label, onClick }: { label: string; onClick: () => void }
 );
 
 const ExportFilters = ({ children }: { children: ReactNode }) => (
-    <SettingsGroup title="Cosa esportare" description="Senza filtri esce l'archivio intero, in un file solo.">
+    <SettingsGroup
+        title="Cosa esportare"
+        keepDescriptionOnMobile
+        description="Senza filtri esce l'archivio intero, in un file solo."
+    >
         {/* Colonne in base alla larghezza del riquadro, non dello schermo: le date hanno bisogno
             di ~160px ciascuna, e a `xl` con barra laterale e menu delle impostazioni aperti tre
             colonne ne davano ~230 al periodo intero. Da 672px di riquadro quattro colonne (stato,
@@ -152,9 +156,10 @@ const ExportSettingsSection = () => {
 
     return (
         <SettingsSection>
+            {/* Senza descrizione: "L'anagrafica completa in un file CSV" la ripeteva, in breve,
+                il paragrafo qui sotto, che dice anche quali colonne ci sono. */}
             <SettingsCard
                 title="Clienti"
-                description="L'anagrafica completa in un file CSV."
                 action={<ExportButton label="Esporta clienti" onClick={() => download(getCustomersExportUrl())} />}
             >
                 <p className="text-sm text-muted-foreground">

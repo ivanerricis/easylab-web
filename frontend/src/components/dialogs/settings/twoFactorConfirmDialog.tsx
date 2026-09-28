@@ -1,10 +1,10 @@
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
-import { RequiredMark } from "@/components/form-field";
+import FormField from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { fieldProps } from "@/lib/formField";
+import { getApiErrorMessage, isFieldRejection } from "@/lib/api";
 
 /**
  * Password *e* secondo fattore insieme, come chiede il backend.
@@ -39,19 +39,28 @@ const TwoFactorConfirmDialog = ({
 }: Props) => {
     const [password, setPassword] = useState("");
     const [code, setCode] = useState("");
+    const [passwordError, setPasswordError] = useState<string>();
+    const [codeError, setCodeError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {
             setPassword("");
             setCode("");
+            setPasswordError(undefined);
+            setCodeError(undefined);
         }
         onOpenChange(nextOpen);
     };
 
     const handleConfirm = async () => {
-        if (!password || !code.trim()) {
-            toast.error("Inserisci password e codice");
+        const nextPasswordError = password ? undefined : "Inserisci la password";
+        const nextCodeError = code.trim() ? undefined : "Inserisci un codice dell'app o di recupero";
+        setPasswordError(nextPasswordError);
+        setCodeError(nextCodeError);
+
+        if (nextPasswordError || nextCodeError) {
+            document.getElementById(nextPasswordError ? "twoFactorConfirmPassword" : "twoFactorConfirmCode")?.focus();
             return;
         }
 
@@ -59,12 +68,27 @@ const TwoFactorConfirmDialog = ({
             setIsSubmitting(true);
             await onConfirm(password, code.trim());
             handleOpenChange(false);
-        } catch {
-            // Il messaggio d'errore lo mostra chi ha passato `onConfirm`, che sa cosa stava
-            // facendo, e poi rilancia apposta perché il dialogo resti aperto. Qui l'errore va
-            // solo fermato: senza questo `catch` arrivava fino al `void handleConfirm()` del
-            // pulsante e diventava un "Uncaught (in promise)" nella console a ogni codice
-            // sbagliato.
+        } catch (error) {
+            // Chi ha passato `onConfirm` rilancia apposta perché il dialogo resti aperto, e
+            // mostra lui in un toast gli errori che non sono di un campo (rete, server). Password
+            // o codice sbagliati (400, 429 per i troppi tentativi) vanno invece qui, sotto il
+            // campo, come nella pagina di accesso. Quale dei due lo dice il messaggio: il server
+            // controlla prima la password e poi il codice, e i due messaggi nominano il proprio
+            // campo. Se un giorno cambiassero, il testo resterebbe giusto, solo sotto l'altro
+            // campo. Senza questo `catch` l'errore arrivava al `void handleConfirm()` del
+            // pulsante e diventava un "Uncaught (in promise)" nella console.
+            if (isFieldRejection(error)) {
+                const message = getApiErrorMessage(error, "Verifica non riuscita");
+
+                if (/password/i.test(message)) {
+                    setPasswordError(message);
+                    document.getElementById("twoFactorConfirmPassword")?.focus();
+                } else {
+                    setCode("");
+                    setCodeError(message);
+                    document.getElementById("twoFactorConfirmCode")?.focus();
+                }
+            }
         } finally {
             // Resta da riabilitare i campi perché si possa riprovare.
             setIsSubmitting(false);
@@ -75,6 +99,7 @@ const TwoFactorConfirmDialog = ({
         <CustomDialog
             open={open}
             onOpenChange={handleOpenChange}
+            isDirty={password !== "" || code !== ""}
             title={title}
             description={description}
             destructive={destructive}
@@ -86,34 +111,37 @@ const TwoFactorConfirmDialog = ({
             onConfirm={() => void handleConfirm()}
             content={
                 <div className="grid gap-3 pb-2">
-                    <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmPassword">
-                            Password
-                            <RequiredMark />
-                        </Label>
+                    <FormField id="twoFactorConfirmPassword" label="Password" required error={passwordError}>
                         <Input
-                            id="twoFactorConfirmPassword"
+                            {...fieldProps("twoFactorConfirmPassword", { error: passwordError, required: true })}
                             type="password"
                             autoComplete="current-password"
                             value={password}
-                            onChange={(event) => setPassword(event.target.value)}
+                            onChange={(event) => {
+                                setPassword(event.target.value);
+                                setPasswordError(undefined);
+                            }}
                         />
-                    </div>
+                    </FormField>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="twoFactorConfirmCode">
-                            Codice di verifica o di recupero
-                            <RequiredMark />
-                        </Label>
+                    <FormField
+                        id="twoFactorConfirmCode"
+                        label="Codice di verifica o di recupero"
+                        required
+                        error={codeError}
+                    >
                         <Input
-                            id="twoFactorConfirmCode"
+                            {...fieldProps("twoFactorConfirmCode", { error: codeError, required: true })}
                             autoComplete="one-time-code"
                             maxLength={9}
                             className="text-center font-mono tracking-widest"
                             value={code}
-                            onChange={(event) => setCode(event.target.value)}
+                            onChange={(event) => {
+                                setCode(event.target.value);
+                                setCodeError(undefined);
+                            }}
                         />
-                    </div>
+                    </FormField>
                 </div>
             }
         />

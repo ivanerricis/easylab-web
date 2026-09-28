@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Computer, Moon, RotateCcw, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SettingsActions, SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
+import { SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/use-theme";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
@@ -182,13 +182,6 @@ const ThemeSettingsSection = () => {
 
     return (
         <SettingsSection>
-            <SettingsActions>
-                <Button type="button" variant="outline" size="sm" onClick={handleResetDefaults}>
-                    <RotateCcw className="size-4" />
-                    Ripristina predefiniti
-                </Button>
-            </SettingsActions>
-
             <SettingsCard
                 title="Modalità"
                 description="Scegli se seguire il sistema oppure forzare il tema chiaro o scuro."
@@ -344,6 +337,24 @@ const ThemeSettingsSection = () => {
                         </Button>
                     ))}
                 </div>
+            </SettingsCard>
+
+            {/* Il ripristino ha una card sua, in fondo, dopo le cinque personalizzazioni che
+                azzera: prima era un pulsante piccolo da solo sopra le card, che sembrava
+                riguardare anche la modalità (che invece non tocca). */}
+            <SettingsCard
+                title="Valori predefiniti"
+                action={
+                    <Button type="button" variant="outline" onClick={handleResetDefaults}>
+                        <RotateCcw className="size-4" />
+                        Ripristina predefiniti
+                    </Button>
+                }
+            >
+                <p className="text-sm text-muted-foreground">
+                    Riporta colore, angoli, righe e densità delle tabelle e dimensione del testo ai valori iniziali. La
+                    modalità chiara o scura resta quella scelta.
+                </p>
             </SettingsCard>
         </SettingsSection>
     );

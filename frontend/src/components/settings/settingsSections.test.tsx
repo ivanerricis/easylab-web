@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { AxiosError, AxiosHeaders } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -76,9 +77,20 @@ beforeEach(() => {
 });
 
 describe("UsersSettingsSection", () => {
+    // Per il testo proprio della prima cella, non per `getByText`: l'utente "admin" ha anche il
+    // contrassegno "admin", e i due testi sarebbero indistinguibili.
     const rowOf = (username: string) => {
-        const cell = within(screen.getByRole("table")).getByText(username);
-        return cell.closest("tr") as HTMLElement;
+        const row = within(screen.getByRole("table"))
+            .getAllByRole("row")
+            .find(
+                (candidate) => candidate.querySelector("td")?.firstElementChild?.firstChild?.textContent === username
+            );
+
+        if (!row) {
+            throw new Error(`Nessuna riga per ${username}`);
+        }
+
+        return row;
     };
 
     /** In tabella le azioni diverse da "Sessioni" stanno nel menu "⋯" della riga. */
@@ -99,7 +111,7 @@ describe("UsersSettingsSection", () => {
         renderWithUser(<UsersSettingsSection />);
         await within(await screen.findByRole("table")).findByText("luigi");
 
-        expect(within(rowOf("admin")).getByText("(tu)")).toBeInTheDocument();
+        expect(within(rowOf("admin")).getByText("tu")).toBeInTheDocument();
         const own = await openActionsMenu("admin");
         expect(own.getByRole("menuitem", { name: "Disattiva 2FA" })).toBeInTheDocument();
         expect(own.queryByRole("menuitem", { name: "Rigenera password" })).not.toBeInTheDocument();
@@ -122,7 +134,10 @@ describe("UsersSettingsSection", () => {
         await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
         const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
         await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
-        expect(toast.error).toHaveBeenCalledWith("Inserisci la tua password");
+        // Sotto il campo, non in un toast: vedi `FormField`.
+        expect(within(dialog).getByRole("alert")).toHaveTextContent("Inserisci la tua password");
+        expect(within(dialog).getByLabelText(/^Password/)).toHaveAttribute("aria-invalid", "true");
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.disableUserTwoFactor).not.toHaveBeenCalled();
 
         await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
@@ -131,6 +146,52 @@ describe("UsersSettingsSection", () => {
         await waitFor(() => {
             expect(api.disableUserTwoFactor).toHaveBeenCalledWith(1, "segreta1!");
         });
+    });
+
+    /** La password rifiutata dal server (400) riguarda il campo: va sotto, e il dialogo resta aperto. */
+    it("con la propria password sbagliata mostra l'errore sotto il campo", async () => {
+        const config = { headers: new AxiosHeaders() };
+        api.disableUserTwoFactor.mockRejectedValue(
+            new AxiosError("Request failed", "ERR_BAD_REQUEST", config, null, {
+                data: { message: "La password non è corretta" },
+                status: 400,
+                statusText: "Bad Request",
+                headers: {},
+                config,
+            })
+        );
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
+        const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "sbagliata");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
+
+        expect(await within(dialog).findByRole("alert")).toHaveTextContent("La password non è corretta");
+        expect(toast.error).not.toHaveBeenCalled();
+        expect(screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).toBeInTheDocument();
+
+        // Riscrivere la password toglie l'errore.
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "1");
+        expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    /** Un account disabilitato si riconosce dal colore: riga rossa in tabella, striscia nella scheda. */
+    it("segna in rosso gli account disabilitati", async () => {
+        api.listUsers.mockResolvedValue([admin, { ...luigi, active: false }]);
+        const { container } = renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        expect(rowOf("luigi")).toHaveAttribute("data-status-color", "red");
+        expect(rowOf("admin")).not.toHaveAttribute("data-status-color");
+
+        const cards = Array.from(container.querySelectorAll("article"));
+        const cardOf = (username: string) =>
+            cards.find((card) => card.querySelector("h3")?.textContent?.startsWith(username));
+        expect(cardOf("luigi")?.querySelector(".bg-status-red")).not.toBeNull();
+        expect(cardOf("admin")?.querySelector(".bg-status-red")).toBeNull();
+        expect(within(cardOf("luigi")!).getByText("disabilitato")).toBeInTheDocument();
     });
 
     it("rigenera la password di un altro e la mostra una volta", async () => {
@@ -259,7 +320,9 @@ describe("SecuritySettingsSection", () => {
         api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
         renderWithUser(<SecuritySettingsSection />);
 
-        expect(await screen.findByText("Codici di recupero ancora utilizzabili: 5 su 8.")).toBeInTheDocument();
+        // Una riga etichetta/valore (`DetailItem`): il valore sta accanto alla sua etichetta.
+        const value = await screen.findByText("5 su 8");
+        expect(value.closest("div")).toHaveTextContent("Codici di recupero utilizzabili");
     });
 
     it("disattiva la 2FA e aggiorna anche l'utente in sessione", async () => {
@@ -336,7 +399,7 @@ describe("SecuritySettingsSection", () => {
         expect(within(codesDialog).getByText("ABCD-2345")).toBeInTheDocument();
         expect(api.startTwoFactorSetup).toHaveBeenCalledWith("segreta1!");
         expect(api.enableTwoFactor).toHaveBeenCalledWith("123456");
-        expect(await screen.findByText("Codici di recupero ancora utilizzabili: 8 su 8.")).toBeInTheDocument();
+        expect(await screen.findByText("8 su 8")).toBeInTheDocument();
         expect(screen.queryByText("Non attiva")).not.toBeInTheDocument();
         expect(refresh).toHaveBeenCalled();
     });
@@ -357,7 +420,7 @@ describe("SecuritySettingsSection", () => {
         expect(await screen.findByRole("dialog", { name: "Codici di recupero" })).toBeInTheDocument();
         expect(screen.getByText("WXYZ-2345")).toBeInTheDocument();
         expect(api.regenerateRecoveryCodes).toHaveBeenCalledWith({ password: "segreta1!", code: "123456" });
-        expect(await screen.findByText("Codici di recupero ancora utilizzabili: 8 su 8.")).toBeInTheDocument();
+        expect(await screen.findByText("8 su 8")).toBeInTheDocument();
     });
 
     it("se la rigenerazione fallisce lo dice una volta e lascia il dialogo aperto", async () => {
@@ -437,7 +500,7 @@ describe("EmailSettingsPanel", () => {
         passwordSet: true,
     };
 
-    const saveButton = () => screen.getByRole("button", { name: "Salva impostazioni" });
+    const saveButton = () => screen.getByRole("button", { name: "Salva" });
 
     beforeEach(() => {
         api.getEmailSettings.mockResolvedValue(saved);
@@ -452,7 +515,7 @@ describe("EmailSettingsPanel", () => {
     it("attiva Salva solo quando qualcosa è cambiato", async () => {
         renderWithUser(<EmailSettingsPanel />);
         await waitFor(() => {
-            expect(screen.getByLabelText("Host SMTP")).toHaveValue("smtp.example.com");
+            expect(screen.getByLabelText(/^Host SMTP/)).toHaveValue("smtp.example.com");
         });
 
         expect(saveButton()).toBeDisabled();
@@ -464,7 +527,7 @@ describe("EmailSettingsPanel", () => {
 
     it("rifiuta un mittente non valido", async () => {
         renderWithUser(<EmailSettingsPanel />);
-        const fromEmail = await screen.findByLabelText("Email mittente");
+        const fromEmail = await screen.findByLabelText(/^Email mittente/);
         await waitFor(() => {
             expect(fromEmail).toHaveValue("info@example.com");
         });
@@ -473,14 +536,20 @@ describe("EmailSettingsPanel", () => {
         await userEvent.type(fromEmail, "info@");
         await userEvent.click(saveButton());
 
-        expect(toast.error).toHaveBeenCalledWith("L'email mittente non è valida");
+        // Sotto il campo e non in un toast, con il focus lì: vedi `FormField`.
+        expect(fromEmail).toHaveAccessibleDescription("L'email mittente non è valida");
+        expect(fromEmail).toHaveFocus();
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.updateEmailSettings).not.toHaveBeenCalled();
+
+        await userEvent.type(fromEmail, "example.com");
+        expect(fromEmail).not.toHaveAccessibleDescription();
     });
 
     /** Salvato con degli spazi, il form deve tornare pulito: prima Salva restava attivo. */
     it("dopo il salvataggio mostra i valori salvati e torna pulito", async () => {
         renderWithUser(<EmailSettingsPanel />);
-        const host = await screen.findByLabelText("Host SMTP");
+        const host = await screen.findByLabelText(/^Host SMTP/);
         await waitFor(() => {
             expect(host).toHaveValue("smtp.example.com");
         });
@@ -500,7 +569,7 @@ describe("EmailSettingsPanel", () => {
     const renderLoaded = async (settings: typeof saved = saved) => {
         api.getEmailSettings.mockResolvedValue(settings);
         renderWithUser(<EmailSettingsPanel />);
-        const host = await screen.findByLabelText("Host SMTP");
+        const host = await screen.findByLabelText(/^Host SMTP/);
         await waitFor(() => {
             expect(host).toHaveValue(settings.host);
         });
@@ -540,10 +609,17 @@ describe("EmailSettingsPanel", () => {
     it("con l'invio attivo chiede host, utente ed email mittente", async () => {
         const host = await renderLoaded();
 
+        // Con l'invio attivo i tre campi hanno l'asterisco (nascosto agli screen reader, che leggono
+        // "(obbligatorio)"), parte del testo dell'etichetta.
+        expect(host).toHaveAccessibleName("Host SMTP(obbligatorio)");
+        expect(screen.getByLabelText("Utente*(obbligatorio)")).toBeInTheDocument();
+        expect(screen.getByLabelText("Email mittente*(obbligatorio)")).toBeInTheDocument();
+
         await userEvent.clear(host);
         await userEvent.click(saveButton());
 
-        expect(toast.error).toHaveBeenCalledWith("Specifica almeno host, utente ed email mittente");
+        expect(host).toHaveAccessibleDescription("Specifica l'host SMTP");
+        expect(host).toHaveFocus();
         expect(api.updateEmailSettings).not.toHaveBeenCalled();
     });
 
@@ -554,7 +630,9 @@ describe("EmailSettingsPanel", () => {
         await userEvent.type(screen.getByLabelText("Porta"), "70000");
         await userEvent.click(saveButton());
 
-        expect(toast.error).toHaveBeenCalledWith("La porta SMTP deve essere un numero valido");
+        expect(screen.getByLabelText("Porta")).toHaveAccessibleDescription(
+            "La porta SMTP deve essere un numero valido"
+        );
         expect(api.updateEmailSettings).not.toHaveBeenCalled();
     });
 
@@ -564,7 +642,9 @@ describe("EmailSettingsPanel", () => {
         await userEvent.type(host, ".it");
         await userEvent.click(saveButton());
 
-        expect(toast.error).toHaveBeenCalledWith("Specifica una password per l'account email");
+        expect(screen.getByLabelText("Password*(obbligatorio)")).toHaveAccessibleDescription(
+            "Specifica una password per l'account email"
+        );
         expect(api.updateEmailSettings).not.toHaveBeenCalled();
     });
 
@@ -573,7 +653,7 @@ describe("EmailSettingsPanel", () => {
         await renderLoaded({ ...saved, host: "", username: "", fromEmail: "", passwordSet: false });
 
         await userEvent.click(screen.getByLabelText("Abilita invio email ai clienti"));
-        expect(screen.getByLabelText("Host SMTP")).toBeDisabled();
+        expect(screen.getByLabelText(/^Host SMTP/)).toBeDisabled();
         await userEvent.click(saveButton());
 
         await waitFor(() => {
@@ -605,8 +685,8 @@ describe("EmailSettingsPanel", () => {
 
             await userEvent.click(testButton());
 
-            expect(toast.error).toHaveBeenCalledWith(
-                "Inserisci la password nel campo qui sopra per testare la connessione"
+            expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
+                "Per testare la connessione scrivi la password"
             );
             expect(api.testEmailConnection).not.toHaveBeenCalled();
         });
@@ -614,20 +694,25 @@ describe("EmailSettingsPanel", () => {
         it("chiede host e utente", async () => {
             await renderLoaded();
 
-            await userEvent.clear(screen.getByLabelText("Utente"));
+            await userEvent.clear(screen.getByLabelText(/^Utente/));
             await userEvent.click(testButton());
 
-            expect(toast.error).toHaveBeenCalledWith("Per testare la connessione specifica almeno host e utente");
+            expect(screen.getByLabelText(/^Utente/)).toHaveAccessibleDescription(
+                "Per testare la connessione specifica l'utente"
+            );
+            expect(api.testEmailConnection).not.toHaveBeenCalled();
         });
 
         it("chiede un'email mittente valida", async () => {
             await renderLoaded();
 
-            await userEvent.clear(screen.getByLabelText("Email mittente"));
-            await userEvent.type(screen.getByLabelText("Email mittente"), "non-una-mail");
+            await userEvent.clear(screen.getByLabelText(/^Email mittente/));
+            await userEvent.type(screen.getByLabelText(/^Email mittente/), "non-una-mail");
             await userEvent.click(testButton());
 
-            expect(toast.error).toHaveBeenCalledWith("Inserisci un'email mittente valida per testare l'invio");
+            expect(screen.getByLabelText(/^Email mittente/)).toHaveAccessibleDescription(
+                "Inserisci un'email mittente valida per testare l'invio"
+            );
         });
 
         it("manda al server i valori scritti, ripuliti, e riporta la sua risposta", async () => {

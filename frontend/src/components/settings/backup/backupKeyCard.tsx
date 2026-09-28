@@ -1,3 +1,4 @@
+import { KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsCard } from "@/components/settings/settingsUi";
 import CopyableValue from "@/components/dialogs/settings/copyableValue";
@@ -12,6 +13,7 @@ import type { BackupPanel } from "./useBackupPanel";
 const BackupKeyCard = ({ panel }: { panel: BackupPanel }) => (
     <SettingsCard
         title="Chiave di cifratura dei backup"
+        keepDescriptionOnMobile
         description="Ogni backup viene cifrato con questa chiave, così un archivio rubato dal NAS resta illeggibile. Conservala altrove (es. un password manager): se il server viene perso insieme al suo disco, è l'unico modo per ripristinare un backup su un server nuovo."
     >
         {panel.backupKey ? (
@@ -25,6 +27,7 @@ const BackupKeyCard = ({ panel }: { panel: BackupPanel }) => (
         ) : (
             <div>
                 <Button type="button" variant="outline" onClick={panel.openBackupKeyDialog}>
+                    <KeyRound className="size-4" />
                     Mostra ed esporta la chiave
                 </Button>
             </div>

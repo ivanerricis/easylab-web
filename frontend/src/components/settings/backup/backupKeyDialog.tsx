@@ -1,6 +1,8 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import FormField from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { fieldProps } from "@/lib/formField";
+import { KeyRound } from "lucide-react";
 import type { BackupPanel } from "./useBackupPanel";
 
 const BackupKeyDialog = ({ panel }: { panel: BackupPanel }) => (
@@ -14,10 +16,9 @@ const BackupKeyDialog = ({ panel }: { panel: BackupPanel }) => (
         title="Conferma password"
         description="La chiave rende leggibile qualsiasi backup rubato dal NAS: confermala di nuovo con la tua password."
         content={
-            <div className="grid gap-2 pb-2">
-                <Label htmlFor="backupKeyPassword">La tua password</Label>
+            <FormField id="backupKeyPassword" label="La tua password" required className="pb-2">
                 <Input
-                    id="backupKeyPassword"
+                    {...fieldProps("backupKeyPassword", { required: true })}
                     type="password"
                     value={panel.backupKeyPassword}
                     disabled={panel.isLoadingBackupKey}
@@ -25,9 +26,10 @@ const BackupKeyDialog = ({ panel }: { panel: BackupPanel }) => (
                     autoComplete="current-password"
                     autoFocus
                 />
-            </div>
+            </FormField>
         }
         confirmLabel={panel.isLoadingBackupKey ? "Verifica in corso..." : "Mostra la chiave"}
+        confirmIcon={KeyRound}
         cancelLabel="Annulla"
         onCancel={panel.closeBackupKeyDialog}
         onConfirm={() => void panel.handleRevealBackupKey()}

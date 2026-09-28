@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Check, Eye, EyeOff, Save, X } from "lucide-react";
+import { Check, Circle, Eye, EyeOff, Save, X } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
-import { RequiredMark } from "@/components/form-field";
+import FormField from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { changeOwnPassword, getApiErrorMessage } from "@/lib/api";
-import { isPasswordCompliant, passwordRequirements, passwordRequirementsHint } from "@/lib/passwordPolicy";
+import { changeOwnPassword, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { fieldProps, hasFormChanged } from "@/lib/formField";
+import { isPasswordCompliant, passwordRequirements } from "@/lib/passwordPolicy";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -17,17 +17,32 @@ type Props = {
 
 const emptyForm = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
+type FieldErrors = Partial<Record<keyof typeof emptyForm, string>>;
+
 const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
     const [formValues, setFormValues] = useState(emptyForm);
+    const [errors, setErrors] = useState<FieldErrors>({});
+    // I requisiti restano grigi finché non si scrive nel campo: aprendo il dialogo li si vedeva
+    // tutti rossi, come se si fosse già sbagliato qualcosa senza aver toccato niente.
+    const [hasTypedNewPassword, setHasTypedNewPassword] = useState(false);
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const isDirty = hasFormChanged(formValues, emptyForm);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {
             setFormValues(emptyForm);
+            setErrors({});
+            setHasTypedNewPassword(false);
             setIsPasswordVisible(false);
         }
         onOpenChange(nextOpen);
+    };
+
+    const updateField = (field: keyof typeof emptyForm, value: string) => {
+        setFormValues((prev) => ({ ...prev, [field]: value }));
+        setErrors((prev) => ({ ...prev, [field]: undefined }));
     };
 
     const handleConfirm = async () => {
@@ -35,18 +50,30 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             return;
         }
 
+        const nextErrors: FieldErrors = {};
+
         if (!formValues.currentPassword) {
-            toast.error("Inserisci la password attuale");
-            return;
+            nextErrors.currentPassword = "Inserisci la password attuale";
         }
 
         if (!isPasswordCompliant(formValues.newPassword)) {
-            toast.error(passwordRequirementsHint);
-            return;
+            nextErrors.newPassword = "La password non rispetta tutti i requisiti qui sopra";
         }
 
-        if (formValues.newPassword !== formValues.confirmPassword) {
-            toast.error("Le due password inserite non coincidono");
+        if (!formValues.confirmPassword) {
+            nextErrors.confirmPassword = "Ripeti la nuova password";
+        } else if (formValues.confirmPassword !== formValues.newPassword) {
+            nextErrors.confirmPassword = "Le due password inserite non coincidono";
+        }
+
+        setErrors(nextErrors);
+
+        const firstInvalidField = (["currentPassword", "newPassword", "confirmPassword"] as const).find(
+            (field) => nextErrors[field]
+        );
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
             return;
         }
 
@@ -59,16 +86,31 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             toast.success("Password aggiornata con successo");
             handleOpenChange(false);
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile aggiornare la password"));
+            const message = getApiErrorMessage(error, "Impossibile aggiornare la password");
+            const status = getApiErrorStatus(error);
+
+            // 400 è la password attuale sbagliata, 429 i troppi tentativi con quella password:
+            // riguardano quel campo, e il messaggio va lì come nella pagina di accesso. Il resto
+            // (rete, sessione scaduta, errore del server) non è colpa di un campo e resta un toast.
+            if (status === 400 || status === 429) {
+                setErrors({ currentPassword: message });
+                document.getElementById("currentPassword")?.focus();
+            } else {
+                toast.error(message);
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    // Dopo un "Salva" a vuoto i requisiti si colorano comunque: l'errore rimanda a loro.
+    const showRequirementStatus = hasTypedNewPassword || Boolean(errors.newPassword);
+
     return (
         <CustomDialog
             open={open}
             onOpenChange={handleOpenChange}
+            isDirty={isDirty}
             title="Cambia password"
             description="Inserisci la password attuale e quella nuova."
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
@@ -80,36 +122,27 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             confirmDisabled={isSubmitting}
             content={
                 <div className="grid gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="currentPassword">
-                            Password attuale
-                            <RequiredMark />
-                        </Label>
+                    <FormField id="currentPassword" label="Password attuale" required error={errors.currentPassword}>
                         <Input
-                            id="currentPassword"
+                            {...fieldProps("currentPassword", { error: errors.currentPassword, required: true })}
                             type="password"
                             autoComplete="current-password"
                             value={formValues.currentPassword}
-                            onChange={(event) =>
-                                setFormValues((prev) => ({ ...prev, currentPassword: event.target.value }))
-                            }
+                            onChange={(event) => updateField("currentPassword", event.target.value)}
                         />
-                    </div>
+                    </FormField>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="newPassword">
-                            Nuova password
-                            <RequiredMark />
-                        </Label>
+                    <FormField id="newPassword" label="Nuova password" required error={errors.newPassword}>
                         <div className="relative">
                             <Input
-                                id="newPassword"
+                                {...fieldProps("newPassword", { error: errors.newPassword, required: true })}
                                 type={isPasswordVisible ? "text" : "password"}
                                 autoComplete="new-password"
                                 value={formValues.newPassword}
-                                onChange={(event) =>
-                                    setFormValues((prev) => ({ ...prev, newPassword: event.target.value }))
-                                }
+                                onChange={(event) => {
+                                    updateField("newPassword", event.target.value);
+                                    setHasTypedNewPassword(true);
+                                }}
                                 className="pr-9"
                             />
                             <div className="absolute inset-y-0 right-1.5 flex items-center">
@@ -124,46 +157,44 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
                                 </Button>
                             </div>
                         </div>
-                        <ul className="grid gap-1">
+                        <ul className="mt-2 grid gap-1">
                             {passwordRequirements.map((requirement) => {
                                 const satisfied = requirement.isSatisfied(formValues.newPassword);
+                                const StatusIcon = !showRequirementStatus ? Circle : satisfied ? Check : X;
                                 return (
                                     <li
                                         key={requirement.label}
                                         className={cn(
                                             "flex items-center gap-1.5 text-xs",
-                                            satisfied
-                                                ? "text-status-green-foreground line-through"
-                                                : "text-status-red-foreground"
+                                            !showRequirementStatus
+                                                ? "text-muted-foreground"
+                                                : satisfied
+                                                  ? "text-status-green-foreground line-through"
+                                                  : "text-status-red-foreground"
                                         )}
                                     >
-                                        {satisfied ? (
-                                            <Check className="size-3.5 shrink-0" />
-                                        ) : (
-                                            <X className="size-3.5 shrink-0" />
-                                        )}
+                                        <StatusIcon className="size-3.5 shrink-0" />
                                         {requirement.label}
                                     </li>
                                 );
                             })}
                         </ul>
-                    </div>
+                    </FormField>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="confirmPassword">
-                            Conferma nuova password
-                            <RequiredMark />
-                        </Label>
+                    <FormField
+                        id="confirmPassword"
+                        label="Conferma nuova password"
+                        required
+                        error={errors.confirmPassword}
+                    >
                         <Input
-                            id="confirmPassword"
+                            {...fieldProps("confirmPassword", { error: errors.confirmPassword, required: true })}
                             type={isPasswordVisible ? "text" : "password"}
                             autoComplete="new-password"
                             value={formValues.confirmPassword}
-                            onChange={(event) =>
-                                setFormValues((prev) => ({ ...prev, confirmPassword: event.target.value }))
-                            }
+                            onChange={(event) => updateField("confirmPassword", event.target.value)}
                         />
-                    </div>
+                    </FormField>
                 </div>
             }
         />

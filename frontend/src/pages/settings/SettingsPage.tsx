@@ -143,6 +143,9 @@ const SettingsPage = () => {
     // griglie al suo interno si regolano sullo spazio che hanno davvero e non sulla finestra.
     return (
         <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto xl:flex-row xl:overflow-visible">
+            {/* Le altre pagine hanno il titolo nel PageHeader; qui il titolo visibile è la voce
+                attiva del menu, ma chi naviga per intestazioni deve comunque trovare un h1. */}
+            <h1 className="sr-only">Impostazioni</h1>
             <Select value={activeSection} onValueChange={(value) => setActiveSection(value as SettingsSectionKey)}>
                 <SelectTrigger className="w-full xl:hidden">
                     <SelectValue />
@@ -193,9 +196,10 @@ const SettingsPage = () => {
                 </div>
             </aside>
 
-            <section className="@container min-w-0 flex-1 overflow-y-auto rounded-2xl border bg-card/90 p-4 shadow-sm backdrop-blur-sm md:p-6">
-                {sectionContent[activeSection]}
-            </section>
+            {/* Niente bordo né sfondo attorno alla sezione: le card delle impostazioni stanno
+                direttamente sulla pagina, come le DetailSection delle schede. Prima erano una
+                scatola (sezione) nella scatola (card) nella scatola (riquadro). */}
+            <section className="@container min-w-0 flex-1 overflow-y-auto">{sectionContent[activeSection]}</section>
         </div>
     );
 };

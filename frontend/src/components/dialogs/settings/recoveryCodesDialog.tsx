@@ -63,8 +63,14 @@ const RecoveryCodesDialog = ({ open, onOpenChange, codes }: Props) => {
                         ))}
                     </div>
 
-                    <Button type="button" variant="outline" onClick={() => void handleCopyAll()}>
-                        {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
+                        className="text-lg"
+                        onClick={() => void handleCopyAll()}
+                    >
+                        {isCopied ? <Check className="size-5" /> : <Copy className="size-5" />}
                         Copia tutti i codici
                     </Button>
 

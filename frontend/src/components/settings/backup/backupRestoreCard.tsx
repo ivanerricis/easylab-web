@@ -1,3 +1,4 @@
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SettingsFileInput from "@/components/settings/settingsFileInput";
 import {
@@ -6,13 +7,16 @@ import {
     SettingsGroup,
     SettingsLoadingBox,
     SettingsStatusBadge,
+    SettingsWarningNote,
 } from "@/components/settings/settingsUi";
+import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { formatDateTime, formatFileSize } from "@/lib/utils";
 import type { BackupPanel } from "./useBackupPanel";
 
 const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
     <SettingsCard
         title="Ripristino da file esterno"
+        keepDescriptionOnMobile
         description="Carica un dump che non si trova sul server per sovrascrivere i dati attuali. Operazione irreversibile: valuta di eseguire prima un dump del database corrente."
         destructive
     >
@@ -46,14 +50,14 @@ const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
                                 })
                             }
                         >
+                            <RotateCcw className="size-4" />
                             Ripristina da questo file
                         </Button>
                     </div>
                 </SettingsGroup>
 
                 {panel.secretsToReconfigure.length > 0 ? (
-                    <div className="grid gap-1 rounded-md border border-status-yellow/40 bg-status-yellow/10 p-3 text-sm">
-                        <p className="font-medium">Password da reinserire dopo il ripristino</p>
+                    <SettingsWarningNote title="Password da reinserire dopo il ripristino">
                         <p className="text-muted-foreground">
                             Le password sono cifrate con una chiave che resta sul server e non viene inclusa nei backup.
                             Ripristinando su un&apos;altra macchina non sono più leggibili e vanno riscritte:
@@ -63,18 +67,25 @@ const BackupRestoreCard = ({ panel }: { panel: BackupPanel }) => (
                                 <li key={secret}>{secret}</li>
                             ))}
                         </ul>
-                    </div>
+                    </SettingsWarningNote>
                 ) : null}
 
-                <SettingsGroup destructive className="text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-muted-foreground">Ultimo ripristino:</span>
-                        <span className="font-medium">{formatDateTime(panel.lastRestoreAt)}</span>
-                        <SettingsStatusBadge status={panel.lastRestoreStatus} />
-                    </div>
-                    <p className="text-muted-foreground">
-                        Dump utilizzato: <span className="font-mono">{panel.lastRestoreFileName ?? "-"}</span>
-                    </p>
+                <SettingsGroup destructive>
+                    <DetailGrid layout="rows">
+                        <DetailItem
+                            label="Ultimo ripristino"
+                            value={
+                                <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                                    {formatDateTime(panel.lastRestoreAt)}
+                                    <SettingsStatusBadge status={panel.lastRestoreStatus} />
+                                </span>
+                            }
+                        />
+                        <DetailItem
+                            label="Dump utilizzato"
+                            value={<span className="font-mono">{panel.lastRestoreFileName ?? "-"}</span>}
+                        />
+                    </DetailGrid>
                     {panel.lastRestoreError ? (
                         <SettingsErrorNote label="Ultimo errore" message={panel.lastRestoreError} />
                     ) : null}

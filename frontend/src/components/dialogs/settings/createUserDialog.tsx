@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import CustomDialog from "@/components/dialogs/customDialog";
-import { RequiredMark } from "@/components/form-field";
+import FormField from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createUser, getApiErrorMessage, type CreatedUserResult } from "@/lib/api";
+import { fieldProps } from "@/lib/formField";
 import { UserPlus } from "lucide-react";
 
 type Props = {
@@ -15,11 +15,13 @@ type Props = {
 
 const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
     const [username, setUsername] = useState("");
+    const [usernameError, setUsernameError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {
             setUsername("");
+            setUsernameError(undefined);
         }
         onOpenChange(nextOpen);
     };
@@ -30,7 +32,8 @@ const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
         }
 
         if (!username.trim()) {
-            toast.error("Il nome utente non può essere vuoto");
+            setUsernameError("Il nome utente non può essere vuoto");
+            document.getElementById("newUsername")?.focus();
             return;
         }
 
@@ -50,6 +53,7 @@ const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
         <CustomDialog
             open={open}
             onOpenChange={handleOpenChange}
+            isDirty={username !== ""}
             title="Nuovo utente"
             description="La password viene generata automaticamente e mostrata una sola volta dopo la creazione."
             confirmLabel={isSubmitting ? "Creazione..." : "Crea utente"}
@@ -60,18 +64,17 @@ const CreateUserDialog = ({ open, onOpenChange, onCreated }: Props) => {
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid gap-2">
-                    <Label htmlFor="newUsername">
-                        Nome utente
-                        <RequiredMark />
-                    </Label>
+                <FormField id="newUsername" label="Nome utente" required error={usernameError}>
                     <Input
-                        id="newUsername"
+                        {...fieldProps("newUsername", { error: usernameError, required: true })}
                         autoFocus
                         value={username}
-                        onChange={(event) => setUsername(event.target.value)}
+                        onChange={(event) => {
+                            setUsername(event.target.value);
+                            setUsernameError(undefined);
+                        }}
                     />
-                </div>
+                </FormField>
             }
         />
     );

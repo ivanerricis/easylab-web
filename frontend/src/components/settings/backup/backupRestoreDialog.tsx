@@ -1,12 +1,18 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import FormField from "@/components/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fieldProps } from "@/lib/formField";
 import { restoreConfirmKeyword, type BackupPanel } from "./useBackupPanel";
 import { ArchiveRestore } from "lucide-react";
 
 const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
     const { pendingRestore } = panel;
+    // Password, parola di conferma e chiave si scrivono a mano: un Esc di troppo li butterebbe
+    // via senza chiedere. La spunta sullo schema no, si rimette con un clic.
+    const isDirty =
+        panel.restorePassword !== "" || panel.restoreConfirmText !== "" || panel.restoreBackupKeyInput !== "";
 
     return (
         <CustomDialog
@@ -16,6 +22,7 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                     panel.closeRestoreConfirm();
                 }
             }}
+            isDirty={isDirty}
             title="Conferma ripristino database"
             description={
                 pendingRestore?.type === "existing"
@@ -42,23 +49,27 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                         </Label>
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="restorePassword">La tua password</Label>
+                    <FormField id="restorePassword" label="La tua password" required>
                         <Input
-                            id="restorePassword"
+                            {...fieldProps("restorePassword", { required: true })}
+                            aria-describedby="restorePasswordHint"
                             type="password"
                             value={panel.restorePassword}
                             disabled={panel.isRestoring}
                             onChange={(event) => panel.setRestorePassword(event.target.value)}
                             autoComplete="current-password"
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p id="restorePasswordHint" className="mt-1 text-xs text-muted-foreground">
                             Richiesta di nuovo perché il ripristino sostituisce l&apos;intero database.
                         </p>
-                    </div>
+                    </FormField>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="restoreConfirmText">
+                    {/* Senza `gap`, come i `FormField` accanto: l'etichetta sta attaccata al campo. */}
+                    <div className="grid">
+                        {/* Come in `ConfirmDeleteDialog`: `block` perché il `gap` del `Label` flex
+                            spezzava la frase attorno alla parola in grassetto, `text-lg` come le
+                            altre etichette del dialogo. */}
+                        <Label htmlFor="restoreConfirmText" className="block text-lg leading-snug">
                             Digita <span className="font-semibold">{restoreConfirmKeyword}</span> per confermare
                         </Label>
                         <Input
@@ -70,13 +81,12 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                         />
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="restoreBackupKey" className="font-normal text-muted-foreground">
-                            Chiave di backup (solo se richiesta: ripristino da un server diverso da quello che ha creato
-                            questo backup)
-                        </Label>
+                    <FormField id="restoreBackupKey" label="Chiave di backup">
                         <Input
-                            id="restoreBackupKey"
+                            {...fieldProps("restoreBackupKey")}
+                            // Quando serve la chiave lo diceva l'etichetta; ora che l'etichetta è
+                            // breve come le altre, la spiegazione sotto va comunque letta col campo.
+                            aria-describedby="restoreBackupKeyHint"
                             value={panel.restoreBackupKeyInput}
                             disabled={panel.isRestoring}
                             onChange={(event) => panel.setRestoreBackupKeyInput(event.target.value)}
@@ -84,7 +94,10 @@ const BackupRestoreDialog = ({ panel }: { panel: BackupPanel }) => {
                             autoComplete="off"
                             className="font-mono"
                         />
-                    </div>
+                        <p id="restoreBackupKeyHint" className="mt-1 text-xs text-muted-foreground">
+                            Solo se richiesta: ripristino da un server diverso da quello che ha creato questo backup.
+                        </p>
+                    </FormField>
                 </div>
             }
             confirmLabel={panel.isRestoring ? "Ripristino in corso..." : "Ripristina"}

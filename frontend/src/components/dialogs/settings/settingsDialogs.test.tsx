@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { AxiosError, AxiosHeaders } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const changeOwnPassword = vi.fn();
@@ -38,6 +39,18 @@ import { renderWithProviders } from "@/test/render";
 
 const writeText = vi.fn();
 
+/** Un rifiuto del server com'è davvero: axios, con lo stato e il messaggio nel corpo. */
+const buildAxiosError = (message: string, status: number) => {
+    const config = { headers: new AxiosHeaders() };
+    return new AxiosError("Request failed", "ERR_BAD_REQUEST", config, null, {
+        data: { message },
+        status,
+        statusText: "Error",
+        headers: {},
+        config,
+    });
+};
+
 beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
@@ -46,6 +59,17 @@ beforeEach(() => {
 
 describe("ChangePasswordDialog", () => {
     const requirementItems = () => screen.getAllByRole("listitem");
+
+    /** Appena aperto non si è ancora sbagliato niente: i requisiti non devono essere già rossi. */
+    it("mostra i requisiti in grigio finché non si scrive la nuova password", async () => {
+        renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
+
+        expect(requirementItems().every((item) => item.className.includes("text-muted-foreground"))).toBe(true);
+
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "a");
+
+        expect(requirementItems().some((item) => item.className.includes("text-status-red-foreground"))).toBe(true);
+    });
 
     /** La checklist accende i requisiti man mano che si scrive, prima di premere Salva. */
     it("spunta i requisiti mentre si digita", async () => {
@@ -79,19 +103,79 @@ describe("ChangePasswordDialog", () => {
         expect(screen.getByLabelText(/^Password attuale/)).toHaveValue("");
     });
 
-    it("non invia password non conformi o diverse fra loro", async () => {
+    it("segnala sotto ciascun campo quello che manca, con il focus sul primo", async () => {
         renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
 
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
-        expect(toastError).toHaveBeenLastCalledWith("Inserisci la password attuale");
+
+        const currentPassword = screen.getByLabelText(/^Password attuale/);
+        expect(currentPassword).toHaveAccessibleDescription("Inserisci la password attuale");
+        expect(screen.getByLabelText(/^Nuova password/)).toHaveAccessibleDescription(
+            "La password non rispetta tutti i requisiti qui sopra"
+        );
+        expect(screen.getByLabelText(/^Conferma nuova password/)).toHaveAccessibleDescription(
+            "Ripeti la nuova password"
+        );
+        expect(currentPassword).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
+
+        // Scrivere nel campo toglie il suo errore, non quello degli altri.
+        await userEvent.type(currentPassword, "v");
+        expect(currentPassword).not.toHaveAccessibleDescription();
+        expect(screen.getByLabelText(/^Nuova password/)).toHaveAccessibleDescription(
+            "La password non rispetta tutti i requisiti qui sopra"
+        );
+        expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+
+    it("non invia due password diverse fra loro", async () => {
+        renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
 
         await userEvent.type(screen.getByLabelText(/^Password attuale/), "vecchia");
         await userEvent.type(screen.getByLabelText(/^Nuova password/), "nuova-pass1!");
         await userEvent.type(screen.getByLabelText(/^Conferma nuova password/), "nuova-pass2!");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
-        expect(toastError).toHaveBeenLastCalledWith("Le due password inserite non coincidono");
 
+        expect(screen.getByLabelText(/^Conferma nuova password/)).toHaveAccessibleDescription(
+            "Le due password inserite non coincidono"
+        );
+        expect(screen.getByLabelText(/^Conferma nuova password/)).toHaveFocus();
         expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+
+    it("mette sotto la password attuale il rifiuto del server", async () => {
+        changeOwnPassword.mockRejectedValue(buildAxiosError("La password attuale non è corretta", 400));
+        const onOpenChange = vi.fn();
+        renderWithProviders(<ChangePasswordDialog open onOpenChange={onOpenChange} />);
+
+        await userEvent.type(screen.getByLabelText(/^Password attuale/), "sbagliata");
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "nuova-pass1!");
+        await userEvent.type(screen.getByLabelText(/^Conferma nuova password/), "nuova-pass1!");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Password attuale/)).toHaveAccessibleDescription(
+                "La password attuale non è corretta"
+            );
+        });
+        expect(screen.getByLabelText(/^Password attuale/)).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
+        expect(onOpenChange).not.toHaveBeenCalled();
+    });
+
+    it("lascia al toast gli errori che non riguardano un campo", async () => {
+        changeOwnPassword.mockRejectedValue(buildAxiosError("Errore interno", 500));
+        renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
+
+        await userEvent.type(screen.getByLabelText(/^Password attuale/), "vecchia");
+        await userEvent.type(screen.getByLabelText(/^Nuova password/), "nuova-pass1!");
+        await userEvent.type(screen.getByLabelText(/^Conferma nuova password/), "nuova-pass1!");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Errore interno");
+        });
+        expect(screen.getByLabelText(/^Password attuale/)).not.toHaveAccessibleDescription();
     });
 });
 
@@ -127,9 +211,9 @@ describe("TwoFactorSetupDialog", () => {
         expect(onOpenChange).toHaveBeenCalledWith(false);
     });
 
-    it("con un codice sbagliato resta sul QR e svuota il campo", async () => {
+    it("con un codice sbagliato resta sul QR, svuota il campo e dice perché sotto il campo", async () => {
         startTwoFactorSetup.mockResolvedValue({ secretBase32: "S", otpauthUri: "", qrDataUrl: "data:," });
-        enableTwoFactor.mockRejectedValue(new Error("Codice non valido"));
+        enableTwoFactor.mockRejectedValue(buildAxiosError("Il codice non è corretto", 400));
         const onEnabled = vi.fn();
         renderWithProviders(<TwoFactorSetupDialog open onOpenChange={() => {}} onEnabled={onEnabled} />);
 
@@ -139,10 +223,30 @@ describe("TwoFactorSetupDialog", () => {
         await userEvent.click(screen.getByRole("button", { name: "Attiva" }));
 
         await waitFor(() => {
-            expect(toastError).toHaveBeenCalledWith("Codice non valido");
+            expect(screen.getByLabelText(/^Codice di verifica/)).toHaveAccessibleDescription(
+                "Il codice non è corretto"
+            );
         });
         expect(screen.getByLabelText(/^Codice di verifica/)).toHaveValue("");
+        expect(screen.getByLabelText(/^Codice di verifica/)).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(onEnabled).not.toHaveBeenCalled();
+    });
+
+    it("con la rete giù avvisa con un toast, non sotto il codice", async () => {
+        startTwoFactorSetup.mockResolvedValue({ secretBase32: "S", otpauthUri: "", qrDataUrl: "data:," });
+        enableTwoFactor.mockRejectedValue(new Error("Network Error"));
+        renderWithProviders(<TwoFactorSetupDialog open onOpenChange={() => {}} onEnabled={() => {}} />);
+
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+        await userEvent.type(await screen.findByLabelText(/^Codice di verifica/), "000000");
+        await userEvent.click(screen.getByRole("button", { name: "Attiva" }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Network Error");
+        });
+        expect(screen.getByLabelText(/^Codice di verifica/)).not.toHaveAccessibleDescription();
     });
 
     it("non avvia la configurazione senza password", async () => {
@@ -150,8 +254,23 @@ describe("TwoFactorSetupDialog", () => {
 
         await userEvent.click(screen.getByRole("button", { name: "Continua" }));
 
-        expect(toastError).toHaveBeenCalledWith("Inserisci la tua password");
+        expect(screen.getByLabelText(/^Password/)).toHaveAccessibleDescription("Inserisci la tua password");
+        expect(screen.getByLabelText(/^Password/)).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(startTwoFactorSetup).not.toHaveBeenCalled();
+    });
+
+    it("mette sotto la password il rifiuto del server", async () => {
+        startTwoFactorSetup.mockRejectedValue(buildAxiosError("La password non è corretta", 400));
+        renderWithProviders(<TwoFactorSetupDialog open onOpenChange={() => {}} onEnabled={() => {}} />);
+
+        await userEvent.type(screen.getByLabelText(/^Password/), "sbagliata");
+        await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Password/)).toHaveAccessibleDescription("La password non è corretta");
+        });
+        expect(toastError).not.toHaveBeenCalled();
     });
 });
 
@@ -176,8 +295,33 @@ describe("TwoFactorConfirmDialog", () => {
         await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
         await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
 
-        expect(toastError).toHaveBeenCalledWith("Inserisci password e codice");
+        const codeInput = screen.getByLabelText(/^Codice di verifica o di recupero/);
+        expect(codeInput).toHaveAccessibleDescription("Inserisci un codice dell'app o di recupero");
+        expect(codeInput).toHaveFocus();
+        expect(screen.getByLabelText(/^Password/)).not.toHaveAccessibleDescription();
+        expect(toastError).not.toHaveBeenCalled();
         expect(onConfirm).not.toHaveBeenCalled();
+
+        await userEvent.type(codeInput, "1");
+        expect(codeInput).not.toHaveAccessibleDescription();
+    });
+
+    it.each([
+        ["La password non è corretta", /^Password/],
+        ["Il codice non è corretto", /^Codice di verifica o di recupero/],
+    ])("mostra il rifiuto del server sotto il campo che nomina: %s", async (message, label) => {
+        const onConfirm = vi.fn().mockRejectedValue(buildAxiosError(message, 400));
+        const onOpenChange = vi.fn();
+        renderConfirm(onConfirm, onOpenChange);
+
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(screen.getByLabelText(/^Codice di verifica o di recupero/), "123456");
+        await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
+
+        const field = await screen.findByLabelText(label);
+        await waitFor(() => expect(field).toHaveAccessibleDescription(message));
+        expect(field).toHaveFocus();
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
     });
 
     it("conferma e chiude", async () => {
@@ -296,7 +440,11 @@ describe("CreateUserDialog", () => {
 
         await userEvent.click(screen.getByRole("button", { name: "Crea utente" }));
 
-        expect(toastError).toHaveBeenCalledWith("Il nome utente non può essere vuoto");
+        expect(screen.getByLabelText(/^Nome utente/)).toHaveAccessibleDescription(
+            "Il nome utente non può essere vuoto"
+        );
+        expect(screen.getByLabelText(/^Nome utente/)).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(createUser).not.toHaveBeenCalled();
     });
 });

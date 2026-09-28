@@ -25,6 +25,28 @@ export const restoreConfirmKeyword = "RESTORE";
 
 export type PendingRestore = { type: "existing"; fileName: string } | { type: "upload"; file: File };
 
+/**
+ * I campi del form che hanno una validazione. Il nome è anche l'`id` del controllo nella
+ * pagina, così l'errore sa sotto quale campo andare (vedi `FieldError`) e quale mettere a fuoco.
+ * L'ordine è quello della pagina: il focus va al primo sbagliato.
+ */
+const validatedFields = [
+    "frequencyDays",
+    "runAt",
+    "maxBackupsToKeep",
+    "notifyEmailOnFailure",
+    "smbHost",
+    "smbShare",
+    "smbPort",
+    "smbUsername",
+    "smbPassword",
+] as const;
+
+export type BackupField = (typeof validatedFields)[number];
+export type BackupFieldErrors = Partial<Record<BackupField, string>>;
+
+const smbFields: BackupField[] = ["smbHost", "smbShare", "smbPort", "smbUsername", "smbPassword"];
+
 const defaultForm: BackupSettingsInput = {
     autoEnabled: false,
     frequencyDays: 1,
@@ -95,6 +117,7 @@ export const useBackupPanel = () => {
     const [dumpFiles, setDumpFiles] = useState<BackupDumpFileDto[]>([]);
     const [isLoadingDumps, setIsLoadingDumps] = useState(false);
     const [isTestingSmb, setIsTestingSmb] = useState(false);
+    const [errors, setErrors] = useState<BackupFieldErrors>({});
 
     const [restoreUploadFile, setRestoreUploadFile] = useState<File | null>(null);
     const [resetSchemaOnRestore, setResetSchemaOnRestore] = useState(false);
@@ -145,46 +168,94 @@ export const useBackupPanel = () => {
         });
     }, []);
 
+    /**
+     * Aggiorna il form e toglie l'errore dei campi toccati: chi lo sta correggendo non deve
+     * rivederlo. Spegnere o riaccendere la copia sul NAS toglie tutti quelli del NAS, che da
+     * spento non si validano.
+     */
+    const changeFormValues = (values: Partial<BackupSettingsInput>) => {
+        setFormValues((prev) => ({ ...prev, ...values }));
+        setErrors((prev) => {
+            const touched = "smbEnabled" in values ? [...Object.keys(values), ...smbFields] : Object.keys(values);
+            return Object.fromEntries(Object.entries(prev).filter(([field]) => !touched.includes(field)));
+        });
+    };
+
+    /**
+     * Mostra gli errori sotto i campi e mette a fuoco il primo; vero se ce n'è almeno uno. Il
+     * messaggio sotto il campo resta finché non lo si corregge, e dice *quale* campo è il
+     * problema: un toast spariva dopo pochi secondi senza dirlo. I toast restano per il server.
+     */
+    const reportErrors = (nextErrors: BackupFieldErrors) => {
+        setErrors(nextErrors);
+        const firstInvalidField = validatedFields.find((field) => nextErrors[field]);
+
+        if (!firstInvalidField) {
+            return false;
+        }
+
+        document.getElementById(firstInvalidField)?.focus();
+        return true;
+    };
+
+    /** Host, condivisione e utente del NAS, che salvataggio e prova di connessione chiedono entrambi. */
+    const smbRequiredErrors = (prefix: string): BackupFieldErrors => {
+        const nextErrors: BackupFieldErrors = {};
+        const message = (what: string) => (prefix ? `${prefix} specifica ${what}` : `Specifica ${what}`);
+
+        if (!formValues.smbHost.trim()) {
+            nextErrors.smbHost = message("l'host del NAS");
+        }
+
+        if (!formValues.smbShare.trim()) {
+            nextErrors.smbShare = message("il nome della condivisione");
+        }
+
+        if (!formValues.smbUsername.trim()) {
+            nextErrors.smbUsername = message("l'utente del NAS");
+        }
+
+        return nextErrors;
+    };
+
     const handleSave = async () => {
         if (isSaving || isLoading) {
             return;
         }
 
+        const nextErrors: BackupFieldErrors = {};
+
         if (!Number.isInteger(formValues.frequencyDays) || formValues.frequencyDays <= 0) {
-            toast.error("La frequenza deve essere un numero intero positivo");
-            return;
+            nextErrors.frequencyDays = "La frequenza deve essere un numero intero positivo";
         }
 
         if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(formValues.runAt)) {
-            toast.error("L'orario deve essere nel formato HH:mm");
-            return;
+            nextErrors.runAt = "L'orario deve essere nel formato HH:mm";
         }
 
         if (!Number.isInteger(formValues.maxBackupsToKeep) || formValues.maxBackupsToKeep <= 0) {
-            toast.error("Il numero di backup da mantenere deve essere un numero intero positivo");
-            return;
+            nextErrors.maxBackupsToKeep = "Il numero di backup da mantenere deve essere un numero intero positivo";
         }
 
         if (formValues.notifyEmailOnFailure && !settings?.emailConfigured) {
-            toast.error("Configura prima l'invio email nelle impostazioni per attivare questo avviso");
-            return;
+            nextErrors.notifyEmailOnFailure =
+                "Configura prima l'invio email nelle impostazioni per attivare questo avviso";
         }
 
         if (formValues.smbEnabled) {
-            if (!formValues.smbHost.trim() || !formValues.smbShare.trim() || !formValues.smbUsername.trim()) {
-                toast.error("Per il NAS specifica almeno host, condivisione e utente");
-                return;
-            }
+            Object.assign(nextErrors, smbRequiredErrors(""));
 
             if (!settings?.smbPasswordSet && !formValues.smbPassword?.trim()) {
-                toast.error("Specifica una password per la connessione al NAS");
-                return;
+                nextErrors.smbPassword = "Specifica una password per la connessione al NAS";
             }
 
             if (!Number.isInteger(formValues.smbPort) || formValues.smbPort <= 0 || formValues.smbPort > 65535) {
-                toast.error("La porta SMB deve essere un numero valido");
-                return;
+                nextErrors.smbPort = "La porta SMB deve essere un numero valido";
             }
+        }
+
+        if (reportErrors(nextErrors)) {
+            return;
         }
 
         try {
@@ -217,15 +288,16 @@ export const useBackupPanel = () => {
             return;
         }
 
-        if (!formValues.smbHost.trim() || !formValues.smbShare.trim() || !formValues.smbUsername.trim()) {
-            toast.error("Per testare la connessione specifica almeno host, condivisione e utente");
-            return;
+        const password = formValues.smbPassword?.trim();
+        const nextErrors = smbRequiredErrors("Per testare la connessione");
+
+        // Anche con una password già salvata: quella resta sul server, la prova usa la scritta.
+        if (!password) {
+            nextErrors.smbPassword = "Per testare la connessione scrivi la password";
         }
 
-        const password = formValues.smbPassword?.trim();
-
-        if (!password) {
-            toast.error("Inserisci la password nel campo qui sopra per testare la connessione");
+        // `!password` è già fra gli errori: qui serve a TypeScript, che non lo sa.
+        if (reportErrors(nextErrors) || !password) {
             return;
         }
 
@@ -418,6 +490,8 @@ export const useBackupPanel = () => {
         isRunningBackup,
         formValues,
         setFormValues,
+        changeFormValues,
+        errors,
         isDirty,
         outputDir: settings?.outputDir ?? defaultOutputDir,
         lastRunAt: settings?.lastRunAt ?? null,

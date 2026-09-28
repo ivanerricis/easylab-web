@@ -143,17 +143,33 @@ describe("useBackupPanel: caricamento e modifiche", () => {
 });
 
 describe("useBackupPanel: salvataggio", () => {
+    /** Ogni errore va sotto il suo campo, non in un toast: vedi `FieldError`. */
     it.each([
-        [{ frequencyDays: 0 }, "La frequenza deve essere un numero intero positivo"],
-        [{ frequencyDays: 1.5 }, "La frequenza deve essere un numero intero positivo"],
-        [{ runAt: "24:00" }, "L'orario deve essere nel formato HH:mm"],
-        [{ runAt: "9:00" }, "L'orario deve essere nel formato HH:mm"],
-        [{ maxBackupsToKeep: 0 }, "Il numero di backup da mantenere deve essere un numero intero positivo"],
-        [{ notifyEmailOnFailure: true }, "Configura prima l'invio email nelle impostazioni per attivare questo avviso"],
-        [{ smbEnabled: true, smbHost: "nas" }, "Per il NAS specifica almeno host, condivisione e utente"],
+        [{ frequencyDays: 0 }, { frequencyDays: "La frequenza deve essere un numero intero positivo" }],
+        [{ frequencyDays: 1.5 }, { frequencyDays: "La frequenza deve essere un numero intero positivo" }],
+        [{ runAt: "24:00" }, { runAt: "L'orario deve essere nel formato HH:mm" }],
+        [{ runAt: "9:00" }, { runAt: "L'orario deve essere nel formato HH:mm" }],
+        [
+            { maxBackupsToKeep: 0 },
+            { maxBackupsToKeep: "Il numero di backup da mantenere deve essere un numero intero positivo" },
+        ],
+        [
+            { notifyEmailOnFailure: true },
+            {
+                notifyEmailOnFailure: "Configura prima l'invio email nelle impostazioni per attivare questo avviso",
+            },
+        ],
+        [
+            { smbEnabled: true, smbHost: "nas" },
+            {
+                smbShare: "Specifica il nome della condivisione",
+                smbUsername: "Specifica l'utente del NAS",
+                smbPassword: "Specifica una password per la connessione al NAS",
+            },
+        ],
         [
             { smbEnabled: true, smbHost: "nas", smbShare: "backup", smbUsername: "admin" },
-            "Specifica una password per la connessione al NAS",
+            { smbPassword: "Specifica una password per la connessione al NAS" },
         ],
         [
             {
@@ -164,16 +180,42 @@ describe("useBackupPanel: salvataggio", () => {
                 smbPassword: "x",
                 smbPort: 70000,
             },
-            "La porta SMB deve essere un numero valido",
+            { smbPort: "La porta SMB deve essere un numero valido" },
         ],
-    ])("rifiuta %j", async (values, message) => {
+    ])("rifiuta %j", async (values, errors) => {
         const { result } = await renderPanel();
 
         edit(result, values);
         await save(result);
 
-        expect(toast.error).toHaveBeenCalledWith(message);
+        expect(result.current.errors).toEqual(errors);
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.updateBackupSettings).not.toHaveBeenCalled();
+    });
+
+    it("toglie l'errore del campo appena lo si modifica, e quelli del NAS spegnendo la copia", async () => {
+        const { result } = await renderPanel();
+
+        edit(result, { smbEnabled: true, frequencyDays: 0 });
+        await save(result);
+        expect(Object.keys(result.current.errors)).toEqual([
+            "frequencyDays",
+            "smbHost",
+            "smbShare",
+            "smbUsername",
+            "smbPassword",
+        ]);
+
+        act(() => {
+            result.current.changeFormValues({ smbHost: "nas" });
+        });
+        expect(result.current.errors.smbHost).toBeUndefined();
+        expect(result.current.errors.smbShare).toBeDefined();
+
+        act(() => {
+            result.current.changeFormValues({ smbEnabled: false });
+        });
+        expect(result.current.errors).toEqual({ frequencyDays: "La frequenza deve essere un numero intero positivo" });
     });
 
     /** La password del NAS non torna mai dal server: se è già salvata, non va richiesta di nuovo. */
@@ -234,9 +276,8 @@ describe("useBackupPanel: NAS e backup manuale", () => {
         await act(async () => {
             await result.current.handleTestSmbConnection();
         });
-        expect(toast.error).toHaveBeenCalledWith(
-            "Inserisci la password nel campo qui sopra per testare la connessione"
-        );
+        expect(result.current.errors).toEqual({ smbPassword: "Per testare la connessione scrivi la password" });
+        expect(api.testSmbConnection).not.toHaveBeenCalled();
 
         api.testSmbConnection.mockResolvedValue({ message: "Connessione riuscita" });
         edit(result, { smbPassword: " segreta " });

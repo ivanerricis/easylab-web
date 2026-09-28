@@ -1,8 +1,11 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SettingsCard, SettingsEmptyBox, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SettingsCard, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
+import DetailItem, { DetailGrid } from "@/components/detail-item";
+import StatusBadge from "@/components/status-badge";
 import SessionsList from "@/components/settings/sessionsList";
 import CustomDialog from "@/components/dialogs/customDialog";
 import RecoveryCodesDialog from "@/components/dialogs/settings/recoveryCodesDialog";
@@ -15,6 +18,7 @@ import {
     disableTwoFactor,
     getApiErrorMessage,
     getTwoFactorStatus,
+    isFieldRejection,
     listOwnSessions,
     listRecentFailedLogins,
     regenerateRecoveryCodes,
@@ -26,8 +30,11 @@ import {
 import { useAuth } from "@/components/use-auth";
 import { cn, formatDateTime } from "@/lib/utils";
 
+const failedLoginColumnCount = 4;
+const failedLoginsEmptyMessage = "Nessun accesso fallito negli ultimi giorni.";
+
 /**
- * I tentativi falliti in forma di scheda sotto `sm`, dove la tabella a quattro colonne lasciava
+ * I tentativi falliti in forma di scheda in una sezione stretta, dove la tabella a quattro colonne lasciava
  * fuori schermo l'errore, cioè il motivo del rifiuto.
  */
 const failedLoginCardColumns: EntityCardColumn<LogEntryDto>[] = [
@@ -160,7 +167,10 @@ const SecuritySettingsSection = () => {
             toast.success("Verifica in due passaggi disattivata");
             await reloadEverything();
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile disattivare la verifica"));
+            // Password o codice sbagliati li mostra il dialogo sotto il campo.
+            if (!isFieldRejection(error)) {
+                toast.error(getApiErrorMessage(error, "Impossibile disattivare la verifica"));
+            }
             throw error;
         }
     };
@@ -171,7 +181,9 @@ const SecuritySettingsSection = () => {
             setRecoveryCodes(codes);
             await loadStatus();
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile rigenerare i codici"));
+            if (!isFieldRejection(error)) {
+                toast.error(getApiErrorMessage(error, "Impossibile rigenerare i codici"));
+            }
             throw error;
         }
     };
@@ -197,49 +209,45 @@ const SecuritySettingsSection = () => {
                     <SettingsLoadingBox label="Caricamento impostazioni..." />
                 ) : (
                     <div className="grid gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium">Stato:</span>
-                            <span
-                                className={cn(
-                                    "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                                    isEnabled
-                                        ? "bg-status-green/15 text-status-green-foreground"
-                                        : "bg-muted text-muted-foreground"
-                                )}
-                            >
-                                {isEnabled ? "Attiva" : "Non attiva"}
-                            </span>
-                        </div>
+                        {/* Stato e codici rimasti come righe etichetta/valore, lo schema delle schede
+                            di dettaglio (`DetailGrid layout="rows"`), invece di una riga "Stato:" con
+                            una pillola a mano e di una frase che conteneva un numero. */}
+                        <DetailGrid layout="rows">
+                            <DetailItem
+                                label="Stato"
+                                value={
+                                    <StatusBadge color={isEnabled ? "green" : undefined}>
+                                        {isEnabled ? "Attiva" : "Non attiva"}
+                                    </StatusBadge>
+                                }
+                            />
+                            {isEnabled ? (
+                                <DetailItem
+                                    label="Codici di recupero utilizzabili"
+                                    value={
+                                        <span className={cn(remaining === 0 && "text-destructive")}>
+                                            {remaining} su 8
+                                        </span>
+                                    }
+                                />
+                            ) : null}
+                        </DetailGrid>
 
                         {isEnabled ? (
                             <>
-                                <p
-                                    className={cn(
-                                        "text-sm",
-                                        remaining === 0 ? "text-destructive" : "text-muted-foreground"
-                                    )}
-                                >
-                                    {remaining === 0
-                                        ? "Non ti resta nessun codice di recupero: se perdi il telefono non potrai più entrare da solo. Rigenerali adesso."
-                                        : `Codici di recupero ancora utilizzabili: ${remaining} su 8.`}
-                                </p>
+                                {remaining === 0 ? (
+                                    <p className="text-sm text-destructive">
+                                        Non ti resta nessun codice di recupero: se perdi il telefono non potrai più
+                                        entrare da solo. Rigenerali adesso.
+                                    </p>
+                                ) : null}
 
                                 <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsRegenerateOpen(true)}
-                                    >
+                                    <Button type="button" variant="outline" onClick={() => setIsRegenerateOpen(true)}>
                                         <RefreshCw className="size-4" />
                                         Rigenera codici di recupero
                                     </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsDisableOpen(true)}
-                                    >
+                                    <Button type="button" variant="outline" onClick={() => setIsDisableOpen(true)}>
                                         <ShieldOff className="size-4" />
                                         Disattiva
                                     </Button>
@@ -292,6 +300,7 @@ const SecuritySettingsSection = () => {
                 }
                 destructive
                 confirmLabel={revokingSessionId ? "Disconnessione..." : "Disconnetti"}
+                confirmIcon={LogOut}
                 confirmDisabled={revokingSessionId !== null}
                 cancelDisabled={revokingSessionId !== null}
                 onCancel={() => setSessionToRevoke(null)}
@@ -315,42 +324,70 @@ const SecuritySettingsSection = () => {
                         />
                     }
                 >
-                    {isLoadingFailedLogins && failedLogins === null ? (
-                        <SettingsLoadingBox label="Caricamento tentativi di accesso..." />
-                    ) : !failedLogins || failedLogins.length === 0 ? (
-                        <SettingsEmptyBox>Nessun accesso fallito negli ultimi giorni.</SettingsEmptyBox>
-                    ) : (
-                        <>
-                            <Table containerClassName="hidden max-h-64 overflow-y-auto sm:block">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Data e ora</TableHead>
-                                        <TableHead>IP</TableHead>
-                                        <TableHead>Utente</TableHead>
-                                        <TableHead>Errore</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {failedLogins.map((entry, index) => (
-                                        <TableRow key={`${entry.timestamp}-${index}`}>
-                                            <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
-                                            <TableCell>{entry.ip}</TableCell>
-                                            <TableCell>{entry.user}</TableCell>
-                                            <TableCell className="whitespace-normal text-destructive">
-                                                {entry.error ?? ""}
+                    {/* Tabella a mano e schede di `EntityCardList`, come nei Log, e non `EntityTable`:
+                        quella passa alla tabella a `sm` dello schermo, qui conta la larghezza della
+                        sezione (`@container` in SettingsPage). A 768px con la barra laterale aperta
+                        la sezione è di circa 440px e le quattro colonne lasciavano l'errore, cioè il
+                        motivo del rifiuto, schiacciato a destra. Caricamento e lista vuota hanno
+                        l'aspetto di EntityTable: righe-scheletro e messaggio nella tabella. */}
+                    <Table
+                        containerClassName="hidden max-h-64 overflow-y-auto @xl:block"
+                        aria-busy={isLoadingFailedLogins}
+                    >
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Data e ora</TableHead>
+                                <TableHead>IP</TableHead>
+                                <TableHead>Utente</TableHead>
+                                <TableHead>Errore</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoadingFailedLogins && failedLogins === null ? (
+                                Array.from({ length: 3 }, (_, rowIndex) => (
+                                    <TableRow key={`skeleton-${rowIndex}`} aria-hidden={rowIndex > 0}>
+                                        {Array.from({ length: failedLoginColumnCount }, (_, cellIndex) => (
+                                            <TableCell key={cellIndex}>
+                                                {rowIndex === 0 && cellIndex === 0 ? (
+                                                    <span className="sr-only">Caricamento tentativi di accesso...</span>
+                                                ) : null}
+                                                <Skeleton aria-hidden="true" className="h-4 w-full" />
                                             </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                            <EntityCardList
-                                columns={failedLoginCardColumns}
-                                rows={failedLogins}
-                                getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.user}`}
-                                emptyMessage="Nessun accesso fallito negli ultimi giorni."
-                            />
-                        </>
-                    )}
+                                        ))}
+                                    </TableRow>
+                                ))
+                            ) : !failedLogins || failedLogins.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={failedLoginColumnCount}
+                                        className="py-6 text-center text-muted-foreground"
+                                    >
+                                        {failedLoginsEmptyMessage}
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                failedLogins.map((entry, index) => (
+                                    <TableRow key={`${entry.timestamp}-${index}`}>
+                                        <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
+                                        <TableCell>{entry.ip}</TableCell>
+                                        <TableCell>{entry.user}</TableCell>
+                                        <TableCell className="whitespace-normal text-destructive">
+                                            {entry.error ?? ""}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                    <EntityCardList
+                        hiddenFromClassName="@xl:hidden"
+                        columns={failedLoginCardColumns}
+                        rows={failedLogins ?? []}
+                        getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.user}`}
+                        emptyMessage={failedLoginsEmptyMessage}
+                        isInitialLoading={isLoadingFailedLogins && failedLogins === null}
+                        skeletonCardCount={2}
+                    />
                 </SettingsCard>
             ) : null}
 

@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { LogOut } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import SessionsList from "@/components/settings/sessionsList";
 import { getApiErrorMessage, listUserSessions, revokeUserSession, type SessionDto, type UserDto } from "@/lib/api";
@@ -110,6 +111,7 @@ const UserSessionsDialog = ({ open, onOpenChange, user }: Props) => {
                 }
                 destructive
                 confirmLabel={revokingId ? "Disconnessione..." : "Disconnetti"}
+                confirmIcon={LogOut}
                 confirmDisabled={revokingId !== null}
                 cancelDisabled={revokingId !== null}
                 onCancel={() => setSessionToRevoke(null)}

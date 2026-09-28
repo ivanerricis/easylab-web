@@ -1,10 +1,13 @@
 import { startTransition, useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
+import { RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import CustomDialog from "@/components/dialogs/customDialog";
+import { FieldError, RequiredMark } from "@/components/form-field";
+import { fieldErrorId, fieldProps } from "@/lib/formField";
 import {
     SettingsActions,
     SettingsCard,
@@ -32,6 +35,9 @@ import BrandLogo from "@/components/brand-logo";
 
 const maxLogoSizeBytes = 5 * 1024 * 1024;
 
+/** Gli errori di validazione, ognuno sotto il proprio campo (vedi `FormField`), per id del controllo. */
+type CompanyFieldErrors = Partial<Record<"companyName" | "companyTimeZone" | "logoUpload", string>>;
+
 const defaultForm: CompanySettingsInput = {
     name: "",
     email: "",
@@ -58,6 +64,7 @@ const CompanySettingsPanel = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [formValues, setFormValues] = useState<CompanySettingsInput>(defaultForm);
     const [savedValues, setSavedValues] = useState<CompanySettingsInput>(defaultForm);
+    const [errors, setErrors] = useState<CompanyFieldErrors>({});
 
     const [isLoadingLogo, setIsLoadingLogo] = useState(false);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -109,13 +116,28 @@ const CompanySettingsPanel = () => {
             return;
         }
 
+        const nextErrors: CompanyFieldErrors = {};
+
         if (!formValues.name.trim()) {
-            toast.error("Il nome dell'azienda è obbligatorio");
-            return;
+            nextErrors.companyName = "Il nome dell'azienda è obbligatorio";
         }
 
         if (!selectedTimeZone) {
-            toast.error("Scegli un fuso orario dall'elenco, per esempio Europe/Rome");
+            nextErrors.companyTimeZone = "Scegli un fuso orario dall'elenco, per esempio Europe/Rome";
+        }
+
+        // L'errore del logo non c'entra con questo pulsante: resta com'è.
+        setErrors((prev) => ({ logoUpload: prev.logoUpload, ...nextErrors }));
+
+        const firstInvalidField = (["companyName", "companyTimeZone"] as const).find((field) => nextErrors[field]);
+
+        if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
+            return;
+        }
+
+        // Già fra gli errori qui sopra: il controllo serve a TypeScript, che non lo sa.
+        if (!selectedTimeZone) {
             return;
         }
 
@@ -147,9 +169,11 @@ const CompanySettingsPanel = () => {
         }
 
         if (file.size > maxLogoSizeBytes) {
-            toast.error("Il file supera la dimensione massima di 5 MB");
+            setErrors((prev) => ({ ...prev, logoUpload: "Il file supera la dimensione massima di 5 MB" }));
             return;
         }
+
+        setErrors((prev) => ({ ...prev, logoUpload: undefined }));
 
         try {
             setIsUploadingLogo(true);
@@ -187,7 +211,10 @@ const CompanySettingsPanel = () => {
 
     return (
         <SettingsSection>
-            <SettingsCard title="Azienda" description="Dati usati nell'intestazione dei PDF di report e interventi.">
+            <SettingsCard
+                title="Dati aziendali"
+                description="Dati usati nell'intestazione dei PDF di report e interventi."
+            >
                 {isLoading ? (
                     <SettingsLoadingBox />
                 ) : (
@@ -195,15 +222,28 @@ const CompanySettingsPanel = () => {
                         <SettingsGroup>
                             <SettingsFieldRow>
                                 <SettingsField>
-                                    <Label htmlFor="companyName">Nome</Label>
-                                    <Input
-                                        id="companyName"
-                                        placeholder="es: EasyLab"
-                                        value={formValues.name}
-                                        onChange={(event) =>
-                                            setFormValues((prev) => ({ ...prev, name: event.target.value }))
-                                        }
-                                    />
+                                    <Label htmlFor="companyName">
+                                        Nome
+                                        <RequiredMark />
+                                    </Label>
+                                    {/* Controllo ed errore in un blocco solo: `SettingsField` è una
+                                        griglia a due righe condivise con il campo accanto, e un
+                                        terzo figlio finirebbe sovrapposto al controllo. */}
+                                    <div>
+                                        <Input
+                                            {...fieldProps("companyName", {
+                                                error: errors.companyName,
+                                                required: true,
+                                            })}
+                                            placeholder="es: EasyLab"
+                                            value={formValues.name}
+                                            onChange={(event) => {
+                                                setFormValues((prev) => ({ ...prev, name: event.target.value }));
+                                                setErrors((prev) => ({ ...prev, companyName: undefined }));
+                                            }}
+                                        />
+                                        <FieldError id="companyName" error={errors.companyName} />
+                                    </div>
                                 </SettingsField>
 
                                 <SettingsField>
@@ -248,14 +288,33 @@ const CompanySettingsPanel = () => {
 
                             <SettingsFieldRow>
                                 <SettingsField>
-                                    <Label htmlFor="companyTimeZone">Fuso orario</Label>
-                                    <TimeZoneField
-                                        id="companyTimeZone"
-                                        value={formValues.timeZone}
-                                        onValueChange={(timeZone) => setFormValues((prev) => ({ ...prev, timeZone }))}
-                                        aria-invalid={formValues.timeZone.trim() !== "" && !selectedTimeZone}
-                                        aria-describedby="companyTimeZoneHint"
-                                    />
+                                    <Label htmlFor="companyTimeZone">
+                                        Fuso orario
+                                        <RequiredMark />
+                                    </Label>
+                                    <div>
+                                        <TimeZoneField
+                                            id="companyTimeZone"
+                                            value={formValues.timeZone}
+                                            onValueChange={(timeZone) => {
+                                                setFormValues((prev) => ({ ...prev, timeZone }));
+                                                setErrors((prev) => ({ ...prev, companyTimeZone: undefined }));
+                                            }}
+                                            // Rosso già prima di salvare se il fuso arrivato dal server non
+                                            // è riconosciuto. L'errore si aggiunge al testo d'aiuto, non
+                                            // lo sostituisce: quello dice anche a cosa serve il fuso.
+                                            aria-invalid={
+                                                (formValues.timeZone.trim() !== "" && !selectedTimeZone) ||
+                                                Boolean(errors.companyTimeZone)
+                                            }
+                                            aria-describedby={
+                                                errors.companyTimeZone
+                                                    ? `${fieldErrorId("companyTimeZone")} companyTimeZoneHint`
+                                                    : "companyTimeZoneHint"
+                                            }
+                                        />
+                                        <FieldError id="companyTimeZone" error={errors.companyTimeZone} />
+                                    </div>
                                 </SettingsField>
                             </SettingsFieldRow>
 
@@ -276,7 +335,8 @@ const CompanySettingsPanel = () => {
                                 disabled={isSaving || isLoading || !isDirty}
                                 onClick={() => void handleSave()}
                             >
-                                {isSaving ? "Salvataggio..." : "Salva impostazioni"}
+                                <Save className="size-4" />
+                                {isSaving ? "Salvataggio..." : "Salva"}
                             </Button>
                         </SettingsActions>
                     </>
@@ -315,6 +375,7 @@ const CompanySettingsPanel = () => {
                                     disabled={!hasCustomLogo || isResettingLogo || isUploadingLogo}
                                     onClick={() => setIsLogoResetConfirmOpen(true)}
                                 >
+                                    <RotateCcw className="size-4" />
                                     {isResettingLogo ? "Ripristino..." : "Ripristina logo predefinito"}
                                 </Button>
 
@@ -329,6 +390,7 @@ const CompanySettingsPanel = () => {
                                     description="Il logo personalizzato attuale verrà rimosso e sostituito da quello predefinito. Se non hai più il file originale, dovrai crearlo di nuovo per ricaricarlo."
                                     destructive
                                     confirmLabel={isResettingLogo ? "Ripristino..." : "Ripristina"}
+                                    confirmIcon={RotateCcw}
                                     confirmDisabled={isResettingLogo}
                                     cancelDisabled={isResettingLogo}
                                     onCancel={() => setIsLogoResetConfirmOpen(false)}
@@ -347,6 +409,10 @@ const CompanySettingsPanel = () => {
                                     onChange={(event) => void handleLogoFileSelected(event)}
                                     status={isUploadingLogo ? "Caricamento in corso..." : undefined}
                                 />
+                                {/* Con `role="alert"` si legge appena compare: il pulsante di
+                                    `SettingsFileInput` ha già la sua descrizione (etichetta e file
+                                    scelto), e non gli si può aggiungere questa. */}
+                                <FieldError id="logoUpload" error={errors.logoUpload} />
                                 <p className="text-xs text-muted-foreground">
                                     Formati supportati: JPG, PNG, WEBP, GIF, SVG. Dimensione massima 5 MB. Il logo viene
                                     applicato subito dopo il caricamento.

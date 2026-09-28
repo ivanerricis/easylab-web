@@ -1,5 +1,6 @@
 import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import DetailItem, { DetailGrid } from "@/components/detail-item";
 import {
     SettingsCard,
     SettingsErrorNote,
@@ -13,7 +14,6 @@ import type { BackupPanel } from "./useBackupPanel";
 const BackupStatusCard = ({ panel }: { panel: BackupPanel }) => (
     <SettingsCard
         title="Stato backup"
-        description="Riepilogo delle ultime esecuzioni e avvio di un dump immediato."
         action={
             <Button
                 type="button"
@@ -55,9 +55,13 @@ const BackupStatusCard = ({ panel }: { panel: BackupPanel }) => (
                 </SettingsTileGrid>
 
                 {panel.lastDumpPath ? (
-                    <p className="text-xs text-muted-foreground">
-                        Percorso ultimo dump: <span className="font-mono">{panel.lastDumpPath}</span>
-                    </p>
+                    <DetailGrid layout="rows">
+                        <DetailItem
+                            label="Percorso ultimo dump"
+                            value={<span className="font-mono break-all">{panel.lastDumpPath}</span>}
+                            longText
+                        />
+                    </DetailGrid>
                 ) : null}
 
                 {panel.lastError ? <SettingsErrorNote label="Ultimo errore backup" message={panel.lastError} /> : null}

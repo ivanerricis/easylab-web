@@ -1,11 +1,13 @@
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Download, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SettingsCard, SettingsEmptyBox, SettingsSection } from "@/components/settings/settingsUi";
+import { SettingsCard, SettingsEmptyBox, SettingsLoadingBox, SettingsSection } from "@/components/settings/settingsUi";
 import RefreshButton from "@/components/refresh-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SearchInput from "@/components/search-input";
 import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
@@ -32,6 +34,11 @@ const maxRetentionDays = 90;
 const formatDayKey = (dayKey: string) => formatDate(`${dayKey}T00:00:00.000Z`);
 
 const isFailedEntry = (entry: LogEntryDto) => entry.status >= 400;
+
+// Colonne della tabella (data, IP, utente, azione, stato, errore) e righe-scheletro mostrate
+// mentre arriva una pagina: poche, perché la card è alta quanto il contenuto.
+const logColumnCount = 6;
+const logSkeletonRowCount = 5;
 
 /**
  * Le stesse sei colonne della tabella, nella forma a schede sotto `sm`: a 390px la tabella
@@ -172,7 +179,6 @@ const LogsSettingsPanel = () => {
         <SettingsSection className="flex min-h-0 flex-col sm:h-full">
             <SettingsCard
                 title="Log azioni"
-                description="Consulta il registro delle azioni eseguite sull'applicazione, giorno per giorno."
                 className="min-h-0"
                 contentClassName={logFiles.length === 0 ? undefined : "flex min-h-0 flex-1 flex-col gap-3"}
                 action={
@@ -207,17 +213,19 @@ const LogsSettingsPanel = () => {
                                 }
                                 onClick={() => void handleSaveRetention()}
                             >
+                                <Save className="size-4" />
                                 {isSavingRetention ? "Salvataggio..." : "Salva"}
                             </Button>
                         </div>
                         <Button type="button" variant="outline" disabled={!selectedDayKey} onClick={handleDownload}>
+                            <Download className="size-4" />
                             Scarica log selezionato
                         </Button>
                     </>
                 }
             >
                 {isLoadingFiles && logFiles.length === 0 ? (
-                    <SettingsEmptyBox>Caricamento elenco log...</SettingsEmptyBox>
+                    <SettingsLoadingBox label="Caricamento elenco log..." />
                 ) : logFiles.length === 0 ? (
                     <SettingsEmptyBox>Nessun log disponibile sul server.</SettingsEmptyBox>
                 ) : (
@@ -268,22 +276,30 @@ const LogsSettingsPanel = () => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    {/* Righe-scheletro e messaggio vuoto come in EntityTable, così il
+                                        caricamento dei log ha lo stesso aspetto delle altre liste. La
+                                        scritta resta per i lettori di schermo. */}
                                     {isLoadingEntries ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="text-center whitespace-normal text-muted-foreground"
-                                            >
-                                                Caricamento log...
-                                            </TableCell>
-                                        </TableRow>
+                                        Array.from({ length: logSkeletonRowCount }, (_, rowIndex) => (
+                                            <TableRow key={`skeleton-${rowIndex}`} aria-hidden={rowIndex > 0}>
+                                                {Array.from({ length: logColumnCount }, (_, cellIndex) => (
+                                                    <TableCell key={cellIndex}>
+                                                        {rowIndex === 0 && cellIndex === 0 ? (
+                                                            <span className="sr-only">Caricamento log...</span>
+                                                        ) : null}
+                                                        <Skeleton aria-hidden="true" className="h-4 w-full" />
+                                                    </TableCell>
+                                                ))}
+                                            </TableRow>
+                                        ))
                                     ) : entries.length === 0 ? (
                                         <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="text-center whitespace-normal text-muted-foreground"
-                                            >
-                                                Nessuna voce trovata per i criteri selezionati.
+                                            <TableCell colSpan={logColumnCount} className="py-6 text-muted-foreground">
+                                                {/* Centrato nella parte visibile anche se la tabella scorre
+                                                    in orizzontale: vedi lo stesso messaggio in EntityTable. */}
+                                                <span className="sticky left-1/2 inline-block -translate-x-1/2">
+                                                    Nessuna voce trovata per i criteri selezionati.
+                                                </span>
                                             </TableCell>
                                         </TableRow>
                                     ) : (

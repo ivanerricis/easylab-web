@@ -1,5 +1,7 @@
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SettingsEmptyBox, SettingsLoadingBox } from "@/components/settings/settingsUi";
+import StatusBadge from "@/components/status-badge";
 import type { SessionDto } from "@/lib/api";
 import { cn, formatDateTime, formatRelativeTime } from "@/lib/utils";
 
@@ -38,12 +40,14 @@ const SessionsList = ({
     onRevoke,
     emptyLabel = "Nessuna sessione aperta.",
 }: SessionsListProps) => {
+    // Il riquadro di caricamento e quello vuoto delle altre sezioni di Impostazioni: qui erano
+    // una riga di testo grigio, l'unico caricamento della pagina con un aspetto suo.
     if (isLoading) {
-        return <p className="text-sm text-muted-foreground">Caricamento sessioni...</p>;
+        return <SettingsLoadingBox label="Caricamento sessioni..." />;
     }
 
     if (sessions.length === 0) {
-        return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
+        return <SettingsEmptyBox>{emptyLabel}</SettingsEmptyBox>;
     }
 
     return (
@@ -81,14 +85,11 @@ const SessionsList = ({
                             pulsante c'era ma disabilitato, al 50% e senza spiegazione, e sembrava
                             un guasto. Per chiudere questa sessione c'è "Esci" nel menu utente. */}
                         {session.isCurrent ? (
-                            <span className="inline-flex h-8 items-center rounded-full bg-primary/10 px-3 text-xs font-medium text-primary-text">
-                                Questa sessione
-                            </span>
+                            <StatusBadge color="green">Questa sessione</StatusBadge>
                         ) : (
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
                                 disabled={revokingId === session.id}
                                 onClick={() => onRevoke(session)}
                             >

@@ -63,26 +63,34 @@ describe("CompanySettingsPanel", () => {
     const renderPanel = async () => {
         renderWithProviders(<CompanySettingsPanel />);
         await waitFor(() => {
-            expect(screen.getByLabelText("Nome")).toHaveValue("EasyLab");
+            expect(screen.getByLabelText(/^Nome/)).toHaveValue("EasyLab");
         });
     };
 
     it("il nome dell'azienda è obbligatorio", async () => {
         await renderPanel();
+        // L'asterisco è parte dell'etichetta, e "(obbligatorio)" la legge lo screen reader.
+        const name = screen.getByLabelText("Nome*(obbligatorio)");
 
-        await userEvent.clear(screen.getByLabelText("Nome"));
-        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+        await userEvent.clear(name);
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
-        expect(toast.error).toHaveBeenCalledWith("Il nome dell'azienda è obbligatorio");
+        // Sotto il campo e non in un toast, con il focus lì: vedi `FormField`.
+        expect(name).toHaveAccessibleDescription("Il nome dell'azienda è obbligatorio");
+        expect(name).toHaveFocus();
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.updateCompanySettings).not.toHaveBeenCalled();
+
+        await userEvent.type(name, "E");
+        expect(name).not.toHaveAccessibleDescription();
     });
 
     it("salva i dati ripuliti e torna pulito", async () => {
         await renderPanel();
-        const save = screen.getByRole("button", { name: "Salva impostazioni" });
+        const save = screen.getByRole("button", { name: "Salva" });
         expect(save).toBeDisabled();
 
-        await userEvent.type(screen.getByLabelText("Nome"), "  ");
+        await userEvent.type(screen.getByLabelText(/^Nome/), "  ");
         await userEvent.click(save);
 
         await waitFor(() => {
@@ -93,7 +101,7 @@ describe("CompanySettingsPanel", () => {
 
     it("sceglie il fuso orario da tutto l'elenco IANA, non solo da quello impostato", async () => {
         await renderPanel();
-        const timeZone = screen.getByLabelText("Fuso orario");
+        const timeZone = screen.getByLabelText(/^Fuso orario/);
         expect(timeZone).toHaveTextContent("Europe/Rome");
         expect(screen.getByText(/Adesso lì sono le/)).toBeInTheDocument();
 
@@ -105,7 +113,7 @@ describe("CompanySettingsPanel", () => {
 
         await userEvent.type(screen.getByLabelText("Cerca fuso orario"), "tokyo");
         await userEvent.click(screen.getByRole("option", { name: /Asia\/Tokyo/ }));
-        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
             expect(api.updateCompanySettings).toHaveBeenCalledWith({ ...company, timeZone: "Asia/Tokyo" });
@@ -115,7 +123,7 @@ describe("CompanySettingsPanel", () => {
     it("cerca anche per città, senza il trattino basso del nome IANA", async () => {
         await renderPanel();
 
-        await userEvent.click(screen.getByLabelText("Fuso orario"));
+        await userEvent.click(screen.getByLabelText(/^Fuso orario/));
         await userEvent.type(screen.getByLabelText("Cerca fuso orario"), "buenos aires");
 
         expect(screen.getByRole("option", { name: /Buenos_Aires/ })).toBeInTheDocument();
@@ -126,13 +134,19 @@ describe("CompanySettingsPanel", () => {
         api.getCompanySettings.mockResolvedValue({ ...company, timeZone: "Europa/Roma" });
         await renderPanel();
 
-        expect(screen.getByLabelText("Fuso orario")).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByLabelText(/^Fuso orario/)).toHaveAttribute("aria-invalid", "true");
         expect(screen.getByText(/Fuso orario non riconosciuto/)).toBeInTheDocument();
 
-        await userEvent.type(screen.getByLabelText("Nome"), "!");
-        await userEvent.click(screen.getByRole("button", { name: "Salva impostazioni" }));
+        await userEvent.type(screen.getByLabelText(/^Nome/), "!");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
-        expect(toast.error).toHaveBeenCalledWith("Scegli un fuso orario dall'elenco, per esempio Europe/Rome");
+        // L'errore si aggiunge al testo d'aiuto del campo, che resta.
+        expect(screen.getByLabelText(/^Fuso orario/)).toHaveAccessibleDescription(
+            expect.stringMatching(
+                /^Scegli un fuso orario dall'elenco, per esempio Europe\/Rome Fuso orario non riconosciuto/
+            )
+        );
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.updateCompanySettings).not.toHaveBeenCalled();
     });
 
@@ -144,7 +158,8 @@ describe("CompanySettingsPanel", () => {
 
         fireEvent.change(screen.getByLabelText("Carica nuovo logo"), { target: { files: [tooBig] } });
 
-        expect(toast.error).toHaveBeenCalledWith("Il file supera la dimensione massima di 5 MB");
+        expect(screen.getByRole("alert")).toHaveTextContent("Il file supera la dimensione massima di 5 MB");
+        expect(toast.error).not.toHaveBeenCalled();
         expect(api.uploadLogo).not.toHaveBeenCalled();
     });
 

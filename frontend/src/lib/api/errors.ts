@@ -54,3 +54,14 @@ export const getApiErrorStatus = (error: unknown): number | null => {
 
     return null;
 };
+
+/**
+ * Se il rifiuto del server riguarda un campo appena inviato: 400 è la password o il codice
+ * sbagliati, 429 i troppi tentativi. Quei messaggi vanno sotto il campo, come nella pagina di
+ * accesso; rete assente, sessione scaduta ed errori del server restano toast. Era una funzione
+ * locale del dialogo di attivazione della 2FA; ora la usa anche quello di conferma.
+ */
+export const isFieldRejection = (error: unknown) => {
+    const status = getApiErrorStatus(error);
+    return status === 400 || status === 429;
+};

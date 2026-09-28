@@ -11,6 +11,35 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-28 — Pagina di accesso: marchio accanto al logo, errori sotto i campi, segnaposto del logo
+
+- **Niente titolo e sottotitolo nella card.** "Accedi" / "Inserisci le tue credenziali" e
+  "Verifica in due passaggi" con la sua spiegazione ripetevano il bottone e le etichette dei
+  campi, sotto un marchio che dice già dove si è. Nome e sottotitolo del laboratorio stanno ora
+  accanto al logo invece che sotto, e la pagina è più corta. L'`h1` resta, nascosto, per i
+  lettori di schermo.
+- **Errori sotto i campi, come nei dialoghi.** Campi vuoti, credenziali rifiutate e codice
+  sbagliato erano `toast.error`: in alto, spariva da solo dopo qualche secondo, e per chi
+  sbaglia la password è il messaggio più importante della pagina. Ora usano `FieldError` e
+  `fieldProps` come i dialoghi (bordo rosso, `aria-describedby`, focus sul campo), e si tolgono
+  appena si riscrive. Il rifiuto del server va sotto la password perché il server, di proposito,
+  non dice quale delle due credenziali è sbagliata; un challenge 2FA scaduto (410) riporta alla
+  password con il motivo sotto. Le caselle OTP ricevono `aria-invalid` una per una: sono `div`
+  disegnati sopra l'input vero, invisibile, e altrimenti non diventavano rosse.
+- **Segnaposto per il logo.** Senza logo impostato il backend risponde già con un'immagine
+  neutra (`backend/public/logo-placeholder.png`), ma se la richiesta fallisce (backend spento o
+  non ancora partito) il browser disegnava l'icona dell'immagine rotta, nel punto più in vista
+  di login e barra laterale. `BrandLogo` mostra al suo posto un'icona sullo sfondo `muted`,
+  simile al segnaposto del backend, e riprova quando cambia l'indirizzo (l'anteprima nelle
+  impostazioni dopo un caricamento). La usano login, barra laterale e impostazioni, che aveva
+  una sua copia dell'URL del logo: ora legge `brandLogoUrl`.
+
+File: `frontend/src/pages/auth/LoginPage.tsx` e il suo test,
+`frontend/src/components/{brand-logo,main-sidebar}.tsx`,
+`frontend/src/components/settings/companySettingsPanel.tsx`.
+
+---
+
 ## 2026-09-25 — Notifiche, pagina di accesso, confronto degli incassi e due pulizie
 
 Quattro voci rimaste dalla revisione visiva dello stesso giorno (erano in [BACKLOG](BACKLOG.md)).

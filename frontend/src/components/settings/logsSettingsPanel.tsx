@@ -65,12 +65,11 @@ const logCardColumns: EntityCardColumn<LogEntryDto>[] = [
         header: "Errore",
         render: (entry) => <span className="text-destructive">{entry.error}</span>,
         cardSlot: "wide",
+        // Senza la riga "Errore" dove l'errore non c'è: vuota su ogni scheda riuscita era solo
+        // rumore, e accanto a "Utente: -" sembrava un dato mancante.
+        cardHiddenWhen: (entry) => !entry.error,
     },
 ];
-
-// Senza la colonna "Errore" quando non c'è: una riga "Errore" vuota su ogni scheda riuscita
-// era solo rumore.
-const logCardColumnsWithoutError = logCardColumns.filter((column) => column.key !== "error");
 
 const LogsSettingsPanel = () => {
     const [pageSize, setPageSize] = useTableRowsPerPage("logs");
@@ -325,7 +324,7 @@ const LogsSettingsPanel = () => {
 
                         <EntityCardList
                             hiddenFromClassName="@xl:hidden"
-                            columns={entries.some((entry) => entry.error) ? logCardColumns : logCardColumnsWithoutError}
+                            columns={logCardColumns}
                             rows={entries}
                             getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.action}-${entry.status}`}
                             getStatusColor={(entry) => (isFailedEntry(entry) ? "red" : undefined)}

@@ -38,6 +38,12 @@ export type EntityCardColumn<T> = {
      * la lista ha almeno una colonna così.
      */
     cardCollapsed?: boolean;
+    /**
+     * Toglie la riga da una singola scheda quando per quella voce non dice niente: l'errore di un
+     * log riuscito, per esempio. Deciso scheda per scheda e non per la lista intera: con un solo
+     * errore in pagina, prima tutte le schede riuscite mostravano "Errore" con il valore vuoto.
+     */
+    cardHiddenWhen?: (row: T) => boolean;
 };
 
 /**
@@ -136,7 +142,9 @@ const EntityCardImpl = <T,>({
     const [isExpanded, setIsExpanded] = useState(false);
     const detailsId = useId();
     const hiddenCount = detailColumns.filter((column) => column.cardCollapsed).length;
-    const visibleDetailColumns = isExpanded ? detailColumns : detailColumns.filter((column) => !column.cardCollapsed);
+    const visibleDetailColumns = (
+        isExpanded ? detailColumns : detailColumns.filter((column) => !column.cardCollapsed)
+    ).filter((column) => !column.cardHiddenWhen?.(row));
 
     const renderTitle = () => {
         const parts = titleColumns

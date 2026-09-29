@@ -122,6 +122,31 @@ describe("LogsSettingsPanel: errore di caricamento", () => {
     });
 });
 
+describe("LogsSettingsPanel: schede su telefono", () => {
+    /**
+     * La riga "Errore" si decide scheda per scheda: prima bastava un errore nella pagina perché
+     * tutte le schede riuscite mostrassero "Errore" con il valore vuoto.
+     */
+    it("mostra 'Errore' solo sulla scheda della voce che ne ha uno", async () => {
+        api.listLogEntries.mockResolvedValue(
+            page([entry("login riuscito"), { ...entry("login fallito"), status: 401, error: "Credenziali errate" }])
+        );
+
+        const { container } = renderWithProviders(<LogsSettingsPanel />);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        const cards = [...container.querySelectorAll("article")] as HTMLElement[];
+        const ok = cards.find((card) => within(card).queryByText("login riuscito"))!;
+        const failed = cards.find((card) => within(card).queryByText("login fallito"))!;
+
+        expect(within(ok).queryByText("Errore")).not.toBeInTheDocument();
+        expect(within(failed).getByText("Errore")).toBeInTheDocument();
+        expect(within(failed).getByText("Credenziali errate")).toBeInTheDocument();
+    });
+});
+
 describe("LogsSettingsPanel: data del log", () => {
     it("mostra la data del file senza l'orario", async () => {
         api.listLogEntries.mockResolvedValue(page([]));

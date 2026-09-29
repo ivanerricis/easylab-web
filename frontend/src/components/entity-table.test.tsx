@@ -313,6 +313,25 @@ describe("EntityCardList", () => {
         expect(toggle).toHaveAttribute("aria-expanded", "true");
     });
 
+    it("toglie una riga dalla sola scheda in cui 'cardHiddenWhen' è vero", () => {
+        renderCards({
+            columns: [
+                ...columns.filter((column) => column.key !== "actions"),
+                {
+                    key: "warning",
+                    header: "Avviso",
+                    cardHiddenWhen: (row) => row.id !== 1,
+                    render: (row) => `avviso ${row.id}`,
+                },
+            ],
+        });
+        const [mario, anna] = screen.getAllByRole("article");
+
+        expect(within(mario).getByText("Avviso")).toBeInTheDocument();
+        expect(within(mario).getByText("avviso 1")).toBeInTheDocument();
+        expect(within(anna).queryByText("Avviso")).not.toBeInTheDocument();
+    });
+
     it("senza dettagli secondari non mostra il comando per aprire la scheda", () => {
         renderCards();
 

@@ -17,6 +17,21 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   provato e annullato il 2026-09-25; qui la richiesta originale e cosa è emerso.
 - [Notifiche di sistema visibili e chiudibili da tutti](#notifiche-di-sistema-visibili-e-chiudibili-da-tutti):
   un utente non admin legge gli avvisi di sicurezza e dei backup e può chiuderli per tutti.
+- Rimandati dalla scansione del frontend del 2026-09-28 (fase 1 nel CHANGELOG dello stesso giorno):
+  - **Modifiche non salvate nelle Impostazioni e tasto Indietro.** Cambio sezione, link interni e
+    chiusura della scheda chiedono conferma; il tasto Indietro e le navigazioni fatte in codice
+    (ricerca globale, logout dal menu utente) no. Serve `createBrowserRouter` + `useBlocker` in
+    `App.tsx` al posto di `BrowserRouter`: cambio di router da fare con calma, tocca tutte le rotte.
+  - **Preload del font Inter.** Il sottoinsieme latin (48 KB) si scopre solo dopo il CSS, con un
+    breve cambio di carattere al primo caricamento. Da verificare se Vite riscrive un
+    `<link rel=preload>` in `index.html` verso lo stesso file con hash; senza, serve un plugin.
+  - **Testo rosso su fondo rosso tenue** (`bg-destructive/10`): 3,79:1 sul fondo pagina, 4,35:1 sulle
+    card, sotto il 4,5:1. Il rosso pieno è stato corretto; questo caso no.
+  - **Da provare su telefoni veri:** pressione lunga sul calendario per creare un intervento,
+    tastiera a schermo aperta nei dialoghi (restringe `dvh`), Indietro di Android con un dialogo
+    aperto, maiuscole di iOS su "ELIMINA". Gli screenshot erano Playwright + Edge in emulazione.
+  - **Sezioni admin delle Impostazioni non viste a schermo** (Utenti, Azienda, Email, Backup,
+    Aggiornamenti, Log): la verifica visiva è stata fatta con l'utente di prova non admin.
 - [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
   aree da toccare sotto i 44px, colonna Azioni fuori vista nelle tabelle larghe, alcune
   proposte non ancora decise.

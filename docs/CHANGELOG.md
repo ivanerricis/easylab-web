@@ -11,6 +11,144 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-28 — Scansione del frontend, fase 1: telefono, robustezza, accessibilità
+
+Una scansione del frontend con sei agenti (prestazioni, bug, accessibilità, qualità del codice, UX,
+telefono con screenshot Playwright a 360/390/768px) ha trovato una sessantina di problemi. Qui le
+correzioni; i refactoring che ne sono usciti sono la fase 2. Decisioni dell'utente: le scorciatoie a
+un tasto si possono spegnere, il tasto Indietro chiude i dialoghi, il nome utente resta confrontato
+esattamente (sono nomi come "Ivan", quindi la maiuscola automatica del telefono resta).
+
+**Dialoghi e moduli.**
+- **Non escono più dallo schermo.** `CustomDialog` è una colonna alta al massimo `100dvh − 2rem` in
+  cui scorre solo il corpo, con titolo e pulsanti sempre visibili. Prima "Nuovo cliente" a 360×640
+  andava da −63 a 703px: titolo, X e Annulla irraggiungibili, e su un telefono non c'è Esc. Ora
+  16…624px (misurato). `ui/dialog.tsx` ha lo stesso limite come paracadute; "Modifica intervento"
+  passa dal `70vh` fisso all'altezza calcolata come "Modifica report".
+- **Indietro chiude il dialogo** (Android, mouse, browser) invece di cambiare pagina, con la domanda
+  "Modifiche non salvate" se il modulo è sporco. All'apertura il dialogo aggiunge una voce di
+  cronologia con lo stesso stato del router e alla chiusura la consuma, solo se è ancora in cima:
+  una navigazione subito dopo il salvataggio non viene annullata. Regge dialoghi annidati e
+  StrictMode (`hooks/useDialogHistoryEntry.ts`); chi chiude e poi torna indietro aspetta
+  `settleDialogHistory()`. Con un modulo sporco anche ricaricare o chiudere la scheda chiede conferma.
+- **Prezzi**: campi di testo con tastiera decimale che accettano "12,50". Prima il campo numerico
+  con la virgola passava un valore vuoto, salvato come 0 o come nessun prezzo senza avviso; ora
+  "Importo non valido" (`lib/euroAmount.ts`).
+- **"ELIMINA"** chiede le maiuscole alla tastiera, spegne il correttore e perdona maiuscole e spazi:
+  sul telefono "Elimina " lasciava il pulsante spento e le eliminazioni erano impossibili.
+- **Accesso**: il correttore non tocca il nome utente; il codice di recupero è senza maiuscole; dopo
+  l'accesso si torna all'indirizzo completo di filtri, non solo al percorso.
+- **Selettore di date in italiano**, settimana da lunedì, etichette per i lettori di schermo
+  tradotte. Prima "September", "Su Mo Tu…", "Go to the Next Month". I filtri data delle liste e la
+  stampa restano con `<input type="date">` nativo, di proposito: sul telefono apre il selettore di
+  sistema, più comodo del popover.
+- Testi: "Difetto creato con successo" (era "Segnalazione…"), "Inserisci…" invece di "Inserire…",
+  segnaposto d'esempio uniformi "Es. …".
+
+**Campo con suggerimenti (cliente, dispositivo, difetto) usabile da tastiera.** Le voci erano
+pulsanti che rispondevano solo a `onMouseDown`: Tab toglieva il focus e un `setTimeout` di 100ms
+smontava la lista, lo screen reader non sapeva della lista, e Invio inviava tutto il modulo. Ora
+`InputWithAdd` segue lo schema WAI-ARIA combobox: frecce che girano in tondo, Invio sceglie (e
+trattiene l'invio solo in quel caso), Esc chiude la lista senza chiudere il dialogo — Radix ascolta
+Esc su `document` in cattura, prima di React, quindi lo si ferma su `window` e solo a lista aperta —,
+numero di suggerimenti annunciato.
+
+**Schede di dettaglio, liste, sessione.**
+- Le schede mostrano la rotellina a tutta pagina solo senza dati: su "Aggiorna" e dopo "Salva" il
+  contenuto resta, attenuato e `aria-busy`. Prima il `reload()` dopo il salvataggio smontava a metà
+  il dialogo di modifica e lo rimontava (il "lampo" dopo Salva).
+- `useEntityDetail` torna all'elenco su un errore solo al primo caricamento, non su un ricaricamento.
+- **Errore ≠ lista vuota.** `usePaginatedRows`/`useSearchableRows` espongono `error`, ed
+  `EntityTable`/`EntityCardList` mostrano "Impossibile caricare …" con "Riprova" al posto di
+  "Nessun … disponibile.", che a server fermo o in aggiornamento diceva il falso. Collegato in tutte
+  le liste, nei tab delle schede cliente/collaboratore e nel registro dei Log.
+- Dopo l'eliminazione da una scheda si torna indietro nella cronologia: ricerca, filtri e pagina
+  della lista restano.
+- `AuthProvider` considera "non autenticato" solo un 401: con la rete assente o un 502 del tunnel
+  mostra "Impossibile contattare il server" con "Riprova" invece di mandare al login.
+- Una data solo-giorno (`2026-09-28`) si legge come data locale: prima a ovest di Greenwich si
+  vedeva il giorno prima (anche nei Log). Un giorno inesistente mostra "-" invece di scivolare al
+  mese dopo.
+- Su telefono il testo di `HoverDetailCell` nelle schede va a capo invece di finire in puntini.
+- Una colonna non nascondibile (lo "Stato" dei report, ora) non resta nascosta per chi l'aveva
+  tolta prima: `useHiddenColumns(tableKey, columns)` la esclude e ripulisce la preferenza.
+
+**Dashboard e calendario.**
+- **Incassi del mese giusto.** Sfogliando i mesi in fretta la risposta di un mese superato poteva
+  arrivare per ultima e scrivere i suoi incassi sotto l'etichetta dell'altro. Ora vale solo la
+  più recente (id di richiesta come in `usePaginatedRows`) e la superata viene annullata
+  (`getReportStats` accetta un `signal`). Su errore l'etichetta torna al mese caricato e i numeri
+  sono "—", non un falso "0,00 €". I contatori degli interventi non si richiedono più a ogni
+  freccia del mese.
+- **Dialoghi caricati quando servono.** Creazione e modifica (Dashboard, calendario, Report,
+  Interventi) si scaricano alla prima apertura, anticipati dal passaggio del mouse o dal focus sul
+  pulsante, o a pagina ferma (`lib/lazyDialog.ts`: `lazy` e prefetch condividono una promessa,
+  anche perché due `import()` concorrenti dello stesso modulo finto bloccavano vitest). Codice in
+  meno all'apertura (gzip): −53 KB dashboard, −43 KB calendario, −34 KB Interventi, −16 KB Report.
+  Restano montati dopo la prima apertura, per non perdere l'animazione di uscita.
+- Il calendario è in `memo` e non si ridisegna a ogni cambio di mese degli incassi.
+- Settimana e Giorno si aprono sulle 8, non a mezzanotte (prima su telefono si vedevano solo
+  00–07). Il periodo non si tronca più a "S…": va a capo accanto alle frecce, e la barra passa su
+  una riga sola secondo la larghezza del **contenitore** (`@min-[40rem]`), non dello schermo: a
+  768px con la barra laterale il calendario ha ~440px, e con `sm:` il periodo finiva sotto i
+  pulsanti delle viste (trovato negli screenshot di verifica). Su telefono scorre in orizzontale
+  solo la griglia, non la barra.
+- "+N altri" si chiude con Esc. Gli interventi si raggiungono con Tab in tutte le viste, con un nome
+  completo (cliente, tipo, giorno, orario, stato), si aprono con Invio o Spazio e mostrano il
+  riquadro dei dettagli al focus. Sul telefono una pressione lunga su un giorno crea un intervento
+  come il doppio clic, che col tocco non esiste.
+- Il focus del dialogo "Incassi mese" entra nel dialogo invece di restare sotto il velo.
+
+**Struttura e accessibilità.**
+- Un solo `<main>`: `SidebarInset` ne disegnava un secondo attorno a quello di `MainLayout`.
+- Al cambio di percorso (non dei soli parametri, dove stanno filtri e pagine) il focus va su
+  `<main>` senza scorrere e il titolo della nuova pagina si annuncia in una regione `aria-live`,
+  quando il titolo è fermo (le schede lo scrivono all'arrivo dei dati).
+- Tradotti gli ultimi testi inglesi di shadcn ("Toggle Sidebar", "Close"…); `aria-expanded` sul
+  pulsante del menu. Titoli veri (`CardTitle as`) nelle card delle Impostazioni, nelle sezioni
+  delle schede (`h2`), nella pagina d'errore e nelle pagine obbligate (`h1`).
+- Il campanello dice quante notifiche nuove ci sono; il pulsante "Filtri" su mobile quanti filtri
+  sono attivi ("1 attivo", prima "1 attivi" e muto per lo screen reader), e conta solo gli
+  scostamenti dal default (prima segnava "1" a chi non aveva toccato niente).
+- Il separatore delle colonne dichiara la larghezza (`aria-valuenow/min/max`); Invio o Home la
+  ripristinano come il doppio clic; la maniglia ha il contorno di focus comune.
+- Lo "Stato" dei report non si può più nascondere: lo stato altrimenti lo diceva solo il colore.
+- `--destructive` del tema chiaro da L 0.577 a 0.545: sul fondo pagina era 4.13:1, sotto il 4.5:1
+  dei messaggi d'errore dei campi; ora 4.53:1 (5.23:1 sulle card). Il tema scuro era già a norma.
+- `TooltipProvider` passa da `App.tsx` a `MainLayout` (la pagina di accesso non scarica i tooltip);
+  la pagina obbligata della 2FA, fuori dal layout, ha il suo.
+
+**Impostazioni, preferenze, avvio, server.**
+- Azienda, Email e Backup segnalano le modifiche non salvate alla pagina: cambiare sezione o
+  seguire un link interno chiede "Modifiche non salvate", e il browser chiede prima di chiudere.
+  L'app usa `BrowserRouter` (niente `useBlocker`) e il busy-guard è solo un overlay, per questo i
+  link si fermano in cattura sul documento. Restano fuori il tasto Indietro e le navigazioni fatte
+  in codice (BACKLOG).
+- Disattivare la propria 2FA chiude sul server tutte le proprie sessioni: ora si torna subito al
+  login con un messaggio, invece di restare su una sessione morta. Prima del ritorno al login si
+  attende che il dialogo chiuso rilasci la sua voce di cronologia (`settleDialogHistory`).
+- Le sezioni delle Impostazioni e le pagine obbligate si caricano con `lazy`.
+- **`lib/safeStorage.ts`**: con i dati del sito bloccati `localStorage` lancia `SecurityError`, e il
+  `ThemeProvider`, sopra il limite d'errore, lasciava lo schermo bianco. Ora valgono i predefiniti.
+- **Interruttore "Scorciatoie da tastiera"** in Impostazioni › Tema, attivo di default, per chi le fa
+  scattare per sbaglio (lettori di schermo, comandi vocali; WCAG 2.1.4). La preferenza si legge a
+  ogni tasto, quindi vale subito; "?" resta sempre attivo e dice dove riattivarle.
+- **nginx comprime** (gzip) CSS, JS, JSON e SVG sopra 1 KB: prima li serviva in chiaro, e l'accesso
+  d'emergenza dalla LAN scaricava ~515 KB di JS invece di ~166. Verificato sull'immagine di
+  produzione: `Content-Encoding: gzip`, intestazioni di sicurezza invariate. Le risposte già
+  compresse (API) non vengono toccate.
+
+Verifica: typecheck e lint puliti, 927 test unitari e 6 e2e verdi, screenshot Playwright a
+320/360/375/390/768/1024/1366px, chiaro e scuro. Non verificati su dispositivi veri: pressione
+lunga, tastiera a schermo aperta, iOS.
+
+File principali: `frontend/src/components/{dialogs/customDialog,inputWithAdd,entity-table,
+entity-card-list,auth-provider,detail-delete-button,euro-input,date-picker-field}.tsx`,
+`frontend/src/hooks/{useDialogHistoryEntry,useEntityDetail,usePaginatedRows,useHiddenColumns,
+usePageShortcut,useResizableColumns}.ts`, `frontend/src/lib/{euroAmount,lazyDialog,safeStorage,
+theme,utils}.ts`, `frontend/src/pages/{MainLayout,dashboard/DashboardPage,settings/SettingsPage}.tsx`,
+`frontend/src/pages/calendar/**`, `frontend/nginx.conf`, con i relativi test.
+
 ## 2026-09-28 — Schede delle liste su mobile a righe, schede report apribili, numero più visibile
 
 - **Dettagli a righe nelle schede delle liste.** Le schede che su telefono sostituiscono le

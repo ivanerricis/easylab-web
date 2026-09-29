@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -55,10 +55,9 @@ const renderPage = (route: string, currentUser: UserDto) =>
 
 /** I pulsanti della barra laterale: sulla versione mobile c'è un select, nascosto dal CSS. */
 const sectionButtons = () =>
-    screen
+    within(screen.getByRole("navigation", { name: "Sezioni delle impostazioni" }))
         .getAllByRole("button")
-        .map((button) => button.querySelector(".font-semibold")?.textContent)
-        .filter(Boolean);
+        .map((button) => button.textContent);
 
 describe("SettingsPage", () => {
     it("apre il tema di default", async () => {

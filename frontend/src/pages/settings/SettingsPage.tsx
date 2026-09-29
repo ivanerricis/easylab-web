@@ -12,7 +12,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { SettingsLoadingBox } from "@/components/settings/settingsUi";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/use-auth";
@@ -45,62 +53,82 @@ const settingsSectionKeys: SettingsSectionKey[] = [
     "logs",
 ];
 
+type SettingsGroupKey = "preferences" | "lab" | "system";
+
+// Le categorie seguono chi decide cosa: le proprie preferenze, la configurazione del laboratorio,
+// la macchina e i suoi dati. Una categoria senza voci apribili (per un non-admin) sparisce.
+const settingsGroups: Array<{ key: SettingsGroupKey; label: string }> = [
+    { key: "preferences", label: "Preferenze" },
+    { key: "lab", label: "Laboratorio" },
+    { key: "system", label: "Dati e sistema" },
+];
+
 const settingsSections: Array<{
     key: SettingsSectionKey;
+    group: SettingsGroupKey;
     label: string;
     description: string;
     icon: typeof Palette;
 }> = [
     {
         key: "theme",
+        group: "preferences",
         label: "Tema",
         description: "Colori, modalità e accenti visivi",
         icon: Palette,
     },
     {
         key: "security",
+        group: "preferences",
         label: "Sicurezza",
         description: "Verifica in due passaggi del tuo account",
         icon: ShieldCheck,
     },
     {
         key: "users",
+        group: "lab",
         label: "Utenti",
         description: "Account che possono accedere all'app",
         icon: Users,
     },
     {
         key: "company",
+        group: "lab",
         label: "Azienda",
         description: "Dati e logo del laboratorio su app e PDF",
         icon: Building2,
     },
     {
         key: "email",
+        group: "lab",
         label: "Email",
         description: "Configurazione SMTP per l'invio email",
         icon: Mail,
     },
     {
         key: "export",
+        group: "system",
         label: "Esportazione",
         description: "Scarica clienti e report in CSV",
         icon: FileDown,
     },
     {
         key: "backup",
+        group: "system",
         label: "Backup",
         description: "Dump, archivio e ripristino",
         icon: Database,
     },
     {
         key: "update",
+        group: "system",
         label: "Aggiornamenti",
         description: "Verifica e aggiorna l'applicazione",
         icon: RefreshCw,
     },
     {
         key: "logs",
+        group: "system",
         label: "Log",
         description: "Registro delle azioni eseguite",
         icon: ScrollText,
@@ -167,6 +195,12 @@ const SettingsPage = () => {
     const activeSection: SettingsSectionKey =
         isSettingsSectionKey(sectionFromUrl) && canOpenSection(sectionFromUrl) ? sectionFromUrl : "theme";
     const visibleSettingsSections = settingsSections.filter((section) => canOpenSection(section.key));
+    const visibleSettingsGroups = settingsGroups
+        .map((group) => ({
+            ...group,
+            sections: visibleSettingsSections.filter((section) => section.group === group.key),
+        }))
+        .filter((group) => group.sections.length > 0);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -296,50 +330,73 @@ const SettingsPage = () => {
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    {visibleSettingsSections.map((section) => {
-                        const Icon = section.icon;
+                    {visibleSettingsGroups.map((group) => (
+                        <SelectGroup key={group.key}>
+                            <SelectLabel>{group.label}</SelectLabel>
+                            {group.sections.map((section) => {
+                                const Icon = section.icon;
 
-                        return (
-                            <SelectItem key={section.key} value={section.key}>
-                                <Icon className="size-4" />
-                                {section.label}
-                            </SelectItem>
-                        );
-                    })}
+                                return (
+                                    <SelectItem key={section.key} value={section.key}>
+                                        <Icon className="size-4" />
+                                        {section.label}
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectGroup>
+                    ))}
                 </SelectContent>
             </Select>
 
             {/* `self-start` e `max-h-full`: alto quanto le sue voci, non quanto la pagina. Stirato
                 dal flex, per chi non è amministratore (due voci) era una card con ~600px vuoti. */}
-            <aside className="hidden max-h-full w-full shrink-0 flex-col gap-4 self-start overflow-y-auto rounded-2xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:flex xl:max-w-xs">
-                <div className="grid gap-1.5">
-                    {visibleSettingsSections.map((section) => {
-                        const Icon = section.icon;
-                        const isActive = activeSection === section.key;
-
-                        return (
-                            <Button
-                                key={section.key}
-                                type="button"
-                                variant="outline"
-                                onClick={() => setActiveSection(section.key)}
-                                className={cn(
-                                    "h-auto items-start justify-start gap-2 rounded-xl border p-2.5 text-left",
-                                    isActive && "border-primary bg-primary/10 dark:border-primary dark:bg-primary/10"
-                                )}
+            <nav
+                aria-label="Sezioni delle impostazioni"
+                className="hidden max-h-full w-56 shrink-0 self-start overflow-y-auto rounded-2xl border bg-card p-2 shadow-sm xl:block"
+            >
+                <div className="grid gap-3">
+                    {visibleSettingsGroups.map((group) => (
+                        <div
+                            key={group.key}
+                            role="group"
+                            aria-labelledby={`settings-group-${group.key}`}
+                            className="not-first:border-t not-first:pt-3"
+                        >
+                            <p
+                                id={`settings-group-${group.key}`}
+                                className="mb-1.5 px-3 text-xs font-bold tracking-wider text-foreground/60 uppercase"
                             >
-                                <Icon className="mt-0.5 size-4 shrink-0" />
-                                <span className="grid gap-0.5">
-                                    <span className="text-sm font-semibold">{section.label}</span>
-                                    <span className="text-xs font-normal text-muted-foreground">
-                                        {section.description}
-                                    </span>
-                                </span>
-                            </Button>
-                        );
-                    })}
+                                {group.label}
+                            </p>
+                            <ul className="grid gap-0.5">
+                                {group.sections.map((section) => {
+                                    const Icon = section.icon;
+                                    const isActive = activeSection === section.key;
+
+                                    return (
+                                        <li key={section.key}>
+                                            <button
+                                                type="button"
+                                                title={section.description}
+                                                aria-current={isActive ? "page" : undefined}
+                                                onClick={() => setActiveSection(section.key)}
+                                                className={cn(
+                                                    "relative flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
+                                                    isActive &&
+                                                        "bg-primary/10 font-semibold text-primary before:absolute before:top-2 before:bottom-2 before:left-0 before:w-1 before:rounded-full before:bg-primary hover:bg-primary/10 hover:text-primary"
+                                                )}
+                                            >
+                                                <Icon className="size-4 shrink-0" />
+                                                {section.label}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
-            </aside>
+            </nav>
 
             {/* Niente bordo né sfondo attorno alla sezione: le card delle impostazioni stanno
                 direttamente sulla pagina, come le DetailSection delle schede. Prima erano una

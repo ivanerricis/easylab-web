@@ -1,24 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-    applyCornerRadius,
-    applyFontSize,
-    applyTableDensity,
-    applyTableRowIntensity,
-    applyThemeAccentPreset,
-    getStoredCornerRadius,
-    getStoredFontSize,
+    applyPreference,
     getStoredKeyboardShortcutsEnabled,
+    getStoredPreference,
     getStoredTableColumnWidths,
-    getStoredTableDensity,
-    getStoredTableRowIntensity,
     getStoredTableRowsPerPage,
-    getStoredThemeAccentPreset,
-    setStoredCornerRadius,
     setStoredKeyboardShortcutsEnabled,
+    setStoredPreference,
     setStoredTableColumnWidths,
-    setStoredTableRowIntensity,
     setStoredTableRowsPerPage,
-    setStoredThemeAccentPreset,
     themeAccentPresets,
 } from "./theme";
 
@@ -39,13 +29,13 @@ describe("preferenze di tema salvate", () => {
     it("ignora un valore salvato che non corrisponde a nessun preset", () => {
         localStorage.setItem("easylab-web-theme-accent", "preset-inesistente");
 
-        expect(getStoredThemeAccentPreset()).toBeNull();
+        expect(getStoredPreference("accent")).toBeNull();
     });
 
     it("restituisce il preset salvato quando è valido", () => {
-        setStoredThemeAccentPreset("ocean");
+        setStoredPreference("accent", "ocean");
 
-        expect(getStoredThemeAccentPreset()).toBe("ocean");
+        expect(getStoredPreference("accent")).toBe("ocean");
     });
 
     /**
@@ -53,18 +43,18 @@ describe("preferenze di tema salvate", () => {
      * significherebbe congelare l'aspetto attuale anche se il default cambia.
      */
     it("non salva il valore predefinito", () => {
-        setStoredThemeAccentPreset("ocean");
-        setStoredThemeAccentPreset("default");
+        setStoredPreference("accent", "ocean");
+        setStoredPreference("accent", "default");
 
         expect(localStorage.getItem("easylab-web-theme-accent")).toBeNull();
-        expect(getStoredThemeAccentPreset()).toBeNull();
+        expect(getStoredPreference("accent")).toBeNull();
     });
 
     it("rimuove la chiave quando il preset viene azzerato", () => {
-        setStoredThemeAccentPreset("forest");
-        setStoredThemeAccentPreset(null);
+        setStoredPreference("accent", "forest");
+        setStoredPreference("accent", null);
 
-        expect(getStoredThemeAccentPreset()).toBeNull();
+        expect(getStoredPreference("accent")).toBeNull();
     });
 
     it("righe per pagina: default a 10 e valori non validi scartati", () => {
@@ -102,14 +92,14 @@ describe("preferenze di tema salvate", () => {
         localStorage.setItem("easylab-web-table-density", "gigante");
         localStorage.setItem("easylab-web-font-size", "enorme");
 
-        expect(getStoredTableDensity()).toBeNull();
-        expect(getStoredFontSize()).toBeNull();
+        expect(getStoredPreference("density")).toBeNull();
+        expect(getStoredPreference("fontSize")).toBeNull();
     });
 
     it("raggio degli angoli non valido non viene restituito", () => {
         localStorage.setItem("easylab-web-corner-radius", "ovale");
 
-        expect(getStoredCornerRadius()).toBeNull();
+        expect(getStoredPreference("radius")).toBeNull();
     });
 });
 
@@ -144,23 +134,23 @@ describe("palette dei colori principali", () => {
     it("ogni preset è accettato da localStorage e riletto identico", () => {
         for (const preset of themeAccentPresets) {
             localStorage.clear();
-            setStoredThemeAccentPreset(preset.key);
+            setStoredPreference("accent", preset.key);
 
             // Il predefinito è l'unico a non salvare niente: è l'assenza di preferenza.
-            expect(getStoredThemeAccentPreset()).toBe(preset.key === "default" ? null : preset.key);
+            expect(getStoredPreference("accent")).toBe(preset.key === "default" ? null : preset.key);
         }
     });
 
     /**
      * Ogni variabile è confrontata con il campo da cui deve arrivare, non solo con "non
      * vuota": così il test coglie anche un'assegnazione incrociata dentro
-     * `applyThemeAccentPreset` (per esempio `--chart-4` scritta con `chart3`), che a valore
+     * `applyPreference("accent", …)` (per esempio `--chart-4` scritta con `chart3`), che a valore
      * non vuoto passerebbe inosservata.
      */
     it("ogni preset scrive tutte e nove le variabili CSS con i propri valori", () => {
         for (const preset of themeAccentPresets.filter((item) => item.key !== "default")) {
             document.documentElement.removeAttribute("style");
-            applyThemeAccentPreset(preset.key);
+            applyPreference("accent", preset.key);
 
             const attese: [string, string][] = [
                 ["--primary", preset.primary],
@@ -203,7 +193,7 @@ describe("applicazione del tema al DOM", () => {
         const ocean = themeAccentPresets.find((preset) => preset.key === "ocean");
         expect(ocean).toBeDefined();
 
-        applyThemeAccentPreset("ocean");
+        applyPreference("accent", "ocean");
 
         const root = document.documentElement;
         expect(root.style.getPropertyValue("--primary")).toBe(ocean!.primary);
@@ -215,8 +205,8 @@ describe("applicazione del tema al DOM", () => {
      * del tema chiaro: altrimenti il tema scuro resterebbe con i colori di quello chiaro.
      */
     it("rimuove le variabili CSS tornando al preset predefinito", () => {
-        applyThemeAccentPreset("rose");
-        applyThemeAccentPreset("default");
+        applyPreference("accent", "rose");
+        applyPreference("accent", "default");
 
         const root = document.documentElement;
         expect(root.style.getPropertyValue("--primary")).toBe("");
@@ -225,55 +215,55 @@ describe("applicazione del tema al DOM", () => {
     });
 
     it("ignora un preset sconosciuto senza toccare il DOM", () => {
-        applyThemeAccentPreset("ocean");
+        applyPreference("accent", "ocean");
         const before = document.documentElement.style.getPropertyValue("--primary");
 
-        applyThemeAccentPreset("non-esiste" as never);
+        applyPreference("accent", "non-esiste" as never);
 
         expect(document.documentElement.style.getPropertyValue("--primary")).toBe(before);
     });
 
     it("densità e dimensione carattere passano da attributi sull'elemento radice", () => {
-        applyTableDensity("compact");
-        applyFontSize("lg");
+        applyPreference("density", "compact");
+        applyPreference("fontSize", "lg");
 
         expect(document.documentElement.getAttribute("data-table-density")).toBe("compact");
         expect(document.documentElement.getAttribute("data-font-size")).toBe("lg");
 
-        applyTableDensity("default");
-        applyFontSize("default");
+        applyPreference("density", "default");
+        applyPreference("fontSize", "default");
 
         expect(document.documentElement.getAttribute("data-table-density")).toBeNull();
         expect(document.documentElement.getAttribute("data-font-size")).toBeNull();
     });
 
     it("il raggio degli angoli scrive la variabile --radius", () => {
-        applyCornerRadius("round");
+        applyPreference("radius", "round");
 
         expect(document.documentElement.style.getPropertyValue("--radius")).not.toBe("");
     });
 
     it("intensità delle righe: attributo sulla radice, tolto tornando al predefinito", () => {
-        applyTableRowIntensity("soft");
+        applyPreference("rowIntensity", "soft");
         expect(document.documentElement.getAttribute("data-table-row-intensity")).toBe("soft");
 
-        applyTableRowIntensity(null);
+        applyPreference("rowIntensity", null);
         expect(document.documentElement.hasAttribute("data-table-row-intensity")).toBe(false);
     });
 
     it("intensità delle righe e raggio: il predefinito non si salva, un valore ignoto non si legge", () => {
-        setStoredTableRowIntensity("strong");
-        expect(getStoredTableRowIntensity()).toBe("strong");
+        setStoredPreference("rowIntensity", "strong");
+        expect(getStoredPreference("rowIntensity")).toBe("strong");
 
-        setStoredTableRowIntensity("default");
+        setStoredPreference("rowIntensity", "default");
         expect(localStorage.getItem("easylab-web-table-row-intensity")).toBeNull();
 
         localStorage.setItem("easylab-web-table-row-intensity", "fluo");
-        expect(getStoredTableRowIntensity()).toBeNull();
+        expect(getStoredPreference("rowIntensity")).toBeNull();
 
-        setStoredCornerRadius("square");
-        expect(getStoredCornerRadius()).toBe("square");
-        setStoredCornerRadius(null);
+        setStoredPreference("radius", "square");
+        expect(getStoredPreference("radius")).toBe("square");
+        setStoredPreference("radius", null);
         expect(localStorage.getItem("easylab-web-corner-radius")).toBeNull();
     });
 });

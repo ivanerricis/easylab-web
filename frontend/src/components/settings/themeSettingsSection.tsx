@@ -9,33 +9,20 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/use-theme";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import {
-    applyCornerRadius,
-    applyFontSize,
-    applyTableDensity,
-    applyTableRowIntensity,
-    applyThemeAccentPreset,
+    applyPreference,
     cornerRadiusPresets,
     fontSizes,
-    getStoredCornerRadius,
-    getStoredFontSize,
     getStoredKeyboardShortcutsEnabled,
-    getStoredTableDensity,
-    getStoredTableRowIntensity,
-    getStoredThemeAccentPreset,
-    setStoredCornerRadius,
-    setStoredFontSize,
+    getStoredPreference,
     setStoredKeyboardShortcutsEnabled,
-    setStoredTableDensity,
-    setStoredTableRowIntensity,
-    setStoredThemeAccentPreset,
+    setStoredPreference,
     tableDensities,
     tableRowIntensities,
     themeAccentPresets,
-    type CornerRadiusKey,
+    type AppearancePreferenceName,
     type FontSizeKey,
     type TableDensityKey,
     type TableRowIntensityKey,
-    type ThemeAccentPresetKey,
 } from "@/lib/theme";
 import { cn, modifierKey } from "@/lib/utils";
 
@@ -129,43 +116,23 @@ const FontSizePreview = ({ fontSizeKey }: { fontSizeKey: FontSizeKey }) => (
 
 const ThemeSettingsSection = () => {
     const { theme, setTheme } = useTheme();
-    const [selectedAccent, setSelectedAccent] = useState<ThemeAccentPresetKey>(
-        () => getStoredThemeAccentPreset() ?? "default"
-    );
-    const [selectedRowIntensity, setSelectedRowIntensity] = useState<TableRowIntensityKey>(
-        () => getStoredTableRowIntensity() ?? "default"
-    );
-    const [selectedDensity, setSelectedDensity] = useState<TableDensityKey>(() => getStoredTableDensity() ?? "default");
-    const [selectedFontSize, setSelectedFontSize] = useState<FontSizeKey>(() => getStoredFontSize() ?? "default");
-    const [selectedRadius, setSelectedRadius] = useState<CornerRadiusKey>(() => getStoredCornerRadius() ?? "default");
+    const [selected, setSelected] = useState(() => ({
+        accent: getStoredPreference("accent") ?? "default",
+        rowIntensity: getStoredPreference("rowIntensity") ?? "default",
+        density: getStoredPreference("density") ?? "default",
+        fontSize: getStoredPreference("fontSize") ?? "default",
+        radius: getStoredPreference("radius") ?? "default",
+    }));
     const [shortcutsEnabled, setShortcutsEnabled] = useState(getStoredKeyboardShortcutsEnabled);
 
     useEffect(() => {
-        applyThemeAccentPreset(selectedAccent);
-    }, [selectedAccent]);
+        applyPreference("accent", selected.accent);
+    }, [selected.accent]);
 
-    const handleSelectAccent = (presetKey: ThemeAccentPresetKey) => {
-        setSelectedAccent(presetKey);
-        setStoredThemeAccentPreset(presetKey);
-        applyThemeAccentPreset(presetKey);
-    };
-
-    const handleSelectRowIntensity = (intensityKey: TableRowIntensityKey) => {
-        setSelectedRowIntensity(intensityKey);
-        setStoredTableRowIntensity(intensityKey);
-        applyTableRowIntensity(intensityKey);
-    };
-
-    const handleSelectDensity = (densityKey: TableDensityKey) => {
-        setSelectedDensity(densityKey);
-        setStoredTableDensity(densityKey);
-        applyTableDensity(densityKey);
-    };
-
-    const handleSelectFontSize = (fontSizeKey: FontSizeKey) => {
-        setSelectedFontSize(fontSizeKey);
-        setStoredFontSize(fontSizeKey);
-        applyFontSize(fontSizeKey);
+    const handleSelect = <Name extends AppearancePreferenceName>(name: Name, value: (typeof selected)[Name]) => {
+        setSelected((current) => ({ ...current, [name]: value }));
+        setStoredPreference(name, value);
+        applyPreference(name, value);
     };
 
     const handleToggleShortcuts = (enabled: boolean) => {
@@ -173,20 +140,14 @@ const ThemeSettingsSection = () => {
         setStoredKeyboardShortcutsEnabled(enabled);
     };
 
-    const handleSelectRadius = (radiusKey: CornerRadiusKey) => {
-        setSelectedRadius(radiusKey);
-        setStoredCornerRadius(radiusKey);
-        applyCornerRadius(radiusKey);
-    };
-
     // Non tocca la modalità chiara/scura/sistema: è una scelta a sé, non una delle cinque
     // personalizzazioni d'aspetto qui sotto.
     const handleResetDefaults = () => {
-        handleSelectAccent("default");
-        handleSelectRadius("default");
-        handleSelectRowIntensity("default");
-        handleSelectDensity("default");
-        handleSelectFontSize("default");
+        handleSelect("accent", "default");
+        handleSelect("radius", "default");
+        handleSelect("rowIntensity", "default");
+        handleSelect("density", "default");
+        handleSelect("fontSize", "default");
         toast.success("Aspetto ripristinato ai valori predefiniti");
     };
 
@@ -229,8 +190,8 @@ const ThemeSettingsSection = () => {
                             key={preset.key}
                             type="button"
                             variant="outline"
-                            className={optionButtonClasses(selectedAccent === preset.key)}
-                            onClick={() => handleSelectAccent(preset.key)}
+                            className={optionButtonClasses(selected.accent === preset.key)}
+                            onClick={() => handleSelect("accent", preset.key)}
                         >
                             <span
                                 className="mt-0.5 size-4 shrink-0 rounded-full border border-border"
@@ -255,8 +216,8 @@ const ThemeSettingsSection = () => {
                             key={preset.key}
                             type="button"
                             variant="outline"
-                            className={optionButtonClasses(selectedRadius === preset.key)}
-                            onClick={() => handleSelectRadius(preset.key)}
+                            className={optionButtonClasses(selected.radius === preset.key)}
+                            onClick={() => handleSelect("radius", preset.key)}
                         >
                             <RadiusPreview radius={preset.radius} />
                             <span className="grid gap-0.5">
@@ -278,8 +239,8 @@ const ThemeSettingsSection = () => {
                             key={intensity.key}
                             type="button"
                             variant="outline"
-                            className={optionButtonClasses(selectedRowIntensity === intensity.key)}
-                            onClick={() => handleSelectRowIntensity(intensity.key)}
+                            className={optionButtonClasses(selected.rowIntensity === intensity.key)}
+                            onClick={() => handleSelect("rowIntensity", intensity.key)}
                         >
                             <IntensityPreview intensityKey={intensity.key} />
                             <span className="grid gap-0.5">
@@ -316,8 +277,8 @@ const ThemeSettingsSection = () => {
                             key={density.key}
                             type="button"
                             variant="outline"
-                            className={optionButtonClasses(selectedDensity === density.key)}
-                            onClick={() => handleSelectDensity(density.key)}
+                            className={optionButtonClasses(selected.density === density.key)}
+                            onClick={() => handleSelect("density", density.key)}
                         >
                             <DensityPreview densityKey={density.key} />
                             <span className="grid gap-0.5">
@@ -336,8 +297,8 @@ const ThemeSettingsSection = () => {
                             key={fontSize.key}
                             type="button"
                             variant="outline"
-                            className={optionButtonClasses(selectedFontSize === fontSize.key)}
-                            onClick={() => handleSelectFontSize(fontSize.key)}
+                            className={optionButtonClasses(selected.fontSize === fontSize.key)}
+                            onClick={() => handleSelect("fontSize", fontSize.key)}
                         >
                             <FontSizePreview fontSizeKey={fontSize.key} />
                             <span className="grid gap-0.5">

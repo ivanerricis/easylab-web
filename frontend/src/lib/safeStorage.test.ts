@@ -2,15 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStoredCalendarView, setStoredCalendarView } from "./calendarView";
 import { safeStorage } from "./safeStorage";
 import {
-    getStoredFontSize,
     getStoredHiddenColumns,
     getStoredKeyboardShortcutsEnabled,
+    getStoredPreference,
     getStoredTableRowsPerPage,
-    getStoredThemeAccentPreset,
-    setStoredFontSize,
     setStoredKeyboardShortcutsEnabled,
+    setStoredPreference,
     setStoredTableColumnWidths,
-    setStoredThemeAccentPreset,
 } from "./theme";
 import { blockLocalStorage } from "@/test/blockLocalStorage";
 
@@ -47,16 +45,16 @@ describe("safeStorage", () => {
         });
 
         it("le preferenze tornano ai valori predefiniti invece di lanciare", () => {
-            expect(getStoredThemeAccentPreset()).toBeNull();
-            expect(getStoredFontSize()).toBeNull();
+            expect(getStoredPreference("accent")).toBeNull();
+            expect(getStoredPreference("fontSize")).toBeNull();
             expect(getStoredTableRowsPerPage("reports")).toBe(10);
             expect(getStoredHiddenColumns("reports")).toEqual([]);
             expect(getStoredKeyboardShortcutsEnabled()).toBe(true);
             expect(getStoredCalendarView()).toBeTruthy();
 
             expect(() => {
-                setStoredThemeAccentPreset("ocean");
-                setStoredFontSize("lg");
+                setStoredPreference("accent", "ocean");
+                setStoredPreference("fontSize", "lg");
                 setStoredTableColumnWidths("reports", { id: 80 });
                 setStoredKeyboardShortcutsEnabled(false);
                 setStoredCalendarView("week");

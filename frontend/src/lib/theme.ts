@@ -328,164 +328,155 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
 
 const getThemeRoot = () => document.documentElement;
 
-export const getStoredThemeAccentPreset = () => {
-    const storedValue = safeStorage.get(accentStorageKey) as ThemeAccentPresetKey | null;
-
-    return themeAccentPresets.some((preset) => preset.key === storedValue) ? storedValue : null;
+type AppearancePreferenceValues = {
+    accent: ThemeAccentPresetKey;
+    rowIntensity: TableRowIntensityKey;
+    radius: CornerRadiusKey;
+    density: TableDensityKey;
+    fontSize: FontSizeKey;
 };
 
-export const setStoredThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) => {
-    if (!presetKey || presetKey === "default") {
-        safeStorage.remove(accentStorageKey);
+export type AppearancePreferenceName = keyof AppearancePreferenceValues;
+
+type AppearancePreferenceDefinition<Key extends string> = {
+    storageKey: string;
+    keys: readonly Key[];
+    // Riceve solo valori diversi da "default": il ritorno al default passa sempre da `reset`.
+    apply: (key: Key) => void;
+    reset: () => void;
+};
+
+// Attributo su <html>: i valori veri stanno in index.css, qui basta marcare la radice. Il
+// default non ha bisogno di attributo perché è quello dichiarato su :root.
+const rootAttributeDefinition = <Key extends string>(
+    storageKey: string,
+    attribute: string,
+    keys: readonly Key[]
+): AppearancePreferenceDefinition<Key> => ({
+    storageKey,
+    keys,
+    apply: (key) => getThemeRoot().setAttribute(attribute, key),
+    reset: () => getThemeRoot().removeAttribute(attribute),
+});
+
+const accentCssVariables = [
+    "--primary",
+    "--primary-foreground",
+    "--sidebar-primary",
+    "--sidebar-primary-foreground",
+    "--chart-1",
+    "--chart-2",
+    "--chart-3",
+    "--chart-4",
+    "--chart-5",
+] as const;
+
+// Le cinque preferenze d'aspetto (accento, intensità righe, raggio, densità, dimensione testo)
+// erano quindici funzioni quasi uguali, get/set/apply per ciascuna, che cambiavano solo per
+// chiave di storage e per come si applicano (attributo su <html> o variabili CSS). Ora sono
+// una tabella di definizioni e tre funzioni generiche: aggiungerne una sesta è una voce qui.
+const appearancePreferences: {
+    [Name in AppearancePreferenceName]: AppearancePreferenceDefinition<AppearancePreferenceValues[Name]>;
+} = {
+    accent: {
+        storageKey: accentStorageKey,
+        keys: themeAccentPresets.map((preset) => preset.key),
+        apply: (key) => {
+            const preset = themeAccentPresets.find((item) => item.key === key);
+
+            if (!preset) {
+                return;
+            }
+
+            const root = getThemeRoot();
+
+            root.style.setProperty("--primary", preset.primary);
+            root.style.setProperty("--primary-foreground", preset.primaryForeground);
+            root.style.setProperty("--sidebar-primary", preset.sidebarPrimary);
+            root.style.setProperty("--sidebar-primary-foreground", preset.sidebarPrimaryForeground);
+            root.style.setProperty("--chart-1", preset.chart1);
+            root.style.setProperty("--chart-2", preset.chart2);
+            root.style.setProperty("--chart-3", preset.chart3);
+            root.style.setProperty("--chart-4", preset.chart4);
+            root.style.setProperty("--chart-5", preset.chart5);
+        },
+        reset: () => {
+            const root = getThemeRoot();
+
+            accentCssVariables.forEach((variable) => root.style.removeProperty(variable));
+        },
+    },
+    rowIntensity: rootAttributeDefinition(
+        tableRowIntensityStorageKey,
+        tableRowIntensityAttribute,
+        tableRowIntensities.map((intensity) => intensity.key)
+    ),
+    radius: {
+        storageKey: cornerRadiusStorageKey,
+        keys: cornerRadiusPresets.map((preset) => preset.key),
+        apply: (key) => {
+            const preset = cornerRadiusPresets.find((item) => item.key === key);
+
+            if (!preset) {
+                return;
+            }
+
+            getThemeRoot().style.setProperty("--radius", preset.radius);
+        },
+        reset: () => getThemeRoot().style.removeProperty("--radius"),
+    },
+    density: rootAttributeDefinition(
+        tableDensityStorageKey,
+        tableDensityAttribute,
+        tableDensities.map((density) => density.key)
+    ),
+    fontSize: rootAttributeDefinition(
+        fontSizeStorageKey,
+        fontSizeAttribute,
+        fontSizes.map((fontSize) => fontSize.key)
+    ),
+};
+
+// L'indicizzazione con un nome generico dà un'unione di definizioni, non la definizione di
+// quel nome: il cast lega di nuovo il tipo del valore al nome, in un punto solo.
+const getPreferenceDefinition = <Name extends AppearancePreferenceName>(name: Name) =>
+    appearancePreferences[name] as AppearancePreferenceDefinition<AppearancePreferenceValues[Name]>;
+
+export const getStoredPreference = <Name extends AppearancePreferenceName>(
+    name: Name
+): AppearancePreferenceValues[Name] | null => {
+    const definition = getPreferenceDefinition(name);
+    const storedValue = safeStorage.get(definition.storageKey) as AppearancePreferenceValues[Name] | null;
+
+    return definition.keys.some((key) => key === storedValue) ? storedValue : null;
+};
+
+export const setStoredPreference = <Name extends AppearancePreferenceName>(
+    name: Name,
+    value: AppearancePreferenceValues[Name] | null
+) => {
+    const { storageKey } = getPreferenceDefinition(name);
+
+    if (!value || value === "default") {
+        safeStorage.remove(storageKey);
         return;
     }
 
-    safeStorage.set(accentStorageKey, presetKey);
+    safeStorage.set(storageKey, value);
 };
 
-export const applyThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) => {
-    const root = getThemeRoot();
+export const applyPreference = <Name extends AppearancePreferenceName>(
+    name: Name,
+    value: AppearancePreferenceValues[Name] | null
+) => {
+    const definition = getPreferenceDefinition(name);
 
-    if (!presetKey || presetKey === "default") {
-        root.style.removeProperty("--primary");
-        root.style.removeProperty("--primary-foreground");
-        root.style.removeProperty("--sidebar-primary");
-        root.style.removeProperty("--sidebar-primary-foreground");
-        root.style.removeProperty("--chart-1");
-        root.style.removeProperty("--chart-2");
-        root.style.removeProperty("--chart-3");
-        root.style.removeProperty("--chart-4");
-        root.style.removeProperty("--chart-5");
+    if (!value || value === "default") {
+        definition.reset();
         return;
     }
 
-    const preset = themeAccentPresets.find((item) => item.key === presetKey);
-
-    if (!preset) {
-        return;
-    }
-
-    root.style.setProperty("--primary", preset.primary);
-    root.style.setProperty("--primary-foreground", preset.primaryForeground);
-    root.style.setProperty("--sidebar-primary", preset.sidebarPrimary);
-    root.style.setProperty("--sidebar-primary-foreground", preset.sidebarPrimaryForeground);
-    root.style.setProperty("--chart-1", preset.chart1);
-    root.style.setProperty("--chart-2", preset.chart2);
-    root.style.setProperty("--chart-3", preset.chart3);
-    root.style.setProperty("--chart-4", preset.chart4);
-    root.style.setProperty("--chart-5", preset.chart5);
-};
-
-export const getStoredTableRowIntensity = () => {
-    const storedValue = safeStorage.get(tableRowIntensityStorageKey) as TableRowIntensityKey | null;
-
-    return tableRowIntensities.some((intensity) => intensity.key === storedValue) ? storedValue : null;
-};
-
-export const setStoredTableRowIntensity = (intensityKey: TableRowIntensityKey | null) => {
-    if (!intensityKey || intensityKey === "default") {
-        safeStorage.remove(tableRowIntensityStorageKey);
-        return;
-    }
-
-    safeStorage.set(tableRowIntensityStorageKey, intensityKey);
-};
-
-// I colori dei tre livelli stanno in index.css: qui basta marcare la radice, il default
-// non ha bisogno di attributo perché è quello dichiarato su :root.
-export const applyTableRowIntensity = (intensityKey: TableRowIntensityKey | null) => {
-    const root = getThemeRoot();
-
-    if (!intensityKey || intensityKey === "default") {
-        root.removeAttribute(tableRowIntensityAttribute);
-        return;
-    }
-
-    root.setAttribute(tableRowIntensityAttribute, intensityKey);
-};
-
-export const getStoredCornerRadius = () => {
-    const storedValue = safeStorage.get(cornerRadiusStorageKey) as CornerRadiusKey | null;
-
-    return cornerRadiusPresets.some((preset) => preset.key === storedValue) ? storedValue : null;
-};
-
-export const setStoredCornerRadius = (radiusKey: CornerRadiusKey | null) => {
-    if (!radiusKey || radiusKey === "default") {
-        safeStorage.remove(cornerRadiusStorageKey);
-        return;
-    }
-
-    safeStorage.set(cornerRadiusStorageKey, radiusKey);
-};
-
-export const applyCornerRadius = (radiusKey: CornerRadiusKey | null) => {
-    const root = getThemeRoot();
-
-    if (!radiusKey || radiusKey === "default") {
-        root.style.removeProperty("--radius");
-        return;
-    }
-
-    const preset = cornerRadiusPresets.find((item) => item.key === radiusKey);
-
-    if (!preset) {
-        return;
-    }
-
-    root.style.setProperty("--radius", preset.radius);
-};
-
-export const getStoredTableDensity = () => {
-    const storedValue = safeStorage.get(tableDensityStorageKey) as TableDensityKey | null;
-
-    return tableDensities.some((density) => density.key === storedValue) ? storedValue : null;
-};
-
-export const setStoredTableDensity = (densityKey: TableDensityKey | null) => {
-    if (!densityKey || densityKey === "default") {
-        safeStorage.remove(tableDensityStorageKey);
-        return;
-    }
-
-    safeStorage.set(tableDensityStorageKey, densityKey);
-};
-
-export const applyTableDensity = (densityKey: TableDensityKey | null) => {
-    const root = getThemeRoot();
-
-    if (!densityKey || densityKey === "default") {
-        root.removeAttribute(tableDensityAttribute);
-        return;
-    }
-
-    root.setAttribute(tableDensityAttribute, densityKey);
-};
-
-export const getStoredFontSize = () => {
-    const storedValue = safeStorage.get(fontSizeStorageKey) as FontSizeKey | null;
-
-    return fontSizes.some((fontSize) => fontSize.key === storedValue) ? storedValue : null;
-};
-
-export const setStoredFontSize = (fontSizeKey: FontSizeKey | null) => {
-    if (!fontSizeKey || fontSizeKey === "default") {
-        safeStorage.remove(fontSizeStorageKey);
-        return;
-    }
-
-    safeStorage.set(fontSizeStorageKey, fontSizeKey);
-};
-
-export const applyFontSize = (fontSizeKey: FontSizeKey | null) => {
-    const root = getThemeRoot();
-
-    if (!fontSizeKey || fontSizeKey === "default") {
-        root.removeAttribute(fontSizeAttribute);
-        return;
-    }
-
-    root.setAttribute(fontSizeAttribute, fontSizeKey);
+    definition.apply(value);
 };
 
 const parseTableRowsPerPage = (rawValue: string | null): TableRowsPerPageKey | null => {

@@ -1,16 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-    applyCornerRadius,
-    applyFontSize,
-    applyTableDensity,
-    applyTableRowIntensity,
-    applyThemeAccentPreset,
-    getStoredCornerRadius,
-    getStoredFontSize,
-    getStoredTableDensity,
-    getStoredTableRowIntensity,
-    getStoredThemeAccentPreset,
-} from "@/lib/theme";
+import { applyPreference, getStoredPreference } from "@/lib/theme";
 import { safeStorage } from "@/lib/safeStorage";
 import { ThemeProviderContext, type Theme } from "@/components/theme-provider-context";
 
@@ -44,11 +33,11 @@ export function ThemeProvider({
             root.classList.add(theme);
         }
 
-        applyThemeAccentPreset(getStoredThemeAccentPreset());
-        applyTableRowIntensity(getStoredTableRowIntensity());
-        applyTableDensity(getStoredTableDensity());
-        applyFontSize(getStoredFontSize());
-        applyCornerRadius(getStoredCornerRadius());
+        applyPreference("accent", getStoredPreference("accent"));
+        applyPreference("rowIntensity", getStoredPreference("rowIntensity"));
+        applyPreference("density", getStoredPreference("density"));
+        applyPreference("fontSize", getStoredPreference("fontSize"));
+        applyPreference("radius", getStoredPreference("radius"));
     }, [theme]);
 
     const value = {

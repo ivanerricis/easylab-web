@@ -1,15 +1,33 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BackupManagerError } from "./backupError";
 import { BackupDecryptAuthError, decryptArchiveFile, encryptArchiveFile, isEncryptedArchiveFile } from "./backupCrypto";
 import { exportBackupKey, invalidateBackupKeyCache } from "./backupKey";
+
+// Cartella per la chiave solo di questo file, al posto del `data/` vero: `data/backup.key` lo
+// creano e cancellano anche altri file di test in parallelo (vedi `backupKey.test.ts`).
+// `createKeyFile` legge `process.cwd()` all'import, quindi il finto `cwd` va pronto prima degli
+// import: `vi.hoisted` gira prima di tutti.
+const { keyRoot, cwdSpy } = vi.hoisted(() => {
+    const nodeFs = process.getBuiltinModule("node:fs");
+    const nodeOs = process.getBuiltinModule("node:os");
+    const nodePath = process.getBuiltinModule("node:path");
+    const dir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "backup-crypto-key-"));
+
+    return { keyRoot: dir, cwdSpy: vi.spyOn(process, "cwd").mockReturnValue(dir) };
+});
 
 // Vero I/O su disco e vera cifratura: qui interessa che lo streaming produca esattamente
 // gli stessi byte in ingresso, non solo che le chiamate ai mock combacino.
 const keyFilePath = path.join(process.cwd(), "data", "backup.key");
 let tempDir: string;
+
+afterAll(async () => {
+    cwdSpy.mockRestore();
+    await fs.promises.rm(keyRoot, { recursive: true, force: true });
+});
 
 beforeEach(async () => {
     invalidateBackupKeyCache();

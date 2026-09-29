@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BackupManagerError } from "./backupError";
 import {
     decodeBackupKeyOverride,
@@ -10,7 +10,25 @@ import {
     setBackupKey,
 } from "./backupKey";
 
+// Cartella temporanea solo di questo file, al posto del `data/` vero: `data/backup.key` lo creano
+// e cancellano anche altri file di test in parallelo, e capitava di rileggere la chiave di un altro
+// (flaky su CI). `createKeyFile` legge `process.cwd()` quando il modulo viene importato, quindi
+// il finto `cwd` deve essere pronto prima degli import: `vi.hoisted` gira prima di tutti.
+const { tempDir, cwdSpy } = vi.hoisted(() => {
+    const nodeFs = process.getBuiltinModule("node:fs");
+    const nodeOs = process.getBuiltinModule("node:os");
+    const nodePath = process.getBuiltinModule("node:path");
+    const dir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "backup-key-test-"));
+
+    return { tempDir: dir, cwdSpy: vi.spyOn(process, "cwd").mockReturnValue(dir) };
+});
+
 const keyFilePath = path.join(process.cwd(), "data", "backup.key");
+
+afterAll(async () => {
+    cwdSpy.mockRestore();
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+});
 
 beforeEach(async () => {
     invalidateBackupKeyCache();
@@ -41,9 +59,7 @@ describe("getOrCreateBackupKey", () => {
 });
 
 /**
- * Con `node:fs` finto, non sul `data/backup.key` vero: quel file lo creano e cancellano anche
- * altri file di test che girano in parallelo, e un test che scrive e rilegge lo stesso percorso
- * finirebbe per leggere quello che un altro ha appena tolto.
+ * Con `node:fs` finto: nessun file su disco, così si simulano anche gli errori di lettura.
  *
  * Il buco che questi test chiudono: prima un file illeggibile veniva sostituito da una chiave
  * nuova, mai esportata, e la copia custodita dall'admin smetteva di aprire i backup.

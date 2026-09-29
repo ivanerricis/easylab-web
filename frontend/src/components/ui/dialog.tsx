@@ -97,7 +97,11 @@ function DialogContent({
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <DialogPrimitive.Close data-slot="dialog-close" asChild>
-                                <Button variant="ghost" className="absolute top-4 right-4" size="icon-sm">
+                                <Button
+                                    variant="ghost"
+                                    className="absolute top-4 right-4 pointer-coarse:top-2.5 pointer-coarse:right-2.5"
+                                    size="icon-sm"
+                                >
                                     <XIcon />
                                     <span className="sr-only">Chiudi</span>
                                 </Button>

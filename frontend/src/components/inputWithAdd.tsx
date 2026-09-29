@@ -340,7 +340,7 @@ const InputWithAdd = ({
                 // lunga ora occupa due righe.
                 className={cn(
                     buttonVariants({ variant: "ghost", size: "lg" }),
-                    "h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal",
+                    "h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal pointer-coarse:min-h-11",
                     isActive && "bg-muted text-foreground"
                 )}
                 onClick={() => selectOption(option)}
@@ -375,9 +375,10 @@ const InputWithAdd = ({
         >
             <Input
                 ref={inputRef}
-                // 40px fissi come il "+" accanto (`icon-lg`), non `h-full`: su telefono la lista
-                // sta nel flusso sotto il campo, e con `h-full` il campo si allungava con lei.
-                className={cn("group h-10", inputClassName)}
+                // Alto fisso come il "+" accanto (`icon-lg`: 40px, 44 su schermo touch), non
+                // `h-full`: su telefono la lista sta nel flusso sotto il campo, e con `h-full` il
+                // campo si allungava con lei.
+                className={cn("group h-10 pointer-coarse:h-11", inputClassName)}
                 id={id}
                 role="combobox"
                 aria-autocomplete="list"

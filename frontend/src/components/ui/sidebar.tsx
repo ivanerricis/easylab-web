@@ -390,7 +390,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
  * Quella correzione è ora il token `text-primary-text` (index.css), lo stesso dei link.
  */
 const sidebarMenuButtonVariants = cva(
-    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-primary-text data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-primary/15 data-active:hover:text-primary-text dark:data-active:bg-primary/20 dark:data-active:hover:bg-primary/25 [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:group-data-[collapsible=icon]:size-11! data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-primary-text data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-primary/15 data-active:hover:text-primary-text dark:data-active:bg-primary/20 dark:data-active:hover:bg-primary/25 [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
     {
         variants: {
             variant: {
@@ -399,8 +399,8 @@ const sidebarMenuButtonVariants = cva(
                     "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
             },
             size: {
-                default: "h-8 text-sm",
-                sm: "h-7 text-xs",
+                default: "h-8 text-sm pointer-coarse:h-11",
+                sm: "h-7 text-xs pointer-coarse:h-11",
             },
         },
         defaultVariants: {

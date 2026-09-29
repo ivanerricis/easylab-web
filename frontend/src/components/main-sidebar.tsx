@@ -58,7 +58,7 @@ const isPathActive = (pathname: string, itemPath: string) => {
 // pesare la barra più del contenuto. Nella modalità a sole icone il riquadro è di 32px, quindi lì
 // l'icona torna a 18px. Lo stile della voce aperta viene da `isActive` nel componente.
 const menuButtonClassName =
-    "h-10 text-[0.9375rem] [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_svg]:size-4.5";
+    "h-10 pointer-coarse:h-11 text-[0.9375rem] [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&_svg]:size-4.5";
 
 /**
  * Le voci sono link (`<a>` tramite `Link`), non pulsanti che chiamano `navigate`: così si

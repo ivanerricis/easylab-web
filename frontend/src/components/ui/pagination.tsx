@@ -46,7 +46,11 @@ function PaginationButton({ className, isActive, type = "button", ...props }: Pa
         <button
             type={type}
             aria-current={isActive ? "page" : undefined}
-            className={cn(buttonVariants({ variant: isActive ? "default" : "ghost" }), className)}
+            className={cn(
+                buttonVariants({ variant: isActive ? "default" : "ghost" }),
+                "pointer-coarse:min-w-11",
+                className
+            )}
             {...props}
         />
     );
@@ -72,7 +76,11 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
 
 function PaginationEllipsis({ className, ...props }: React.ComponentProps<"span">) {
     return (
-        <span aria-hidden="true" className={cn("flex size-9 items-center justify-center", className)} {...props}>
+        <span
+            aria-hidden="true"
+            className={cn("flex size-9 items-center justify-center pointer-coarse:size-11", className)}
+            {...props}
+        >
             <MoreHorizontal className="size-4" />
         </span>
     );

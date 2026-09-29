@@ -225,7 +225,7 @@ const EntityCardImpl = <T,>({
                     onClick={() => setIsExpanded((expanded) => !expanded)}
                     className={cn(
                         "flex w-full items-center justify-center gap-1.5 px-4 pb-2.5 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline",
-                        "min-h-10"
+                        "min-h-10 pointer-coarse:min-h-11"
                     )}
                 >
                     {isExpanded ? "Meno dettagli" : `Altri dettagli (${hiddenCount})`}

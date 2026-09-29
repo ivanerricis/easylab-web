@@ -155,8 +155,10 @@ const CustomDialog = ({
                     // Anche l'altezza, 40px per tutti: i campi con suggerimenti (cliente,
                     // dispositivo, difetto) erano a 40px per stare alla pari del "+" accanto, mentre
                     // un `Input` semplice (la password) e i menu a tendina restavano ai 36px di
-                    // serie, e sulla stessa griglia si vedeva lo scalino.
+                    // serie, e sulla stessa griglia si vedeva lo scalino. Su schermo touch 44px,
+                    // come i pulsanti (vedi `button.tsx`): questa regola vince su quella dei campi.
                     "**:data-[slot=input]:h-10 **:data-[slot=select-trigger]:data-[size=default]:h-10",
+                    "pointer-coarse:**:data-[slot=input]:h-11 pointer-coarse:**:data-[slot=select-trigger]:data-[size=default]:h-11",
                     // Mai più alto dello schermo: una colonna flex alta al massimo lo schermo meno
                     // 1rem per lato (il limite di `DialogContent`, ripetuto qui perché è su questo
                     // che conta il layout), in cui scorre solo il corpo (vedi sotto) e titolo e

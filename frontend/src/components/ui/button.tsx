@@ -4,6 +4,13 @@ import { Slot } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * `pointer-coarse:` (schermo touch) porta ogni misura a 44px, il minimo consigliato per un
+ * bersaglio da dito: prima su telefono i pulsanti erano da 32-40px, la X dei dialoghi da 32. Sul
+ * puntatore del mouse restano le misure di sempre. Il criterio è il tipo di puntatore e non la
+ * larghezza: vale anche per un tablet, e un desktop con la finestra stretta non cambia. Stesso
+ * accorgimento in `select.tsx`, `sidebar.tsx` e nella paginazione (vedi CHANGELOG del 2026-09-29).
+ */
 const buttonVariants = cva(
     "group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap focus-outline outline-none select-none *:cursor-pointer active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
     {
@@ -23,15 +30,16 @@ const buttonVariants = cva(
             },
             size: {
                 default:
-                    "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+                    "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 pointer-coarse:h-11",
                 xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-                sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-                lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-                icon: "size-9",
+                sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 pointer-coarse:h-11",
+                lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 pointer-coarse:h-11",
+                icon: "size-9 pointer-coarse:size-11",
                 "icon-xs":
                     "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-                "icon-sm": "size-8 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-md",
-                "icon-lg": "size-10",
+                "icon-sm":
+                    "size-8 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-md pointer-coarse:size-11",
+                "icon-lg": "size-10 pointer-coarse:size-11",
             },
         },
         defaultVariants: {

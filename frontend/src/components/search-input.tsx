@@ -33,7 +33,9 @@ const SearchInput = ({ value, onValueChange, placeholder = "Cerca...", label, cl
         // `h-10` come gli altri controlli della barra sopra le tabelle (pulsante Aggiorna, filtri,
         // date, menu Colonne): con l'altezza di serie (36px) il campo restava più basso dei
         // pulsanti accanto, e la riga non era allineata.
-        <InputGroup className={cn("h-10 min-w-0 flex-1 border-primary! sm:w-60 sm:flex-none", className)}>
+        <InputGroup
+            className={cn("h-10 min-w-0 flex-1 border-primary! sm:w-60 sm:flex-none pointer-coarse:h-11", className)}
+        >
             <InputGroupAddon>
                 <Search className="size-5 text-primary" aria-hidden="true" />
             </InputGroupAddon>

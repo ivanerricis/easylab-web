@@ -58,6 +58,7 @@ body,
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-destructive-text: var(--destructive-text);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -155,6 +156,11 @@ body,
      campi. A 0.545 fa 4.53:1 sul fondo e 5.23:1 sulle card (prima 4.77:1); stessa tinta e
      croma, cambia solo la luminosità, il minimo che basta. In scuro era già sopra (6.79:1 e 5.93:1). */
     --destructive: oklch(0.545 0.245 27.325);
+    /* Il rosso come testo su un fondo rosso tenue (pulsante "distruttivo", voce di menu in
+     evidenza): sul fondo pagina con il 10% di rosso fa 3.79:1, sulle card 4.36:1, e al passaggio
+     del mouse (20%) scende ancora. Scurito di un quarto verso il nero arriva a 4.9:1 nel caso
+     peggiore. Il rosso pieno resta per i testi su fondo neutro, che erano già sopra 4.5:1. */
+    --destructive-text: color-mix(in oklab, var(--destructive) 75%, black);
     --border: oklch(0.87 0.012 var(--neutral-hue));
     --input: oklch(0.85 0.012 var(--neutral-hue));
     /* `--ring` è il nome del focus nei componenti shadcn (`ring-ring`): qui segue `--focus-ring`,
@@ -216,6 +222,9 @@ body,
     --accent: oklch(0.3 0.015 var(--neutral-hue));
     --accent-foreground: oklch(0.975 0.004 var(--neutral-hue));
     --destructive: oklch(0.704 0.191 22.216);
+    /* In scuro il fondo tenue è il 20-30% di rosso: il rosso pieno scendeva a 3.69:1 sulle card
+     al passaggio del mouse. Schiarito verso il bianco, 5.0:1 nel caso peggiore. */
+    --destructive-text: color-mix(in oklab, var(--destructive) 70%, white);
     --border: oklch(1 0 0 / 13%);
     --input: oklch(1 0 0 / 17%);
     --chart-1: oklch(0.78 0.16 84);

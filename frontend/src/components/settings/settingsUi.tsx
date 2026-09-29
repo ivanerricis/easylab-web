@@ -189,7 +189,7 @@ export const SettingsTileGrid = ({ children }: { children: ReactNode }) => (
 );
 
 export const SettingsErrorNote = ({ label, message }: { label: string; message: string }) => (
-    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive-text">
         <span className="font-medium">{label}:</span> {message}
     </p>
 );

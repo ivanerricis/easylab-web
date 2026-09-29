@@ -27,7 +27,7 @@ export const useReportsRows = ({
     onPageOutOfRange,
 }: UseReportsRowsParams) => {
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "customer", "asc" | "desc"];
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         usePaginatedRows<ReportDto>({
             fetchRows: (signal) =>
                 listReports({
@@ -55,6 +55,8 @@ export const useReportsRows = ({
         isLoading,
         isInitialLoading,
         isRefetching,
+        /** L'ultimo caricamento fallito, per la tabella ("Riprova"): vedi `error` in `usePaginatedRows`. */
+        loadError: error,
         loadReports: reload,
     };
 };

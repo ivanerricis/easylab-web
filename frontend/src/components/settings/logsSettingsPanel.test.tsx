@@ -20,6 +20,13 @@ vi.mock("@/lib/api", async () => {
     return { ...errors, ...forwarded };
 });
 
+const utils = vi.hoisted(() => ({ formatDate: vi.fn() }));
+vi.mock("@/lib/utils", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/utils")>("@/lib/utils");
+    utils.formatDate.mockImplementation(actual.formatDate);
+    return { ...actual, formatDate: utils.formatDate };
+});
+
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
@@ -92,6 +99,29 @@ describe("LogsSettingsPanel: risposte superate", () => {
     });
 });
 
+describe("LogsSettingsPanel: errore di caricamento", () => {
+    /** Un registro che non si è potuto leggere non si spaccia per vuoto, e si può riprovare. */
+    it("mostra l'errore con 'Riprova' invece di 'Nessuna voce trovata'", async () => {
+        api.listLogEntries.mockRejectedValueOnce(new Error("rete")).mockResolvedValue(page([entry("login riuscito")]));
+
+        renderWithProviders(<LogsSettingsPanel />);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        const table = screen.getByRole("table");
+        expect(within(table).queryByText("Nessuna voce trovata per i criteri selezionati.")).not.toBeInTheDocument();
+        expect(within(table).getByText(/^Impossibile caricare/)).toBeInTheDocument();
+
+        fireEvent.click(within(table).getByRole("button", { name: "Riprova" }));
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(within(table).getByText("login riuscito")).toBeInTheDocument();
+    });
+});
+
 describe("LogsSettingsPanel: data del log", () => {
     it("mostra la data del file senza l'orario", async () => {
         api.listLogEntries.mockResolvedValue(page([]));
@@ -102,5 +132,23 @@ describe("LogsSettingsPanel: data del log", () => {
         });
 
         expect(screen.getByText(/20\/09\/2026/)).toBeInTheDocument();
+    });
+
+    /**
+     * Il giorno del file va a `formatDate` così com'è, che lo legge come giorno locale (vedi
+     * `utils.test.ts`). Con "…T00:00:00.000Z" era la mezzanotte UTC, e a ovest di Greenwich il
+     * file del 20 si leggeva 19. Il fuso non si può cambiare qui: `formatDate` fissa il suo
+     * quando il modulo viene caricato, prima di questo test.
+     */
+    it("passa a formatDate il giorno senza orario UTC", async () => {
+        api.listLogEntries.mockResolvedValue(page([]));
+
+        renderWithProviders(<LogsSettingsPanel />);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(utils.formatDate).toHaveBeenCalledWith("2026-09-20");
+        expect(utils.formatDate).not.toHaveBeenCalledWith(expect.stringContaining("T00:00"));
     });
 });

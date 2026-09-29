@@ -64,6 +64,14 @@ beforeEach(() => {
 });
 
 describe("ForcePasswordChangePage", () => {
+    /** Il titolo è l'h1 della pagina, dentro il punto di riferimento `main`. */
+    it("ha un titolo di livello 1 dentro main", () => {
+        renderPage();
+
+        const heading = screen.getByRole("heading", { level: 1, name: "Imposta una nuova password" });
+        expect(heading.closest("main")).not.toBeNull();
+    });
+
     it("spiega a quale account si riferisce", () => {
         renderPage();
 

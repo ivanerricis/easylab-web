@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import type { ComponentProps } from "react";
 
 const navigate = vi.fn();
 
@@ -51,9 +52,9 @@ const buildAxiosError = (message: string, status: number) => {
     });
 };
 
-const renderLoginPage = () =>
+const renderLoginPage = (initialEntries?: ComponentProps<typeof MemoryRouter>["initialEntries"]) =>
     render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={initialEntries}>
             <AuthProvider>
                 <LoginPage />
             </AuthProvider>
@@ -158,6 +159,52 @@ describe("LoginPage", () => {
         await userEvent.click(await screen.findByRole("button", { name: "Usa un codice di recupero" }));
 
         expect(screen.getByLabelText("Codice di recupero")).toHaveFocus();
+    });
+
+    it("scrive il codice di recupero senza maiuscole né correzioni della tastiera", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        renderLoginPage();
+        await submitCredentials();
+        await userEvent.click(await screen.findByRole("button", { name: "Usa un codice di recupero" }));
+
+        const input = screen.getByLabelText("Codice di recupero");
+        expect(input).toHaveAttribute("autocapitalize", "none");
+        expect(input).toHaveAttribute("autocorrect", "off");
+        expect(input).toHaveAttribute("spellcheck", "false");
+    });
+
+    /**
+     * Il correttore sì, la maiuscola automatica no: i nomi utente sono di norma con l'iniziale
+     * maiuscola ("Ivan"), e il confronto del server è esatto di proposito.
+     */
+    it("non fa correggere il nome utente alla tastiera, ma lascia la maiuscola automatica", () => {
+        renderLoginPage();
+        const input = screen.getByLabelText("Nome utente");
+
+        expect(input).toHaveAttribute("autocorrect", "off");
+        expect(input).toHaveAttribute("spellcheck", "false");
+        expect(input).not.toHaveAttribute("autocapitalize");
+    });
+
+    /** Un link a una lista filtrata aperto a sessione scaduta deve tornare alla lista filtrata. */
+    it("dopo l'accesso torna all'indirizzo di partenza con filtri e ancora", async () => {
+        login.mockResolvedValue({ status: "authenticated", user: { ...user, twoFactorEnabled: false } });
+
+        renderLoginPage([
+            {
+                pathname: "/login",
+                state: { from: { pathname: "/reports", search: "?status=open&page=2", hash: "#fondo" } },
+            },
+        ]);
+        await submitCredentials();
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith(
+                { pathname: "/reports", search: "?status=open&page=2", hash: "#fondo" },
+                { replace: true }
+            );
+        });
     });
 
     /**

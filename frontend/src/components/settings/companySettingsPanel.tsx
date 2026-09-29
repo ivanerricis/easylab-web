@@ -59,7 +59,12 @@ const canonicalTimeZone = (value: string): string | null => {
 const currentTimeIn = (timeZone: string) =>
     new Intl.DateTimeFormat("it-IT", { timeZone, hour: "2-digit", minute: "2-digit" }).format(new Date());
 
-const CompanySettingsPanel = () => {
+type Props = {
+    /** Chiamata a ogni cambio di "ci sono modifiche non salvate", e con `false` allo smontaggio. */
+    onDirtyChange?: (isDirty: boolean) => void;
+};
+
+const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [formValues, setFormValues] = useState<CompanySettingsInput>(defaultForm);
@@ -74,6 +79,15 @@ const CompanySettingsPanel = () => {
     const [logoUpdatedAt, setLogoUpdatedAt] = useState<string | null>(null);
 
     const isDirty = isSettingsFormDirty(formValues, savedValues);
+
+    // La pagina Impostazioni chiede conferma prima di lasciare la sezione con modifiche non
+    // salvate: le serve sapere quando il modulo è diverso da quanto salvato. Allo smontaggio
+    // (sezione cambiata) non ci sono più modifiche in sospeso.
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+    }, [isDirty, onDirtyChange]);
+
+    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
     const selectedTimeZone = formValues.timeZone.trim() ? canonicalTimeZone(formValues.timeZone) : null;
 
     const loadSettings = async () => {

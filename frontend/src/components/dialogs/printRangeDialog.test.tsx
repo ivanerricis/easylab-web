@@ -81,7 +81,8 @@ describe("DatePickerField", () => {
         renderWithProviders(<DatePickerField value="2026-09-11" onValueChange={onValueChange} />);
 
         await userEvent.click(screen.getByRole("button", { name: /11\/09\/2026/ }));
-        await userEvent.click(screen.getByRole("button", { name: /1 settembre 2026|September 1st, 2026/ }));
+        // Ancorata: in italiano "1 settembre 2026" sta anche dentro "11" e "21 settembre 2026".
+        await userEvent.click(screen.getByRole("button", { name: /^martedì 1 settembre 2026$/i }));
 
         expect(onValueChange).toHaveBeenCalledWith("2026-09-01");
     });

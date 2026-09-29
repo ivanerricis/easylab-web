@@ -6,7 +6,6 @@ import { AuthProvider } from "./components/auth-provider";
 import { BusyGuardProvider } from "@/components/busy-guard-provider";
 import RequireAuth from "@/components/require-auth";
 import { Toaster } from "./components/ui/sonner";
-import { TooltipProvider } from "./components/ui/tooltip";
 import LoadingPage from "./components/loadingPage";
 import UnhandledErrorPage from "@/pages/UnhandledErrorPage";
 
@@ -32,42 +31,43 @@ export function App() {
     return (
         <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
             <BusyGuardProvider>
-                <TooltipProvider>
-                    <BrowserRouter>
-                        <AppErrorBoundary>
-                            <AuthProvider>
-                                <Suspense fallback={<LoadingPage />}>
-                                    <Routes>
-                                        <Route path="/login" element={<LoginPage />} />
-                                        <Route element={<RequireAuth />}>
-                                            <Route path="/" element={<MainLayout />}>
-                                                <Route index element={<Navigate to="/dashboard" replace />} />
-                                                <Route path="dashboard" element={<DashboardPage />} />
-                                                <Route path="reports" element={<ReportsPage />} />
-                                                <Route path="reports/:id" element={<ReportPage />} />
-                                                <Route path="interventions" element={<InterventionsPage />} />
-                                                <Route path="interventions/:id" element={<InterventionPage />} />
-                                                <Route path="clients" element={<CustomersPage />} />
-                                                <Route path="clients/:id" element={<CustomerPage />} />
-                                                {/* Stessa pagina, tab degli interventi: vedi `CustomerPage`. */}
-                                                <Route path="clients/:id/interventions" element={<CustomerPage />} />
-                                                <Route path="collaborators" element={<CollaboratorsPage />} />
-                                                <Route path="collaborators/:id" element={<CollaboratorPage />} />
-                                                <Route path="technicians" element={<TechnicianPage />} />
-                                                <Route path="technicians/:id" element={<SingleTechnicianPage />} />
-                                                <Route path="devices" element={<DevicesPage />} />
-                                                <Route path="issues" element={<IssuesPage />} />
-                                                <Route path="settings" element={<SettingsPage />} />
-                                                <Route path="error" element={<UnhandledErrorPage />} />
-                                                <Route path="*" element={<NotFoundPage />} />
-                                            </Route>
+                {/* Niente `TooltipProvider` qui: sta in MainLayout, dove sono i tooltip dell'app,
+                    così la pagina di login non ne scarica il codice. Una pagina fuori dal layout
+                    che mostra tooltip (anche solo la "X" di un dialogo) ne monta uno suo. */}
+                <BrowserRouter>
+                    <AppErrorBoundary>
+                        <AuthProvider>
+                            <Suspense fallback={<LoadingPage />}>
+                                <Routes>
+                                    <Route path="/login" element={<LoginPage />} />
+                                    <Route element={<RequireAuth />}>
+                                        <Route path="/" element={<MainLayout />}>
+                                            <Route index element={<Navigate to="/dashboard" replace />} />
+                                            <Route path="dashboard" element={<DashboardPage />} />
+                                            <Route path="reports" element={<ReportsPage />} />
+                                            <Route path="reports/:id" element={<ReportPage />} />
+                                            <Route path="interventions" element={<InterventionsPage />} />
+                                            <Route path="interventions/:id" element={<InterventionPage />} />
+                                            <Route path="clients" element={<CustomersPage />} />
+                                            <Route path="clients/:id" element={<CustomerPage />} />
+                                            {/* Stessa pagina, tab degli interventi: vedi `CustomerPage`. */}
+                                            <Route path="clients/:id/interventions" element={<CustomerPage />} />
+                                            <Route path="collaborators" element={<CollaboratorsPage />} />
+                                            <Route path="collaborators/:id" element={<CollaboratorPage />} />
+                                            <Route path="technicians" element={<TechnicianPage />} />
+                                            <Route path="technicians/:id" element={<SingleTechnicianPage />} />
+                                            <Route path="devices" element={<DevicesPage />} />
+                                            <Route path="issues" element={<IssuesPage />} />
+                                            <Route path="settings" element={<SettingsPage />} />
+                                            <Route path="error" element={<UnhandledErrorPage />} />
+                                            <Route path="*" element={<NotFoundPage />} />
                                         </Route>
-                                    </Routes>
-                                </Suspense>
-                            </AuthProvider>
-                        </AppErrorBoundary>
-                    </BrowserRouter>
-                </TooltipProvider>
+                                    </Route>
+                                </Routes>
+                            </Suspense>
+                        </AuthProvider>
+                    </AppErrorBoundary>
+                </BrowserRouter>
                 <Toaster
                     closeButton={true}
                     position="top-center"

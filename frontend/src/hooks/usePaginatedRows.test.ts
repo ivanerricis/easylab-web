@@ -159,6 +159,40 @@ describe("usePaginatedRows", () => {
         expect(result.current.isLoading).toBe(false);
     });
 
+    /**
+     * Lista che non si è potuta leggere ≠ lista vuota: con il solo toast, sparito il toast la
+     * tabella diceva "Nessun … disponibile.". `error` porta il messaggio della pagina, e una
+     * risposta buona (il "Riprova") lo azzera.
+     */
+    it("espone l'errore finché una ricarica non va a buon fine", async () => {
+        const fetchRows = vi
+            .fn()
+            .mockRejectedValueOnce(new Error("rete non raggiungibile"))
+            .mockResolvedValueOnce(buildResponse([{ id: 1, name: "Mario" }]));
+
+        const { result } = renderHook(() =>
+            usePaginatedRows<Row>({
+                fetchRows,
+                queryKey: [],
+                errorMessage: "Impossibile caricare i report",
+            })
+        );
+
+        expect(result.current.error).toBeNull();
+
+        await waitFor(() => {
+            expect(result.current.error).toBe("Impossibile caricare i report");
+        });
+        expect(result.current.isInitialLoading).toBe(false);
+
+        await act(async () => {
+            await result.current.reload();
+        });
+
+        expect(result.current.error).toBeNull();
+        expect(result.current.rows).toEqual([{ id: 1, name: "Mario" }]);
+    });
+
     it("ricarica quando cambia la queryKey", async () => {
         const fetchRows = vi.fn().mockResolvedValue(buildResponse([{ id: 1, name: "A" }]));
 

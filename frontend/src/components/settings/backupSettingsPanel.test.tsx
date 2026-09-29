@@ -104,6 +104,22 @@ beforeEach(() => {
 });
 
 describe("BackupSettingsPanel", () => {
+    /** La pagina Impostazioni lo usa per chiedere prima di lasciare la sezione. */
+    it("segnala alla pagina le modifiche non salvate della configurazione", async () => {
+        const onDirtyChange = vi.fn();
+        renderWithProviders(
+            <AuthProviderContext.Provider value={{ ...initialAuthProviderState, isLoading: false, logout }}>
+                <BackupSettingsPanel onDirtyChange={onDirtyChange} />
+            </AuthProviderContext.Provider>
+        );
+        await within(await screen.findByRole("table")).findByRole("button", { name: "Ripristina db-backup-1.tar.gz" });
+        expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+        await userEvent.click(screen.getByLabelText("Esegui dump in automatico"));
+
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    });
+
     it("elenca i dump con la loro dimensione", async () => {
         await renderPanel();
 

@@ -16,7 +16,8 @@ type ProvidersOptions = {
 };
 
 /**
- * Monta un componente dentro gli stessi provider che `App.tsx` mette intorno a ogni pagina:
+ * Monta un componente dentro gli stessi provider che `App.tsx` e `MainLayout` (il
+ * `TooltipProvider`) mettono intorno a ogni pagina:
  * senza `TooltipProvider` qualunque pulsante con tooltip fa fallire il render, senza router
  * falliscono `useNavigate` e `Link`, e il blocco a schermo delle operazioni lunghe passa da
  * `BusyGuardProvider`.

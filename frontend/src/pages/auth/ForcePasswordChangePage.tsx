@@ -6,7 +6,7 @@ import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { changeOwnPassword, getApiErrorMessage } from "@/lib/api";
 import { isPasswordCompliant, passwordRequirementsHint } from "@/lib/passwordPolicy";
 import { useAuth } from "@/components/use-auth";
@@ -62,13 +62,17 @@ const ForcePasswordChangePage = () => {
     };
 
     return (
-        <div className="flex h-svh w-full items-center justify-center px-4">
+        <main className="flex h-svh w-full items-center justify-center px-4">
             <Card className="w-full max-w-sm">
                 <CardHeader>
                     <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                         <ShieldAlert className="size-5" />
                     </div>
-                    <CardTitle className="text-2xl">Imposta una nuova password</CardTitle>
+                    {/* Un h1 e non `CardTitle` (un div): è il titolo della pagina, e chi naviga per
+                        intestazioni non ne trovava nessuno. Stesse classi di `CardTitle`. */}
+                    <h1 data-slot="card-title" className="font-heading text-2xl leading-normal font-medium">
+                        Imposta una nuova password
+                    </h1>
                     <CardDescription>
                         {user ? `L'account "${user.username}" usa ancora una password generata automaticamente. ` : ""}
                         Per continuare devi impostarne una tua.
@@ -141,7 +145,7 @@ const ForcePasswordChangePage = () => {
                     </form>
                 </CardContent>
             </Card>
-        </div>
+        </main>
     );
 };
 

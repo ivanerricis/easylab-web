@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent } from "react";
+import { getStoredKeyboardShortcutsEnabled } from "@/lib/theme";
 
 /**
  * Gli strati che si aprono sopra la pagina e in cui una lettera ha già un significato: in un
@@ -21,8 +22,17 @@ const blockingRoles = '[role="dialog"], [role="menu"], [role="listbox"]';
  *
  * Il tasto resta senza effetto mentre si scrive — in un campo, in un'area di testo, in un
  * elemento modificabile — e mentre il focus è dentro uno strato che le lettere se le tiene.
+ *
+ * E resta senza effetto quando l'utente le ha spente in Impostazioni › Tema. La preferenza si
+ * legge al momento del tasto e non al montaggio: l'interruttore vale subito, anche per le
+ * pagine già aperte. `alwaysActive` è per il solo "?": se si spegnesse anche lui, chi ha
+ * disattivato le scorciatoie non avrebbe più l'elenco che gli dice dove riaccenderle.
  */
-export const usePageShortcut = (key: string, onTrigger: () => void) => {
+export const usePageShortcut = (
+    key: string,
+    onTrigger: () => void,
+    { alwaysActive = false }: { alwaysActive?: boolean } = {}
+) => {
     // Un evento e non una dipendenza: chi chiama passa una funzione scritta sul posto, nuova a
     // ogni render, e l'ascoltatore non deve staccarsi e riattaccarsi per questo.
     const trigger = useEffectEvent(onTrigger);
@@ -30,6 +40,10 @@ export const usePageShortcut = (key: string, onTrigger: () => void) => {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key !== key || event.ctrlKey || event.metaKey || event.altKey) {
+                return;
+            }
+
+            if (!alwaysActive && !getStoredKeyboardShortcutsEnabled()) {
                 return;
             }
 
@@ -51,5 +65,5 @@ export const usePageShortcut = (key: string, onTrigger: () => void) => {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [key]);
+    }, [key, alwaysActive]);
 };

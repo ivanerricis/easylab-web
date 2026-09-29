@@ -60,28 +60,29 @@ describe("RequireAuth", () => {
     });
 
     /** Una password generata non deve dare accesso all'app, nemmeno a una pagina. */
-    it("impone il cambio password prima di qualunque pagina", () => {
+    it("impone il cambio password prima di qualunque pagina", async () => {
         renderAt("/reports", { user: { ...user, mustChangePassword: true }, isLoading: false });
 
-        expect(screen.getByText("Imposta una nuova password")).toBeInTheDocument();
+        // `findBy`: le due pagine obbligate sono caricate con `lazy`.
+        expect(await screen.findByText("Imposta una nuova password")).toBeInTheDocument();
         expect(screen.queryByText("Pagina report")).not.toBeInTheDocument();
     });
 
-    it("impone la configurazione della 2FA quando il server la richiede", () => {
+    it("impone la configurazione della 2FA quando il server la richiede", async () => {
         renderAt("/reports", { user: { ...user, isAdmin: true, twoFactorSetupRequired: true }, isLoading: false });
 
-        expect(screen.getByText("Attiva la verifica in due passaggi")).toBeInTheDocument();
+        expect(await screen.findByText("Attiva la verifica in due passaggi")).toBeInTheDocument();
         expect(screen.queryByText("Pagina report")).not.toBeInTheDocument();
     });
 
     /** La configurazione chiede la password: quella generata va sostituita prima. */
-    it("con entrambi gli obblighi chiede prima il cambio password", () => {
+    it("con entrambi gli obblighi chiede prima il cambio password", async () => {
         renderAt("/reports", {
             user: { ...user, isAdmin: true, mustChangePassword: true, twoFactorSetupRequired: true },
             isLoading: false,
         });
 
-        expect(screen.getByText("Imposta una nuova password")).toBeInTheDocument();
+        expect(await screen.findByText("Imposta una nuova password")).toBeInTheDocument();
         expect(screen.queryByText("Attiva la verifica in due passaggi")).not.toBeInTheDocument();
     });
 

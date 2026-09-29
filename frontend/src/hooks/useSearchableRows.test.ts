@@ -76,6 +76,23 @@ describe("useSearchableRows", () => {
         expect(fetchRows).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 }));
     });
 
+    it("espone l'errore di caricamento, per distinguerlo da una lista vuota", async () => {
+        const fetchRows = vi.fn().mockRejectedValue(new Error("rete"));
+
+        const { result } = renderHook(() =>
+            useSearchableRows({
+                fetchRows,
+                searchText: "",
+                currentPage: 1,
+                pageSize: 10,
+                errorMessage: "Impossibile caricare i dispositivi",
+            })
+        );
+        await flush();
+
+        expect(result.current.error).toBe("Impossibile caricare i dispositivi");
+    });
+
     // D11: eliminare l'unica riga dell'ultima pagina non deve lasciare la tabella vuota su
     // una pagina che non esiste più. Vedi `usePaginatedRows`.
     it("avvisa con l'ultima pagina valida quando quella richiesta la supera", async () => {

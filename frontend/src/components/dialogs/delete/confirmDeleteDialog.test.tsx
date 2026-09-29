@@ -17,7 +17,7 @@ const renderDialog = (props: Partial<Parameters<typeof ConfirmDeleteDialog>[0]> 
     );
 
 describe("ConfirmDeleteDialog", () => {
-    it("sblocca l'eliminazione solo con la parola di conferma esatta", async () => {
+    it("sblocca l'eliminazione solo con la parola di conferma", async () => {
         const onConfirm = vi.fn();
         renderDialog({ onConfirm });
         const confirm = screen.getByRole("button", { name: "Elimina" });
@@ -25,7 +25,7 @@ describe("ConfirmDeleteDialog", () => {
 
         expect(confirm).toBeDisabled();
 
-        await userEvent.type(input, "elimina");
+        await userEvent.type(input, "ELIMIN");
         expect(confirm).toBeDisabled();
 
         await userEvent.clear(input);
@@ -33,6 +33,29 @@ describe("ConfirmDeleteDialog", () => {
         await userEvent.click(confirm);
 
         expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * Sul telefono la tastiera mette la maiuscola solo alla prima lettera, e la tastiera
+     * suggerita aggiunge uno spazio dopo la parola: "Elimina " è la parola giusta scritta come la
+     * scrive un telefono, e prima lasciava il pulsante spento senza dire perché.
+     */
+    it("accetta la parola scritta come la scrive un telefono (maiuscole e spazi)", async () => {
+        renderDialog();
+        const input = screen.getByLabelText("Digita ELIMINA per confermare");
+
+        await userEvent.type(input, "Elimina ");
+
+        expect(screen.getByRole("button", { name: "Elimina" })).toBeEnabled();
+    });
+
+    it("chiede alla tastiera maiuscole e niente correzioni", () => {
+        renderDialog();
+        const input = screen.getByLabelText("Digita ELIMINA per confermare");
+
+        expect(input).toHaveAttribute("autocapitalize", "characters");
+        expect(input).toHaveAttribute("autocorrect", "off");
+        expect(input).toHaveAttribute("spellcheck", "false");
     });
 
     /**

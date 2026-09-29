@@ -126,7 +126,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                             // proporrebbe qui il nome di chi sta al computer, non quello del
                             // tecnico che si sta inserendo.
                             autoComplete="off"
-                            placeholder="Anna"
+                            placeholder="Es. Anna"
                             value={formValues.firstName}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, firstName: event.target.value }));
@@ -138,7 +138,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                         <Input
                             {...fieldProps("lastName", { error: errors.lastName, required: true })}
                             autoComplete="off"
-                            placeholder="Verdi"
+                            placeholder="Es. Verdi"
                             value={formValues.lastName}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, lastName: event.target.value }));
@@ -151,7 +151,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                             {...fieldProps("phoneNumber")}
                             type="tel"
                             autoComplete="off"
-                            placeholder="333 1234567"
+                            placeholder="Es. 333 1234567"
                             value={formValues.phoneNumber}
                             onChange={(event) =>
                                 setFormValues((prev) => ({ ...prev, phoneNumber: event.target.value }))
@@ -162,7 +162,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
                         <Input
                             {...fieldProps("vatNumber")}
                             autoComplete="off"
-                            placeholder="IT12345678901"
+                            placeholder="Es. IT12345678901"
                             value={formValues.vatNumber}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, vatNumber: event.target.value }))}
                         />

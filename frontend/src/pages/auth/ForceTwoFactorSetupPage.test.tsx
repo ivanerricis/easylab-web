@@ -1,5 +1,6 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const startTwoFactorSetup = vi.fn();
@@ -56,6 +57,14 @@ beforeEach(() => {
 });
 
 describe("ForceTwoFactorSetupPage", () => {
+    /** Il titolo è l'h1 della pagina, dentro il punto di riferimento `main`. */
+    it("ha un titolo di livello 1 dentro main", () => {
+        renderPage();
+
+        const heading = screen.getByRole("heading", { level: 1, name: "Attiva la verifica in due passaggi" });
+        expect(heading.closest("main")).not.toBeNull();
+    });
+
     /**
      * `refresh` fa sparire questa pagina, e con lei i codici di recupero: chiamarlo appena la
      * 2FA è attiva li toglierebbe di mezzo prima che l'admin li abbia salvati, e non verrebbero
@@ -91,6 +100,25 @@ describe("ForceTwoFactorSetupPage", () => {
         await waitFor(() => {
             expect(refresh).toHaveBeenCalledOnce();
         });
+    });
+
+    /**
+     * In app la pagina sta fuori da `MainLayout`, che è dove l'app mette il `TooltipProvider`: il
+     * provider se lo porta lei, e senza la X del dialogo (che ha un tooltip) farebbe lanciare
+     * Radix. Qui la si monta senza il provider di `renderWithProviders`.
+     */
+    it("apre il dialogo di configurazione anche senza un TooltipProvider intorno", async () => {
+        render(
+            <AuthProviderContext.Provider value={{ ...initialAuthProviderState, isLoading: false, refresh, logout }}>
+                <MemoryRouter>
+                    <ForceTwoFactorSetupPage />
+                </MemoryRouter>
+            </AuthProviderContext.Provider>
+        );
+
+        await userEvent.click(screen.getByRole("button", { name: "Configura adesso" }));
+
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
     });
 
     it("permette di uscire", async () => {

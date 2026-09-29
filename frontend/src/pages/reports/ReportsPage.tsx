@@ -1,6 +1,6 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
-import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
+import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
+import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
@@ -8,7 +8,7 @@ import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
 import { createReport, deleteReport, getApiErrorMessage, getReportPrintUrl, updateReport } from "@/lib/api";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { ReportDto } from "@/types/dtos";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -31,10 +31,27 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
 import { showCreatedToast } from "@/lib/createdToast";
 import { resolveReportReferences, toReportCreatePayload, toReportUpdatePayload } from "@/lib/reportForm";
+
+/**
+ * I dialoghi di creazione e modifica si scaricano solo quando servono, non con la pagina (vedi
+ * `lazyWithPrefetch`): quello di creazione già al passaggio del mouse o al focus su "Crea
+ * nuovo…", entrambi a pagina ferma.
+ */
+const { Component: CreateReportDialog, prefetch: prefetchCreateReportDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/create/createReportDialog")
+);
+const { Component: EditReportDialog, prefetch: prefetchEditReportDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/edit/editReportDialog")
+);
+const prefetchReportDialogs = () => {
+    prefetchCreateReportDialog();
+    prefetchEditReportDialog();
+};
 
 const visibilityFilters: ReportVisibilityFilter[] = ["all", "open", "closed"];
 const sortOptionValues = reportSortOptions.map((option) => option.value);
@@ -49,6 +66,8 @@ const ReportsPage = () => {
     // basta da solo a dire se il dialogo è aperto.
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
     const [reportToDelete, setReportToDelete] = useState<ReportDto | null>(null);
+    const hasOpenedCreateDialog = useHasBeenOpen(isCreateDialogOpen);
+    const hasOpenedEditDialog = useHasBeenOpen(reportToEdit != null);
     const [isDeleting, setIsDeleting] = useState(false);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     // "visibility" è il nome che usa già la dashboard nei suoi collegamenti.
@@ -61,8 +80,8 @@ const ReportsPage = () => {
         updateParams({ [listUrlParams.search]: value })
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("reports");
-    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("reports");
-    const { reportRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadReports } =
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("reports", reportColumns);
+    const { reportRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadError, loadReports } =
         useReportsRows({
             searchText: committedSearchText,
             visibilityFilter,
@@ -73,6 +92,8 @@ const ReportsPage = () => {
             pageSize,
             onPageOutOfRange: setCurrentPage,
         });
+
+    usePrefetchWhenIdle(prefetchReportDialogs);
 
     const handleSortOptionChange = (value: ReportSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_REPORT_SORT_OPTION ? null : value });
@@ -157,27 +178,40 @@ const ReportsPage = () => {
                     // L'esportazione CSV sta in Impostazioni → Esportazione: è un'operazione
                     // sull'archivio, non una delle azioni quotidiane di questa pagina.
                     action={
-                        <CreateEntityButton label="Crea nuovo report" onClick={() => setIsCreateDialogOpen(true)} />
+                        <CreateEntityButton
+                            label="Crea nuovo report"
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            onPointerEnter={prefetchCreateReportDialog}
+                            onFocus={prefetchCreateReportDialog}
+                        />
                     }
                 />
 
-                <CreateReportDialog
-                    open={isCreateDialogOpen}
-                    onOpenChange={setIsCreateDialogOpen}
-                    onSubmit={handleCreateReport}
-                />
+                {hasOpenedCreateDialog ? (
+                    <Suspense fallback={null}>
+                        <CreateReportDialog
+                            open={isCreateDialogOpen}
+                            onOpenChange={setIsCreateDialogOpen}
+                            onSubmit={handleCreateReport}
+                        />
+                    </Suspense>
+                ) : null}
 
-                <EditReportDialog
-                    open={reportToEdit != null}
-                    reportId={reportToEdit?.id ?? null}
-                    customerName={reportToEdit?.customer ?? ""}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setReportToEdit(null);
-                        }
-                    }}
-                    onSubmit={handleEditReport}
-                />
+                {hasOpenedEditDialog ? (
+                    <Suspense fallback={null}>
+                        <EditReportDialog
+                            open={reportToEdit != null}
+                            reportId={reportToEdit?.id ?? null}
+                            customerName={reportToEdit?.customer ?? ""}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setReportToEdit(null);
+                                }
+                            }}
+                            onSubmit={handleEditReport}
+                        />
+                    </Suspense>
+                ) : null}
 
                 <ConfirmDeleteDialog
                     open={reportToDelete != null}
@@ -235,6 +269,8 @@ const ReportsPage = () => {
                             // nessun report aperto "Nessun report disponibile." sarebbe falso.
                             hasActiveFilters={visibilityFilter !== "all" || dateFrom != null || dateTo != null}
                             rows={reportRows}
+                            loadError={loadError}
+                            onRetry={() => void loadReports()}
                             onOpenReport={handleOpenReport}
                             onEditReport={handleOpenEditDialog}
                             onPrintReport={handlePrintReport}

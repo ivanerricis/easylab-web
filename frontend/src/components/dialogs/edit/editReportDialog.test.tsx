@@ -1,5 +1,6 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 
 const api = vi.hoisted(() => ({
     getReport: vi.fn(),
@@ -135,5 +136,37 @@ describe("EditReportDialog: risposta superata", () => {
         });
 
         expect(screen.getByLabelText("Note")).toHaveValue("Nota del secondo report");
+    });
+});
+
+/**
+ * I prezzi erano campi numerici: "25,50" (la virgola italiana) arrivava vuoto e `Number("")`
+ * lo salvava come 0 senza dire niente. Ora la virgola si legge, e un testo illeggibile ferma il
+ * salvataggio con l'errore accanto al campo.
+ */
+describe("EditReportDialog: prezzi", () => {
+    vi.setConfig({ testTimeout: 20000 });
+
+    it("legge la virgola e rifiuta un importo illeggibile invece di salvarlo come zero", async () => {
+        api.getReport.mockResolvedValue(report(1, ""));
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        renderDialog({ onSubmit });
+
+        const technicianPrice = await screen.findByLabelText("Prezzo lavoro tecnico");
+        await userEvent.clear(technicianPrice);
+        await userEvent.type(technicianPrice, "25,5 euro");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(await screen.findByText("Importo non valido")).toBeInTheDocument();
+        expect(technicianPrice).toHaveAttribute("aria-invalid", "true");
+        expect(onSubmit).not.toHaveBeenCalled();
+
+        await userEvent.clear(technicianPrice);
+        await userEvent.type(technicianPrice, "25,50");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ technicianPrice: 25.5 }));
+        });
     });
 });

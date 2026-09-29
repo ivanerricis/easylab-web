@@ -55,6 +55,7 @@ const TechnicianPage = () => {
     const {
         data: technician,
         isLoading: isTechnicianLoading,
+        isReloading: isTechnicianReloading,
         isNotFound,
         reload: reloadTechnician,
         setData: setTechnician,
@@ -93,6 +94,7 @@ const TechnicianPage = () => {
         isInitialLoading: areReportsInitialLoading,
         isRefetching: areReportsRefetching,
         isLoading: areReportsLoading,
+        error: reportsLoadError,
         reload: reloadReports,
     } = usePaginatedRows<ReportDto>({
         fetchRows: (signal) =>
@@ -133,7 +135,9 @@ const TechnicianPage = () => {
         );
     }
 
-    if (isTechnicianLoading) {
+    // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
+    // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
+    if (isTechnicianLoading && !technician) {
         return <LoadingPage />;
     }
 
@@ -144,7 +148,7 @@ const TechnicianPage = () => {
             <DetailHeader onBack={handleBack} title={technicianName} hideTitleOnMobile={technician != null}>
                 <RefreshButton
                     onRefresh={handleRefresh}
-                    isRefreshing={areReportsLoading}
+                    isRefreshing={areReportsLoading || isTechnicianReloading}
                     label="Aggiorna i dati del tecnico"
                 />
 
@@ -179,6 +183,9 @@ const TechnicianPage = () => {
 
             {technician ? (
                 <DetailSection
+                    isBusy={isTechnicianReloading}
+                    // Su telefono il titolo è l'`h1` della pagina: vedi `titleAs`.
+                    titleAs={isPhone ? "div" : "h2"}
                     title={
                         // Su telefono il nome sta qui invece che nell'intestazione (vedi
                         // `hideTitleOnMobile`), come nella scheda cliente: a 390px freccia, titolo e
@@ -230,6 +237,8 @@ const TechnicianPage = () => {
                             hasActiveFilters: visibilityFilter !== "all",
                             filteredMessage: "Nessun report di questo tecnico corrisponde al filtro.",
                         })}
+                        loadError={reportsLoadError}
+                        onRetry={() => void reloadReports()}
                         renderRowActions={(row) => (
                             <>
                                 <OpenEntityButton

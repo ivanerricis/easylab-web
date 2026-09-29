@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Kbd from "@/components/ui/kbd";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { getStoredKeyboardShortcutsEnabled } from "@/lib/theme";
 import { cn, modifierKey } from "@/lib/utils";
 
 const groups: { heading: string; rows: { keys: string[]; label: string }[] }[] = [
@@ -46,7 +48,17 @@ const groups: { heading: string; rows: { keys: string[]; label: string }[] }[] =
  */
 const ShortcutsLegend = () => {
     const [open, setOpen] = useState(false);
-    usePageShortcut("?", () => setOpen(true));
+    // Letta all'apertura: la preferenza può cambiare in Impostazioni mentre la pagina è aperta.
+    const [shortcutsEnabled, setShortcutsEnabled] = useState(true);
+    // "?" funziona anche con le scorciatoie spente: è da qui che si scopre dove riaccenderle.
+    usePageShortcut(
+        "?",
+        () => {
+            setShortcutsEnabled(getStoredKeyboardShortcutsEnabled());
+            setOpen(true);
+        },
+        { alwaysActive: true }
+    );
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -57,6 +69,22 @@ const ShortcutsLegend = () => {
                         Non funzionano mentre si scrive in un campo: lì le lettere restano lettere.
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* Dove si spengono (o si riaccendono) quelle a un tasto: "/", "n", "r", "i". Le
+                    combinazioni con Ctrl e i tasti delle finestre restano sempre attivi. */}
+                <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    {shortcutsEnabled
+                        ? "Le scorciatoie a un tasto si possono disattivare in "
+                        : "Le scorciatoie a un tasto sono disattivate. Si riattivano in "}
+                    <Link
+                        to="/settings?section=theme"
+                        className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-outline outline-none"
+                        onClick={() => setOpen(false)}
+                    >
+                        Impostazioni › Tema
+                    </Link>
+                    .
+                </p>
 
                 <div className="flex flex-col gap-4">
                     {groups.map((group, index) => (

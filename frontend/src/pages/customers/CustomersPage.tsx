@@ -57,15 +57,23 @@ const CustomersPage = () => {
     const [printCustomerId, setPrintCustomerId] = useState<number | null>(null);
     const [printKind, setPrintKind] = useState<CustomerPrintKind>("reports");
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("customers");
-    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("customers");
-    const { customerRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadCustomers } =
-        useCustomersRows({
-            searchText: committedSearchText,
-            sortOption,
-            currentPage,
-            pageSize,
-            onPageOutOfRange: setCurrentPage,
-        });
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("customers", customerColumns);
+    const {
+        customerRows,
+        totalItems,
+        totalPages,
+        isLoading,
+        isInitialLoading,
+        isRefetching,
+        loadError,
+        loadCustomers,
+    } = useCustomersRows({
+        searchText: committedSearchText,
+        sortOption,
+        currentPage,
+        pageSize,
+        onPageOutOfRange: setCurrentPage,
+    });
 
     const handleSortOptionChange = (value: CustomerSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_CUSTOMER_SORT_OPTION ? null : value });
@@ -250,6 +258,8 @@ const CustomersPage = () => {
                     <CustomersTable
                         isInitialLoading={isInitialLoading}
                         isRefetching={isRefetching}
+                        loadError={loadError}
+                        onRetry={() => void loadCustomers()}
                         skeletonRowCount={pageSize}
                         columns={customerColumns}
                         sort={parseSortOption(sortOption)}

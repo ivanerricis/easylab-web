@@ -99,6 +99,29 @@ describe("CompanySettingsPanel", () => {
         expect(save).toBeDisabled();
     });
 
+    /** La pagina Impostazioni lo usa per chiedere prima di lasciare la sezione. */
+    it("segnala alla pagina quando ci sono modifiche non salvate, e quando non ci sono più", async () => {
+        const onDirtyChange = vi.fn();
+        const { unmount } = renderWithProviders(<CompanySettingsPanel onDirtyChange={onDirtyChange} />);
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Nome/)).toHaveValue("EasyLab");
+        });
+        expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+        await userEvent.type(screen.getByLabelText(/^Telefono/), "7");
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+        await waitFor(() => {
+            expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+        });
+
+        await userEvent.type(screen.getByLabelText(/^Telefono/), "8");
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+        unmount();
+        expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    });
+
     it("sceglie il fuso orario da tutto l'elenco IANA, non solo da quello impostato", async () => {
         await renderPanel();
         const timeZone = screen.getByLabelText(/^Fuso orario/);

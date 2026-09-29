@@ -5,7 +5,8 @@ const listCustomers = vi.fn();
 const listInterventions = vi.fn();
 const listReports = vi.fn();
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async () => ({
+    ...(await vi.importActual<typeof import("@/lib/api/errors")>("@/lib/api/errors")),
     listCustomers: (...args: unknown[]) => listCustomers(...args),
     listInterventions: (...args: unknown[]) => listInterventions(...args),
     listReports: (...args: unknown[]) => listReports(...args),
@@ -105,6 +106,41 @@ describe("hook delle righe delle pagine", () => {
         expect(listReports).toHaveBeenCalledWith(
             expect.objectContaining({ visibility: "open", sortBy: "customer", sortOrder: "asc" })
         );
+    });
+
+    it("i tre hook espongono l'errore di caricamento con il messaggio della loro lista", async () => {
+        listCustomers.mockRejectedValue(new Error("rete"));
+        listInterventions.mockRejectedValue(new Error("rete"));
+        listReports.mockRejectedValue(new Error("rete"));
+
+        const customers = renderHook(() =>
+            useCustomersRows({ searchText: "", sortOption: "name:asc", currentPage: 1, pageSize: 10 })
+        );
+        const interventions = renderHook(() =>
+            useInterventionsRows({
+                searchText: "",
+                statusFilter: "all",
+                typeFilter: "all",
+                sortOption: "createdAt:desc",
+                currentPage: 1,
+                pageSize: 10,
+            })
+        );
+        const reports = renderHook(() =>
+            useReportsRows({
+                searchText: "",
+                visibilityFilter: "all",
+                sortOption: "createdAt:desc",
+                currentPage: 1,
+                pageSize: 10,
+            })
+        );
+
+        await waitFor(() => {
+            expect(customers.result.current.loadError).toBe("Impossibile caricare i clienti");
+            expect(interventions.result.current.loadError).toBe("Impossibile caricare gli interventi");
+            expect(reports.result.current.loadError).toBe("Impossibile caricare i report");
+        });
     });
 
     // D11: i tre hook inoltrano `onPageOutOfRange` a `usePaginatedRows`, che lo chiama con

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastError = vi.fn();
 
@@ -46,6 +46,29 @@ describe("formatDate / formatDateTime", () => {
             expect(format("")).toBe("-");
             expect(format("non è una data")).toBe("-");
         }
+    });
+});
+
+describe("formatDate con una data solo-giorno", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    it("legge AAAA-MM-GG come giorno locale anche a ovest di Greenwich", async () => {
+        // Il fuso va impostato prima di importare il modulo: i formattatori fissano il loro
+        // fuso quando vengono creati. A New York la mezzanotte UTC del 28 è la sera del 27.
+        vi.stubEnv("TZ", "America/New_York");
+        vi.resetModules();
+        const { formatDate: formatDateInNewYork } = await import("./utils");
+
+        expect(formatDateInNewYork("2026-09-28")).toBe("28/09/2026");
+        // Un istante con l'ora resta un istante: qui il giorno prima è quello giusto.
+        expect(formatDateInNewYork("2026-09-28T02:00:00.000Z")).toBe("27/09/2026");
+    });
+
+    it("mostra un trattino per un giorno che non esiste", () => {
+        expect(formatDate("2026-02-31")).toBe("-");
     });
 });
 

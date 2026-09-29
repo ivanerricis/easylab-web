@@ -163,7 +163,12 @@ describe("useEntityDetail", () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
 
-    it("reload ricarica senza mai rifiutare, anche su errore", async () => {
+    /**
+     * Un errore su un ricaricamento (Aggiorna, o il `reload()` dopo un "Salva") non butta più
+     * fuori dalla scheda: i dati ci sono ancora, basta il toast. Prima si tornava all'elenco
+     * come al primo caricamento.
+     */
+    it("reload non rifiuta mai e, su errore, tiene la scheda con il toast", async () => {
         const fetcher = vi.fn().mockResolvedValue({ id: 5, name: "Mario" });
 
         const { result } = renderHook(() =>
@@ -179,6 +184,57 @@ describe("useEntityDetail", () => {
         });
 
         expect(toastError).toHaveBeenCalledWith("boom");
-        expect(navigate).toHaveBeenCalledWith("/reports");
+        expect(navigate).not.toHaveBeenCalled();
+        expect(result.current.data).toEqual({ id: 5, name: "Mario" });
+        expect(result.current.isLoading).toBe(false);
+    });
+
+    it("dopo un cambio di id un errore torna di nuovo all'elenco: è il primo caricamento di quell'id", async () => {
+        const fetcher = vi
+            .fn()
+            .mockResolvedValueOnce({ id: 5, name: "Mario" })
+            .mockRejectedValueOnce(new Error("boom"));
+
+        const { result, rerender } = renderHook(
+            ({ id }: { id: string }) => useEntityDetail(id, fetcher, { backTo: "/reports", errorMessage: "Errore" }),
+            { initialProps: { id: "5" } }
+        );
+
+        await waitFor(() => expect(result.current.data).toEqual({ id: 5, name: "Mario" }));
+
+        rerender({ id: "6" });
+
+        await waitFor(() => expect(navigate).toHaveBeenCalledWith("/reports"));
+    });
+
+    /** `isReloading` è ciò che fa attenuare la scheda invece di sostituirla con il caricamento. */
+    it("distingue il ricaricamento con i dati in pagina dal primo caricamento", async () => {
+        const second = createDeferred<{ id: number; name: string }>();
+        const fetcher = vi.fn().mockResolvedValueOnce({ id: 5, name: "Mario" }).mockReturnValueOnce(second.promise);
+
+        const { result } = renderHook(() =>
+            useEntityDetail("5", fetcher, { backTo: "/reports", errorMessage: "Errore" })
+        );
+
+        expect(result.current.isLoading).toBe(true);
+        expect(result.current.isReloading).toBe(false);
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+        let reloadPromise!: Promise<void>;
+        act(() => {
+            reloadPromise = result.current.reload();
+        });
+
+        expect(result.current.isReloading).toBe(true);
+        expect(result.current.data).toEqual({ id: 5, name: "Mario" });
+
+        await act(async () => {
+            second.resolve({ id: 5, name: "Mario Rossi" });
+            await reloadPromise;
+        });
+
+        expect(result.current.isReloading).toBe(false);
+        expect(result.current.data).toEqual({ id: 5, name: "Mario Rossi" });
     });
 });

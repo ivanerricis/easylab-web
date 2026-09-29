@@ -11,6 +11,7 @@ import {
     getStoredTableRowIntensity,
     getStoredThemeAccentPreset,
 } from "@/lib/theme";
+import { safeStorage } from "@/lib/safeStorage";
 import { ThemeProviderContext, type Theme } from "@/components/theme-provider-context";
 
 type ThemeProviderProps = {
@@ -25,7 +26,10 @@ export function ThemeProvider({
     storageKey = "vite-ui-theme",
     ...props
 }: ThemeProviderProps) {
-    const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(storageKey) as Theme) || defaultTheme);
+    // `safeStorage` e non `localStorage` diretto: questo inizializzatore gira sopra il limite
+    // d'errore dell'app, e con i dati del sito bloccati il `SecurityError` di `localStorage`
+    // lasciava lo schermo bianco invece del tema predefinito.
+    const [theme, setTheme] = useState<Theme>(() => (safeStorage.get(storageKey) as Theme) || defaultTheme);
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -50,7 +54,7 @@ export function ThemeProvider({
     const value = {
         theme,
         setTheme: (theme: Theme) => {
-            localStorage.setItem(storageKey, theme);
+            safeStorage.set(storageKey, theme);
             setTheme(theme);
         },
     };

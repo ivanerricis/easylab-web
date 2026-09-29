@@ -1,7 +1,8 @@
-import EntityCardList, { type EntityCardSlot } from "@/components/entity-card-list";
+import EntityCardList, { LoadErrorState, type EntityCardSlot } from "@/components/entity-card-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListScrollRestoration } from "@/hooks/useListScrollRestoration";
+import { withoutLockedColumns } from "@/hooks/useHiddenColumns";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,18 @@ type EntityTableProps<TRow> = {
     rows: TRow[];
     getRowKey: (row: TRow) => React.Key;
     emptyMessage: string;
+    /**
+     * Il messaggio dell'ultimo caricamento fallito: l'`error` di `usePaginatedRows` /
+     * `useSearchableRows`. Senza righe va al posto di `emptyMessage`, con un pulsante "Riprova"
+     * che chiama `onRetry` (di norma la `reload` dello stesso hook): una lista che non si è
+     * potuta leggere non deve dire "Nessun … disponibile.".
+     *
+     * Con delle righe già in tabella (una ricarica fallita) le righe restano e basta il toast:
+     * sostituirle con l'errore toglierebbe dati ancora validi a chi li stava leggendo.
+     * Facoltative: senza, la tabella si comporta come prima.
+     */
+    loadError?: string | null;
+    onRetry?: () => void;
     renderRowActions: (row: TRow) => ReactNode;
     /**
      * Colora la riga in base allo stato (`data-status-color`, interpretato da index.css
@@ -262,6 +275,8 @@ const EntityTable = <TRow,>({
     rows,
     getRowKey,
     emptyMessage,
+    loadError,
+    onRetry,
     renderRowActions,
     getRowStatusColor,
     onRowOpen,
@@ -272,13 +287,16 @@ const EntityTable = <TRow,>({
     onSortChange,
     hiddenColumnKeys,
 }: EntityTableProps<TRow>) => {
-    const columns = useMemo(
-        () =>
-            hiddenColumnKeys?.length
-                ? allColumns.filter((column) => !hiddenColumnKeys.includes(column.key))
-                : allColumns,
-        [allColumns, hiddenColumnKeys]
-    );
+    const columns = useMemo(() => {
+        // Una colonna non nascondibile si disegna anche se le preferenze salvate la dicono
+        // nascosta (l'utente l'aveva tolta prima che diventasse bloccata): vedi
+        // `withoutLockedColumns`.
+        const effectiveHiddenKeys = hiddenColumnKeys?.length ? withoutLockedColumns(hiddenColumnKeys, allColumns) : [];
+
+        return effectiveHiddenKeys.length
+            ? allColumns.filter((column) => !effectiveHiddenKeys.includes(column.key))
+            : allColumns;
+    }, [allColumns, hiddenColumnKeys]);
     const columnKeys = useMemo(() => columns.map((column) => column.key), [columns]);
     // Le schede su mobile mostrano tutte le colonne tranne le azioni, senza il filtro del menu
     // "Colonne" (vedi il commento sulla prop `hiddenColumnKeys`): un `useMemo` a parte, e non
@@ -385,9 +403,15 @@ const EntityTable = <TRow,>({
                                         // La maniglia sta dentro il `th` e non a cavallo del bordo:
                                         // l'intestazione è in `overflow: hidden` per troncare il
                                         // titolo, quindi la metà esterna verrebbe tagliata via.
+                                        // Il focus è la linea di tutti i controlli (`focus-outline`):
+                                        // prima c'era solo uno sfondo appena più chiaro, che da
+                                        // tastiera non si vedeva. Disegnata all'interno
+                                        // (`-outline-offset-2`, con `!` per vincere lo stacco di
+                                        // 2px della ricetta a pari specificità) per lo stesso
+                                        // `overflow: hidden` che taglierebbe una linea esterna.
                                         <span
                                             {...resizeHandleProps}
-                                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none transition-colors select-none hover:bg-background/40 focus-visible:bg-background/60 focus-visible:outline-none"
+                                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none focus-outline transition-colors outline-none select-none hover:bg-background/40 focus-visible:bg-background/60 focus-visible:-outline-offset-2!"
                                         />
                                     ) : null}
                                 </TableHead>
@@ -418,7 +442,13 @@ const EntityTable = <TRow,>({
                                     e `text-center` metteva il messaggio fuori dallo schermo.
                                     `left-1/2` di un elemento sticky si riferisce all'area che
                                     scorre, e la traslazione lo riporta indietro di mezza larghezza. */}
-                                <span className="sticky left-1/2 inline-block -translate-x-1/2">{emptyMessage}</span>
+                                <span className="sticky left-1/2 inline-block -translate-x-1/2">
+                                    {loadError ? (
+                                        <LoadErrorState message={loadError} onRetry={onRetry} />
+                                    ) : (
+                                        emptyMessage
+                                    )}
+                                </span>
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -450,6 +480,8 @@ const EntityTable = <TRow,>({
                 getStatusColor={getRowStatusColor}
                 renderActions={renderRowActions}
                 emptyMessage={emptyMessage}
+                loadError={loadError}
+                onRetry={onRetry}
                 isInitialLoading={isInitialLoading}
                 skeletonCardCount={Math.min(visibleSkeletonRows, 4)}
             />

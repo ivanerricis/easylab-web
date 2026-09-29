@@ -35,6 +35,10 @@ vi.mock("@/pages/technicians/TechnicianPage", () => ({ default: () => "Pagina: s
 vi.mock("@/pages/devices/DevicesPage", () => ({ default: () => "Pagina: dispositivi" }));
 vi.mock("@/pages/issues/IssuesPage", () => ({ default: () => "Pagina: difetti" }));
 vi.mock("@/pages/settings/SettingsPage", () => ({ default: () => "Pagina: impostazioni" }));
+// Le due pagine obbligate ora sono `lazy` in RequireAuth: finte come le altre, perché sotto carico
+// il primo import del modulo vero poteva superare il secondo di `findByText`.
+vi.mock("@/pages/auth/ForcePasswordChangePage", () => ({ default: () => "Imposta una nuova password" }));
+vi.mock("@/pages/auth/ForceTwoFactorSetupPage", () => ({ default: () => "Attiva la verifica in due passaggi" }));
 
 import App from "./App";
 import type { UserDto } from "@/lib/api";

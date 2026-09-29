@@ -49,6 +49,8 @@ export const usePaginatedRows = <TRow>({
     // Distingue il primo caricamento dalle ricariche successive: sono due stati che
     // vogliono due segnali diversi, e prima erano lo stesso `isLoading` per entrambi.
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+    // L'ultima richiesta è fallita: vedi `error` più sotto, nel valore restituito.
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const fetchRowsRef = useRef(fetchRows);
     const errorMessageRef = useRef(errorMessage);
@@ -105,6 +107,7 @@ export const usePaginatedRows = <TRow>({
             setRows(response.items);
             setTotalItems(response.totalItems);
             setTotalPages(response.totalPages);
+            setLoadError(null);
 
             // La pagina chiesta non esiste più (`totalPages` è sempre almeno 1: vedi
             // `crudRouter.ts`): l'ultima riga della pagina è stata eliminata, o un filtro ha
@@ -124,6 +127,7 @@ export const usePaginatedRows = <TRow>({
                 return;
             }
 
+            setLoadError(errorMessageRef.current);
             toast.error(getApiErrorMessage(error, errorMessageRef.current));
         } finally {
             if (!controller.signal.aborted && requestId === latestRequestIdRef.current) {
@@ -172,6 +176,17 @@ export const usePaginatedRows = <TRow>({
          * ogni pausa di battitura (300ms di debounce) e rendeva il campo non cliccabile.
          */
         isRefetching: isLoading && hasLoadedOnce,
+        /**
+         * Il messaggio della pagina ("Impossibile caricare i report") se l'ultima richiesta è
+         * fallita, `null` altrimenti; torna `null` alla prima risposta buona.
+         *
+         * Prima un errore lasciava solo il toast, che sparisce da solo: la tabella restava vuota
+         * e diceva "Nessun report disponibile." — una lista vuota e una lista che non si è
+         * potuta leggere erano indistinguibili, e senza un modo di riprovare se non ricaricare
+         * l'applicazione. `EntityTable` lo mostra con un pulsante "Riprova" (`loadError`).
+         * Le righe di prima, se c'erano, restano: vedi `EntityTable`.
+         */
+        error: loadError,
         reload,
     };
 };

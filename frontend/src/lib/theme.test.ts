@@ -7,12 +7,14 @@ import {
     applyThemeAccentPreset,
     getStoredCornerRadius,
     getStoredFontSize,
+    getStoredKeyboardShortcutsEnabled,
     getStoredTableColumnWidths,
     getStoredTableDensity,
     getStoredTableRowIntensity,
     getStoredTableRowsPerPage,
     getStoredThemeAccentPreset,
     setStoredCornerRadius,
+    setStoredKeyboardShortcutsEnabled,
     setStoredTableColumnWidths,
     setStoredTableRowIntensity,
     setStoredTableRowsPerPage,
@@ -312,5 +314,21 @@ describe("larghezze delle colonne salvate", () => {
         );
 
         expect(getStoredTableColumnWidths("report")).toEqual({ customer: 240, price: 96.5 });
+    });
+});
+
+describe("scorciatoie da tastiera", () => {
+    it("sono attive se non c'è una scelta salvata", () => {
+        expect(getStoredKeyboardShortcutsEnabled()).toBe(true);
+    });
+
+    it("si salva solo lo spegnimento: riaccenderle toglie la voce", () => {
+        setStoredKeyboardShortcutsEnabled(false);
+        expect(getStoredKeyboardShortcutsEnabled()).toBe(false);
+        expect(localStorage.getItem("easylab-web-keyboard-shortcuts")).toBe("off");
+
+        setStoredKeyboardShortcutsEnabled(true);
+        expect(getStoredKeyboardShortcutsEnabled()).toBe(true);
+        expect(localStorage.getItem("easylab-web-keyboard-shortcuts")).toBeNull();
     });
 });

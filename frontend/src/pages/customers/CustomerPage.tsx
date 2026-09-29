@@ -80,6 +80,7 @@ const CustomerPage = () => {
     const {
         data: customer,
         isLoading: isCustomerLoading,
+        isReloading: isCustomerReloading,
         isNotFound,
         reload: reloadCustomer,
         setData: setCustomer,
@@ -188,7 +189,9 @@ const CustomerPage = () => {
         );
     }
 
-    if (isCustomerLoading) {
+    // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
+    // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
+    if (isCustomerLoading && !customer) {
         return <LoadingPage />;
     }
 
@@ -228,7 +231,7 @@ const CustomerPage = () => {
             <DetailHeader onBack={handleBack} title={customerName} hideTitleOnMobile>
                 <RefreshButton
                     onRefresh={handleRefresh}
-                    isRefreshing={lists.isLoading}
+                    isRefreshing={lists.isLoading || isCustomerReloading}
                     label="Aggiorna i dati del cliente"
                 />
 
@@ -284,6 +287,9 @@ const CustomerPage = () => {
 
             {customer ? (
                 <DetailSection
+                    isBusy={isCustomerReloading}
+                    // Su telefono il titolo contiene già l'`h1` della pagina: vedi `titleAs`.
+                    titleAs={isPhone ? "div" : "h2"}
                     title={
                         // Su telefono il nome sta qui invece che nell'intestazione (vedi
                         // `hideTitleOnMobile`): lì freccia e sei pulsanti occupano la riga, e

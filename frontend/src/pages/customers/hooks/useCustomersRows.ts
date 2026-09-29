@@ -21,7 +21,7 @@ export const useCustomersRows = ({
     onPageOutOfRange,
 }: UseCustomersRowsParams) => {
     const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "name", "asc" | "desc"];
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         usePaginatedRows<CustomerDto>({
             fetchRows: (signal) =>
                 listCustomers({ page: currentPage, pageSize, search: searchText, sortBy, sortOrder, signal }),
@@ -38,6 +38,8 @@ export const useCustomersRows = ({
         isLoading,
         isInitialLoading,
         isRefetching,
+        /** L'ultimo caricamento fallito, per la tabella ("Riprova"): vedi `error` in `usePaginatedRows`. */
+        loadError: error,
         loadCustomers: reload,
     };
 };

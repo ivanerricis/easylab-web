@@ -123,21 +123,42 @@ const DetailGrid = ({
  * Una sezione di una scheda: card con titolo e contenuto. I titoli erano blu come i titoli delle
  * card dei numeri in alto, e competevano con il nome nell'intestazione e con i collegamenti
  * (anch'essi blu); ora sono nel colore del testo, in grassetto: il blu resta a ciò che si clicca.
+ *
+ * Il titolo è un `h2` vero, dentro il `CardTitle` che ne dà l'aspetto: prima era un `div` con
+ * l'aria di un titolo, e chi naviga per titoli con un lettore di schermo saltava dal nome della
+ * scheda (`h1`) direttamente fuori pagina, senza "Anagrafica", "Dettagli", ... in mezzo. Il
+ * preflight di Tailwind toglie all'`h2` dimensione, peso e margini propri, quindi a schermo non
+ * cambia niente.
  */
 const DetailSection = ({
     title,
+    titleAs: TitleTag = "h2",
+    isBusy = false,
     className,
     contentClassName,
     children,
 }: {
     title: ReactNode;
+    /**
+     * `div` quando il titolo porta già un titolo suo: su telefono le schede di cliente,
+     * collaboratore e tecnico ci mettono l'`h1` della pagina (vedi `hideTitleOnMobile`), e un
+     * `h1` dentro un `h2` non è HTML valido.
+     */
+    titleAs?: "h2" | "div";
+    /**
+     * Ricarica con i dati già in pagina (vedi `isReloading` in `useEntityDetail`): il contenuto
+     * resta leggibile, appena attenuato, come le righe di `EntityTable` quando la lista ricarica.
+     */
+    isBusy?: boolean;
     className?: string;
     contentClassName?: string;
     children: ReactNode;
 }) => (
-    <Card className={cn("gap-4", className)}>
+    <Card aria-busy={isBusy || undefined} className={cn("gap-4", isBusy && "opacity-60 transition-opacity", className)}>
         <CardHeader>
-            <CardTitle className="font-semibold">{title}</CardTitle>
+            <CardTitle className="font-semibold">
+                <TitleTag>{title}</TitleTag>
+            </CardTitle>
         </CardHeader>
         <CardContent className={contentClassName}>{children}</CardContent>
     </Card>

@@ -18,6 +18,12 @@ type CustomersTableProps = {
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
+    /**
+     * L'ultimo caricamento fallito e come riprovarlo: senza righe la tabella mostra l'errore
+     * con "Riprova" invece del messaggio di lista vuota. Vedi `loadError` in `EntityTable`.
+     */
+    loadError?: string | null;
+    onRetry?: () => void;
     skeletonRowCount?: number;
     /** Ordinamento dalle intestazioni e colonne nascoste: vedi `EntityTable`. */
     sort?: TableSort;
@@ -36,6 +42,8 @@ const CustomersTable = ({
     onDeleteCustomer,
     isInitialLoading,
     isRefetching,
+    loadError,
+    onRetry,
     skeletonRowCount,
     sort,
     onSortChange,
@@ -85,6 +93,8 @@ const CustomersTable = ({
             onRowOpen={(row) => onOpenCustomer(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
+            loadError={loadError}
+            onRetry={onRetry}
             skeletonRowCount={skeletonRowCount}
             sort={sort}
             onSortChange={onSortChange}

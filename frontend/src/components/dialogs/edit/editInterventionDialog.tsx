@@ -207,7 +207,10 @@ const EditInterventionDialog = ({
                             Caricamento dati dell'intervento...
                         </div>
                     ) : (
-                        <div className="grid max-h-[70vh] gap-2 overflow-y-auto pr-1">
+                        // L'altezza segue lo schermo, come in `EditReportDialog`: con un 70vh fisso,
+                        // su un telefono basso intestazione, pulsanti e margini non ci stavano nel
+                        // 30% che restava, e il dialogo usciva dallo schermo.
+                        <div className="grid max-h-[calc(100dvh-15rem)] gap-2 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
                             <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
                                 <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                                     Anagrafica

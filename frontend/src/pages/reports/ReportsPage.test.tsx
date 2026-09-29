@@ -104,6 +104,18 @@ vi.mock("@/components/dialogs/edit/editReportDialog", () => ({
 import ReportsPage from "./ReportsPage";
 
 /**
+ * I dialoghi si caricano pigramente, alla prima apertura: prima di dire che uno non si è aperto,
+ * si aspetta che avrebbe fatto in tempo ad aprirsi, altrimenti il test passerebbe anche con il
+ * dialogo in arrivo. Il tempo non è solo quello del modulo: React mostra il contenuto sospeso
+ * almeno 300ms dopo il suo segnaposto, per non far lampeggiare la pagina.
+ */
+const settleLazyDialogs = () =>
+    act(async () => {
+        await import("@/components/dialogs/create/createReportDialog");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+
+/**
  * I test che aprono menu e select di Radix con userEvent superano i 5 secondi di default quando
  * girano insieme al resto della suite (da soli ne bastano due): stesso margine degli altri file
  * con dialoghi e select.
@@ -174,7 +186,7 @@ const renderPage = async (route = "/reports") => {
 const submitEdit = async (values: Record<string, unknown>) => {
     editValues = { ...baseEdit, ...values };
     await userEvent.click(within(table()).getByRole("button", { name: "Modifica report 1" }));
-    await userEvent.click(screen.getByRole("button", { name: /Invia modifica/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Invia modifica/ }));
     await waitFor(() => {
         expect(api.updateReport).toHaveBeenCalled();
     });
@@ -202,7 +214,7 @@ describe("ReportsPage", () => {
 
         await userEvent.keyboard("n");
 
-        expect(screen.getByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
+        expect(await screen.findByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
     });
 
     /** La protezione che conta: "n" è una lettera, e nella ricerca si deve poter scrivere. */
@@ -211,6 +223,7 @@ describe("ReportsPage", () => {
 
         await userEvent.type(screen.getByRole("searchbox"), "notebook");
 
+        await settleLazyDialogs();
         expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
         expect(screen.getByRole("searchbox")).toHaveValue("notebook");
     });
@@ -229,7 +242,7 @@ describe("ReportsPage", () => {
         expect(search).not.toHaveFocus();
 
         await userEvent.keyboard("n");
-        expect(screen.getByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
+        expect(await screen.findByRole("button", { name: "Invia creazione" })).toBeInTheDocument();
     });
 
     /**
@@ -243,6 +256,7 @@ describe("ReportsPage", () => {
         await screen.findByRole("menu");
         await userEvent.keyboard("n");
 
+        await settleLazyDialogs();
         expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
     });
 
@@ -253,6 +267,7 @@ describe("ReportsPage", () => {
         await screen.findByRole("listbox");
         await userEvent.keyboard("n");
 
+        await settleLazyDialogs();
         expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
     });
 
@@ -272,6 +287,7 @@ describe("ReportsPage", () => {
         await screen.findByText("Non si accende più dopo la pioggia");
         await userEvent.keyboard("n");
 
+        await settleLazyDialogs();
         expect(screen.queryByRole("button", { name: "Invia creazione" })).not.toBeInTheDocument();
     });
 
@@ -492,7 +508,7 @@ describe("ReportsPage", () => {
 
         await userEvent.click(within(table()).getByRole("button", { name: "Modifica report 2" }));
 
-        expect(screen.getByRole("button", { name: "Invia modifica 2 Cliente 2" })).toBeInTheDocument();
+        expect(await screen.findByRole("button", { name: "Invia modifica 2 Cliente 2" })).toBeInTheDocument();
     });
 
     /**
@@ -555,7 +571,7 @@ describe("ReportsPage", () => {
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo report" }));
-        await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
             expect(toastSuccess).toHaveBeenCalledWith("Report #99 creato", expect.any(Object));
@@ -596,7 +612,7 @@ describe("ReportsPage", () => {
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo report" }));
-        await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
             expect(api.listReports).toHaveBeenCalledTimes(2);
@@ -616,7 +632,7 @@ describe("ReportsPage", () => {
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo report" }));
         await act(async () => {
-            await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
+            await userEvent.click(await screen.findByRole("button", { name: "Invia creazione" }));
         });
 
         await waitFor(() => {

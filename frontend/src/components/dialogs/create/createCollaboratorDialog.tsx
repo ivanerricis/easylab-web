@@ -109,7 +109,7 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                             // proporrebbe qui il nome di chi sta al computer, non quello del
                             // collaboratore che si sta inserendo.
                             autoComplete="off"
-                            placeholder="Luca"
+                            placeholder="Es. Luca"
                             value={formValues.firstName}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, firstName: event.target.value }));
@@ -121,7 +121,7 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                         <Input
                             {...fieldProps("lastName")}
                             autoComplete="off"
-                            placeholder="Neri"
+                            placeholder="Es. Neri"
                             value={formValues.lastName}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, lastName: event.target.value }))}
                         />
@@ -131,7 +131,7 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
                             {...fieldProps("phoneNumber")}
                             type="tel"
                             autoComplete="off"
-                            placeholder="333 1234567"
+                            placeholder="Es. 333 1234567"
                             value={formValues.phoneNumber}
                             onChange={(event) =>
                                 setFormValues((prev) => ({ ...prev, phoneNumber: event.target.value }))

@@ -40,7 +40,7 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
 
     const handleConfirm = async () => {
         if (description.trim() === "") {
-            setDescriptionError("Inserire una descrizione per il problema");
+            setDescriptionError("Inserisci una descrizione del difetto");
             document.getElementById("description")?.focus();
             return;
         }
@@ -55,7 +55,7 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
             setIsSubmitting(true);
             await onSubmit({ description });
             onOpenChange(false);
-            toast.success(mode === "edit" ? "Difetto aggiornato con successo" : "Segnalazione creata con successo");
+            toast.success(mode === "edit" ? "Difetto aggiornato con successo" : "Difetto creato con successo");
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile salvare i dati"));
         } finally {
@@ -85,7 +85,7 @@ const CreateIssueDialog = ({ open, onOpenChange, onSubmit, mode = "create", init
                 <FormField id="description" label="Descrizione" required error={descriptionError}>
                     <Textarea
                         {...fieldProps("description", { error: descriptionError, required: true })}
-                        placeholder="Display rotto"
+                        placeholder="Es. Display rotto"
                         value={description}
                         onChange={(event) => {
                             setDescription(event.target.value);

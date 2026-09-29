@@ -27,15 +27,21 @@ type MobileFiltersSheetProps = {
  * I controlli sono i figli, gli stessi della barra desktop: il pannello non ne duplica la logica.
  */
 const MobileFiltersSheet = ({ activeCount, children }: MobileFiltersSheetProps) => {
+    // Il numero sta nel nome del pulsante: prima il nome era "Filtri" e basta, e siccome
+    // `aria-label` sostituisce il contenuto, il pallino (con il suo "1 attivi", anche sgrammaticato)
+    // non arrivava mai allo screen reader.
+    const triggerLabel =
+        activeCount > 0 ? `Filtri, ${activeCount} ${activeCount === 1 ? "attivo" : "attivi"}` : "Filtri";
+
     return (
         <Sheet>
             <SheetTrigger asChild>
-                <Button variant="outline" size="lg" className="h-10 gap-2 px-3" aria-label="Filtri">
+                <Button variant="outline" size="lg" className="h-10 gap-2 px-3" aria-label={triggerLabel}>
                     <SlidersHorizontal className="size-4" />
                     <span>Filtri</span>
                     {activeCount > 0 ? (
                         <span
-                            aria-label={`${activeCount} attivi`}
+                            aria-hidden="true"
                             className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
                         >
                             {activeCount}

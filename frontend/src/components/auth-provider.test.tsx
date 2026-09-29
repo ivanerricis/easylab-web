@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +52,17 @@ const Probe = () => {
 
 const auth = () => authRef.current as AuthProviderState;
 
+/** Come arriva da axios una risposta: `getApiErrorStatus` guarda solo questi campi. */
+const httpError = (status: number) =>
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+        isAxiosError: true,
+        response: { status, data: {} },
+    });
+const unauthorizedError = () => httpError(401);
+/** Nessuna risposta: rete assente o server irraggiungibile. */
+const networkError = () =>
+    Object.assign(new Error("Network Error"), { isAxiosError: true, code: "ERR_NETWORK", response: undefined });
+
 const renderProvider = async () => {
     render(
         <AuthProvider>
@@ -76,7 +88,7 @@ describe("AuthProvider", () => {
     });
 
     it("resta anonimo se non c'è una sessione", async () => {
-        getMe.mockRejectedValue(new Error("401"));
+        getMe.mockRejectedValue(unauthorizedError());
 
         await renderProvider();
 
@@ -84,7 +96,7 @@ describe("AuthProvider", () => {
     });
 
     it("entra con un login senza secondo fattore", async () => {
-        getMe.mockRejectedValue(new Error("401"));
+        getMe.mockRejectedValue(unauthorizedError());
         login.mockResolvedValue({ status: "authenticated", user });
         await renderProvider();
 
@@ -100,7 +112,7 @@ describe("AuthProvider", () => {
      * fattore sia stato verificato.
      */
     it("non considera autenticato chi deve ancora dare il secondo fattore", async () => {
-        getMe.mockRejectedValue(new Error("401"));
+        getMe.mockRejectedValue(unauthorizedError());
         login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc" });
         await renderProvider();
 
@@ -155,6 +167,55 @@ describe("AuthProvider", () => {
         });
 
         expect(screen.getByText("anonimo")).toBeInTheDocument();
+    });
+
+    /**
+     * Prima qualunque errore di `/auth/me` valeva "non autenticato": con la rete assente o il
+     * server in riavvio si finiva al login con una sessione valida. Ora solo il 401.
+     */
+    it("con la rete assente non manda al login: mostra l'errore con Riprova", async () => {
+        getMe.mockRejectedValueOnce(networkError()).mockResolvedValueOnce(user);
+        render(
+            <AuthProvider>
+                <Probe />
+            </AuthProvider>
+        );
+
+        expect(await screen.findByRole("heading", { name: "Impossibile contattare il server" })).toBeInTheDocument();
+        expect(
+            screen.getByText("Connessione al server non riuscita. Controlla la rete e riprova.")
+        ).toBeInTheDocument();
+        expect(screen.queryByText("anonimo")).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+
+        expect(await screen.findByText("mario")).toBeInTheDocument();
+        expect(getMe).toHaveBeenCalledTimes(2);
+    });
+
+    it("con un errore del server mostra l'errore; se poi risponde 401 porta al login", async () => {
+        getMe.mockRejectedValueOnce(httpError(502)).mockRejectedValueOnce(unauthorizedError());
+        render(
+            <AuthProvider>
+                <Probe />
+            </AuthProvider>
+        );
+
+        await userEvent.click(await screen.findByRole("button", { name: "Riprova" }));
+
+        expect(await screen.findByText("anonimo")).toBeInTheDocument();
+    });
+
+    it("un refresh fallito per la rete non butta fuori chi ha già una sessione", async () => {
+        getMe.mockResolvedValueOnce(user).mockRejectedValueOnce(networkError());
+        await renderProvider();
+
+        await act(async () => {
+            await auth().refresh();
+        });
+
+        expect(screen.getByText("mario")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Riprova" })).not.toBeInTheDocument();
     });
 
     it("toglie l'handler allo smontaggio", async () => {

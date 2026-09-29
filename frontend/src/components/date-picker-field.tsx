@@ -3,6 +3,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatDate, formatDateISO } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
+import { it as italianLocale } from "react-day-picker/locale";
 
 type Props = {
     id?: string;
@@ -74,6 +75,13 @@ const DatePickerField = ({
                     mode="single"
                     selected={selectedDate}
                     defaultMonth={selectedDate}
+                    // In italiano e con la settimana che parte da lunedì, come il resto dell'app
+                    // (il calendario degli interventi, le date scritte): prima il mese era "September",
+                    // i giorni "Su Mo Tu…" con la domenica in testa, e i lettori di schermo leggevano
+                    // "Go to the Next Month". Il locale di react-day-picker, non quello nudo di
+                    // date-fns: aggiunge le etichette dei pulsanti e delle celle tradotte.
+                    locale={italianLocale}
+                    weekStartsOn={1}
                     onSelect={(date) => {
                         if (date) {
                             onValueChange(formatDateISO(date));

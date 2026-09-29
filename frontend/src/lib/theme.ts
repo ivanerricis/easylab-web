@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/safeStorage";
+
 export type ThemeAccentPresetKey =
     "default" | "ocean" | "forest" | "olive" | "amber" | "brick" | "rose" | "violet" | "graphite";
 
@@ -87,6 +89,7 @@ const fontSizeAttribute = "data-font-size";
 const tableRowsPerPageStorageKey = "easylab-web-table-rows-per-page";
 const tableColumnWidthsStorageKey = "easylab-web-table-column-widths";
 const tableHiddenColumnsStorageKey = "easylab-web-table-hidden-columns";
+const keyboardShortcutsStorageKey = "easylab-web-keyboard-shortcuts";
 
 export const cornerRadiusPresets: CornerRadiusPreset[] = [
     {
@@ -326,18 +329,18 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
 const getThemeRoot = () => document.documentElement;
 
 export const getStoredThemeAccentPreset = () => {
-    const storedValue = localStorage.getItem(accentStorageKey) as ThemeAccentPresetKey | null;
+    const storedValue = safeStorage.get(accentStorageKey) as ThemeAccentPresetKey | null;
 
     return themeAccentPresets.some((preset) => preset.key === storedValue) ? storedValue : null;
 };
 
 export const setStoredThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) => {
     if (!presetKey || presetKey === "default") {
-        localStorage.removeItem(accentStorageKey);
+        safeStorage.remove(accentStorageKey);
         return;
     }
 
-    localStorage.setItem(accentStorageKey, presetKey);
+    safeStorage.set(accentStorageKey, presetKey);
 };
 
 export const applyThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) => {
@@ -374,18 +377,18 @@ export const applyThemeAccentPreset = (presetKey: ThemeAccentPresetKey | null) =
 };
 
 export const getStoredTableRowIntensity = () => {
-    const storedValue = localStorage.getItem(tableRowIntensityStorageKey) as TableRowIntensityKey | null;
+    const storedValue = safeStorage.get(tableRowIntensityStorageKey) as TableRowIntensityKey | null;
 
     return tableRowIntensities.some((intensity) => intensity.key === storedValue) ? storedValue : null;
 };
 
 export const setStoredTableRowIntensity = (intensityKey: TableRowIntensityKey | null) => {
     if (!intensityKey || intensityKey === "default") {
-        localStorage.removeItem(tableRowIntensityStorageKey);
+        safeStorage.remove(tableRowIntensityStorageKey);
         return;
     }
 
-    localStorage.setItem(tableRowIntensityStorageKey, intensityKey);
+    safeStorage.set(tableRowIntensityStorageKey, intensityKey);
 };
 
 // I colori dei tre livelli stanno in index.css: qui basta marcare la radice, il default
@@ -402,18 +405,18 @@ export const applyTableRowIntensity = (intensityKey: TableRowIntensityKey | null
 };
 
 export const getStoredCornerRadius = () => {
-    const storedValue = localStorage.getItem(cornerRadiusStorageKey) as CornerRadiusKey | null;
+    const storedValue = safeStorage.get(cornerRadiusStorageKey) as CornerRadiusKey | null;
 
     return cornerRadiusPresets.some((preset) => preset.key === storedValue) ? storedValue : null;
 };
 
 export const setStoredCornerRadius = (radiusKey: CornerRadiusKey | null) => {
     if (!radiusKey || radiusKey === "default") {
-        localStorage.removeItem(cornerRadiusStorageKey);
+        safeStorage.remove(cornerRadiusStorageKey);
         return;
     }
 
-    localStorage.setItem(cornerRadiusStorageKey, radiusKey);
+    safeStorage.set(cornerRadiusStorageKey, radiusKey);
 };
 
 export const applyCornerRadius = (radiusKey: CornerRadiusKey | null) => {
@@ -434,18 +437,18 @@ export const applyCornerRadius = (radiusKey: CornerRadiusKey | null) => {
 };
 
 export const getStoredTableDensity = () => {
-    const storedValue = localStorage.getItem(tableDensityStorageKey) as TableDensityKey | null;
+    const storedValue = safeStorage.get(tableDensityStorageKey) as TableDensityKey | null;
 
     return tableDensities.some((density) => density.key === storedValue) ? storedValue : null;
 };
 
 export const setStoredTableDensity = (densityKey: TableDensityKey | null) => {
     if (!densityKey || densityKey === "default") {
-        localStorage.removeItem(tableDensityStorageKey);
+        safeStorage.remove(tableDensityStorageKey);
         return;
     }
 
-    localStorage.setItem(tableDensityStorageKey, densityKey);
+    safeStorage.set(tableDensityStorageKey, densityKey);
 };
 
 export const applyTableDensity = (densityKey: TableDensityKey | null) => {
@@ -460,18 +463,18 @@ export const applyTableDensity = (densityKey: TableDensityKey | null) => {
 };
 
 export const getStoredFontSize = () => {
-    const storedValue = localStorage.getItem(fontSizeStorageKey) as FontSizeKey | null;
+    const storedValue = safeStorage.get(fontSizeStorageKey) as FontSizeKey | null;
 
     return fontSizes.some((fontSize) => fontSize.key === storedValue) ? storedValue : null;
 };
 
 export const setStoredFontSize = (fontSizeKey: FontSizeKey | null) => {
     if (!fontSizeKey || fontSizeKey === "default") {
-        localStorage.removeItem(fontSizeStorageKey);
+        safeStorage.remove(fontSizeStorageKey);
         return;
     }
 
-    localStorage.setItem(fontSizeStorageKey, fontSizeKey);
+    safeStorage.set(fontSizeStorageKey, fontSizeKey);
 };
 
 export const applyFontSize = (fontSizeKey: FontSizeKey | null) => {
@@ -503,17 +506,17 @@ const parseTableRowsPerPage = (rawValue: string | null): TableRowsPerPageKey | n
  * legacy invece che al default.
  */
 export const getStoredTableRowsPerPage = (tableKey: string): TableRowsPerPageKey => {
-    const perTableValue = parseTableRowsPerPage(localStorage.getItem(`${tableRowsPerPageStorageKey}:${tableKey}`));
+    const perTableValue = parseTableRowsPerPage(safeStorage.get(`${tableRowsPerPageStorageKey}:${tableKey}`));
 
     if (perTableValue) {
         return perTableValue;
     }
 
-    return parseTableRowsPerPage(localStorage.getItem(tableRowsPerPageStorageKey)) ?? 10;
+    return parseTableRowsPerPage(safeStorage.get(tableRowsPerPageStorageKey)) ?? 10;
 };
 
 export const setStoredTableRowsPerPage = (tableKey: string, pageSize: TableRowsPerPageKey) => {
-    localStorage.setItem(`${tableRowsPerPageStorageKey}:${tableKey}`, String(pageSize));
+    safeStorage.set(`${tableRowsPerPageStorageKey}:${tableKey}`, String(pageSize));
 };
 
 /**
@@ -531,7 +534,7 @@ export const setStoredTableRowsPerPage = (tableKey: string, pageSize: TableRowsP
  * ancora una voce e ricade sulla misura naturale.
  */
 export const getStoredTableColumnWidths = (tableKey: string): Record<string, number> => {
-    const rawValue = localStorage.getItem(`${tableColumnWidthsStorageKey}:${tableKey}`);
+    const rawValue = safeStorage.get(`${tableColumnWidthsStorageKey}:${tableKey}`);
 
     if (!rawValue) {
         return {};
@@ -561,11 +564,11 @@ export const setStoredTableColumnWidths = (tableKey: string, widths: Record<stri
     const storageKey = `${tableColumnWidthsStorageKey}:${tableKey}`;
 
     if (Object.keys(widths).length === 0) {
-        localStorage.removeItem(storageKey);
+        safeStorage.remove(storageKey);
         return;
     }
 
-    localStorage.setItem(storageKey, JSON.stringify(widths));
+    safeStorage.set(storageKey, JSON.stringify(widths));
 };
 
 /**
@@ -575,9 +578,7 @@ export const setStoredTableColumnWidths = (tableKey: string, widths: Record<stri
  */
 export const getStoredHiddenColumns = (tableKey: string): string[] => {
     try {
-        const parsedValue: unknown = JSON.parse(
-            localStorage.getItem(`${tableHiddenColumnsStorageKey}:${tableKey}`) ?? "[]"
-        );
+        const parsedValue: unknown = JSON.parse(safeStorage.get(`${tableHiddenColumnsStorageKey}:${tableKey}`) ?? "[]");
 
         return Array.isArray(parsedValue) ? parsedValue.filter((item): item is string => typeof item === "string") : [];
     } catch {
@@ -588,15 +589,34 @@ export const getStoredHiddenColumns = (tableKey: string): string[] => {
 export const setStoredHiddenColumns = (tableKey: string, columnKeys: readonly string[]) => {
     const storageKey = `${tableHiddenColumnsStorageKey}:${tableKey}`;
 
-    try {
-        if (columnKeys.length === 0) {
-            localStorage.removeItem(storageKey);
-            return;
-        }
-
-        localStorage.setItem(storageKey, JSON.stringify(columnKeys));
-    } catch {
-        // localStorage non disponibile (navigazione privata, quota): la scelta vale finché la
-        // pagina resta aperta, che è comunque meglio di un errore.
+    // Senza localStorage (dati del sito bloccati, quota) `safeStorage` non lancia: la scelta
+    // vale finché la pagina resta aperta, che è comunque meglio di un errore.
+    if (columnKeys.length === 0) {
+        safeStorage.remove(storageKey);
+        return;
     }
+
+    safeStorage.set(storageKey, JSON.stringify(columnKeys));
+};
+
+/**
+ * Le scorciatoie a un tasto ("/", "n", "r", "i"), attive se non c'è una scelta salvata.
+ *
+ * Si possono spegnere perché una lettera nuda scatta anche per sbaglio: con un lettore di
+ * schermo che usa le lettere per muoversi nella pagina, con i comandi vocali, o semplicemente
+ * battendo un tasto con il focus fuori dai campi (WCAG 2.1.4). Si salva solo lo spegnimento,
+ * come per le altre preferenze: il valore predefinito non occupa una voce.
+ *
+ * Si legge a ogni tasto premuto (vedi `usePageShortcut`), non una volta all'avvio: così
+ * l'interruttore in Impostazioni vale subito, senza ricaricare la pagina.
+ */
+export const getStoredKeyboardShortcutsEnabled = () => safeStorage.get(keyboardShortcutsStorageKey) !== "off";
+
+export const setStoredKeyboardShortcutsEnabled = (enabled: boolean) => {
+    if (enabled) {
+        safeStorage.remove(keyboardShortcutsStorageKey);
+        return;
+    }
+
+    safeStorage.set(keyboardShortcutsStorageKey, "off");
 };

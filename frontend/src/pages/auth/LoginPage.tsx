@@ -71,9 +71,17 @@ const LoginPage = () => {
     const [passwordError, setPasswordError] = useState<string>();
     const [codeError, setCodeError] = useState<string>();
 
+    // Si torna all'indirizzo intero da cui `RequireAuth` ha mandato qui, filtri compresi: prima
+    // si teneva solo il percorso, e un link a una lista filtrata (`/reports?status=…`) aperto a
+    // sessione scaduta portava alla lista senza filtri.
     const goToApp = () => {
-        const state = location.state as { from?: { pathname: string } } | null;
-        navigate(state?.from?.pathname ?? "/dashboard", { replace: true });
+        const from = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
+        navigate(
+            from?.pathname
+                ? { pathname: from.pathname, search: from.search ?? "", hash: from.hash ?? "" }
+                : "/dashboard",
+            { replace: true }
+        );
     };
 
     const backToCredentials = (reason?: string) => {
@@ -183,6 +191,11 @@ const LoginPage = () => {
                                         // proporre il codice senza farlo ricopiare a mano.
                                         autoComplete="one-time-code"
                                         inputMode="text"
+                                        // Un codice, non una parola: la tastiera del telefono non
+                                        // deve metterci la maiuscola né "correggerlo".
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        spellCheck={false}
                                         maxLength={9}
                                         autoFocus
                                         className="text-center font-mono text-lg tracking-widest"
@@ -271,6 +284,13 @@ const LoginPage = () => {
                             <Input
                                 {...fieldProps("loginUsername", { error: usernameError })}
                                 autoComplete="username"
+                                // Niente correttore: un nome utente non è una parola del
+                                // dizionario, e la tastiera del telefono lo "correggeva" in un
+                                // altro, che il server rifiuta. La maiuscola automatica invece
+                                // resta: i nomi utente sono di norma con l'iniziale maiuscola
+                                // ("Ivan"), e il confronto del server è esatto di proposito.
+                                autoCorrect="off"
+                                spellCheck={false}
                                 autoFocus
                                 value={username}
                                 onChange={(event) => {

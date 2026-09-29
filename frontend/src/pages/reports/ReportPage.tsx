@@ -12,7 +12,7 @@ import DetailDeleteButton from "@/components/detail-delete-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import { toReportUpdatePayload } from "@/lib/reportForm";
 import { getReport, getReportPrintUrl, updateReport, deleteReport } from "@/lib/api";
-import { formatDateTime, formatEuro, formatYesNo, openPrintWindow } from "@/lib/utils";
+import { cn, formatDateTime, formatEuro, formatYesNo, openPrintWindow } from "@/lib/utils";
 import { Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
@@ -26,6 +26,7 @@ const ReportPage = () => {
     const {
         data: report,
         isLoading,
+        isReloading,
         isNotFound,
         reload,
     } = useEntityDetail(id, getReport, {
@@ -62,7 +63,11 @@ const ReportPage = () => {
         );
     }
 
-    if (isLoading) {
+    // Il caricamento a tutta pagina solo quando non c'è ancora niente da mostrare. Prima valeva
+    // anche per i ricaricamenti: "Aggiorna" faceva lampeggiare la scheda, e il `reload()` dopo
+    // "Salva" smontava a metà salvataggio il dialogo di modifica (che sta qui sotto) e lo
+    // rimontava da capo. Ora durante un ricaricamento la scheda resta, attenuata (sotto).
+    if (isLoading && !report) {
         return <LoadingPage />;
     }
 
@@ -125,79 +130,91 @@ const ReportPage = () => {
                 />
             </DetailHeader>
 
-            <DetailStats
-                mobileTitle={pageTitle}
-                items={[
-                    {
-                        label: "Stato",
-                        value: (
-                            <DetailStatBadge color={reportStatusColor(report.closed)}>
-                                {formatReportStatus(report.closed)}
-                            </DetailStatBadge>
-                        ),
-                    },
-                    { label: "Prezzo interno", value: formatEuro(report.price) },
-                    { label: "Prezzo tecnici", value: formatEuro(report.technicianPrice) },
-                    { label: "Totale", value: formatEuro(report.totalPrice) },
-                    { label: "Pagamento", value: paymentMethodLabels[report.paymentMethod] },
-                ]}
-            />
+            {/* Il contenuto sotto l'intestazione, attenuato durante un ricaricamento come le righe
+                di una lista (`EntityTable`): leggibile, e `aria-busy` per chi non vede
+                l'attenuazione. L'intestazione resta piena: i suoi pulsanti funzionano comunque. */}
+            <div
+                aria-busy={isReloading}
+                className={cn("flex flex-col gap-4", isReloading && "opacity-60 transition-opacity")}
+            >
+                <DetailStats
+                    mobileTitle={pageTitle}
+                    items={[
+                        {
+                            label: "Stato",
+                            value: (
+                                <DetailStatBadge color={reportStatusColor(report.closed)}>
+                                    {formatReportStatus(report.closed)}
+                                </DetailStatBadge>
+                            ),
+                        },
+                        { label: "Prezzo interno", value: formatEuro(report.price) },
+                        { label: "Prezzo tecnici", value: formatEuro(report.technicianPrice) },
+                        { label: "Totale", value: formatEuro(report.totalPrice) },
+                        { label: "Pagamento", value: paymentMethodLabels[report.paymentMethod] },
+                    ]}
+                />
 
-            <div className="grid gap-4 xl:grid-cols-2">
-                <DetailSection title="Anagrafica">
-                    {/* Le sezioni della scheda report a righe (etichetta a sinistra, valore a destra),
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <DetailSection title="Anagrafica">
+                        {/* Le sezioni della scheda report a righe (etichetta a sinistra, valore a destra),
                         come il riepilogo in cima su telefono: si scorre una colonna sola invece di
                         saltare fra due, e i valori si allineano tutti sul bordo destro. */}
-                    <DetailGrid layout="rows">
-                        <DetailItem label="Cliente" value={report.customerName ?? "Cliente sconosciuto"} />
-                        <DetailItem label="Telefono" value={report.customerPhone ?? "-"} />
-                        <DetailItem label="Collaboratore" value={report.collaboratorName ?? "-"} />
-                        <DetailItem label="Dispositivo" value={report.deviceName} />
-                        <DetailItem label="Difetto catalogo" value={report.issueName} />
-                    </DetailGrid>
-                </DetailSection>
+                        <DetailGrid layout="rows">
+                            <DetailItem label="Cliente" value={report.customerName ?? "Cliente sconosciuto"} />
+                            <DetailItem label="Telefono" value={report.customerPhone ?? "-"} />
+                            <DetailItem label="Collaboratore" value={report.collaboratorName ?? "-"} />
+                            <DetailItem label="Dispositivo" value={report.deviceName} />
+                            <DetailItem label="Difetto catalogo" value={report.issueName} />
+                        </DetailGrid>
+                    </DetailSection>
 
-                {/*
+                    {/*
                     Stato (aperto/chiuso) e metodo di pagamento non si ripetono qui: stanno già
                     nei numeri in alto. C'è invece "Avvisato", che si imposta dal dialogo di
                     modifica ma in questa pagina non compariva da nessuna parte.
                 */}
-                <DetailSection title="Stato e gestione">
-                    <DetailGrid layout="rows">
-                        <DetailItem label="Alimentatore" value={formatYesNo(report.charger)} />
-                        <DetailItem label="Backup dati" value={formatYesNo(report.dataBackup)} />
-                        <DetailItem label="Avvisato" value={formatYesNo(report.alerted)} />
-                        <DetailItem label="Creato il" value={formatDateTime(report.created_at)} />
-                        <DetailItem
-                            label="Ultimo aggiornamento"
-                            value={report.updated_at ? formatDateTime(report.updated_at) : "-"}
-                        />
-                    </DetailGrid>
-                </DetailSection>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-                <DetailSection title="Dettagli intervento">
-                    <DetailGrid layout="rows">
-                        <DetailItem label="Problema riscontrato" value={report.issueDescription ?? "-"} longText />
-                        <DetailItem label="Descrizione intervento" value={report.serviceDescription ?? "-"} longText />
-                        <DetailItem label="Password" value={report.password ?? "-"} />
-                        <DetailItem label="Note" value={report.note ?? "-"} longText />
-                    </DetailGrid>
-                </DetailSection>
-
-                {/* Un tecnico solo per report: prima era una tabella bordata di una riga dentro la
-                    card, un'altra scatola; ora due voci come il resto della scheda. */}
-                <DetailSection title="Tecnici associati" className="self-start">
-                    {!hasTechnician ? (
-                        <p className="text-muted-foreground">Nessun tecnico associato a questo report.</p>
-                    ) : (
+                    <DetailSection title="Stato e gestione">
                         <DetailGrid layout="rows">
-                            <DetailItem label="Tecnico" value={technicianName} />
-                            <DetailItem label="Prezzo" value={formatEuro(report.technicianPrice)} />
+                            <DetailItem label="Alimentatore" value={formatYesNo(report.charger)} />
+                            <DetailItem label="Backup dati" value={formatYesNo(report.dataBackup)} />
+                            <DetailItem label="Avvisato" value={formatYesNo(report.alerted)} />
+                            <DetailItem label="Creato il" value={formatDateTime(report.created_at)} />
+                            <DetailItem
+                                label="Ultimo aggiornamento"
+                                value={report.updated_at ? formatDateTime(report.updated_at) : "-"}
+                            />
                         </DetailGrid>
-                    )}
-                </DetailSection>
+                    </DetailSection>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <DetailSection title="Dettagli intervento">
+                        <DetailGrid layout="rows">
+                            <DetailItem label="Problema riscontrato" value={report.issueDescription ?? "-"} longText />
+                            <DetailItem
+                                label="Descrizione intervento"
+                                value={report.serviceDescription ?? "-"}
+                                longText
+                            />
+                            <DetailItem label="Password" value={report.password ?? "-"} />
+                            <DetailItem label="Note" value={report.note ?? "-"} longText />
+                        </DetailGrid>
+                    </DetailSection>
+
+                    {/* Un tecnico solo per report: prima era una tabella bordata di una riga dentro la
+                    card, un'altra scatola; ora due voci come il resto della scheda. */}
+                    <DetailSection title="Tecnici associati" className="self-start">
+                        {!hasTechnician ? (
+                            <p className="text-muted-foreground">Nessun tecnico associato a questo report.</p>
+                        ) : (
+                            <DetailGrid layout="rows">
+                                <DetailItem label="Tecnico" value={technicianName} />
+                                <DetailItem label="Prezzo" value={formatEuro(report.technicianPrice)} />
+                            </DetailGrid>
+                        )}
+                    </DetailSection>
+                </div>
             </div>
 
             <EditReportDialog

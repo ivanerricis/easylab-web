@@ -38,6 +38,7 @@ import { fieldProps } from "@/lib/formField";
 import type { StatusColor } from "@/lib/statusColors";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useAuth } from "@/components/use-auth";
+import { settleDialogHistory } from "@/hooks/useDialogHistoryEntry";
 
 /** Rosso per un account disabilitato: tinta della riga in tabella, striscia della scheda. */
 const getUserStatusColor = (user: UserDto): StatusColor | undefined => (user.active ? undefined : "red");
@@ -45,7 +46,7 @@ const getUserStatusColor = (user: UserDto): StatusColor | undefined => (user.act
 const ownTwoFactorResetPasswordId = "ownTwoFactorResetPassword";
 
 const UsersSettingsSection = () => {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, refresh } = useAuth();
     const [users, setUsers] = useState<UserDto[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -185,8 +186,24 @@ const UsersSettingsSection = () => {
                 userPendingTwoFactorReset.id,
                 isResettingOwnTwoFactor ? twoFactorResetPassword : undefined
             );
-            setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
             closeTwoFactorReset();
+
+            // Sul proprio account il backend ha appena chiuso tutte le sessioni, compresa questa
+            // (vedi `adminDisableTwoFactor`): la pagina resterebbe aperta su una sessione che non
+            // esiste più, e la prima azione successiva finirebbe al login senza spiegazioni.
+            // `refresh` chiede di nuovo chi è l'utente, riceve 401 e `RequireAuth` porta subito
+            // al login; il messaggio dice perché.
+            if (isResettingOwnTwoFactor) {
+                toast.success("Verifica in due passaggi disattivata. Accedi di nuovo con la tua password.");
+                // Prima si consuma la voce di cronologia del dialogo appena chiuso: il login arriva
+                // con un `replace`, che altrimenti potrebbe sostituire quella voce invece della
+                // pagina, e il `back()` del dialogo tornerebbe poi fuori posto.
+                await settleDialogHistory();
+                await refresh();
+                return;
+            }
+
+            setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
             toast.success(`Verifica in due passaggi disattivata per "${updated.username}"`);
         } catch (error) {
             const message = getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi");

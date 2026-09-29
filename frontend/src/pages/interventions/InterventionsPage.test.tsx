@@ -155,7 +155,7 @@ describe("InterventionsPage", () => {
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo intervento" }));
-        await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
             expect(toastSuccess).toHaveBeenCalledWith("Intervento #77 creato", expect.any(Object));
@@ -183,7 +183,7 @@ describe("InterventionsPage", () => {
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo intervento" }));
-        await userEvent.click(screen.getByRole("button", { name: "Invia creazione" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia creazione" }));
 
         await waitFor(() => {
             expect(submitError).toBeInstanceOf(Error);
@@ -199,7 +199,7 @@ describe("InterventionsPage", () => {
         await renderPage();
 
         await userEvent.click(within(table()).getByRole("button", { name: "Modifica intervento 9" }));
-        await userEvent.click(screen.getByRole("button", { name: "Invia modifica" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia modifica" }));
 
         await waitFor(() => {
             expect(updateIntervention).toHaveBeenCalledWith(9, formValues);

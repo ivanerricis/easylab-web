@@ -29,9 +29,16 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+// `as` per quando il titolo è davvero un titolo della pagina (es. `h2`): chi naviga per titoli
+// con lo screen reader altrimenti non lo trova. Resta un `div` di default, così le card dove il
+// titolo è solo un'etichetta non cambiano; l'aspetto lo decidono le classi, non il tag.
+function CardTitle({
+    className,
+    as: Component = "div",
+    ...props
+}: React.ComponentProps<"div"> & { as?: "div" | "h1" | "h2" | "h3" }) {
     return (
-        <div
+        <Component
             data-slot="card-title"
             className={cn(
                 "font-heading text-base leading-normal font-medium group-data-[size=sm]/card:text-sm",

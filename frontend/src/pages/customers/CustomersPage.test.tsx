@@ -41,6 +41,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import CustomersPage from "./CustomersPage";
 import { renderWithProviders } from "@/test/render";
+import { setStoredHiddenColumns } from "@/lib/theme";
 
 const customer = {
     id: 3,
@@ -70,6 +71,29 @@ beforeEach(() => {
 });
 
 describe("CustomersPage", () => {
+    /** Una lista che non si è potuta leggere non si spaccia per vuota, e si può riprovare. */
+    it("se i clienti non si caricano lo dice con 'Riprova'", async () => {
+        api.listCustomers.mockRejectedValueOnce(new Error("rete"));
+        renderWithProviders(<CustomersPage />);
+
+        expect(await within(table()).findByText("Impossibile caricare i clienti.")).toBeInTheDocument();
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Riprova" }));
+
+        expect(await within(table()).findByText("Mario")).toBeInTheDocument();
+    });
+
+    /** Il nome non si nasconde: una preferenza salvata che lo nasconde non conta più. */
+    it("mostra la colonna del nome anche se era fra le nascoste salvate", async () => {
+        setStoredHiddenColumns("customers", ["firstName", "email"]);
+        await renderPage();
+
+        expect(within(table()).getByRole("columnheader", { name: "Nome" })).toBeInTheDocument();
+        expect(within(table()).queryByRole("columnheader", { name: "Email" })).not.toBeInTheDocument();
+        // Il menu "Colonne" conta solo l'email come nascosta.
+        expect(screen.getByRole("button", { name: "Colonne, 1 nascoste" })).toBeInTheDocument();
+    });
+
     it("ordina per nome di default", async () => {
         await renderPage();
 

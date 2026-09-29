@@ -24,10 +24,14 @@ const HoverDetailCell = ({ text, detail }: HoverDetailCellProps) => {
             <PopoverTrigger asChild>
                 {/* `block max-w-full truncate`: con la tabella a larghezze fisse la cella tronca
                     il testo con i puntini, ma un bottone inline non si lascia troncare e veniva
-                    tagliato di netto sul bordo della colonna. */}
+                    tagliato di netto sul bordo della colonna.
+                    Sotto `sm` la stessa colonna è una riga di una scheda (`EntityCardList`), dove
+                    non c'è una larghezza di colonna da rispettare: lì il testo va a capo invece di
+                    finire in puntini, che su un telefono nascondevano proprio il difetto che la
+                    riga doveva mostrare. La tabella c'è solo da `sm` in su e non cambia. */}
                 <button
                     type="button"
-                    className="block max-w-full cursor-pointer truncate text-left underline decoration-muted-foreground decoration-dotted underline-offset-4"
+                    className="block max-w-full cursor-pointer truncate text-left underline decoration-muted-foreground decoration-dotted underline-offset-4 max-sm:wrap-break-word max-sm:whitespace-normal"
                 >
                     {text}
                 </button>

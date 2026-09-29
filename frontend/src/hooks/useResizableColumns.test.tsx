@@ -332,10 +332,37 @@ describe("useResizableColumns: tastiera e doppio click", () => {
     it("gli altri tasti non fanno niente", () => {
         render(<Harness />);
 
-        fireEvent.keyDown(handle("Cliente"), { key: "Enter" });
+        fireEvent.keyDown(handle("Cliente"), { key: "ArrowUp" });
+        fireEvent.keyDown(handle("Cliente"), { key: "a" });
 
         expect(widthOf("customer")).toBe(200);
         expect(stored()).toBeNull();
+    });
+
+    /** Il doppio click non ha un equivalente da mouse per chi usa la tastiera: Invio e Home lo sono. */
+    it.each(["Enter", "Home"])("%s riporta la colonna alla larghezza misurata, come il doppio click", (key) => {
+        localStorage.setItem(storageKey, JSON.stringify({ id: 60, customer: 320, device: 140 }));
+        render(<Harness />);
+
+        fireEvent.keyDown(handle("Cliente"), { key });
+
+        expect(widthOf("customer")).toBe(200);
+        expect(stored()).toEqual({ id: 60, customer: 200, device: 140 });
+    });
+
+    /** Senza un valore, lo screen reader annuncia "separatore" e basta: la larghezza non si sente mai. */
+    it("il separatore dichiara la larghezza in pixel, e la aggiorna quando cambia", () => {
+        render(<Harness />);
+
+        expect(handle("Cliente")).toHaveAttribute("aria-valuenow", "200");
+        expect(handle("Cliente")).toHaveAttribute("aria-valuemin", "56");
+        // Nessun massimo vero: la larghezza dell'intera tabella, 60 + 200 + 140 + 180.
+        expect(handle("Cliente")).toHaveAttribute("aria-valuemax", "580");
+
+        fireEvent.keyDown(handle("Cliente"), { key: "ArrowRight" });
+
+        expect(handle("Cliente")).toHaveAttribute("aria-valuenow", "216");
+        expect(handle("Cliente")).toHaveAttribute("aria-valuemax", "596");
     });
 
     it("il doppio click riporta la colonna alla larghezza misurata", () => {

@@ -1,6 +1,7 @@
 import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
 import type { InterventionCreateInput } from "@/lib/api";
+import { invalidEuroAmountMessage, parseEuroAmount } from "@/lib/euroAmount";
 import {
     getInterventionValidationError,
     isAssistanceInterventionType,
@@ -71,7 +72,8 @@ export const interventionFieldOrder = [
     "price",
 ] as const;
 
-const parsePrice = (value: string) => (value.trim() === "" ? null : Number(value));
+/** Il prezzo è facoltativo: vuoto vale "nessun prezzo" (`null`), un testo illeggibile `NaN`. */
+const parsePrice = parseEuroAmount;
 
 /**
  * Tutti gli errori dei campi dell'intervento in un colpo solo, ciascuno accanto al proprio campo.
@@ -87,7 +89,11 @@ export const validateInterventionForm = (values: InterventionFormState): Interve
 
     const price = parsePrice(values.price);
 
-    if (price != null && (!Number.isFinite(price) || price < 0)) {
+    // Un prezzo illeggibile ha il suo messaggio: prima "12,50" in un campo numerico arrivava
+    // vuoto e si salvava come nessun prezzo, senza che nessuno se ne accorgesse.
+    if (price != null && !Number.isFinite(price)) {
+        errors.price = invalidEuroAmountMessage;
+    } else if (price != null && price < 0) {
         errors.price = "Il prezzo deve essere maggiore o uguale a zero";
     }
 

@@ -68,6 +68,7 @@ const CollaboratorPage = () => {
     const {
         data: collaborator,
         isLoading: isCollaboratorLoading,
+        isReloading: isCollaboratorReloading,
         isNotFound,
         reload: reloadCollaborator,
         setData: setCollaborator,
@@ -131,7 +132,9 @@ const CollaboratorPage = () => {
         );
     }
 
-    if (isCollaboratorLoading) {
+    // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
+    // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
+    if (isCollaboratorLoading && !collaborator) {
         return <LoadingPage />;
     }
 
@@ -159,7 +162,7 @@ const CollaboratorPage = () => {
             <DetailHeader onBack={handleBack} title={collaboratorName} hideTitleOnMobile={collaborator != null}>
                 <RefreshButton
                     onRefresh={handleRefresh}
-                    isRefreshing={lists.isLoading}
+                    isRefreshing={lists.isLoading || isCollaboratorReloading}
                     label="Aggiorna i dati del collaboratore"
                 />
 
@@ -191,6 +194,9 @@ const CollaboratorPage = () => {
 
             {collaborator ? (
                 <DetailSection
+                    isBusy={isCollaboratorReloading}
+                    // Su telefono il titolo è l'`h1` della pagina: vedi `titleAs`.
+                    titleAs={isPhone ? "div" : "h2"}
                     title={
                         // Su telefono il nome sta qui invece che nell'intestazione (vedi
                         // `hideTitleOnMobile`), come nella scheda cliente: a 390px freccia, titolo e

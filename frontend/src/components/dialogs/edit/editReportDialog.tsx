@@ -15,6 +15,7 @@ import { startTransition, useEffect, useEffectEvent, useState, type ReactNode } 
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import EuroInput from "@/components/euro-input";
+import { invalidEuroAmountMessage, parseEuroAmount } from "@/lib/euroAmount";
 import { formatPersonName } from "@/lib/people";
 
 /**
@@ -232,8 +233,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         const issueId = Number(formValues.issueId);
         const collaboratorId = formValues.collaboratorId === "none" ? null : Number(formValues.collaboratorId);
         const technicianId = formValues.technicianId === "none" ? null : Number(formValues.technicianId);
-        const technicianPrice = Number(formValues.technicianPrice);
-        const internalPrice = Number(formValues.internalPrice);
+        // Qui i prezzi ci sono sempre: il campo lasciato vuoto vale 0, come prima. Un testo che
+        // non è un importo invece non diventa più 0 in silenzio (`Number("")`, o il valore vuoto
+        // che il vecchio campo numerico passava per "12,50"): ha il suo errore accanto al campo.
+        const technicianPrice = parseEuroAmount(formValues.technicianPrice) ?? 0;
+        const internalPrice = parseEuroAmount(formValues.internalPrice) ?? 0;
 
         // Tutti gli errori in una passata, ciascuno accanto al proprio campo: prima ogni
         // controllo usciva dalla funzione con un toast, quindi su un form da dodici campi si
@@ -258,11 +262,15 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             nextErrors.collaboratorId = "Per chiudere un report è necessario selezionare un collaboratore";
         }
 
-        if (!Number.isFinite(technicianPrice) || technicianPrice < 0) {
+        if (!Number.isFinite(technicianPrice)) {
+            nextErrors.technicianPrice = invalidEuroAmountMessage;
+        } else if (technicianPrice < 0) {
             nextErrors.technicianPrice = "Il prezzo del tecnico deve essere maggiore o uguale a zero";
         }
 
-        if (!Number.isFinite(internalPrice) || internalPrice < 0) {
+        if (!Number.isFinite(internalPrice)) {
+            nextErrors.internalPrice = invalidEuroAmountMessage;
+        } else if (internalPrice < 0) {
             nextErrors.internalPrice = "Il prezzo interno deve essere maggiore o uguale a zero";
         } else if (formValues.paymentMethod !== "non_paid" && internalPrice <= 0) {
             nextErrors.internalPrice = "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0";

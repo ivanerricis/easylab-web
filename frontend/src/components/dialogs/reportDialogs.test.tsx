@@ -81,7 +81,7 @@ const chooseOption = async (label: string | RegExp, option: string) => {
 /** Scrive in un campo con suggerimenti e clicca quello indicato. */
 const pickSuggestion = async (field: HTMLElement, text: string, suggestion: string) => {
     await userEvent.type(field, text);
-    await userEvent.click(await screen.findByRole("button", { name: suggestion }));
+    await userEvent.click(await screen.findByRole("option", { name: suggestion }));
 };
 
 beforeEach(() => {
@@ -462,7 +462,7 @@ describe("EditReportDialog", () => {
         expect(screen.getByLabelText("Password sblocco")).toHaveValue("0000");
         expect(screen.getByRole("combobox", { name: /^Dispositivo/ })).toHaveTextContent("Notebook");
         expect(screen.getByRole("combobox", { name: "Tecnico" })).toHaveTextContent("Paolo");
-        expect(screen.getByLabelText("Prezzo interno")).toHaveValue(80);
+        expect(screen.getByLabelText("Prezzo interno")).toHaveValue("80");
         expect(screen.getByRole("radio", { name: "Contanti" })).toBeChecked();
         expect(screen.getByRole("checkbox", { name: "Alimentatore presente" })).toBeChecked();
     });
@@ -548,7 +548,7 @@ describe("EditReportDialog", () => {
 
         await userEvent.click(screen.getByRole("radio", { name: "Non pagato" }));
 
-        expect(screen.getByLabelText("Prezzo interno")).toHaveValue(0);
+        expect(screen.getByLabelText("Prezzo interno")).toHaveValue("0");
 
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
         await waitFor(() => {

@@ -44,7 +44,11 @@ const ReportsFilters = ({
     columnsMenu,
 }: ReportsFiltersProps) => {
     const isMobile = useIsMobile(FILTERS_COMPACT_BREAKPOINT);
-    const activeFilters = [visibilityFilter !== "all", Boolean(dateFrom || dateTo)].filter(Boolean).length;
+    // Il pallino conta solo quello che l'utente ha cambiato rispetto a come si apre la pagina.
+    // La pagina parte da "Report aperti" (il default di `ReportsPage`), non da "Tutti": contare
+    // `!== "all"` mostrava "1 attivo" a chi non aveva toccato niente, e lo toglieva proprio a chi
+    // aveva scelto di vedere tutti i report.
+    const activeFilters = [visibilityFilter !== "open", Boolean(dateFrom || dateTo)].filter(Boolean).length;
 
     const visibilityControl = (variant?: "sheet") => (
         <FilterSelect

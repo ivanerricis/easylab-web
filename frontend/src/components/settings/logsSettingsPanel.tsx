@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SearchInput from "@/components/search-input";
-import EntityCardList, { type EntityCardColumn } from "@/components/entity-card-list";
+import EntityCardList, { LoadErrorState, type EntityCardColumn } from "@/components/entity-card-list";
 import TablePagination from "@/components/table-pagination";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
@@ -31,7 +31,10 @@ import { cn, formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 const minRetentionDays = 1;
 const maxRetentionDays = 90;
 
-const formatDayKey = (dayKey: string) => formatDate(`${dayKey}T00:00:00.000Z`);
+// Il giorno del file ("2026-09-20") passa com'è: `formatDate` legge una data solo-giorno come
+// mezzanotte locale. Prima diventava "…T00:00:00.000Z", mezzanotte UTC, e su un dispositivo con
+// un fuso a ovest di Greenwich il file del 20 si leggeva "19/09/2026".
+const formatDayKey = (dayKey: string) => formatDate(dayKey);
 
 const isFailedEntry = (entry: LogEntryDto) => entry.status >= 400;
 
@@ -141,6 +144,7 @@ const LogsSettingsPanel = () => {
         totalItems,
         totalPages,
         isLoading: isLoadingEntries,
+        error: entriesLoadError,
         reload: reloadEntries,
     } = usePaginatedRows<LogEntryDto>({
         fetchRows: (signal) =>
@@ -298,7 +302,16 @@ const LogsSettingsPanel = () => {
                                                 {/* Centrato nella parte visibile anche se la tabella scorre
                                                     in orizzontale: vedi lo stesso messaggio in EntityTable. */}
                                                 <span className="sticky left-1/2 inline-block -translate-x-1/2">
-                                                    Nessuna voce trovata per i criteri selezionati.
+                                                    {/* Un registro che non si è potuto leggere non è un
+                                                        registro vuoto: vedi `LoadErrorState`. */}
+                                                    {entriesLoadError ? (
+                                                        <LoadErrorState
+                                                            message={entriesLoadError}
+                                                            onRetry={() => void reloadEntries()}
+                                                        />
+                                                    ) : (
+                                                        "Nessuna voce trovata per i criteri selezionati."
+                                                    )}
                                                 </span>
                                             </TableCell>
                                         </TableRow>
@@ -333,6 +346,8 @@ const LogsSettingsPanel = () => {
                             getRowKey={(entry) => `${entry.timestamp}-${entry.ip}-${entry.action}-${entry.status}`}
                             getStatusColor={(entry) => (isFailedEntry(entry) ? "red" : undefined)}
                             emptyMessage="Nessuna voce trovata per i criteri selezionati."
+                            loadError={entriesLoadError}
+                            onRetry={() => void reloadEntries()}
                             isInitialLoading={isLoadingEntries}
                         />
 

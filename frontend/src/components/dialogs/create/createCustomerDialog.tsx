@@ -134,7 +134,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}
                             autoComplete="off"
-                            placeholder="Mario"
+                            placeholder="Es. Mario"
                             value={formValues.firstName}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, firstName: event.target.value }));
@@ -146,7 +146,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                         <Input
                             {...fieldProps("lastName")}
                             autoComplete="off"
-                            placeholder="Rossi"
+                            placeholder="Es. Rossi"
                             value={formValues.lastName}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, lastName: event.target.value }))}
                         />
@@ -156,7 +156,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                             {...fieldProps("phoneNumber", { error: errors.phoneNumber, required: true })}
                             type="tel"
                             autoComplete="off"
-                            placeholder="333 1234567"
+                            placeholder="Es. 333 1234567"
                             value={formValues.phoneNumber}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, phoneNumber: event.target.value }));
@@ -169,7 +169,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                             {...fieldProps("phoneNumberSecondary")}
                             type="tel"
                             autoComplete="off"
-                            placeholder="333 9876543"
+                            placeholder="Es. 333 9876543"
                             value={formValues.phoneNumberSecondary}
                             onChange={(event) =>
                                 setFormValues((prev) => ({ ...prev, phoneNumberSecondary: event.target.value }))
@@ -181,7 +181,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                             {...fieldProps("email", { error: errors.email })}
                             type="email"
                             autoComplete="off"
-                            placeholder="mario.rossi@email.com"
+                            placeholder="Es. mario.rossi@email.com"
                             value={formValues.email}
                             onChange={(event) => {
                                 setFormValues((prev) => ({ ...prev, email: event.target.value }));
@@ -193,7 +193,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
                         <Input
                             {...fieldProps("city")}
                             autoComplete="off"
-                            placeholder="Roma"
+                            placeholder="Es. Roma"
                             value={formValues.city}
                             onChange={(event) => setFormValues((prev) => ({ ...prev, city: event.target.value }))}
                         />

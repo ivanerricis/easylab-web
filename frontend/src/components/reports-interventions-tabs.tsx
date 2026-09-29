@@ -107,6 +107,8 @@ const ReportsInterventionsTabs = ({
                         onRowOpen={(row) => onOpenReport(row.id)}
                         isInitialLoading={reports.isInitialLoading}
                         isRefetching={reports.isRefetching}
+                        loadError={reports.error}
+                        onRetry={() => void reports.reload()}
                         skeletonRowCount={reports.pageSize}
                     />
                 </div>
@@ -140,6 +142,8 @@ const ReportsInterventionsTabs = ({
                         onRowOpen={(row) => onOpenIntervention(row.id)}
                         isInitialLoading={interventions.isInitialLoading}
                         isRefetching={interventions.isRefetching}
+                        loadError={interventions.error}
+                        onRetry={() => void interventions.reload()}
                         skeletonRowCount={interventions.pageSize}
                     />
                 </div>

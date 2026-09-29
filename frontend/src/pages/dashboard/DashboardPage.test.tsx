@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,6 +90,24 @@ vi.mock("@/pages/calendar/components/interventions-calendar", async () => {
     return { default: CalendarStub };
 });
 
+/**
+ * I dialoghi di creazione hanno i loro test: qui sono pulsanti che consegnano i valori scelti dal
+ * test, e che esistono solo a dialogo aperto (la pagina li carica pigramente alla prima apertura).
+ */
+vi.mock("@/components/dialogs/create/createReportDialog", () => ({
+    default: ({ open, onSubmit }: { open: boolean; onSubmit: (values: unknown) => Promise<void> }) =>
+        open ? <button onClick={() => void onSubmit({})}>Invia report</button> : null,
+}));
+
+vi.mock("@/components/dialogs/create/createInterventionDialog", () => ({
+    default: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Nuovo intervento" /> : null),
+}));
+
+vi.mock("@/lib/reportForm", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/reportForm")>("@/lib/reportForm");
+    return { ...actual, resolveReportReferences: vi.fn().mockResolvedValue({}), toReportCreatePayload: () => ({}) };
+});
+
 import DashboardPage from "./DashboardPage";
 import { renderWithProviders } from "@/test/render";
 
@@ -127,7 +145,7 @@ describe("DashboardPage", () => {
     it("mostra i contatori del mese corrente", async () => {
         await renderPage();
 
-        expect(api.getReportStats).toHaveBeenCalledWith("2026-09");
+        expect(api.getReportStats).toHaveBeenCalledWith("2026-09", expect.any(AbortSignal));
         for (const [label, value] of [
             ["Report aperti", "12"],
             ["Report chiusi", "30"],
@@ -194,7 +212,7 @@ describe("DashboardPage", () => {
         await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
 
         await waitFor(() => {
-            expect(api.getReportStats).toHaveBeenLastCalledWith("2026-08");
+            expect(api.getReportStats).toHaveBeenLastCalledWith("2026-08", expect.any(AbortSignal));
         });
         expect(within(dialog).getByText("agosto 2026")).toBeInTheDocument();
         expect(within(dialog).getByRole("button", { name: "Mese successivo" })).toBeEnabled();
@@ -257,7 +275,9 @@ describe("DashboardPage", () => {
         await waitFor(() => {
             expect(api.listInterventions).toHaveBeenCalledTimes(2);
         });
-        expect(api.getReportStats).toHaveBeenCalledTimes(2);
+        // Un intervento cambia i contatori degli interventi, non gli incassi dei report.
+        expect(api.getInterventionStats).toHaveBeenCalledTimes(2);
+        expect(api.getReportStats).toHaveBeenCalledTimes(1);
         expect(toastSuccess).toHaveBeenCalledWith("Intervento #77 creato", expect.any(Object));
         expect(openPrintWindow).not.toHaveBeenCalled();
     });
@@ -273,5 +293,141 @@ describe("DashboardPage", () => {
             expect(interventionError).toBeInstanceOf(Error);
         });
         expect(toastError).not.toHaveBeenCalled();
+    });
+
+    /** Il focus entra nel dialogo: prima restava sulla scheda sotto il velo, fuori dal dialogo. */
+    it("aprendo gli incassi il focus va sul dialogo, non sulla freccia del mese", async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+        expect(dialog).toHaveFocus();
+    });
+
+    /** I contatori degli interventi non dipendono dal mese degli incassi. */
+    it("cambiando mese non richiede i contatori degli interventi", async () => {
+        await renderPage();
+        expect(api.getInterventionStats).toHaveBeenCalledTimes(1);
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        await userEvent.click(screen.getByRole("button", { name: "Mese precedente" }));
+
+        await waitFor(() => {
+            expect(api.getReportStats).toHaveBeenLastCalledWith("2026-08", expect.any(AbortSignal));
+        });
+        expect(api.getInterventionStats).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * Due clic veloci sulla freccia: la risposta di agosto arriva dopo quella di luglio, e prima
+     * scriveva i suoi incassi sotto l'etichetta di luglio.
+     */
+    it("sfogliando in fretta vale solo la risposta dell'ultimo mese scelto", async () => {
+        await renderPage();
+        const pending = new Map<string, (value: unknown) => void>();
+        api.getReportStats.mockImplementation((month: string) => new Promise((resolve) => pending.set(month, resolve)));
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+        await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
+        expect(within(dialog).getByText("luglio 2026")).toBeInTheDocument();
+
+        await act(async () => {
+            pending.get("2026-07")?.({ ...reportStats, monthlyRevenue: 700, monthlyNetRevenue: 600 });
+        });
+        await act(async () => {
+            pending.get("2026-08")?.({ ...reportStats, monthlyRevenue: 800, monthlyNetRevenue: 750 });
+        });
+
+        expect(within(dialog).getByText("luglio 2026")).toBeInTheDocument();
+        expect(within(dialog).getByText(/^700,00/)).toBeInTheDocument();
+        expect(within(dialog).queryByText(/^800,00/)).not.toBeInTheDocument();
+    });
+
+    it("sfogliando i mesi annulla la richiesta del mese superato", async () => {
+        await renderPage();
+        const signals = new Map<string, AbortSignal>();
+        api.getReportStats.mockImplementation((month: string, signal: AbortSignal) => {
+            signals.set(month, signal);
+            return new Promise(() => {});
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+        await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
+
+        expect(signals.get("2026-08")?.aborted).toBe(true);
+        expect(signals.get("2026-07")?.aborted).toBe(false);
+    });
+
+    /** Su errore l'etichetta torna al mese dei numeri a schermo, invece di mentire. */
+    it("se il mese scelto non si carica, l'etichetta torna al mese caricato", async () => {
+        await renderPage();
+        api.getReportStats.mockRejectedValue(new Error("Database non raggiungibile"));
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+        await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Database non raggiungibile");
+        });
+        expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
+        expect(within(dialog).getByText(/^1520,50/)).toBeInTheDocument();
+        // Un solo tentativo: tornare al mese caricato non deve far partire un'altra richiesta.
+        expect(api.getReportStats).toHaveBeenCalledTimes(2);
+    });
+
+    /** Senza dati il riquadro dice "—", non "0,00 €": un mese vuoto e un errore non si confondono. */
+    it("se i dati non arrivano mostra un trattino, non zero", async () => {
+        api.getReportStats.mockRejectedValue(new Error("Database non raggiungibile"));
+        api.getInterventionStats.mockRejectedValue(new Error("Database non raggiungibile"));
+        renderWithProviders(<DashboardPage />);
+
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: /Report aperti/ })).toHaveTextContent("—");
+        });
+        expect(screen.getByRole("button", { name: /Interventi completati/ })).toHaveTextContent("—");
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
+        expect(within(dialog).queryByText(/0,00/)).not.toBeInTheDocument();
+        expect(within(dialog).getAllByText("—")).toHaveLength(2);
+    });
+
+    /** Il dialogo si scarica alla prima apertura: le scorciatoie devono aprirlo lo stesso. */
+    it.each([
+        ["r", "Invia report"],
+        ["i", "Nuovo intervento"],
+    ])("la scorciatoia %s apre il dialogo di creazione", async (key, name) => {
+        await renderPage();
+
+        await userEvent.keyboard(key);
+
+        expect(await screen.findByRole(key === "r" ? "button" : "dialog", { name })).toBeInTheDocument();
+    });
+
+    it("dopo aver creato un report ricarica gli incassi del mese scelto", async () => {
+        api.createReport.mockResolvedValue({ id: 5 });
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /Incassi mese/ }));
+        await userEvent.click(screen.getByRole("button", { name: "Mese precedente" }));
+        await waitFor(() => {
+            expect(api.getReportStats).toHaveBeenLastCalledWith("2026-08", expect.any(AbortSignal));
+        });
+        await userEvent.keyboard("{Escape}");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report" }));
+        await userEvent.click(await screen.findByRole("button", { name: "Invia report" }));
+
+        await waitFor(() => {
+            expect(toastSuccess).toHaveBeenCalledWith("Report #5 creato", expect.any(Object));
+        });
+        expect(api.getReportStats).toHaveBeenLastCalledWith("2026-08", expect.any(AbortSignal));
+        expect(api.getReportStats).toHaveBeenCalledTimes(3);
     });
 });

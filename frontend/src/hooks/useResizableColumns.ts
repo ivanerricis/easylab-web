@@ -398,10 +398,34 @@ export const useResizableColumns = ({
 
             const currentWidth = () => widthsRef.current[columnKey] ?? naturalWidths[columnKey];
 
+            // Torna alla larghezza naturale togliendo la voce scelta dall'utente: la colonna
+            // ricade sulla misura presa in questo mount, che il salvataggio successivo congela
+            // insieme al resto del layout. Un secondo ripristino, più avanti, la riporta alla
+            // naturale di allora.
+            const resetWidth = () => {
+                const nextWidths = { ...widthsRef.current };
+
+                delete nextWidths[columnKey];
+                widthsRef.current = nextWidths;
+                setWidths(nextWidths);
+                persistWidths();
+            };
+
+            // Un separatore che si può mettere a fuoco è un controllo con un valore: senza
+            // `aria-valuenow` lo screen reader annuncia "separatore" e basta, e chi usa le frecce
+            // non sente mai quanto è larga la colonna. Valori in pixel, letti dallo stato (non dal
+            // ref) perché qui siamo nel render. Un vero massimo non c'è: si dichiara la larghezza
+            // di tutta la tabella, che non è mai minore di quella della colonna.
+            const width = widths[columnKey] ?? naturalWidths[columnKey];
+            const tableWidth = columnKeys.reduce((total, key) => total + (widths[key] ?? naturalWidths[key] ?? 0), 0);
+
             return {
                 role: "separator" as const,
                 "aria-orientation": "vertical" as const,
                 "aria-label": `Ridimensiona colonna ${columnLabel}`,
+                "aria-valuenow": width,
+                "aria-valuemin": minColumnWidth,
+                "aria-valuemax": Math.max(width, tableWidth),
                 tabIndex: 0,
                 onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
                     if (event.button !== 0) {
@@ -443,6 +467,14 @@ export const useResizableColumns = ({
                     persistWidths();
                 },
                 onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => {
+                    // Invio e Home fanno da tastiera quello che fa il doppio click col mouse,
+                    // che altrimenti non aveva equivalente.
+                    if (event.key === "Enter" || event.key === "Home") {
+                        event.preventDefault();
+                        resetWidth();
+                        return;
+                    }
+
                     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
                         return;
                     }
@@ -453,21 +485,11 @@ export const useResizableColumns = ({
                 },
                 onDoubleClick: (event: ReactPointerEvent<HTMLElement>) => {
                     event.stopPropagation();
-
-                    // Torna alla larghezza naturale togliendo la voce scelta dall'utente: la
-                    // colonna ricade sulla misura presa in questo mount, che il salvataggio
-                    // successivo congela insieme al resto del layout. Un secondo doppio click,
-                    // più avanti, la riporta alla naturale di allora.
-                    const nextWidths = { ...widthsRef.current };
-
-                    delete nextWidths[columnKey];
-                    widthsRef.current = nextWidths;
-                    setWidths(nextWidths);
-                    persistWidths();
+                    resetWidth();
                 },
             };
         },
-        [applyWidth, elasticColumnKey, naturalWidths, persistWidths]
+        [applyWidth, columnKeys, elasticColumnKey, naturalWidths, persistWidths, widths]
     );
 
     /**

@@ -1,7 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { memo, useId, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import StatusBadge from "@/components/status-badge";
 import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { isStatusColor, statusStyles } from "@/lib/statusColors";
@@ -58,6 +59,12 @@ type EntityCardListProps<T> = {
     getStatusColor?: (row: T) => string | undefined;
     renderActions?: (row: T) => ReactNode;
     emptyMessage: string;
+    /**
+     * Il messaggio dell'ultimo caricamento fallito (`error` di `usePaginatedRows`): senza righe,
+     * va al posto di `emptyMessage`, con "Riprova" se c'è `onRetry`. Vedi `LoadErrorState`.
+     */
+    loadError?: string | null;
+    onRetry?: () => void;
     /** Primo caricamento: schede-scheletro invece di un vuoto che poi salta. */
     isInitialLoading?: boolean;
     skeletonCardCount?: number;
@@ -165,7 +172,9 @@ const EntityCardImpl = <T,>({
                             #{idColumn?.render(row)}
                         </p>
                     ) : null}
-                    <h3 className="text-base leading-snug font-semibold break-words">{renderTitle()}</h3>
+                    {/* `h2` e non `h3`: nelle liste il titolo sopra è l'`h1` della pagina, e un
+                        salto di livello fa credere a chi naviga per titoli che manchi un pezzo. */}
+                    <h2 className="text-base leading-snug font-semibold break-words">{renderTitle()}</h2>
                 </div>
                 {badgeColumn ? (
                     <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>
@@ -241,6 +250,26 @@ const EntityCardImpl = <T,>({
 // `memo` da solo non capisce i generici: il cast riporta il tipo che ha `EntityCardImpl`.
 const EntityCard = memo(EntityCardImpl, areCardPropsEqual) as typeof EntityCardImpl;
 
+/**
+ * "Impossibile caricare …" con il pulsante "Riprova", al posto del messaggio di lista vuota.
+ *
+ * Prima una lista che non si era potuta leggere (rete assente, server fermo) e una lista
+ * davvero vuota erano la stessa cosa a schermo: sparito il toast, restava "Nessun report
+ * disponibile.", che è un'affermazione falsa, e per riprovare bisognava ricaricare l'intera
+ * applicazione. Condiviso fra la tabella (`EntityTable`) e le schede, che lo mostrano uguale.
+ */
+export const LoadErrorState = ({ message, onRetry }: { message: string; onRetry?: () => void }) => (
+    <div className="flex flex-col items-center gap-3 text-center">
+        <p className="font-medium text-foreground">{message}.</p>
+        {onRetry ? (
+            <Button type="button" variant="outline" onClick={onRetry}>
+                <RefreshCw />
+                Riprova
+            </Button>
+        ) : null}
+    </div>
+);
+
 const EntityCardList = <T,>({
     className,
     columns,
@@ -249,6 +278,8 @@ const EntityCardList = <T,>({
     getStatusColor,
     renderActions,
     emptyMessage,
+    loadError,
+    onRetry,
     isInitialLoading = false,
     skeletonCardCount = 3,
     hiddenFromClassName = "sm:hidden",
@@ -294,7 +325,7 @@ const EntityCardList = <T,>({
     if (rows.length === 0) {
         return (
             <div className={cn("py-6 text-center text-sm text-muted-foreground", hiddenFromClassName, className)}>
-                {emptyMessage}
+                {loadError ? <LoadErrorState message={loadError} onRetry={onRetry} /> : emptyMessage}
             </div>
         );
     }

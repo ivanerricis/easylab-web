@@ -57,7 +57,12 @@ const reportErrors = (nextErrors: EmailFieldErrors, setErrors: (errors: EmailFie
     return true;
 };
 
-const EmailSettingsPanel = () => {
+type Props = {
+    /** Chiamata a ogni cambio di "ci sono modifiche non salvate", e con `false` allo smontaggio. */
+    onDirtyChange?: (isDirty: boolean) => void;
+};
+
+const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
@@ -68,6 +73,15 @@ const EmailSettingsPanel = () => {
     const [errors, setErrors] = useState<EmailFieldErrors>({});
 
     const isDirty = isSettingsFormDirty(formValues, savedValues, ["password"]);
+
+    // La pagina Impostazioni chiede conferma prima di lasciare la sezione con modifiche non
+    // salvate: le serve sapere quando il modulo è diverso da quanto salvato. Allo smontaggio
+    // (sezione cambiata) non ci sono più modifiche in sospeso.
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+    }, [isDirty, onDirtyChange]);
+
+    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
     const loadSettings = async () => {
         setIsLoading(true);

@@ -118,16 +118,15 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     const [rowToDelete, setRowToDelete] = useState<TRow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [pageSize, setStoredPageSize] = useTableRowsPerPage(tableKey);
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } = useSearchableRows<TRow>(
-        {
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
+        useSearchableRows<TRow>({
             fetchRows: listRows,
             searchText: committedSearchText,
             currentPage,
             pageSize,
             errorMessage: loadErrorMessage,
             onPageOutOfRange: setCurrentPage,
-        }
-    );
+        });
 
     // Lista vuota e ricerca senza esiti hanno frasi diverse: vedi `resolveEmptyListMessage`.
     const resolvedEmptyMessage = resolveEmptyListMessage({ emptyMessage, searchText: committedSearchText });
@@ -238,6 +237,8 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                         isRowLocked={isRowLocked}
                         isInitialLoading={isInitialLoading}
                         isRefetching={isRefetching}
+                        loadError={error}
+                        onRetry={() => void reload()}
                         skeletonRowCount={pageSize}
                     />
                 </div>

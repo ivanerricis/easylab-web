@@ -48,6 +48,18 @@
     padding: 2px 6px;
 }
 
+/* Gli eventi ora si raggiungono con Tab (vedi `CalendarEventWrapper`): l'anello è quello del resto
+   dell'app e solo da tastiera, al posto del contorno azzurro della libreria, che compariva anche
+   al click del mouse. */
+.rbc-event:focus {
+    outline: none;
+}
+
+.rbc-event:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+}
+
 /* Il blu dei testi (`--primary-text`), non quello dei pulsanti: in scuro `--primary` su card era
    a 3,54:1, sotto il 4,5:1 di un testo piccolo come questo. */
 .rbc-show-more {
@@ -88,17 +100,6 @@
     color: var(--foreground);
 }
 
-/*
- * Nell'agenda il titolo dell'evento va a capo invece di troncarsi. `CalendarEventPopover` lo
- * rende con `truncate`, che nelle celle del mese serve; ma la tabella dell'agenda non ha
- * larghezze fisse, quindi una riga che non può andare a capo allargava la colonna oltre il
- * riquadro e su mobile il nome dell'intervento usciva tagliato a destra.
- */
-.rbc-agenda-view .rbc-agenda-event-cell > span {
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-
 @media (max-width: 640px) {
     /*
      * Il popup "+N altri" è posizionato dalla libreria dentro il calendario, che su mobile è largo
@@ -115,8 +116,23 @@
         max-height: min(70dvh, calc(100dvh - 8rem));
     }
 
+    /*
+     * Sotto i 640px le sette colonne restano larghe 640px e la griglia scorre in orizzontale. Scorre
+     * solo la vista, non tutto il riquadro: prima lo scorrimento stava sul contenitore del
+     * calendario e si portava via anche la barra con frecce e viste, che usciva dallo schermo
+     * appena si scorreva la griglia. La larghezza minima va sulle righe, non sulla vista, perché
+     * è la vista a scorrere.
+     */
     .rbc-month-view,
     .rbc-time-view {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    .rbc-month-view > .rbc-month-header,
+    .rbc-month-view > .rbc-month-row,
+    .rbc-time-view > .rbc-time-header,
+    .rbc-time-view > .rbc-time-content {
         min-width: 640px;
     }
 

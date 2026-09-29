@@ -32,6 +32,12 @@ type EntityCrudTableProps<TRow extends { id: number }> = {
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
+    /**
+     * L'ultimo caricamento fallito e come riprovarlo: senza righe la tabella mostra l'errore
+     * con "Riprova" invece del messaggio di lista vuota. Vedi `loadError` in `EntityTable`.
+     */
+    loadError?: string | null;
+    onRetry?: () => void;
     skeletonRowCount?: number;
 };
 
@@ -57,6 +63,8 @@ const EntityCrudTable = <TRow extends { id: number }>({
     isRowLocked,
     isInitialLoading,
     isRefetching,
+    loadError,
+    onRetry,
     skeletonRowCount,
 }: EntityCrudTableProps<TRow>) => {
     const navigate = useNavigate();
@@ -109,6 +117,8 @@ const EntityCrudTable = <TRow extends { id: number }>({
             onRowOpen={getOpenPath ? (row) => void navigate(getOpenPath(row.id)) : undefined}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
+            loadError={loadError}
+            onRetry={onRetry}
             skeletonRowCount={skeletonRowCount}
         />
     );

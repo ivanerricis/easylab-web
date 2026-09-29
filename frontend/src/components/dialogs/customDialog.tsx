@@ -1,8 +1,9 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import type { LucideIcon } from "lucide-react";
+import { useDialogHistoryEntry } from "@/hooks/useDialogHistoryEntry";
 
 type Props = Readonly<{
     content?: ReactNode;
@@ -91,6 +92,51 @@ const CustomDialog = ({
         onOpenChange?.(false);
     };
 
+    // "Indietro" del telefono o del browser chiude il dialogo, con le stesse regole di Esc e
+    // del clic fuori: la domanda se il modulo è sporco, niente se un'operazione in corso
+    // (`preventOutsideClose`) non lo permette. Con la domanda già aperta, un secondo Indietro
+    // vale "Continua a modificare": è il gesto di chi vuole uscire dalla domanda, non dal
+    // modulo. In tutti i casi in cui il dialogo resta aperto la voce della cronologia si
+    // rimette (vedi `useDialogHistoryEntry`).
+    useDialogHistoryEntry(open === true, () => {
+        if (isDiscardConfirmOpen) {
+            setIsDiscardConfirmOpen(false);
+            return true;
+        }
+
+        if (preventOutsideClose) {
+            return true;
+        }
+
+        if (isDirty) {
+            setIsDiscardConfirmOpen(true);
+            return true;
+        }
+
+        onOpenChange?.(false);
+        return false;
+    });
+
+    // Chiudere la scheda o ricaricare con un modulo sporco: la domanda del browser, l'unica
+    // possibile lì (il testo lo decide lui). Senza, un F5 o un tocco di troppo sulla X della
+    // scheda buttava via il report senza chiedere niente.
+    const guardsUnload = open === true && isDirty;
+
+    useEffect(() => {
+        if (!guardsUnload) {
+            return;
+        }
+
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            // I browser più vecchi chiedono conferma solo con `returnValue` impostato.
+            event.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [guardsUnload]);
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
@@ -111,6 +157,16 @@ const CustomDialog = ({
                     // un `Input` semplice (la password) e i menu a tendina restavano ai 36px di
                     // serie, e sulla stessa griglia si vedeva lo scalino.
                     "**:data-[slot=input]:h-10 **:data-[slot=select-trigger]:data-[size=default]:h-10",
+                    // Mai più alto dello schermo: una colonna flex alta al massimo lo schermo meno
+                    // 1rem per lato (il limite di `DialogContent`, ripetuto qui perché è su questo
+                    // che conta il layout), in cui scorre solo il corpo (vedi sotto) e titolo e
+                    // pulsanti restano sempre visibili. Prima il dialogo era alto quanto il contenuto e,
+                    // centrato con `-translate-y-1/2`, usciva da entrambi i lati: "Nuovo cliente"
+                    // a 360×640 andava da −63 a 703px, con il titolo e "Salva" fuori schermo e
+                    // irraggiungibili (lo scroll della pagina sotto è bloccato). I dialoghi a
+                    // passi, che su telefono fissano un'altezza loro, restano come sono: la loro
+                    // è già entro questo limite.
+                    "flex max-h-[calc(100dvh-2rem)] flex-col",
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}
@@ -143,12 +199,12 @@ const CustomDialog = ({
                     scritti per quei casi non comparivano mai.
                 */}
                 {/* Colonna flex: di solito non cambia niente (il form è alto quanto il contenuto),
-                    ma quando un dialogo ha un'altezza fissa (i dialoghi a passi su telefono) il
-                    contenuto può prendere lo spazio che resta e scorrere, con i pulsanti fermi in
-                    fondo. */}
+                    ma quando il dialogo tocca il limite dello schermo, o ha un'altezza fissa (i
+                    dialoghi a passi su telefono), il contenuto prende lo spazio che resta e
+                    scorre, con i pulsanti fermi in fondo. */}
                 <form
                     noValidate
-                    className="flex min-h-0 flex-col"
+                    className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
                         onConfirm?.();
@@ -176,7 +232,12 @@ const CustomDialog = ({
                         {description ? <DialogDescription>{description}</DialogDescription> : null}
                     </DialogHeader>
 
-                    {content}
+                    {/* Il corpo è la sola parte che scorre, quando il dialogo tocca il limite
+                        dello schermo. `-m-1 p-1`: `overflow` taglia anche in orizzontale, e senza
+                        quei 4px di margine l'anello del focus e quello rosso dei campi invalidi
+                        (3px) restavano tagliati sui bordi. `flex-col` perché i contenuti dei
+                        dialoghi a passi prendono con `flex-1` lo spazio che resta. */}
+                    <div className="-m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1">{content}</div>
 
                     {(showCancelButton || showConfirmButton) && (
                         <DialogFooter className={cn("mt-2", footerClassName)}>

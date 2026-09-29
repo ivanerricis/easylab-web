@@ -188,6 +188,20 @@ describe("SimpleEntityPage", () => {
         });
     });
 
+    /** Una lista che non si è potuta leggere non si spaccia per vuota, e si può riprovare. */
+    it("se la lista non si carica lo dice con 'Riprova' invece del messaggio di lista vuota", async () => {
+        listDevices.mockRejectedValueOnce(new Error("rete")).mockResolvedValueOnce(page(devices));
+        renderWithProviders(<DevicesPage />);
+
+        expect(await within(table()).findByText("Impossibile caricare i dispositivi.")).toBeInTheDocument();
+        expect(screen.queryByText("Nessun dispositivo disponibile.")).not.toBeInTheDocument();
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Riprova" }));
+
+        expect(await within(table()).findByText("Notebook")).toBeInTheDocument();
+        expect(listDevices).toHaveBeenCalledTimes(2);
+    });
+
     it("non offre modifica ed eliminazione per le righe bloccate", async () => {
         listIssues.mockResolvedValue(
             page([

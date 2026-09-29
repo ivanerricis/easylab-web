@@ -84,8 +84,13 @@ export const SettingsCard = ({
                         di index.css): a 14px/500 il titolo della card pesava meno dei titoli dei
                         `SettingsGroup` che contiene (14px/600). Scritto come `text-lg` e non come
                         `text-section` perché tailwind-merge non conosce le misure con nome, prende
-                        `text-section` per un colore e non toglie il `text-sm` di CardTitle. */}
-                    <CardTitle className="text-lg font-semibold group-data-[size=sm]/card:text-lg">{title}</CardTitle>
+                        `text-section` per un colore e non toglie il `text-sm` di CardTitle.
+                        `h2` perché è davvero il titolo di una sezione, sotto l'`h1` (nascosto) di
+                        SettingsPage: da `div` lo screen reader non lo trovava navigando per titoli.
+                        Le classi sono le stesse, quindi a vista non cambia niente. */}
+                    <CardTitle as="h2" className="text-lg font-semibold group-data-[size=sm]/card:text-lg">
+                        {title}
+                    </CardTitle>
                     {description ? (
                         <CardDescription className={descriptionVisibility(keepDescriptionOnMobile)}>
                             {description}

@@ -94,6 +94,14 @@ describe("api report", () => {
         const get = vi.spyOn(api, "get").mockResolvedValue({ data: { openCount: 3 } });
 
         await expect(getReportStats("2026-09")).resolves.toEqual({ openCount: 3 });
-        expect(get).toHaveBeenCalledWith("/reports/stats", { params: { month: "2026-09" } });
+        expect(get).toHaveBeenCalledWith("/reports/stats", { params: { month: "2026-09" }, signal: undefined });
+    });
+
+    it("passa il segnale di annullamento alla richiesta delle statistiche", async () => {
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: { openCount: 3 } });
+        const signal = new AbortController().signal;
+
+        await getReportStats("2026-09", signal);
+        expect(get).toHaveBeenCalledWith("/reports/stats", { params: { month: "2026-09" }, signal });
     });
 });

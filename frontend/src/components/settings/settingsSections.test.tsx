@@ -146,6 +146,30 @@ describe("UsersSettingsSection", () => {
         await waitFor(() => {
             expect(api.disableUserTwoFactor).toHaveBeenCalledWith(1, "segreta1!");
         });
+        // Il backend ha chiuso anche questa sessione: `refresh` riceve 401 e si torna al login.
+        await waitFor(() => {
+            expect(refresh).toHaveBeenCalledTimes(1);
+        });
+        expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Accedi di nuovo"));
+    });
+
+    /** Sbloccare un altro utente non tocca la propria sessione: niente ritorno al login. */
+    it("togliere la 2FA di un altro aggiorna solo la riga", async () => {
+        const luigiWithTwoFactor = { ...luigi, twoFactorEnabled: true };
+        api.listUsers.mockResolvedValue([admin, luigiWithTwoFactor]);
+        api.disableUserTwoFactor.mockResolvedValue(luigi);
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Disattiva 2FA" }));
+        const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
+
+        await waitFor(() => {
+            expect(toast.success).toHaveBeenCalledWith('Verifica in due passaggi disattivata per "luigi"');
+        });
+        expect(api.disableUserTwoFactor).toHaveBeenCalledWith(2, undefined);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     /** La password rifiutata dal server (400) riguarda il campo: va sotto, e il dialogo resta aperto. */
@@ -188,7 +212,7 @@ describe("UsersSettingsSection", () => {
 
         const cards = Array.from(container.querySelectorAll("article"));
         const cardOf = (username: string) =>
-            cards.find((card) => card.querySelector("h3")?.textContent?.startsWith(username));
+            cards.find((card) => card.querySelector("h2")?.textContent?.startsWith(username));
         expect(cardOf("luigi")?.querySelector(".bg-status-red")).not.toBeNull();
         expect(cardOf("admin")?.querySelector(".bg-status-red")).toBeNull();
         expect(within(cardOf("luigi")!).getByText("disabilitato")).toBeInTheDocument();
@@ -523,6 +547,20 @@ describe("EmailSettingsPanel", () => {
         await userEvent.type(screen.getByLabelText("Password"), "nuova");
 
         expect(saveButton()).toBeEnabled();
+    });
+
+    /** Anche una password nuova è una modifica: la pagina chiede prima di lasciare la sezione. */
+    it("segnala alla pagina le modifiche non salvate, password compresa", async () => {
+        const onDirtyChange = vi.fn();
+        renderWithUser(<EmailSettingsPanel onDirtyChange={onDirtyChange} />);
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Host SMTP/)).toHaveValue("smtp.example.com");
+        });
+        expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+        await userEvent.type(screen.getByLabelText("Password"), "nuova");
+
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
     });
 
     it("rifiuta un mittente non valido", async () => {

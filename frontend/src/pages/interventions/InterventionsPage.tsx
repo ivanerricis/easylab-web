@@ -1,10 +1,6 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import CreateInterventionDialog, {
-    type CreateInterventionSubmitValues,
-} from "@/components/dialogs/create/createInterventionDialog";
-import EditInterventionDialog, {
-    type EditInterventionSubmitValues,
-} from "@/components/dialogs/edit/editInterventionDialog";
+import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
+import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CustomDialog from "@/components/dialogs/customDialog";
 import PageHeader from "@/components/page-header";
@@ -20,7 +16,7 @@ import {
     sendInterventionEmail,
     updateIntervention,
 } from "@/lib/api";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { InterventionDto } from "@/types/dtos";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { toInterventionCreatePayload, toInterventionUpdatePayload } from "@/lib/interventionForm";
@@ -46,12 +42,29 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
 import { showCreatedToast } from "@/lib/createdToast";
 import { Mail } from "lucide-react";
 
 const statusFilters: InterventionStatusFilter[] = ["all", "programmato", "in_lavorazione", "completato"];
+/**
+ * I dialoghi di creazione e modifica si scaricano solo quando servono, non con la pagina (vedi
+ * `lazyWithPrefetch`): quello di creazione già al passaggio del mouse o al focus su "Crea
+ * nuovo…", entrambi a pagina ferma.
+ */
+const { Component: CreateInterventionDialog, prefetch: prefetchCreateInterventionDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/create/createInterventionDialog")
+);
+const { Component: EditInterventionDialog, prefetch: prefetchEditInterventionDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/edit/editInterventionDialog")
+);
+const prefetchInterventionDialogs = () => {
+    prefetchCreateInterventionDialog();
+    prefetchEditInterventionDialog();
+};
+
 const typeFilters: InterventionTypeFilter[] = ["all", "consegna_materiale", "intervento_sede", "intervento_remoto"];
 const sortOptionValues = interventionSortOptions.map((option) => option.value);
 
@@ -64,6 +77,8 @@ const InterventionsPage = () => {
     // separati che ogni `onOpenChange` doveva azzerare insieme.
     const [interventionToEdit, setInterventionToEdit] = useState<InterventionDto | null>(null);
     const [interventionToDelete, setInterventionToDelete] = useState<InterventionDto | null>(null);
+    const hasOpenedCreateDialog = useHasBeenOpen(isCreateDialogOpen);
+    const hasOpenedEditDialog = useHasBeenOpen(interventionToEdit != null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [interventionIdToEmail, setInterventionIdToEmail] = useState<number | null>(null);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -84,19 +99,32 @@ const InterventionsPage = () => {
         updateParams({ [listUrlParams.search]: value })
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("interventions");
-    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("interventions");
-    const { interventionRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadInterventions } =
-        useInterventionsRows({
-            searchText: committedSearchText,
-            statusFilter,
-            typeFilter,
-            sortOption,
-            dateFrom,
-            dateTo,
-            currentPage,
-            pageSize,
-            onPageOutOfRange: setCurrentPage,
-        });
+    const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns(
+        "interventions",
+        interventionColumns
+    );
+    const {
+        interventionRows,
+        totalItems,
+        totalPages,
+        isLoading,
+        isInitialLoading,
+        isRefetching,
+        loadError,
+        loadInterventions,
+    } = useInterventionsRows({
+        searchText: committedSearchText,
+        statusFilter,
+        typeFilter,
+        sortOption,
+        dateFrom,
+        dateTo,
+        currentPage,
+        pageSize,
+        onPageOutOfRange: setCurrentPage,
+    });
+
+    usePrefetchWhenIdle(prefetchInterventionDialogs);
 
     const handleSortOptionChange = (value: InterventionSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_INTERVENTION_SORT_OPTION ? null : value });
@@ -201,27 +229,40 @@ const InterventionsPage = () => {
                     title="Interventi"
                     description="Gestisci consegne materiale e interventi in sede o da remoto."
                     action={
-                        <CreateEntityButton label="Crea nuovo intervento" onClick={() => setIsCreateDialogOpen(true)} />
+                        <CreateEntityButton
+                            label="Crea nuovo intervento"
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            onPointerEnter={prefetchCreateInterventionDialog}
+                            onFocus={prefetchCreateInterventionDialog}
+                        />
                     }
                 />
 
-                <CreateInterventionDialog
-                    open={isCreateDialogOpen}
-                    onOpenChange={setIsCreateDialogOpen}
-                    onSubmit={handleCreateIntervention}
-                />
+                {hasOpenedCreateDialog ? (
+                    <Suspense fallback={null}>
+                        <CreateInterventionDialog
+                            open={isCreateDialogOpen}
+                            onOpenChange={setIsCreateDialogOpen}
+                            onSubmit={handleCreateIntervention}
+                        />
+                    </Suspense>
+                ) : null}
 
-                <EditInterventionDialog
-                    open={interventionToEdit != null}
-                    interventionId={interventionToEdit?.id ?? null}
-                    customerName={interventionToEdit?.customer ?? ""}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setInterventionToEdit(null);
-                        }
-                    }}
-                    onSubmit={handleEditIntervention}
-                />
+                {hasOpenedEditDialog ? (
+                    <Suspense fallback={null}>
+                        <EditInterventionDialog
+                            open={interventionToEdit != null}
+                            interventionId={interventionToEdit?.id ?? null}
+                            customerName={interventionToEdit?.customer ?? ""}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setInterventionToEdit(null);
+                                }
+                            }}
+                            onSubmit={handleEditIntervention}
+                        />
+                    </Suspense>
+                ) : null}
 
                 <ConfirmDeleteDialog
                     open={interventionToDelete != null}
@@ -297,6 +338,8 @@ const InterventionsPage = () => {
                             onSortChange={handleTableSortChange}
                             hiddenColumnKeys={hiddenColumnKeys}
                             rows={interventionRows}
+                            loadError={loadError}
+                            onRetry={() => void loadInterventions()}
                             searchText={committedSearchText}
                             hasActiveFilters={
                                 statusFilter !== "all" || typeFilter !== "all" || dateFrom != null || dateTo != null

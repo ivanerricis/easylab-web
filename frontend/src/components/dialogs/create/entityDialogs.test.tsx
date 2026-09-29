@@ -225,7 +225,7 @@ describe("CreateIssueDialog", () => {
         renderWithProviders(<CreateIssueDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await save();
-        expect(screen.getByRole("alert")).toHaveTextContent("Inserire una descrizione per il problema");
+        expect(screen.getByRole("alert")).toHaveTextContent("Inserisci una descrizione del difetto");
 
         await userEvent.type(screen.getByLabelText(/Descrizione/), "Schermo rotto");
         await save();

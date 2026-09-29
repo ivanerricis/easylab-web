@@ -89,7 +89,7 @@ describe("CreateInterventionDialog", () => {
 
     const fillCustomerAndCollaborator = async () => {
         await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
-        await userEvent.click(await screen.findByRole("button", { name: "Mario Rossi - 333" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Mario Rossi - 333" }));
         await chooseOption(/^Collaboratore/, "Luca Bianchi");
     };
 

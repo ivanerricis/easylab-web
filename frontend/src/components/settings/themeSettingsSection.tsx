@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Computer, Moon, RotateCcw, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { SettingsCard, SettingsGroup, SettingsSection } from "@/components/settings/settingsUi";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/use-theme";
@@ -16,11 +18,13 @@ import {
     fontSizes,
     getStoredCornerRadius,
     getStoredFontSize,
+    getStoredKeyboardShortcutsEnabled,
     getStoredTableDensity,
     getStoredTableRowIntensity,
     getStoredThemeAccentPreset,
     setStoredCornerRadius,
     setStoredFontSize,
+    setStoredKeyboardShortcutsEnabled,
     setStoredTableDensity,
     setStoredTableRowIntensity,
     setStoredThemeAccentPreset,
@@ -33,7 +37,7 @@ import {
     type TableRowIntensityKey,
     type ThemeAccentPresetKey,
 } from "@/lib/theme";
-import { cn } from "@/lib/utils";
+import { cn, modifierKey } from "@/lib/utils";
 
 type ModeOption = {
     value: "light" | "dark" | "system";
@@ -134,6 +138,7 @@ const ThemeSettingsSection = () => {
     const [selectedDensity, setSelectedDensity] = useState<TableDensityKey>(() => getStoredTableDensity() ?? "default");
     const [selectedFontSize, setSelectedFontSize] = useState<FontSizeKey>(() => getStoredFontSize() ?? "default");
     const [selectedRadius, setSelectedRadius] = useState<CornerRadiusKey>(() => getStoredCornerRadius() ?? "default");
+    const [shortcutsEnabled, setShortcutsEnabled] = useState(getStoredKeyboardShortcutsEnabled);
 
     useEffect(() => {
         applyThemeAccentPreset(selectedAccent);
@@ -161,6 +166,11 @@ const ThemeSettingsSection = () => {
         setSelectedFontSize(fontSizeKey);
         setStoredFontSize(fontSizeKey);
         applyFontSize(fontSizeKey);
+    };
+
+    const handleToggleShortcuts = (enabled: boolean) => {
+        setShortcutsEnabled(enabled);
+        setStoredKeyboardShortcutsEnabled(enabled);
     };
 
     const handleSelectRadius = (radiusKey: CornerRadiusKey) => {
@@ -337,6 +347,29 @@ const ThemeSettingsSection = () => {
                         </Button>
                     ))}
                 </div>
+            </SettingsCard>
+
+            {/* Non è aspetto, ma è una preferenza di questo browser come le altre della sezione, e
+                non tocca nessun altro utente. Fuori da "Valori predefiniti": quello azzera l'aspetto. */}
+            <SettingsCard
+                title="Scorciatoie da tastiera"
+                description="Tasti singoli come / per cercare e n per creare. Premi ? per l'elenco completo."
+                keepDescriptionOnMobile
+            >
+                <div className="flex items-start gap-3">
+                    <Checkbox
+                        id="keyboardShortcutsEnabled"
+                        checked={shortcutsEnabled}
+                        onCheckedChange={(checked) => handleToggleShortcuts(checked === true)}
+                    />
+                    <Label htmlFor="keyboardShortcutsEnabled" className="cursor-pointer leading-snug">
+                        Attiva le scorciatoie a un tasto
+                    </Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    Spegnile se scattano per sbaglio, per esempio con un lettore di schermo o con i comandi vocali.{" "}
+                    {modifierKey}+K per la ricerca e i tasti delle finestre restano sempre attivi.
+                </p>
             </SettingsCard>
 
             {/* Il ripristino ha una card sua, in fondo, dopo le cinque personalizzazioni che

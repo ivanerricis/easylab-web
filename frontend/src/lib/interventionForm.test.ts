@@ -68,6 +68,13 @@ describe("validateInterventionForm / toInterventionSubmitFields", () => {
         });
     });
 
+    /** Prima "12,50" arrivava vuoto dal campo numerico e si salvava come nessun prezzo. */
+    it("legge il prezzo con la virgola e segnala quello illeggibile invece di scartarlo", () => {
+        expect(validateInterventionForm({ ...filled, price: "12,50" })).toEqual({});
+        expect(toInterventionSubmitFields({ ...filled, price: "12,50" }).price).toBe(12.5);
+        expect(validateInterventionForm({ ...filled, price: "12,5 euro" })).toEqual({ price: "Importo non valido" });
+    });
+
     it("converte i campi di testo e toglie problema e orari a una consegna materiale", () => {
         expect(toInterventionSubmitFields(filled)).toMatchObject({
             description: "Sostituito cavo",

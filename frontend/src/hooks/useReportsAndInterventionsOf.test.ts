@@ -6,7 +6,8 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 const listReports = vi.fn();
 const listInterventions = vi.fn();
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async () => ({
+    ...(await vi.importActual<typeof import("@/lib/api/errors")>("@/lib/api/errors")),
     listReports: (...args: unknown[]) => listReports(...args),
     listInterventions: (...args: unknown[]) => listInterventions(...args),
 }));
@@ -47,6 +48,24 @@ describe("useReportsAndInterventionsOf", () => {
         await waitFor(() => {
             expect(result.current.reports.page).toBe(2);
         });
+    });
+
+    /** L'errore arriva alle tabelle dei tab tramite `reports.error`/`interventions.error`. */
+    it("espone l'errore di ciascuna lista", async () => {
+        listInterventions.mockRejectedValue(new Error("rete"));
+
+        const { result } = renderHook(() =>
+            useReportsAndInterventionsOf({
+                owner: { customerId: 1 },
+                tableKeyPrefix: "customer",
+                ownerLabel: "del cliente",
+            })
+        );
+
+        await waitFor(() => {
+            expect(result.current.interventions.error).toBe("Impossibile caricare gli interventi del cliente");
+        });
+        expect(result.current.reports.error).toBeNull();
     });
 
     it("riporta la pagina degli interventi all'ultima valida quando la richiesta la supera", async () => {

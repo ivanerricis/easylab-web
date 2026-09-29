@@ -67,10 +67,22 @@ const confirmDelete = async () => {
 
 let editValues: unknown;
 
-vi.mock("@/components/dialogs/edit/editReportDialog", () => ({
-    default: ({ open, onSubmit }: { open: boolean; onSubmit: (v: unknown) => Promise<void> }) =>
-        open ? <button onClick={() => void onSubmit(editValues)}>Invia modifica</button> : null,
-}));
+/**
+ * Quante volte il dialogo di modifica del report è stato montato: il `reload()` dopo "Salva"
+ * lo smontava (la pagina passava al caricamento a tutta pagina) e lo rimontava da capo.
+ */
+const editReportDialogMounts = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock("@/components/dialogs/edit/editReportDialog", async () => {
+    const { useEffect } = await vi.importActual<typeof import("react")>("react");
+    const MockEditReportDialog = ({ open, onSubmit }: { open: boolean; onSubmit: (v: unknown) => Promise<void> }) => {
+        useEffect(() => {
+            editReportDialogMounts.count += 1;
+        }, []);
+        return open ? <button onClick={() => void onSubmit(editValues)}>Invia modifica</button> : null;
+    };
+    return { default: MockEditReportDialog };
+});
 
 vi.mock("@/components/dialogs/edit/editInterventionDialog", () => ({
     default: ({ open, onSubmit }: { open: boolean; onSubmit: (v: unknown) => Promise<void> }) =>
@@ -130,6 +142,7 @@ const report = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    editReportDialogMounts.count = 0;
     document.title = "EasyLab";
     api.getCustomer.mockResolvedValue({
         id: 30,
@@ -254,6 +267,45 @@ describe("ReportPage", () => {
         await waitFor(() => {
             expect(api.getReport).toHaveBeenCalledTimes(2);
         });
+    });
+
+    /**
+     * Il difetto del lampo dopo "Salva": `reload()` rimetteva `isLoading`, la pagina passava al
+     * caricamento a tutta pagina e smontava il dialogo di modifica a metà salvataggio (che poi
+     * veniva rimontato da capo). Ora la scheda resta, attenuata e `aria-busy`, fino ai dati nuovi.
+     */
+    it("dopo 'Salva' ricarica tenendo la scheda e il dialogo montati", async () => {
+        editValues = { reportId: 5, technicianId: 50, technicianPrice: 25, internalPrice: 90 };
+        await renderPage();
+
+        let resolveReload!: (value: typeof report) => void;
+        api.getReport.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveReload = resolve;
+            })
+        );
+
+        await userEvent.click(screen.getByRole("button", { name: "Modifica report" }));
+        await userEvent.click(screen.getByRole("button", { name: "Invia modifica" }));
+
+        await waitFor(() => expect(api.getReport).toHaveBeenCalledTimes(2));
+
+        // A metà ricaricamento: niente caricamento a tutta pagina, la scheda c'è ancora.
+        expect(screen.queryByText("Caricamento in corso")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Report #5 - Mario Rossi");
+        expect(screen.getByRole("button", { name: "Invia modifica" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { level: 2, name: "Anagrafica" }).closest("[aria-busy='true']")
+        ).not.toBeNull();
+
+        resolveReload({ ...report, price: 90 });
+
+        await waitFor(() => {
+            expect(
+                screen.getByRole("heading", { level: 2, name: "Anagrafica" }).closest("[aria-busy='true']")
+            ).toBeNull();
+        });
+        expect(editReportDialogMounts.count).toBe(1);
     });
 
     it("elimina il report dopo la conferma e torna all'elenco, senza lasciare la scheda nella cronologia", async () => {

@@ -34,7 +34,7 @@ import { NotificationsMenu } from "./notifications-menu";
 import { renderWithProviders } from "@/test/render";
 
 const openMenu = async () => {
-    await userEvent.click(screen.getByRole("button", { name: "Notifiche" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Notifiche/ }));
     return screen.getByRole("menu");
 };
 
@@ -55,6 +55,26 @@ describe("NotificationsMenu", () => {
         renderWithProviders(<NotificationsMenu />);
 
         expect(await screen.findByText("9+")).toBeInTheDocument();
+    });
+
+    /** Il pallino si vede soltanto: senza il numero nel nome, lo screen reader diceva "Notifiche" e basta. */
+    it("dice nel nome del pulsante quante voci nuove ci sono, col numero vero", async () => {
+        remindersLoad.mockResolvedValue(
+            Array.from({ length: 12 }, (_, index) => ({ id: String(index), title: `Cliente ${index}` }))
+        );
+
+        renderWithProviders(<NotificationsMenu />);
+
+        expect(await screen.findByRole("button", { name: "Notifiche, 12 nuove" })).toBeInTheDocument();
+    });
+
+    it("al singolare con una voce sola, e senza numero quando non c'è niente", async () => {
+        remindersLoad.mockResolvedValue([{ id: "1", title: "Cliente 1" }]);
+
+        renderWithProviders(<NotificationsMenu />);
+
+        expect(screen.getByRole("button", { name: "Notifiche" })).toBeInTheDocument();
+        expect(await screen.findByRole("button", { name: "Notifiche, 1 nuova" })).toBeInTheDocument();
     });
 
     it("mostra il testo della sezione vuota", async () => {

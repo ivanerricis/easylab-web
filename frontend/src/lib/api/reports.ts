@@ -187,5 +187,5 @@ export type ReportStatsDto = {
     previousMonthToDate: { revenue: number; days: number } | null;
 };
 
-export const getReportStats = async (month?: string) =>
-    (await api.get<ReportStatsDto>("/reports/stats", { params: { month } })).data;
+export const getReportStats = async (month?: string, signal?: AbortSignal) =>
+    (await api.get<ReportStatsDto>("/reports/stats", { params: { month }, signal })).data;

@@ -63,8 +63,34 @@ export function formatDateTime(value: string | Date | null | undefined) {
  * `Intl.DateTimeFormat` identico a ogni render solo per non convertirla in stringa.
  */
 export function formatDate(value: string | Date | null | undefined) {
-    return formatDateWith(dateFormatter, value);
+    return formatDateWith(dateFormatter, (typeof value === "string" && parseLocalDay(value)) || value);
 }
+
+/**
+ * Una data solo-giorno ("2026-09-28", come `interventionDate`) letta come mezzanotte *locale*.
+ *
+ * `new Date("2026-09-28")` la legge invece come mezzanotte UTC: su un dispositivo con un fuso a
+ * ovest di Greenwich (un telefono rimasto sull'ora di un viaggio, un browser in UTC-x) diventava
+ * il 27 alle 20:00 locali, e la scheda dell'intervento mostrava il giorno prima. Stessa lettura
+ * di `parseDateValue` in `date-picker-field.tsx`, che non si può importare da qui: quel file
+ * importa già `formatDate`, e un modulo di utilità non deve dipendere da un componente.
+ * Solo la forma esatta `AAAA-MM-GG`: una data con l'ora ("…T10:00:00Z") è un istante preciso e
+ * resta a `new Date`.
+ */
+const parseLocalDay = (value: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+    if (!match) {
+        return undefined;
+    }
+
+    const [, year, month, day] = match.map(Number);
+    const date = new Date(year, month - 1, day);
+
+    // "2026-02-31" non esiste: `new Date(2026, 1, 31)` (e lo stesso `new Date("2026-02-31")`)
+    // lo farebbe scivolare al 3 marzo. Una data non valida fa scrivere "-" a `formatDateWith`.
+    return date.getMonth() === month - 1 ? date : new Date(Number.NaN);
+};
 
 /**
  * "5 minuti fa", "2 giorni fa": la distanza da adesso, per i dati in cui conta quanto sono

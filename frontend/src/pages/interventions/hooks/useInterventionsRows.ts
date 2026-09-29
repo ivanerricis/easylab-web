@@ -32,7 +32,7 @@ export const useInterventionsRows = ({
         "createdAt" | "interventionDate" | "customer" | "status",
         "asc" | "desc",
     ];
-    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, reload } =
+    const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         usePaginatedRows<InterventionDto>({
             fetchRows: (signal) =>
                 listInterventions({
@@ -61,6 +61,8 @@ export const useInterventionsRows = ({
         isLoading,
         isInitialLoading,
         isRefetching,
+        /** L'ultimo caricamento fallito, per la tabella ("Riprova"): vedi `error` in `usePaginatedRows`. */
+        loadError: error,
         loadInterventions: reload,
     };
 };

@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
 
 type UseEntityDetailOptions = {
-    /** Dove tornare se il caricamento fallisce con un errore diverso da 404 (un 404 mostra
-     * invece "non trovato" restando sull'indirizzo: vedi `NotFoundState`). */
+    /** Dove tornare se il *primo* caricamento fallisce con un errore diverso da 404 (un 404
+     * mostra invece "non trovato" restando sull'indirizzo: vedi `NotFoundState`). */
     backTo: string;
     /** Messaggio del toast per gli errori diversi da 404. */
     errorMessage: string;
@@ -14,11 +14,18 @@ type UseEntityDetailOptions = {
 export type UseEntityDetailResult<T> = {
     data: T | null;
     isLoading: boolean;
+    /**
+     * Ricarica con la scheda già in pagina (Aggiorna, dopo un "Salva"): `isLoading` con dei
+     * dati. Le pagine mostrano il caricamento a tutta pagina solo senza dati, e in questo caso
+     * attenuano il contenuto: vedi `isReloading` in `ReportPage`.
+     */
+    isReloading: boolean;
     isNotFound: boolean;
     /**
      * Ricarica: la stessa funzione che l'hook usa al montaggio e al cambio di id, quindi non
-     * rifiuta mai (un errore duro riporta già all'elenco da sé) — si può passare diretta a
-     * `RefreshButton` o a `Promise.all` senza un `try/catch` attorno.
+     * rifiuta mai (un errore duro mostra già il toast da sé, e al primo caricamento riporta
+     * all'elenco) — si può passare diretta a `RefreshButton` o a `Promise.all` senza un
+     * `try/catch` attorno.
      */
     reload: () => Promise<void>;
     /**
@@ -72,11 +79,24 @@ export const useEntityDetail = <T>(
     // potrebbe scrivere in pagina i dati di un id che non è più quello mostrato.
     const latestRequestIdRef = useRef(0);
 
+    /**
+     * Se la scheda ha già dei dati dell'id corrente: decide cosa fare di un errore.
+     *
+     * Al primo caricamento non c'è niente da mostrare, e tornare all'elenco è l'unica cosa
+     * sensata. Su un ricaricamento (Aggiorna, o il `reload()` dopo un "Salva") invece i dati ci
+     * sono ancora: prima anche lì si veniva buttati all'elenco, perdendo la scheda che si stava
+     * guardando per un errore di rete di un istante — dopo un salvataggio andato a buon fine,
+     * per giunta. Ora resta la scheda con il toast, e si può riprovare con Aggiorna.
+     * Una ref e non `data`: `load` non deve cambiare identità a ogni dato che arriva.
+     */
+    const hasDataRef = useRef(false);
+
     const load = useCallback(async () => {
         if (!isValidId) {
             // Invalida anche una richiesta per l'id precedente ancora in volo: senza,
             // potrebbe risolversi dopo e riportare `isNotFound` a `false`.
             latestRequestIdRef.current += 1;
+            hasDataRef.current = false;
             setData(null);
             setIsNotFound(true);
             setIsLoading(false);
@@ -94,6 +114,7 @@ export const useEntityDetail = <T>(
                 return;
             }
 
+            hasDataRef.current = true;
             setData(result);
             setIsNotFound(false);
         } catch (error) {
@@ -102,13 +123,17 @@ export const useEntityDetail = <T>(
             }
 
             if (getApiErrorStatus(error) === 404) {
+                hasDataRef.current = false;
                 setData(null);
                 setIsNotFound(true);
                 return;
             }
 
             toast.error(getApiErrorMessage(error, errorMessageRef.current));
-            navigate(backToRef.current);
+
+            if (!hasDataRef.current) {
+                navigate(backToRef.current);
+            }
         } finally {
             if (requestId === latestRequestIdRef.current) {
                 setIsLoading(false);
@@ -125,6 +150,7 @@ export const useEntityDetail = <T>(
         // azzerare va fatto solo qui e non a ogni `reload()`: il pulsante Aggiorna deve poter
         // tenere i dati vecchi leggibili mentre carica quelli nuovi, come fa `usePaginatedRows`.
         void (async () => {
+            hasDataRef.current = false;
             setData(null);
             setIsNotFound(!isValidId);
             await load();
@@ -134,5 +160,19 @@ export const useEntityDetail = <T>(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isValidId, numericId]);
 
-    return { data, isLoading, isNotFound, reload: load, setData };
+    // `setData` dall'esterno conta come un dato caricato: dopo una modifica salvata con la
+    // riga della PUT, un errore del ricaricamento successivo non deve buttare fuori.
+    const setLoadedData = useCallback((value: T) => {
+        hasDataRef.current = true;
+        setData(value);
+    }, []);
+
+    return {
+        data,
+        isLoading,
+        isReloading: isLoading && data != null,
+        isNotFound,
+        reload: load,
+        setData: setLoadedData,
+    };
 };

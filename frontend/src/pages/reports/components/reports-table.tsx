@@ -19,6 +19,12 @@ type ReportsTableProps = {
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
+    /**
+     * L'ultimo caricamento fallito e come riprovarlo: senza righe la tabella mostra l'errore
+     * con "Riprova" invece del messaggio di lista vuota. Vedi `loadError` in `EntityTable`.
+     */
+    loadError?: string | null;
+    onRetry?: () => void;
     skeletonRowCount?: number;
     /** Ordinamento dalle intestazioni e colonne nascoste: vedi `EntityTable`. */
     sort?: TableSort;
@@ -46,6 +52,8 @@ const ReportsTable = ({
     onDeleteReport,
     isInitialLoading,
     isRefetching,
+    loadError,
+    onRetry,
     skeletonRowCount,
     sort,
     onSortChange,
@@ -102,6 +110,8 @@ const ReportsTable = ({
             onRowOpen={(row) => onOpenReport(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}
+            loadError={loadError}
+            onRetry={onRetry}
             skeletonRowCount={skeletonRowCount}
             sort={sort}
             onSortChange={onSortChange}

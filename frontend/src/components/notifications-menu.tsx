@@ -24,15 +24,24 @@ export function NotificationsMenu() {
         dismiss(sourceKey, notificationId);
     };
 
+    // Il numero sta anche nel nome del pulsante: il pallino rosso si vede soltanto, e chi usa
+    // uno screen reader sentiva "Notifiche" sia con zero voci sia con dodici. Qui il numero è
+    // quello vero, non il "9+" del pallino, che serve solo a farlo stare nel cerchio.
+    const triggerLabel =
+        badgeCount === 0 ? "Notifiche" : `Notifiche, ${badgeCount} ${badgeCount === 1 ? "nuova" : "nuove"}`;
+
     return (
         <DropdownMenu>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon-lg" className="relative" aria-label="Notifiche">
+                        <Button variant="outline" size="icon-lg" className="relative" aria-label={triggerLabel}>
                             <Bell className="size-5" />
                             {badgeCount > 0 ? (
-                                <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-white">
+                                <span
+                                    aria-hidden="true"
+                                    className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-white"
+                                >
                                     {badgeCount > 9 ? "9+" : badgeCount}
                                 </span>
                             ) : null}

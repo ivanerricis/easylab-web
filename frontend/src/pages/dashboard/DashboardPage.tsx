@@ -15,10 +15,8 @@ import CardDashboard, {
     dashboardCardLayoutClassName,
     dashboardCardValueClassName,
 } from "./components/cardDashboard";
-import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
-import CreateInterventionDialog, {
-    type CreateInterventionSubmitValues,
-} from "@/components/dialogs/create/createInterventionDialog";
+import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
+import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
 import RefreshButton from "@/components/refresh-button";
@@ -32,9 +30,24 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import TableActionButton from "@/components/table-action-button";
-import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const InterventionsCalendar = lazy(() => import("@/pages/calendar/components/interventions-calendar"));
+
+/**
+ * I due dialoghi di creazione si scaricano solo quando servono: con i loro campi (cliente,
+ * dispositivo, difetto, i dialoghi annidati per crearli) pesavano sulla prima apertura della
+ * dashboard, la pagina iniziale, anche per chi li apre di rado. Il passaggio del mouse o il focus
+ * sul pulsante "Nuovo…" li chiede in anticipo, così all'apertura l'animazione non aspetta la rete;
+ * con la scorciatoia da tastiera arrivano un attimo dopo, e fino ad allora non si vede niente
+ * (`fallback={null}`) invece di un caricamento che lampeggia.
+ */
+const { Component: CreateReportDialog, prefetch: prefetchCreateReportDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/create/createReportDialog")
+);
+const { Component: CreateInterventionDialog, prefetch: prefetchCreateInterventionDialog } = lazyWithPrefetch(
+    () => import("@/components/dialogs/create/createInterventionDialog")
+);
 import CreateEntityButton from "@/components/create-entity-button";
 import {
     createIntervention,
@@ -45,6 +58,8 @@ import {
     getInterventionStats,
     getReportStats,
 } from "@/lib/api";
+import type { InterventionStatsDto } from "@/lib/api/interventions";
+import type { ReportStatsDto } from "@/lib/api/reports";
 import { cn, formatEuro, openPrintWindow } from "@/lib/utils";
 import { resolveReportReferences, toReportCreatePayload } from "@/lib/reportForm";
 import { showCreatedToast } from "@/lib/createdToast";
@@ -55,6 +70,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { lazyWithPrefetch, useHasBeenOpen } from "@/lib/lazyDialog";
 
 const getMonthKey = (date: Date) => {
     const year = date.getFullYear();
@@ -102,6 +118,10 @@ const percentFormatter = new Intl.NumberFormat("it-IT", {
     signDisplay: "exceptZero",
 });
 
+/** "—" finché il dato non è arrivato (o se il caricamento è fallito), non un falso zero. */
+const formatCount = (value: number | null | undefined) => (value == null ? "—" : String(value));
+const formatAmount = (value: number | null | undefined) => (value == null ? "—" : formatEuro(value));
+
 const shiftMonthKey = (monthKey: string, deltaMonths: number) => {
     const [yearPart, monthPart] = monthKey.split("-");
     const date = new Date(Number(yearPart), Number(monthPart) - 1 + deltaMonths, 1);
@@ -113,6 +133,8 @@ const DashboardPage = () => {
     const navigate = useNavigate();
     const [dialogCreateReportOpen, setDialogCreateReportOpen] = useState(false);
     const [dialogCreateInterventionOpen, setDialogCreateInterventionOpen] = useState(false);
+    const hasOpenedCreateReport = useHasBeenOpen(dialogCreateReportOpen);
+    const hasOpenedCreateIntervention = useHasBeenOpen(dialogCreateInterventionOpen);
     // Qui i pulsanti di creazione sono due, quindi non c'è una "n" sola che possa valere per
     // entrambi: una lettera per ciascuno, l'iniziale di quello che aprono.
     usePageShortcut("r", () => setDialogCreateReportOpen(true));
@@ -134,34 +156,130 @@ const DashboardPage = () => {
         loadEvents: loadCalendarEvents,
     } = useCalendarInterventions(calendarRange);
     const [selectedRevenueMonth, setSelectedRevenueMonth] = useState(() => getMonthKey(new Date()));
-    const [openReports, setOpenReports] = useState(0);
-    const [closedReports, setClosedReports] = useState(0);
-    const [monthlyRevenue, setMonthlyRevenue] = useState(0);
-    const [previousMonthToDate, setPreviousMonthToDate] = useState<{ revenue: number; days: number } | null>(null);
-    const [monthlyNetRevenue, setMonthlyNetRevenue] = useState(0);
-    const [monthlyRevenueSeries, setMonthlyRevenueSeries] = useState<
-        { monthKey: string; value: number; netValue: number }[]
-    >([]);
-    const [scheduledInterventions, setScheduledInterventions] = useState(0);
-    const [inProgressInterventions, setInProgressInterventions] = useState(0);
-    const [completedInterventions, setCompletedInterventions] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
+    // Il mese scelto anche in un ref, per chi lo legge dopo un `await`: la creazione di un report
+    // ricaricava gli incassi del mese catturato all'apertura del dialogo, anche se nel frattempo
+    // se n'era scelto un altro.
+    const selectedRevenueMonthRef = useRef(selectedRevenueMonth);
+    // L'ultimo mese i cui dati sono arrivati davvero: se il caricamento di un altro fallisce,
+    // l'etichetta torna qui, sui numeri che sono ancora a schermo.
+    const loadedRevenueMonthRef = useRef<string | null>(null);
+    // `null` finché non arriva una risposta: su errore la scheda mostra "—" e non un falso
+    // "0,00 €" (o "0 report aperti"), indistinguibile da un mese davvero vuoto.
+    const [reportStats, setReportStats] = useState<ReportStatsDto | null>(null);
+    const [interventionStats, setInterventionStats] = useState<InterventionStatsDto | null>(null);
+    const [isReportStatsLoading, setIsReportStatsLoading] = useState(true);
+    const [isInterventionStatsLoading, setIsInterventionStatsLoading] = useState(true);
+    const isLoading = isReportStatsLoading || isInterventionStatsLoading;
     // Come nelle liste: il velo che copre tutto ha senso solo quando non c'è ancora niente
     // da vedere. Dal secondo caricamento in poi (cambio mese, pulsante Aggiorna) i numeri
     // precedenti restano leggibili e attenuati, così cliccare due volte la freccia del mese
     // non finisce contro un velo che intercetta il clic.
     const [hasLoadedMetricsOnce, setHasLoadedMetricsOnce] = useState(false);
+    // Come in `usePaginatedRows` e `useCalendarInterventions`: vale solo la risposta più recente.
+    // Sfogliando i mesi in fretta partiva una richiesta per mese, e quella di un mese già
+    // superato poteva arrivare per ultima e scrivere i suoi incassi sotto l'etichetta dell'altro.
+    const latestReportStatsRequestIdRef = useRef(0);
+    const latestInterventionStatsRequestIdRef = useRef(0);
+    const reportStatsAbortRef = useRef<AbortController | null>(null);
+
+    // All'uscita dalla dashboard non resta in volo una richiesta di incassi.
+    useEffect(() => () => reportStatsAbortRef.current?.abort(), []);
+
+    const monthlyRevenue = reportStats?.monthlyRevenue ?? null;
+    const monthlyRevenueSeries = useMemo(() => reportStats?.series ?? [], [reportStats]);
+    const previousMonthToDate = reportStats?.previousMonthToDate ?? null;
 
     const selectedRevenueLabel = useMemo(() => getMonthLabel(selectedRevenueMonth), [selectedRevenueMonth]);
 
     const isCurrentRevenueMonth = selectedRevenueMonth === getMonthKey(new Date());
 
-    const handlePreviousRevenueMonth = () => setSelectedRevenueMonth((prev) => shiftMonthKey(prev, -1));
+    /**
+     * Gli incassi (e i contatori dei report) di un mese. Il mese si chiede qui, non con un
+     * effetto sul mese scelto: così su errore l'etichetta può tornare all'ultimo mese caricato
+     * senza che quel ritorno faccia partire un'altra richiesta, destinata a fallire di nuovo.
+     *
+     * La richiesta superata viene anche annullata, come nel calendario: il controllo sull'id
+     * basterebbe a scartarne la risposta, ma così il server non calcola un mese che nessuno
+     * guarderà più.
+     */
+    const loadReportStats = useCallback(async (month: string) => {
+        const requestId = latestReportStatsRequestIdRef.current + 1;
+        latestReportStatsRequestIdRef.current = requestId;
+        reportStatsAbortRef.current?.abort();
+        const controller = new AbortController();
+        reportStatsAbortRef.current = controller;
+        setIsReportStatsLoading(true);
+
+        try {
+            const stats = await getReportStats(month, controller.signal);
+
+            if (requestId !== latestReportStatsRequestIdRef.current) {
+                return;
+            }
+
+            loadedRevenueMonthRef.current = month;
+            setReportStats(stats);
+        } catch (error) {
+            if (requestId !== latestReportStatsRequestIdRef.current) {
+                return;
+            }
+
+            toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
+
+            // L'etichetta torna al mese dei numeri a schermo. Senza un mese caricato resta
+            // quella scelta, e i numeri sono "—".
+            const loadedMonth = loadedRevenueMonthRef.current;
+            if (loadedMonth) {
+                selectedRevenueMonthRef.current = loadedMonth;
+                setSelectedRevenueMonth(loadedMonth);
+            }
+        } finally {
+            if (requestId === latestReportStatsRequestIdRef.current) {
+                setIsReportStatsLoading(false);
+            }
+        }
+    }, []);
+
+    /**
+     * I contatori degli interventi non dipendono dal mese: prima si richiedevano a ogni freccia
+     * del grafico degli incassi. Ora al montaggio, con "Aggiorna" e dopo la creazione di un
+     * intervento, cioè quando possono essere cambiati.
+     */
+    const loadInterventionStats = useCallback(async () => {
+        const requestId = latestInterventionStatsRequestIdRef.current + 1;
+        latestInterventionStatsRequestIdRef.current = requestId;
+        setIsInterventionStatsLoading(true);
+
+        try {
+            const stats = await getInterventionStats();
+
+            if (requestId === latestInterventionStatsRequestIdRef.current) {
+                setInterventionStats(stats);
+            }
+        } catch (error) {
+            if (requestId === latestInterventionStatsRequestIdRef.current) {
+                toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
+            }
+        } finally {
+            if (requestId === latestInterventionStatsRequestIdRef.current) {
+                setIsInterventionStatsLoading(false);
+            }
+        }
+    }, []);
+
+    const selectRevenueMonth = (month: string) => {
+        selectedRevenueMonthRef.current = month;
+        setSelectedRevenueMonth(month);
+        void loadReportStats(month);
+    };
+
+    // Dal ref e non dallo stato: due clic nello stesso istante partono entrambi dal mese giusto.
+    const handlePreviousRevenueMonth = () => selectRevenueMonth(shiftMonthKey(selectedRevenueMonthRef.current, -1));
     const handleNextRevenueMonth = () => {
-        if (isCurrentRevenueMonth) {
+        if (selectedRevenueMonthRef.current === getMonthKey(new Date())) {
             return;
         }
-        setSelectedRevenueMonth((prev) => shiftMonthKey(prev, 1));
+        selectRevenueMonth(shiftMonthKey(selectedRevenueMonthRef.current, 1));
     };
 
     /**
@@ -179,6 +297,10 @@ const DashboardPage = () => {
      * 31 marzo contro febbraio sì) vuol dire che il confronto è già con il mese intero.
      */
     const revenueComparison = useMemo(() => {
+        if (monthlyRevenue == null) {
+            return null;
+        }
+
         const previousMonthKey = shiftMonthKey(selectedRevenueMonth, -1);
         const previousPoint = monthlyRevenueSeries.find((point) => point.monthKey === previousMonthKey);
         const [previousYear, previousMonth] = previousMonthKey.split("-").map(Number);
@@ -206,32 +328,10 @@ const DashboardPage = () => {
         [monthlyRevenueSeries]
     );
 
-    const loadDashboardMetrics = async (month: string) => {
-        setIsLoading(true);
-        try {
-            const [reportStats, interventionStats] = await Promise.all([getReportStats(month), getInterventionStats()]);
-
-            setOpenReports(reportStats.openCount);
-            setClosedReports(reportStats.closedCount);
-            setMonthlyRevenue(reportStats.monthlyRevenue);
-            setPreviousMonthToDate(reportStats.previousMonthToDate ?? null);
-            setMonthlyNetRevenue(reportStats.monthlyNetRevenue);
-            setMonthlyRevenueSeries(reportStats.series);
-            setScheduledInterventions(interventionStats.programmatoCount);
-            setInProgressInterventions(interventionStats.inLavorazioneCount);
-            setCompletedInterventions(interventionStats.completatoCount);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
-        } finally {
-            setIsLoading(false);
-            setHasLoadedMetricsOnce(true);
-        }
-    };
-
     const handleCreateReport = async (values: CreateReportSubmitValues) => {
         const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
 
-        await loadDashboardMetrics(selectedRevenueMonth);
+        await loadReportStats(selectedRevenueMonthRef.current);
 
         showCreatedToast({
             message: `Report #${createdReport.id} creato`,
@@ -241,27 +341,40 @@ const DashboardPage = () => {
     };
 
     // Come `handleCreateReport` qui sopra, niente try/catch: l'errore lo mostra il dialogo.
-    const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
-        const customerId = await resolveCustomerId(values.customerId, values.customer);
-        const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
+    // `useCallback` perché passa al calendario, che è in `memo`: una funzione nuova a ogni
+    // ridisegno della dashboard lo ridisegnerebbe ogni volta. Il mese degli incassi si legge dal
+    // ref, quindi non serve fra le dipendenze.
+    const handleCreateIntervention = useCallback(
+        async (values: CreateInterventionSubmitValues) => {
+            const customerId = await resolveCustomerId(values.customerId, values.customer);
+            const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
 
-        await Promise.all([loadCalendarEvents(), loadDashboardMetrics(selectedRevenueMonth)]);
+            await Promise.all([loadCalendarEvents(), loadInterventionStats()]);
 
-        showCreatedToast({
-            message: `Intervento #${createdIntervention.id} creato`,
-            onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
-            onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
-        });
-    };
+            showCreatedToast({
+                message: `Intervento #${createdIntervention.id} creato`,
+                onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
+                onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
+            });
+        },
+        [loadCalendarEvents, loadInterventionStats, navigate]
+    );
 
+    // Solo al montaggio: il cambio di mese chiede i suoi dati da sé (`selectRevenueMonth`).
     useEffect(() => {
         startTransition(() => {
-            void loadDashboardMetrics(selectedRevenueMonth);
+            void Promise.all([loadReportStats(selectedRevenueMonthRef.current), loadInterventionStats()]).finally(() =>
+                setHasLoadedMetricsOnce(true)
+            );
         });
-    }, [selectedRevenueMonth]);
+    }, [loadInterventionStats, loadReportStats]);
 
     const handleRefreshDashboard = async () => {
-        await Promise.all([loadDashboardMetrics(selectedRevenueMonth), loadCalendarEvents()]);
+        await Promise.all([
+            loadReportStats(selectedRevenueMonthRef.current),
+            loadInterventionStats(),
+            loadCalendarEvents(),
+        ]);
     };
 
     const goToReportsPage = (visibilityFilter: "open" | "closed") => {
@@ -293,11 +406,15 @@ const DashboardPage = () => {
                                 label="Nuovo report"
                                 mobileLabel="Report"
                                 onClick={() => setDialogCreateReportOpen(true)}
+                                onPointerEnter={prefetchCreateReportDialog}
+                                onFocus={prefetchCreateReportDialog}
                             />
                             <CreateEntityButton
                                 label="Nuovo intervento"
                                 mobileLabel="Intervento"
                                 onClick={() => setDialogCreateInterventionOpen(true)}
+                                onPointerEnter={prefetchCreateInterventionDialog}
+                                onFocus={prefetchCreateInterventionDialog}
                             />
                         </div>
                     </div>
@@ -331,7 +448,7 @@ const DashboardPage = () => {
                         text="Report aperti"
                         mobileText="Aperti"
                         icon={CircleDashed}
-                        number={String(openReports)}
+                        number={formatCount(reportStats?.openCount)}
                         iconColor="text-destructive"
                         onClick={() => goToReportsPage("open")}
                     />
@@ -339,7 +456,7 @@ const DashboardPage = () => {
                         text="Report chiusi"
                         mobileText="Chiusi"
                         icon={CircleCheck}
-                        number={String(closedReports)}
+                        number={formatCount(reportStats?.closedCount)}
                         iconColor="text-status-green-foreground"
                         onClick={() => goToReportsPage("closed")}
                     />
@@ -348,7 +465,7 @@ const DashboardPage = () => {
                         text="Interventi programmati"
                         mobileText="Programmati"
                         icon={CalendarClock}
-                        number={String(scheduledInterventions)}
+                        number={formatCount(interventionStats?.programmatoCount)}
                         iconColor="text-destructive"
                         onClick={() => goToInterventionsPage("programmato")}
                     />
@@ -356,7 +473,7 @@ const DashboardPage = () => {
                         text="Interventi in lavorazione"
                         mobileText="In lavorazione"
                         icon={Loader}
-                        number={String(inProgressInterventions)}
+                        number={formatCount(interventionStats?.inLavorazioneCount)}
                         iconColor="text-action-print"
                         onClick={() => goToInterventionsPage("in_lavorazione")}
                     />
@@ -364,7 +481,7 @@ const DashboardPage = () => {
                         text="Interventi completati"
                         mobileText="Completati"
                         icon={CircleCheck}
-                        number={String(completedInterventions)}
+                        number={formatCount(interventionStats?.completatoCount)}
                         iconColor="text-status-green-foreground"
                         onClick={() => goToInterventionsPage("completato")}
                     />
@@ -397,8 +514,19 @@ const DashboardPage = () => {
                         </DialogTrigger>
 
                         {/* Senza `onOpenAutoFocus` il focus finiva sul primo pulsante, la freccia "Mese
-                        precedente", e il suo fumetto si apriva da solo sopra l'importo. */}
-                        <DialogContent className="sm:max-w-md" onOpenAutoFocus={(event) => event.preventDefault()}>
+                        precedente", e il suo fumetto si apriva da solo sopra l'importo. Ma il solo
+                        `preventDefault` lo lasciava sulla scheda sotto il velo, fuori dal dialogo:
+                        Tab ripartiva da lì e uno screen reader non annunciava niente. Ora va sul
+                        dialogo stesso, che ha già `tabIndex=-1` e si presenta con il suo titolo. */}
+                        <DialogContent
+                            className="outline-none sm:max-w-md"
+                            onOpenAutoFocus={(event) => {
+                                event.preventDefault();
+                                if (event.currentTarget instanceof HTMLElement) {
+                                    event.currentTarget.focus();
+                                }
+                            }}
+                        >
                             <DialogHeader>
                                 <DialogTitle>Incassi mese</DialogTitle>
                                 <DialogDescription>Andamento degli ultimi 6 mesi.</DialogDescription>
@@ -422,7 +550,7 @@ const DashboardPage = () => {
 
                                     <div className="min-w-0 flex-1 text-center">
                                         <div className="text-2xl font-bold sm:text-3xl">
-                                            {formatEuro(monthlyRevenue)}
+                                            {formatAmount(monthlyRevenue)}
                                         </div>
                                         <div className="mt-1 text-sm text-muted-foreground">{selectedRevenueLabel}</div>
                                         {revenueComparison ? (
@@ -468,7 +596,7 @@ const DashboardPage = () => {
                                         <div className="mt-2 text-sm text-muted-foreground">
                                             Al netto tecnici esterni:{" "}
                                             <span className="font-semibold text-foreground">
-                                                {formatEuro(monthlyNetRevenue)}
+                                                {formatAmount(reportStats?.monthlyNetRevenue)}
                                             </span>
                                         </div>
                                     </div>
@@ -500,7 +628,7 @@ const DashboardPage = () => {
                                             <button
                                                 key={point.monthKey}
                                                 type="button"
-                                                onClick={() => setSelectedRevenueMonth(point.monthKey)}
+                                                onClick={() => selectRevenueMonth(point.monthKey)}
                                                 title={`${shortLabel}: ${formatEuro(point.value)}`}
                                                 aria-label={`${shortLabel}: ${formatEuro(point.value)}`}
                                                 aria-pressed={isSelected}
@@ -574,17 +702,25 @@ const DashboardPage = () => {
                 <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
             ) : null}
 
-            <CreateReportDialog
-                open={dialogCreateReportOpen}
-                onOpenChange={setDialogCreateReportOpen}
-                onSubmit={handleCreateReport}
-            />
+            {hasOpenedCreateReport ? (
+                <Suspense fallback={null}>
+                    <CreateReportDialog
+                        open={dialogCreateReportOpen}
+                        onOpenChange={setDialogCreateReportOpen}
+                        onSubmit={handleCreateReport}
+                    />
+                </Suspense>
+            ) : null}
 
-            <CreateInterventionDialog
-                open={dialogCreateInterventionOpen}
-                onOpenChange={setDialogCreateInterventionOpen}
-                onSubmit={handleCreateIntervention}
-            />
+            {hasOpenedCreateIntervention ? (
+                <Suspense fallback={null}>
+                    <CreateInterventionDialog
+                        open={dialogCreateInterventionOpen}
+                        onOpenChange={setDialogCreateInterventionOpen}
+                        onSubmit={handleCreateIntervention}
+                    />
+                </Suspense>
+            ) : null}
         </div>
     );
 };

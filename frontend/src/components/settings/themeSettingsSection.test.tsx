@@ -190,4 +190,25 @@ describe("ThemeSettingsSection", () => {
         expect(isHighlighted(option("Modalità", "Scuro"))).toBe(true);
         expect(localStorage.getItem("vite-ui-theme")).toBe("dark");
     });
+
+    it("le scorciatoie da tastiera si spengono e si riaccendono dalla casella", async () => {
+        renderSection();
+        const checkbox = screen.getByRole("checkbox", { name: "Attiva le scorciatoie a un tasto" });
+        expect(checkbox).toBeChecked();
+
+        await userEvent.click(checkbox);
+        expect(checkbox).not.toBeChecked();
+        expect(localStorage.getItem("easylab-web-keyboard-shortcuts")).toBe("off");
+
+        await userEvent.click(checkbox);
+        expect(checkbox).toBeChecked();
+        expect(localStorage.getItem("easylab-web-keyboard-shortcuts")).toBeNull();
+    });
+
+    it("riapre con le scorciatoie spente se erano state spente", () => {
+        localStorage.setItem("easylab-web-keyboard-shortcuts", "off");
+        renderSection();
+
+        expect(screen.getByRole("checkbox", { name: "Attiva le scorciatoie a un tasto" })).not.toBeChecked();
+    });
 });

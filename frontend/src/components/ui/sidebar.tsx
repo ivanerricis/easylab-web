@@ -174,9 +174,12 @@ function Sidebar({
                     }
                     side={side}
                 >
+                    {/* Titolo e descrizione li legge solo lo screen reader all'apertura del
+                        pannello: in inglese, come arrivavano da shadcn, erano l'unico testo non
+                        italiano dell'app. */}
                     <SheetHeader className="sr-only">
-                        <SheetTitle>Sidebar</SheetTitle>
-                        <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+                        <SheetTitle>Menu principale</SheetTitle>
+                        <SheetDescription>Menu di navigazione</SheetDescription>
                     </SheetHeader>
                     <div className="flex h-full w-full flex-col">{children}</div>
                 </SheetContent>
@@ -231,7 +234,7 @@ function Sidebar({
 }
 
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-    const { toggleSidebar } = useSidebar();
+    const { toggleSidebar, isMobile, open, openMobile } = useSidebar();
 
     return (
         <Tooltip>
@@ -242,6 +245,9 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
                     variant="outline"
                     size="icon-lg"
                     className={cn(className)}
+                    // Dice allo screen reader se il menu è aperto: su mobile conta il pannello a
+                    // comparsa, su desktop la barra fissa (che da chiusa resta come colonna di icone).
+                    aria-expanded={isMobile ? openMobile : open}
                     onClick={(event) => {
                         onClick?.(event);
                         toggleSidebar();
@@ -249,7 +255,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
                     {...props}
                 >
                     <PanelLeftIcon className="size-5" />
-                    <span className="sr-only">Toggle Sidebar</span>
+                    <span className="sr-only">Apri/chiudi menu</span>
                 </Button>
             </TooltipTrigger>
             <TooltipContent>Apri/chiudi menu</TooltipContent>
@@ -257,9 +263,12 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
     );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+// Un `div` e non il `<main>` di shadcn: il contenuto principale lo dichiara già MainLayout,
+// attorno alla sola pagina (senza intestazione), e due `<main>` annidati confondono i punti di
+// riferimento dello screen reader, che ne annunciava due.
+function SidebarInset({ className, ...props }: React.ComponentProps<"div">) {
     return (
-        <main
+        <div
             data-slot="sidebar-inset"
             className={cn(
                 "relative flex w-full flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",

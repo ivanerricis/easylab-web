@@ -29,6 +29,8 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
         setConfirmText("");
     }
 
+    const isConfirmed = confirmText.trim().toUpperCase() === deleteConfirmKeyword;
+
     return (
         <CustomDialog
             open={open}
@@ -50,6 +52,14 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
                         disabled={isDeleting}
                         onChange={(event) => setConfirmText(event.target.value)}
                         autoComplete="off"
+                        // Sul telefono la tastiera partiva in minuscolo e il correttore
+                        // trasformava "ELIMINA" in "Elimina" (o in un'altra parola): il pulsante
+                        // restava spento senza un motivo visibile. Qui si chiedono le maiuscole e
+                        // niente correzioni; il confronto più sotto perdona comunque maiuscole e
+                        // spazi, perché la conferma sta nel digitare la parola, non nel come.
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
                     />
                 </div>
             }
@@ -59,7 +69,7 @@ const ConfirmDeleteDialog = ({ open, onOpenChange, title, description, isDeletin
             onCancel={() => onOpenChange(false)}
             onConfirm={() => void onConfirm()}
             cancelDisabled={isDeleting}
-            confirmDisabled={isDeleting || confirmText !== deleteConfirmKeyword}
+            confirmDisabled={isDeleting || !isConfirmed}
             preventOutsideClose={isDeleting}
             destructive
         />

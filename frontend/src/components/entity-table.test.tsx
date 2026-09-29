@@ -122,6 +122,23 @@ describe("EntityTable: colonne nascoste", () => {
     });
 });
 
+describe("EntityTable: colonne non nascondibili", () => {
+    /**
+     * Lo "Stato" dei report è diventato non nascondibile dopo che qualcuno l'aveva già nascosto:
+     * la chiave salvata nelle preferenze non deve più toglierlo dalla tabella.
+     */
+    it("disegna una colonna con hideable: false anche se è fra le nascoste", () => {
+        renderTable({
+            columns: columns.map((column) => (column.key === "status" ? { ...column, hideable: false } : column)),
+            hiddenColumnKeys: ["status", "email"],
+        });
+        const table = screen.getByRole("table");
+
+        expect(within(table).getByRole("columnheader", { name: "Stato" })).toBeInTheDocument();
+        expect(within(table).queryByRole("columnheader", { name: "Email" })).not.toBeInTheDocument();
+    });
+});
+
 describe("EntityTable", () => {
     it("disegna intestazioni, valori e azioni di ogni riga", () => {
         renderTable();
@@ -141,6 +158,32 @@ describe("EntityTable", () => {
         renderTable({ rows: [] });
 
         expect(within(screen.getByRole("table")).getByText("Nessun elemento.")).toBeInTheDocument();
+    });
+
+    /** Una lista che non si è potuta leggere non deve dire "Nessun elemento.". */
+    it("senza righe e con un errore di caricamento mostra l'errore e 'Riprova', in tabella e nelle schede", () => {
+        const onRetry = vi.fn();
+        renderTable({ rows: [], loadError: "Impossibile caricare i report", onRetry });
+
+        expect(screen.queryByText("Nessun elemento.")).not.toBeInTheDocument();
+
+        const table = screen.getByRole("table");
+        expect(within(table).getByText("Impossibile caricare i report.")).toBeInTheDocument();
+        fireEvent.click(within(table).getByRole("button", { name: "Riprova" }));
+        expect(onRetry).toHaveBeenCalledTimes(1);
+
+        // Le schede su mobile: tutto ciò che non è la tabella.
+        const buttons = screen.getAllByRole("button", { name: "Riprova" });
+        expect(buttons).toHaveLength(2);
+        fireEvent.click(buttons.find((button) => !table.contains(button))!);
+        expect(onRetry).toHaveBeenCalledTimes(2);
+    });
+
+    it("con delle righe già in tabella un errore di ricarica le lascia dove sono", () => {
+        renderTable({ loadError: "Impossibile caricare i report", onRetry: vi.fn() });
+
+        expect(within(screen.getByRole("table")).getByText("Mario")).toBeInTheDocument();
+        expect(screen.queryByText("Impossibile caricare i report.")).not.toBeInTheDocument();
     });
 
     /**
@@ -226,7 +269,8 @@ describe("EntityCardList", () => {
         renderCards();
         const [mario, anna] = screen.getAllByRole("article");
 
-        expect(within(mario).getByRole("heading")).toHaveTextContent("Mario Rossi");
+        // `h2`: sotto l'`h1` della pagina, senza saltare un livello.
+        expect(within(mario).getByRole("heading", { level: 2 })).toHaveTextContent("Mario Rossi");
         expect(within(mario).getByText("#1")).toBeInTheDocument();
         // Il segnaposto "-" di un cognome assente non finisce nel titolo.
         expect(within(anna).getByRole("heading")).toHaveTextContent(/^Anna$/);

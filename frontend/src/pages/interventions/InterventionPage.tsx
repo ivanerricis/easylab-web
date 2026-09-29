@@ -21,7 +21,7 @@ import {
     deleteIntervention,
     sendInterventionEmail,
 } from "@/lib/api";
-import { formatDate, formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
 import { toInterventionUpdatePayload } from "@/lib/interventionForm";
 import {
     formatInterventionStatus,
@@ -45,6 +45,7 @@ const InterventionPage = () => {
     const {
         data: intervention,
         isLoading,
+        isReloading,
         isNotFound,
         reload,
     } = useEntityDetail(id, getIntervention, {
@@ -106,7 +107,9 @@ const InterventionPage = () => {
         );
     }
 
-    if (isLoading) {
+    // Il caricamento a tutta pagina solo senza dati: sui ricaricamenti (Aggiorna, dopo "Salva")
+    // la scheda resta, attenuata. Vedi lo stesso commento in `ReportPage`.
+    if (isLoading && !intervention) {
         return <LoadingPage />;
     }
 
@@ -177,70 +180,76 @@ const InterventionPage = () => {
                 />
             </DetailHeader>
 
-            {/* Sotto `xl` una riga per voce, con il valore a destra: "In lavorazione" o
+            {/* Attenuato durante un ricaricamento: vedi lo stesso blocco in `ReportPage`. */}
+            <div
+                aria-busy={isReloading}
+                className={cn("flex flex-col gap-4", isReloading && "opacity-60 transition-opacity")}
+            >
+                {/* Sotto `xl` una riga per voce, con il valore a destra: "In lavorazione" o
                 "Intervento da remoto" non escono più dal bordo di una mezza card. */}
-            <DetailStats
-                mobileTitle={pageTitle}
-                items={[
-                    {
-                        label: "Stato",
-                        value: (
-                            <DetailStatBadge color={interventionStatusColor[intervention.status]}>
-                                {formatInterventionStatus(intervention.status)}
-                            </DetailStatBadge>
-                        ),
-                    },
-                    { label: "Tipo intervento", value: formatInterventionType(intervention.type) },
-                    { label: "Data intervento", value: formatDate(intervention.interventionDate) },
-                    {
-                        label: "Ora inizio",
-                        value: isAssistance ? formatInterventionTime(intervention.startTime) : "-",
-                    },
-                    { label: "Ora fine", value: isAssistance ? formatInterventionTime(intervention.endTime) : "-" },
-                ]}
-            />
+                <DetailStats
+                    mobileTitle={pageTitle}
+                    items={[
+                        {
+                            label: "Stato",
+                            value: (
+                                <DetailStatBadge color={interventionStatusColor[intervention.status]}>
+                                    {formatInterventionStatus(intervention.status)}
+                                </DetailStatBadge>
+                            ),
+                        },
+                        { label: "Tipo intervento", value: formatInterventionType(intervention.type) },
+                        { label: "Data intervento", value: formatDate(intervention.interventionDate) },
+                        {
+                            label: "Ora inizio",
+                            value: isAssistance ? formatInterventionTime(intervention.startTime) : "-",
+                        },
+                        { label: "Ora fine", value: isAssistance ? formatInterventionTime(intervention.endTime) : "-" },
+                    ]}
+                />
 
-            <div className="grid gap-4 xl:grid-cols-2">
-                <DetailSection title="Anagrafica" className="self-start">
-                    {/* A righe come la scheda report: etichetta a sinistra, valore a destra. */}
-                    <DetailGrid layout="rows">
-                        <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />
-                        <DetailItem label="Telefono" value={intervention.customerPhone ?? "-"} />
-                        <DetailItem
-                            label="Collaboratore"
-                            value={intervention.collaboratorName ?? "Collaboratore sconosciuto"}
-                        />
-                    </DetailGrid>
-                </DetailSection>
+                <div className="grid gap-4 xl:grid-cols-2">
+                    <DetailSection title="Anagrafica" className="self-start">
+                        {/* A righe come la scheda report: etichetta a sinistra, valore a destra. */}
+                        <DetailGrid layout="rows">
+                            <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />
+                            <DetailItem label="Telefono" value={intervention.customerPhone ?? "-"} />
+                            <DetailItem
+                                label="Collaboratore"
+                                value={intervention.collaboratorName ?? "Collaboratore sconosciuto"}
+                            />
+                        </DetailGrid>
+                    </DetailSection>
 
-                {/* A righe come la scheda report; i testi liberi (problema, descrizione, note) su
+                    {/* A righe come la scheda report; i testi liberi (problema, descrizione, note) su
                     telefono vanno sotto l'etichetta (`longText`). */}
-                <DetailSection title="Dettagli">
-                    <DetailGrid layout="rows">
-                        {isAssistance ? (
-                            <DetailItem label="Problema" value={intervention.problem ?? "-"} longText />
-                        ) : null}
-                        {/* Lo stesso nome del campo nel modulo ("Assistenza effettuata" o "Materiali
+                    <DetailSection title="Dettagli">
+                        <DetailGrid layout="rows">
+                            {isAssistance ? (
+                                <DetailItem label="Problema" value={intervention.problem ?? "-"} longText />
+                            ) : null}
+                            {/* Lo stesso nome del campo nel modulo ("Assistenza effettuata" o "Materiali
                             da consegnare"): "Descrizione" non diceva cosa ci fosse scritto. */}
-                        <DetailItem
-                            label={interventionDescriptionLabel(intervention.type)}
-                            value={intervention.description ?? "-"}
-                            longText
-                        />
-                        <DetailItem label="Note" value={intervention.note ?? "-"} longText />
-                        <DetailItem
-                            label="Prezzo"
-                            value={intervention.price != null ? formatEuro(intervention.price) : "-"}
-                        />
-                        <DetailItem label="Pagamento" value={formatPaidStatus(intervention.paid)} />
-                        <DetailItem label="Da fatturare" value={formatToInvoiceStatus(intervention.toInvoice)} />
-                        <DetailItem label="Creato il" value={formatDateTime(intervention.created_at)} />
-                        <DetailItem
-                            label="Ultimo aggiornamento"
-                            value={intervention.updated_at ? formatDateTime(intervention.updated_at) : "-"}
-                        />
-                    </DetailGrid>
-                </DetailSection>
+                            <DetailItem
+                                label={interventionDescriptionLabel(intervention.type)}
+                                value={intervention.description ?? "-"}
+                                longText
+                            />
+                            <DetailItem label="Note" value={intervention.note ?? "-"} longText />
+                            <DetailItem
+                                label="Prezzo"
+                                value={intervention.price != null ? formatEuro(intervention.price) : "-"}
+                            />
+                            <DetailItem label="Pagamento" value={formatPaidStatus(intervention.paid)} />
+                            <DetailItem label="Da fatturare" value={formatToInvoiceStatus(intervention.toInvoice)} />
+                            <DetailItem label="Creato il" value={formatDateTime(intervention.created_at)} />
+                            <DetailItem
+                                label="Ultimo aggiornamento"
+                                value={intervention.updated_at ? formatDateTime(intervention.updated_at) : "-"}
+                            />
+                        </DetailGrid>
+                    </DetailSection>
+                </div>
             </div>
 
             <CustomDialog

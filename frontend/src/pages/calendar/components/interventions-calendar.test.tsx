@@ -41,10 +41,16 @@ const event: InterventionCalendarEvent = {
     },
 };
 
-const renderCalendar = (onRangeChange = vi.fn(), { reactStrictMode = false } = {}) => {
+const renderCalendar = (
+    onRangeChange = vi.fn(),
+    {
+        reactStrictMode = false,
+        events = [event],
+    }: { reactStrictMode?: boolean; events?: InterventionCalendarEvent[] } = {}
+) => {
     renderWithProviders(
         <InterventionsCalendar
-            events={[event]}
+            events={events}
             isLoading={false}
             isInitialLoading={false}
             onCreateIntervention={vi.fn()}
@@ -185,5 +191,109 @@ describe("InterventionsCalendar", () => {
             expect(onRangeChange).toHaveBeenCalledTimes(3);
         });
         expect(onRangeChange.mock.calls[2][0]).toEqual(initialRange);
+    });
+});
+
+const eventLabel = "Mario Rossi, Intervento in sede, venerdì 11 settembre dalle 09:00 alle 10:30, Programmato";
+
+/**
+ * Da tastiera: nella vista mese l'evento non si raggiungeva con Tab (la libreria non gli dà
+ * `tabIndex`), e dove si raggiungeva (settimana, giorno) Invio non faceva niente.
+ */
+describe("InterventionsCalendar: eventi da tastiera", () => {
+    it.each([
+        ["mese", "month", "{Enter}"],
+        ["mese", "month", " "],
+        ["settimana", "week", "{Enter}"],
+        ["giorno", "day", " "],
+    ])("nella vista %s l'evento si raggiunge con Tab e si apre con %j", async (_label, view, key) => {
+        localStorage.setItem("easylab-web-calendar-view", view);
+        renderCalendar();
+
+        const eventButton = screen.getByRole("button", { name: eventLabel });
+        expect(eventButton).toHaveAttribute("tabindex", "0");
+
+        eventButton.focus();
+        await userEvent.keyboard(key);
+
+        expect(navigate).toHaveBeenCalledWith("/interventions/9");
+    });
+
+    it("gli altri tasti non aprono niente", async () => {
+        renderCalendar();
+
+        screen.getByRole("button", { name: eventLabel }).focus();
+        await userEvent.keyboard("a");
+
+        expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("nell'agenda l'evento è un pulsante, e Invio apre il dettaglio", async () => {
+        localStorage.setItem("easylab-web-calendar-view", "agenda");
+        renderCalendar();
+
+        screen.getByRole("button", { name: eventLabel }).focus();
+        await userEvent.keyboard("{Enter}");
+
+        expect(navigate).toHaveBeenCalledWith("/interventions/9");
+    });
+});
+
+/**
+ * Il popup "+N altri". In jsdom le misure valgono zero e la libreria non limiterebbe le righe:
+ * con un'altezza finta di 20px per ogni elemento, in ogni giorno ci sta un evento solo.
+ */
+describe('InterventionsCalendar: popup "+N altri"', () => {
+    const crowdedDay = Array.from({ length: 4 }, (_, index) => ({
+        ...event,
+        id: 20 + index,
+        title: `Cliente ${index + 1}`,
+        resource: { ...event.resource, id: 20 + index, customer: `Cliente ${index + 1}` },
+    }));
+
+    beforeEach(() => {
+        vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+            DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 20 })
+        );
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('si chiude con Esc, e il focus torna al "+N altri"', async () => {
+        renderCalendar(vi.fn(), { events: crowdedDay });
+
+        const showMore = screen.getByRole("button", { name: "+3 altri" });
+        await userEvent.click(showMore);
+        expect(document.querySelector(".rbc-overlay")).toBeInTheDocument();
+
+        await userEvent.keyboard("{Escape}");
+
+        expect(document.querySelector(".rbc-overlay")).not.toBeInTheDocument();
+        expect(showMore).toHaveFocus();
+    });
+
+    it("aperto da tastiera porta il focus sul primo intervento del popup", async () => {
+        renderCalendar(vi.fn(), { events: crowdedDay });
+
+        screen.getByRole("button", { name: "+3 altri" }).focus();
+        await userEvent.keyboard("{Enter}");
+
+        await waitFor(() => {
+            expect(document.activeElement?.closest(".rbc-overlay")).not.toBeNull();
+        });
+        expect(document.activeElement).toHaveAccessibleName(/^Cliente 1, /);
+    });
+
+    it("Esc senza popup aperto non fa niente", async () => {
+        renderCalendar(vi.fn(), { events: crowdedDay });
+        const onMouseDown = vi.fn();
+        document.addEventListener("mousedown", onMouseDown);
+
+        await userEvent.keyboard("{Escape}");
+
+        document.removeEventListener("mousedown", onMouseDown);
+        expect(onMouseDown).not.toHaveBeenCalled();
     });
 });

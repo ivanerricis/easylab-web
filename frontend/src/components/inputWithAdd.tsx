@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "./ui/button";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { buttonVariants } from "./ui/button";
 import { Input } from "./ui/input";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,9 @@ const splitCustomerOption = (option: string): { name: string; phone: string | nu
         ? { name: option, phone: null }
         : { name: option.slice(0, separatorIndex), phone: option.slice(separatorIndex + 3) };
 };
+
+/** Le voci della lista, nell'ordine in cui le frecce le percorrono: "Crea …" viene per ultima. */
+type ListItem = { kind: "option"; value: string } | { kind: "create" };
 
 type Props = Readonly<{
     id: string;
@@ -56,6 +59,14 @@ type Props = Readonly<{
     isSelectedOption?: boolean;
 }>;
 
+/**
+ * Campo con suggerimenti secondo lo schema WAI-ARIA "combobox" con lista a comparsa.
+ *
+ * Il focus resta sempre sul campo: la voce "attiva" delle frecce è indicata con
+ * `aria-activedescendant`, non spostando il focus sulle voci. Prima i suggerimenti erano
+ * pulsanti che rispondevano solo a `onMouseDown`: da tastiera non si raggiungevano (Tab faceva
+ * perdere il focus e la lista spariva), e Invio inviava l'intero modulo del dialogo.
+ */
 const InputWithAdd = ({
     id,
     "aria-invalid": ariaInvalid,
@@ -74,7 +85,18 @@ const InputWithAdd = ({
     const [isOpen, setIsOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [searchResults, setSearchResults] = useState<string[]>([]);
+    /** Indice in `items` della voce evidenziata dalle frecce; -1 = nessuna. */
+    const [activeIndex, setActiveIndex] = useState(-1);
     const debouncedValue = useDebouncedValue(value, 250);
+    const inputRef = useRef<HTMLInputElement>(null);
+    /**
+     * Rimettere il focus sul campo dopo una scelta (vedi `returnFocusToInput`) non deve
+     * riaprire la lista appena chiusa: `onFocus` la aprirebbe di nuovo.
+     */
+    const skipOpenOnFocusRef = useRef(false);
+
+    const listboxId = `${id}-suggerimenti`;
+    const optionId = (index: number) => `${id}-suggerimento-${index}`;
 
     const normalizedValue = value.trim().toLowerCase();
     /**
@@ -111,6 +133,8 @@ const InputWithAdd = ({
 
                 if (!isCancelled) {
                     setSearchResults(results);
+                    // Arrivano voci nuove: l'indice evidenziato si riferiva alle vecchie.
+                    setActiveIndex(-1);
                 }
             } catch {
                 // La ricerca annullata (superata da una più recente, o smontato il campo)
@@ -151,16 +175,87 @@ const InputWithAdd = ({
     }, [normalizedValue, options]);
 
     const canCreate = !onSearch && hasQuery && !hasExactMatch;
-    const hasSuggestions = filteredOptions.length > 0 || canCreate;
+
+    const items = useMemo<ListItem[]>(
+        () => [
+            ...filteredOptions.map((option): ListItem => ({ kind: "option", value: option })),
+            ...(canCreate ? [{ kind: "create" } as const] : []),
+        ],
+        [filteredOptions, canCreate]
+    );
+
+    const isListVisible = isOpen && items.length > 0;
+    // Un indice rimasto da una lista più lunga (le voci cambiano a ogni tasto) non vale più.
+    const currentIndex = isListVisible && activeIndex < items.length ? activeIndex : -1;
+
+    /**
+     * Esc a lista aperta deve chiudere solo la lista, non il dialogo. Radix ascolta Esc su
+     * `document` in fase di cattura, cioè prima di qualunque `onKeyDown` di React: fermarlo lì
+     * sarebbe troppo tardi. Lo si intercetta allora su `window`, che in cattura viene ancora
+     * prima di `document`, e solo finché la lista è aperta e il tasto parte da questo campo: a
+     * lista chiusa l'ascoltatore non c'è più, e il secondo Esc arriva al dialogo come sempre.
+     */
+    useEffect(() => {
+        if (!isListVisible) {
+            return;
+        }
+
+        const handleEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key !== "Escape" || event.target !== inputRef.current) {
+                return;
+            }
+
+            event.stopPropagation();
+            event.preventDefault();
+            setIsOpen(false);
+            setActiveIndex(-1);
+        };
+
+        window.addEventListener("keydown", handleEscape, { capture: true });
+        return () => window.removeEventListener("keydown", handleEscape, { capture: true });
+    }, [isListVisible]);
+
+    // La voce evidenziata dalle frecce resta visibile anche quando la lista scorre.
+    useEffect(() => {
+        if (currentIndex === -1) {
+            return;
+        }
+
+        // `?.`: jsdom non implementa `scrollIntoView`.
+        document.getElementById(`${id}-suggerimento-${currentIndex}`)?.scrollIntoView?.({ block: "nearest" });
+    }, [id, currentIndex]);
+
+    const closeList = () => {
+        setIsOpen(false);
+        setActiveIndex(-1);
+    };
+
+    /**
+     * Di norma il focus non lascia mai il campo (le voci trattengono il `mousedown`). Se però un
+     * browser da telefono lo sposta comunque sulla lista prima del tocco, lo si riporta sul
+     * campo: altrimenti, sparita la lista, il focus resterebbe sul nulla.
+     */
+    const returnFocusToInput = () => {
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+            skipOpenOnFocusRef.current = true;
+            inputRef.current.focus();
+        }
+    };
+
+    const selectOption = (option: string) => {
+        onChange(option);
+        closeList();
+        returnFocusToInput();
+    };
 
     const handleCreate = async () => {
         const trimmed = value.trim();
-        if (!trimmed) {
+        if (!trimmed || isCreating) {
             return;
         }
 
         if (!onCreate) {
-            setIsOpen(false);
+            closeList();
             return;
         }
 
@@ -168,92 +263,188 @@ const InputWithAdd = ({
             setIsCreating(true);
             await onCreate(trimmed);
             onChange(trimmed);
-            setIsOpen(false);
+            closeList();
+            returnFocusToInput();
         } finally {
             setIsCreating(false);
         }
     };
 
+    const chooseItem = (item: ListItem) => {
+        if (item.kind === "create") {
+            void handleCreate();
+        } else {
+            selectOption(item.value);
+        }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            // Le frecce aprono anche la lista chiusa (dopo Esc, o dopo una scelta): è il modo
+            // da tastiera di rivedere i suggerimenti senza cancellare il testo.
+            event.preventDefault();
+            setIsOpen(true);
+
+            if (items.length === 0) {
+                return;
+            }
+
+            const step = event.key === "ArrowDown" ? 1 : -1;
+            // Senza voce attiva, giù parte dalla prima e su dall'ultima; poi si gira in tondo.
+            const nextIndex =
+                currentIndex === -1
+                    ? step === 1
+                        ? 0
+                        : items.length - 1
+                    : (currentIndex + step + items.length) % items.length;
+            setActiveIndex(nextIndex);
+            return;
+        }
+
+        // Invio sceglie solo se c'è una voce evidenziata: altrimenti non si trattiene, e invia
+        // il modulo del dialogo come in qualunque altro campo.
+        // Durante una composizione (tastiere IME) Invio conferma i caratteri, non la voce.
+        if (event.key === "Enter" && currentIndex !== -1 && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            chooseItem(items[currentIndex]);
+        }
+    };
+
+    const resultCount = filteredOptions.length;
+    // Detto una volta dallo screen reader quando la lista cambia, senza togliere il focus.
+    const announcement = !isListVisible
+        ? ""
+        : resultCount === 0
+          ? "Nessun suggerimento"
+          : resultCount === 1
+            ? "1 suggerimento"
+            : `${resultCount} suggerimenti`;
+
+    const renderOption = (option: string, index: number) => {
+        // Solo le voci dei clienti (quelle che arrivano da `onSearch`) hanno il telefono in
+        // coda: dispositivi e difetti restano come sono, anche se contengono un trattino.
+        const { name, phone } = onSearch ? splitCustomerOption(option) : { name: option, phone: null };
+        const isActive = index === currentIndex;
+
+        return (
+            <div
+                key={option}
+                id={optionId(index)}
+                role="option"
+                aria-selected={isActive}
+                // Il nome accessibile resta la voce intera, con il trattino: i due pezzi in
+                // colonna letti di fila sarebbero "Nome333".
+                aria-label={phone == null ? undefined : option}
+                // `whitespace-normal` e altezza libera: "Nome Cognome - telefono" è più largo di
+                // un campo su telefono, e senza andare a capo il numero finiva tagliato. Una voce
+                // lunga ora occupa due righe.
+                className={cn(
+                    buttonVariants({ variant: "ghost", size: "lg" }),
+                    "h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal",
+                    isActive && "bg-muted text-foreground"
+                )}
+                onClick={() => selectOption(option)}
+            >
+                {phone == null ? (
+                    option
+                ) : (
+                    <span className="flex min-w-0 flex-col">
+                        <span>{name}</span>
+                        <span className="text-sm whitespace-nowrap text-muted-foreground">{phone}</span>
+                    </span>
+                )}
+            </div>
+        );
+    };
+
+    const createIndex = filteredOptions.length;
+    const isCreateActive = canCreate && currentIndex === createIndex;
+
     return (
-        <div className="relative w-full">
+        <div
+            className="relative w-full"
+            // La lista si chiude appena il focus esce dal gruppo campo + lista, senza più il
+            // `setTimeout` di 100ms che serviva solo a lasciar arrivare il `mousedown` sulla voce
+            // prima di smontarla. Il focus che passa dal campo alla lista (vedi
+            // `returnFocusToInput`) resta dentro, e la lista resta aperta.
+            onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    closeList();
+                }
+            }}
+        >
             <Input
+                ref={inputRef}
                 // 40px fissi come il "+" accanto (`icon-lg`), non `h-full`: su telefono la lista
                 // sta nel flusso sotto il campo, e con `h-full` il campo si allungava con lei.
                 className={cn("group h-10", inputClassName)}
                 id={id}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={isListVisible}
+                aria-controls={isListVisible ? listboxId : undefined}
+                aria-activedescendant={currentIndex === -1 ? undefined : optionId(currentIndex)}
                 aria-invalid={ariaInvalid}
                 aria-describedby={ariaDescribedBy}
                 placeholder={placeholder}
                 value={value}
-                onFocus={() => setIsOpen(true)}
-                onBlur={() => {
-                    setTimeout(() => setIsOpen(false), 100);
+                onFocus={() => {
+                    if (skipOpenOnFocusRef.current) {
+                        skipOpenOnFocusRef.current = false;
+                        return;
+                    }
+                    setIsOpen(true);
                 }}
+                onKeyDown={handleKeyDown}
                 onChange={(event) => {
                     onChange(event.target.value);
                     setIsOpen(true);
+                    // Il testo cambia, le voci pure: l'evidenziazione riparte da capo.
+                    setActiveIndex(-1);
                 }}
                 required={required}
             />
 
-            {isOpen && hasSuggestions ? (
+            <span className="sr-only" aria-live="polite">
+                {announcement}
+            </span>
+
+            {isListVisible ? (
                 // Sotto `sm` la lista sta nel flusso invece che sovrapposta: nei dialoghi il campo
                 // è dentro un'area che scorre, e una lista `absolute` veniva tagliata dal bordo di
                 // quell'area (su telefono si vedevano due voci e mezza). Nel flusso spinge in giù
                 // i campi sotto, e l'area scorre per mostrarla tutta. Da `sm` il dialogo è largo
                 // e alto abbastanza, e la lista torna sovrapposta come prima.
-                <div className="mt-1 w-full rounded-md border bg-card shadow-sm sm:absolute sm:z-10 sm:mt-2">
-                    <div className="max-h-48 overflow-auto">
-                        {filteredOptions.map((option) => {
-                            // Solo le voci dei clienti (quelle che arrivano da `onSearch`) hanno il
-                            // telefono in coda: dispositivi e difetti restano come sono, anche se
-                            // contengono un trattino.
-                            const { name, phone } = onSearch
-                                ? splitCustomerOption(option)
-                                : { name: option, phone: null };
-
-                            return (
-                                <Button
-                                    key={option}
-                                    type="button"
-                                    variant="ghost"
-                                    size={"lg"}
-                                    // `whitespace-normal` e altezza libera: "Nome Cognome - telefono"
-                                    // è più largo di un campo su telefono, e senza andare a capo il
-                                    // numero finiva tagliato. Una voce lunga ora occupa due righe.
-                                    className="h-auto min-h-10 w-full justify-start rounded-sm py-2 text-left whitespace-normal"
-                                    // Il nome accessibile resta la voce intera, con il trattino:
-                                    // i due pezzi in colonna letti di fila sarebbero "Nome333".
-                                    aria-label={phone == null ? undefined : option}
-                                    onMouseDown={() => {
-                                        onChange(option);
-                                        setIsOpen(false);
-                                    }}
-                                >
-                                    {phone == null ? (
-                                        option
-                                    ) : (
-                                        <span className="flex min-w-0 flex-col">
-                                            <span>{name}</span>
-                                            <span className="text-sm whitespace-nowrap text-muted-foreground">
-                                                {phone}
-                                            </span>
-                                        </span>
-                                    )}
-                                </Button>
-                            );
-                        })}
-                    </div>
+                <div
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="Suggerimenti"
+                    // Fuori dall'ordine di Tab: serve solo da rete per il focus spostato dal tocco
+                    // su telefono (vedi l'`onBlur` del contenitore).
+                    tabIndex={-1}
+                    className="mt-1 w-full rounded-md border bg-card shadow-sm outline-none sm:absolute sm:z-10 sm:mt-2"
+                    // Trattiene il focus sul campo: senza, il `mousedown` su una voce lo toglieva
+                    // al campo e la lista si chiudeva prima del `click` che sceglie. Il `click`
+                    // (e non il `mousedown`) è quello che anche il tocco su telefono genera.
+                    onMouseDown={(event) => event.preventDefault()}
+                >
+                    <div className="max-h-48 overflow-auto">{filteredOptions.map(renderOption)}</div>
 
                     {canCreate ? (
-                        <Button
-                            type="button"
-                            size="lg"
-                            className="w-full rounded-sm"
-                            onMouseDown={() => {
+                        <div
+                            id={optionId(createIndex)}
+                            role="option"
+                            aria-selected={isCreateActive}
+                            aria-disabled={isCreating || undefined}
+                            className={cn(
+                                buttonVariants({ size: "lg" }),
+                                "w-full rounded-sm",
+                                isCreateActive && "bg-primary/80 ring-2 ring-focus-ring ring-inset",
+                                isCreating && "pointer-events-none opacity-50"
+                            )}
+                            onClick={() => {
                                 void handleCreate();
                             }}
-                            disabled={isCreating}
                         >
                             <Plus className="size-5" />
                             {/* `canCreate` è vero solo senza `onSearch`, e i due usi senza
@@ -263,7 +454,7 @@ const InputWithAdd = ({
                                 facoltativo nel tipo, e `handleCreate` lo ricontrolla prima di
                                 chiamarlo, a difesa di un chiamante futuro che lo dimentichi. */}
                             {isCreating ? "Creazione..." : `Crea "${value.trim()}"`}
-                        </Button>
+                        </div>
                     ) : null}
                 </div>
             ) : null}

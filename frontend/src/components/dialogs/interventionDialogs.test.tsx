@@ -89,7 +89,8 @@ describe("CreateInterventionDialog", () => {
 
     const fillCustomerAndCollaborator = async () => {
         await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
-        await userEvent.click(await screen.findByRole("option", { name: "Mario Rossi - 333" }));
+        // Dieci secondi e non il secondo di default: vedi `pickSuggestion` in `reportDialogs.test.tsx`.
+        await userEvent.click(await screen.findByRole("option", { name: "Mario Rossi - 333" }, { timeout: 10_000 }));
         await chooseOption(/^Collaboratore/, "Luca Bianchi");
     };
 
@@ -289,7 +290,8 @@ describe("CreateInterventionDialog", () => {
     });
 
     /** Su telefono il modulo diventa a quattro passi (vedi `interventionSteps`). */
-    describe("su telefono, a passi", () => {
+    // Fra i test più lunghi: sotto carico i 20 secondi di default del file non bastavano.
+    describe("su telefono, a passi", { timeout: 60_000 }, () => {
         const desktopWidth = window.innerWidth;
 
         beforeEach(() => {
@@ -312,13 +314,10 @@ describe("CreateInterventionDialog", () => {
                 "Seleziona un collaboratore",
             ]);
 
-            // Il cliente scritto a mano, non scelto dai suggerimenti: vedi lo stesso test in
-            // `reportDialogs.test.tsx`.
-            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
-            await chooseOption(/^Collaboratore/, "Luca Bianchi");
+            await fillCustomerAndCollaborator();
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
-            // "Avanti" verifica il cliente sul server prima di passare oltre: il passo arriva
-            // dopo la risposta, non subito.
+            // Il cliente è stato scelto dai suggerimenti, quindi l'id c'è già e "Avanti" non lo
+            // verifica sul server (quel percorso ha i suoi test, sotto).
             expect(await screen.findByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
             expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
 
@@ -332,9 +331,8 @@ describe("CreateInterventionDialog", () => {
             await waitFor(() => {
                 expect(onSubmit).toHaveBeenCalled();
             });
-            // L'id trovato dalla verifica su "Avanti" si tiene: il salvataggio non lo cerca di nuovo.
             expect(onSubmit.mock.calls[0][0]).toMatchObject({
-                customer: "Mario Rossi",
+                customer: "Mario Rossi - 333",
                 customerId: 30,
                 collaboratorId: 40,
                 interventionDate: "2026-10-05",

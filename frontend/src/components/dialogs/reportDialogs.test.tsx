@@ -78,10 +78,18 @@ const chooseOption = async (label: string | RegExp, option: string) => {
     await userEvent.click(await screen.findByRole("option", { name: option }));
 };
 
-/** Scrive in un campo con suggerimenti e clicca quello indicato. */
+/**
+ * Scrive in un campo con suggerimenti e clicca quello indicato.
+ *
+ * Dieci secondi e non il secondo di default di `findBy`: la lista arriva dopo la pausa di battitura
+ * (250ms), la ricerca e un nuovo disegno del dialogo intero, e con la CPU occupata (CI, o altri
+ * processi in locale) tutto questo supera il secondo anche se la lista poi compare: misurato con la
+ * CPU sotto carico, una lista comparsa 2 secondi dopo la scadenza dell'attesa. Un'attesa più lunga
+ * non rallenta i test che passano, finisce appena la voce c'è.
+ */
 const pickSuggestion = async (field: HTMLElement, text: string, suggestion: string) => {
     await userEvent.type(field, text);
-    await userEvent.click(await screen.findByRole("option", { name: suggestion }));
+    await userEvent.click(await screen.findByRole("option", { name: suggestion }, { timeout: 10_000 }));
 };
 
 beforeEach(() => {
@@ -309,7 +317,9 @@ describe("CreateReportDialog", () => {
     });
 
     /** Su telefono le tre sezioni diventano tre passi (vedi `reportSteps`). */
-    describe("su telefono, a passi", () => {
+    // Fra i test più lunghi (il cliente si cerca e si sceglie, poi tre passi): sotto carico i 20 secondi
+    // di default del file non bastavano.
+    describe("su telefono, a passi", { timeout: 60_000 }, () => {
         const desktopWidth = window.innerWidth;
 
         beforeEach(() => {
@@ -336,19 +346,16 @@ describe("CreateReportDialog", () => {
                 "Seleziona un dispositivo",
             ]);
 
-            // Il cliente scritto a mano, non scelto dai suggerimenti: la ricerca clienti è coperta dai
-            // test sopra, e qui su CI il suggerimento non compariva (in locale sì) — il test riguarda i
-            // passi, non la ricerca.
-            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+            await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
-            // "Avanti" verifica il cliente sul server prima di passare oltre: il passo arriva
-            // dopo la risposta, non subito.
+            // Il cliente è stato scelto dai suggerimenti, quindi l'id c'è già e "Avanti" non lo
+            // verifica sul server (quel percorso ha i suoi test, sotto).
             await pickSuggestion(await screen.findByLabelText(/^Difetto/), "schermo", "Schermo rotto");
             // "Indietro" torna al passo prima senza perdere quanto scritto.
             await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
-            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi");
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Schermo rotto");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
@@ -360,9 +367,8 @@ describe("CreateReportDialog", () => {
             await waitFor(() => {
                 expect(onSubmit).toHaveBeenCalled();
             });
-            // L'id trovato dalla verifica su "Avanti" si tiene: il salvataggio non lo cerca di nuovo.
             expect(onSubmit.mock.calls[0][0]).toMatchObject({
-                customer: "Mario Rossi",
+                customer: "Mario Rossi - 333",
                 customerId: 30,
                 deviceId: 10,
                 issueId: 20,

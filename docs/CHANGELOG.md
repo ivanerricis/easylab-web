@@ -11,6 +11,69 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-29 — Scansione del frontend, fase 2: meno copie, più test
+
+Seconda parte della scansione del 2026-09-28: i refactoring e i test mancanti, sopra il codice già
+corretto nella fase 1. Nessun cambiamento visibile, salvo dove detto. Sei agenti in due ondate, su
+file separati; ogni hook nuovo ha i suoi test, verificati rompendo apposta il codice (mutazioni).
+
+- **`usePendingAction`** (`hooks/usePendingAction.ts`). Il blocco "conferma → esegui → avviso →
+  chiudi" (elemento in attesa, stato "in corso", protezione dal doppio invio, `try/catch/finally`
+  con i toast) era scritto a mano undici volte: eliminazioni in report, interventi, clienti,
+  anagrafiche e schede, invio email (due copie identiche parola per parola), le quattro azioni sugli
+  utenti. Ora è un hook solo; i casi particolari passano da `onDone` (ricaricare, tornare indietro
+  dopo `settleDialogHistory`, la 2FA sul proprio account) e `onError` (la password rifiutata sotto
+  il campo). Unica differenza: il doppio invio è fermato anche da un ref, che cambia subito, e non
+  solo dallo stato, che arriva al render dopo. ~190 righe in meno.
+- **`createEntityApi`** (`lib/api/client.ts`), controparte di `createCrudRouter` del backend: le
+  cinque anagrafiche ripetevano la stessa lista, `pageSize ?? 1000`, `search.trim()` e rinomina dei
+  timestamp. Stessi nomi esportati e stesse richieste. Tolto `listCustomers()` senza parametri, che
+  scaricava l'intera tabella clienti e non usava più nessuno (un `@ts-expect-error` nel test lo fa
+  segnalare dal typecheck se tornasse).
+- **Liste principali.** Negli hook `use{Reports,Interventions,Customers}Rows` la `queryKey` era una
+  copia a mano dei parametri: un filtro nuovo dimenticato nella chiave non avrebbe ricaricato la
+  lista. Ora chiave e richiesta nascono dallo stesso oggetto. L'ordinamento "campo:verso" non passa
+  più da un cast non verificato: `parseSortParams` (`lib/tableSort.ts`) controlla campo e verso
+  contro i tipi dell'API e per un valore sconosciuto (un link vecchio) usa il predefinito della
+  lista. Accanto resta `parseSortOption`, che serve alle intestazioni della tabella.
+- **`useSettingsForm`** (`hooks/useSettingsForm.ts`): carica, tiene modifiche e salvataggio, valida,
+  salva, riallinea il modulo alla risposta e segnala alla pagina le modifiche non salvate, per i
+  pannelli Azienda, Email, Backup e conservazione dei Log, che lo riscrivevano ognuno con piccole
+  differenze (l'email costruiva due volte la stessa conversione DTO → modulo).
+- **`reportFieldErrors`** (`lib/formField.ts`): "mostra gli errori e metti a fuoco il primo campo
+  sbagliato" era scritto a mano in undici punti; ora lo usano i pannelli e nove dialoghi. Quelli a
+  passi gli passano un `focusField` che prima apre il passo del campo.
+- **`FormField` e `FormSection` nei moduli grandi.** Una cinquantina di campi (modifica e creazione
+  report, campi degli interventi, backup) erano etichetta + asterisco + controllo + errore a mano:
+  ora passano da `FormField`, che ha `labelSize="sm"` (una misura, non una classe libera: `text-sm`
+  sopra `text-lg` faceva perdere a tailwind-merge il `leading-none` di `Label`),
+  `groupControlAndError` per la subgrid delle Impostazioni e `description`. Il riquadro delle
+  sezioni, copiato in sei punti, è `components/dialogs/form-section.tsx`. Verificato con Playwright
+  a 390 e 1366px su 37 stati dei dialoghi: posizione e misura di 790 elementi, attributi aria e
+  focus identici prima e dopo.
+- **Creazione di report e interventi.** "Crea → ricarica → avviso con Apri/Stampa" era copiato sei
+  volte: ora `submitNewReport`/`submitNewIntervention` (`lib/reportForm.ts`,
+  `lib/interventionForm.ts`) e `useCreateReportFlow`/`useCreateInterventionFlow`
+  (`hooks/useCreateEntityFlow.ts`); ogni pagina dice solo cosa ricaricare.
+- **Dashboard** da 728 a 496 righe: lo stato dei numeri è in `useDashboardStats`, un oggetto invece
+  di sei `useState`, con gli stessi presìdi della fase 1 (id della richiesta, annullamento, "—" su
+  errore, etichetta che torna al mese caricato). I conti sui mesi, che sbagliano senza farsi
+  notare, sono in `lib/monthKey.ts` e il confronto "fino allo stesso giorno" in
+  `pages/dashboard/revenueComparison.ts`, con test su cambio d'anno e febbraio nei bisestili
+  (2028, 2100, 2000).
+- **`EntityDetailGate`** (`components/entity-detail-gate.tsx`): il blocco non trovato / caricamento /
+  non disponibile ripetuto nelle cinque schede di dettaglio.
+- **Test.** Nuovi test unitari per `useListScrollRestoration`, `listScroll` e `tableSort`; quelli di
+  `usePageShortcut` e `useHiddenColumns` coprono ora le regole scritte solo nei commenti. Nuovo e2e
+  `e2e/reportsFlow.spec.ts`: crea un report con un cliente nuovo scegliendo dal combobox; apre un
+  report da una lista filtrata, cercata e alla seconda pagina e, tornando indietro, ritrova
+  indirizzo e posizione di scorrimento; lo modifica e lo elimina con ELIMINA tornando alla stessa
+  lista; su telefono (390×844) il dialogo del cliente nuovo sta nello schermo e "Indietro" chiude i
+  dialoghi uno alla volta senza cambiare pagina. Sono cose che jsdom non può verificare.
+
+Verifica: typecheck e lint puliti, 1029 test unitari e 9 e2e verdi (erano 927 e 6 dopo la fase 1),
+screenshot di Dashboard, incassi e schede a 390 e 1366px.
+
 ## 2026-09-28 — Scansione del frontend, fase 1: telefono, robustezza, accessibilità
 
 Una scansione del frontend con sei agenti (prestazioni, bug, accessibilità, qualità del codice, UX,

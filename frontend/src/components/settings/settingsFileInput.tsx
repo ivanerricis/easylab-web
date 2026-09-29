@@ -41,7 +41,12 @@ const SettingsFileInput = ({
             <Label id={labelId} htmlFor={id}>
                 {label}
             </Label>
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            {/* `relative`: `sr-only` rende il campo `position: absolute`, e senza un antenato
+                posizionato vicino si ancorava al `<main>` del layout, fuori dalla sezione che
+                scorre. Lì, alla sua altezza naturale, allungava l'area di scorrimento del `<main>`:
+                in Backup 2715px invece di 792 su telefono, e arrivati in fondo alla sezione si
+                continuava a scorrere su uno schermo vuoto. */}
+            <div className="relative flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                 <input
                     ref={inputRef}
                     id={id}

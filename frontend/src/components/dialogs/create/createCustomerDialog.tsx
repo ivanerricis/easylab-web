@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
-import { fieldProps, hasFormChanged } from "@/lib/formField";
+import { fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api";
 import { isValidEmail } from "@/lib/utils";
@@ -30,6 +30,9 @@ type Props = {
 };
 
 type FieldErrors = Partial<Record<"firstName" | "phoneNumber" | "email", string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["firstName", "phoneNumber", "email"] as const;
 
 const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [formValues, setFormValues] = useState({
@@ -85,12 +88,7 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
             nextErrors.email = "Indirizzo email non valido";
         }
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = (["firstName", "phoneNumber", "email"] as const).find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors)) {
             return;
         }
 

@@ -1,6 +1,7 @@
 import DatePickerField from "@/components/date-picker-field";
 import EuroInput from "@/components/euro-input";
-import { FieldError, RequiredMark } from "@/components/form-field";
+import FormField from "@/components/form-field";
+import FormSection from "@/components/dialogs/form-section";
 import PaidStatusSelector from "@/components/paid-status-selector";
 import ToInvoiceSelector from "@/components/to-invoice-selector";
 import { Input } from "@/components/ui/input";
@@ -44,11 +45,7 @@ export const InterventionCollaboratorField = ({
     onChange,
     collaborators,
 }: FieldsProps & { collaborators: CollaboratorDto[] }) => (
-    <div className="grid gap-1">
-        <Label htmlFor="collaboratorId" className="text-lg">
-            Collaboratore
-            <RequiredMark />
-        </Label>
+    <FormField id="collaboratorId" label="Collaboratore" className="gap-1" required error={errors.collaboratorId}>
         <Select value={values.collaboratorId} onValueChange={(collaboratorId) => onChange({ collaboratorId })}>
             <SelectTrigger
                 id="collaboratorId"
@@ -65,8 +62,7 @@ export const InterventionCollaboratorField = ({
                 ))}
             </SelectContent>
         </Select>
-        <FieldError id="collaboratorId" error={errors.collaboratorId} />
-    </div>
+    </FormField>
 );
 
 /** L'intera sezione "Intervento": tipo, stato, data, prezzo, pagamento, orari, problema, descrizione, note. */
@@ -85,11 +81,7 @@ export const InterventionDetailsSection = ({
     const isCompleted = isCompletedInterventionStatus(values.status);
 
     return (
-        <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                {part ? interventionDetailsPartTitles[part] : "Intervento"}
-            </h3>
-
+        <FormSection title={part ? interventionDetailsPartTitles[part] : "Intervento"}>
             {/*
                 `items-start` in tutte le griglie di campi: quando un campo mostra l'errore sotto di
                 sé la riga si allunga, e senza le celle vicine si stiravano con lei spingendo in giù
@@ -98,10 +90,7 @@ export const InterventionDetailsSection = ({
             <div className="grid items-start gap-4 lg:grid-cols-2">
                 {shows("schedule") ? (
                     <>
-                        <div className="grid gap-1">
-                            <Label htmlFor="type" className="text-lg">
-                                Tipo intervento
-                            </Label>
+                        <FormField id="type" label="Tipo intervento" className="gap-1">
                             <Select
                                 value={values.type}
                                 onValueChange={(type) => onChange({ type: type as InterventionType })}
@@ -117,12 +106,9 @@ export const InterventionDetailsSection = ({
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
+                        </FormField>
 
-                        <div className="grid gap-1">
-                            <Label htmlFor="status" className="text-lg">
-                                Stato
-                            </Label>
+                        <FormField id="status" label="Stato" className="gap-1">
                             <Select
                                 value={values.status}
                                 onValueChange={(status) => onChange({ status: status as InterventionStatus })}
@@ -138,37 +124,34 @@ export const InterventionDetailsSection = ({
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
+                        </FormField>
 
-                        <div className="grid gap-1">
-                            <Label htmlFor="interventionDate" className="text-lg">
-                                {interventionDateLabel(values.type)}
-                                <RequiredMark />
-                            </Label>
+                        <FormField
+                            id="interventionDate"
+                            label={interventionDateLabel(values.type)}
+                            className="gap-1"
+                            required
+                            error={errors.interventionDate}
+                        >
                             <DatePickerField
                                 id="interventionDate"
                                 {...fieldErrorAria("interventionDate", errors.interventionDate)}
                                 value={values.interventionDate}
                                 onValueChange={(interventionDate) => onChange({ interventionDate })}
                             />
-                            <FieldError id="interventionDate" error={errors.interventionDate} />
-                        </div>
+                        </FormField>
                     </>
                 ) : null}
 
                 {shows("payment") ? (
                     <>
-                        <div className="grid gap-1">
-                            <Label htmlFor="price" className="text-lg">
-                                Prezzo
-                            </Label>
+                        <FormField id="price" label="Prezzo" className="gap-1" error={errors.price}>
                             <EuroInput
                                 {...fieldProps("price", { error: errors.price })}
                                 value={values.price}
                                 onChange={(event) => onChange({ price: event.target.value })}
                             />
-                            <FieldError id="price" error={errors.price} />
-                        </div>
+                        </FormField>
 
                         {/*
                          * Larghi quanto tutta la sezione: dentro mezza colonna le due schede radio si
@@ -201,29 +184,33 @@ export const InterventionDetailsSection = ({
                                 ["endTime", "Ora fine"],
                             ] as const
                         ).map(([field, label]) => (
-                            <div key={field} className="grid gap-1">
-                                <Label htmlFor={field} className="text-lg">
-                                    {label}
-                                    {isCompleted ? <RequiredMark /> : null}
-                                </Label>
+                            <FormField
+                                key={field}
+                                id={field}
+                                label={label}
+                                className="gap-1"
+                                required={isCompleted}
+                                error={errors[field]}
+                            >
                                 <Input
                                     {...fieldProps(field, { error: errors[field] })}
                                     type="time"
                                     value={values[field]}
                                     onChange={(event) => onChange({ [field]: event.target.value })}
                                 />
-                                <FieldError id={field} error={errors[field]} />
-                            </div>
+                            </FormField>
                         ))}
                     </div>
                 ) : null}
 
                 {isAssistance && shows("work") ? (
-                    <div className="grid gap-1 lg:col-span-2">
-                        <Label htmlFor="problem" className="text-lg">
-                            Problema
-                            <RequiredMark />
-                        </Label>
+                    <FormField
+                        id="problem"
+                        label="Problema"
+                        className="gap-1 lg:col-span-2"
+                        required
+                        error={errors.problem}
+                    >
                         <Textarea
                             {...fieldProps("problem", { error: errors.problem })}
                             className="resize-none"
@@ -232,17 +219,18 @@ export const InterventionDetailsSection = ({
                             value={values.problem}
                             onChange={(event) => onChange({ problem: event.target.value })}
                         />
-                        <FieldError id="problem" error={errors.problem} />
-                    </div>
+                    </FormField>
                 ) : null}
 
                 {shows("work") ? (
                     <>
-                        <div className="grid gap-1 lg:col-span-2">
-                            <Label htmlFor="description" className="text-lg">
-                                {interventionDescriptionLabel(values.type)}
-                                {isCompleted ? <RequiredMark /> : null}
-                            </Label>
+                        <FormField
+                            id="description"
+                            label={interventionDescriptionLabel(values.type)}
+                            className="gap-1 lg:col-span-2"
+                            required={isCompleted}
+                            error={errors.description}
+                        >
                             <Textarea
                                 {...fieldProps("description", { error: errors.description })}
                                 className="resize-none"
@@ -255,13 +243,9 @@ export const InterventionDetailsSection = ({
                                 value={values.description}
                                 onChange={(event) => onChange({ description: event.target.value })}
                             />
-                            <FieldError id="description" error={errors.description} />
-                        </div>
+                        </FormField>
 
-                        <div className="grid gap-1 lg:col-span-2">
-                            <Label htmlFor="note" className="text-lg">
-                                Note
-                            </Label>
+                        <FormField id="note" label="Note" className="gap-1 lg:col-span-2">
                             <Textarea
                                 id="note"
                                 className="resize-none"
@@ -270,10 +254,10 @@ export const InterventionDetailsSection = ({
                                 value={values.note}
                                 onChange={(event) => onChange({ note: event.target.value })}
                             />
-                        </div>
+                        </FormField>
                     </>
                 ) : null}
             </div>
-        </section>
+        </FormSection>
     );
 };

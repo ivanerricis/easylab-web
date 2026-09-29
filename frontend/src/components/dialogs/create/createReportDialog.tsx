@@ -1,6 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
+import FormField from "@/components/form-field";
+import FormSection from "@/components/dialogs/form-section";
+import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { findCustomerByText } from "@/lib/customerLookup";
 import { isCatchAllIssue } from "@/lib/issues";
@@ -8,7 +9,6 @@ import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDial
 import CreateDeviceDialog from "@/components/dialogs/create/createDeviceDialog";
 import CreateIssueDialog from "@/components/dialogs/create/createIssueDialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     createCustomer,
@@ -305,12 +305,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 stepErrors.client = await checkCustomerExists();
             }
 
-            setFieldErrors(stepErrors);
-
-            const firstInvalidStepField = fieldOrder.find((field) => stepErrors[field]);
-
-            if (firstInvalidStepField) {
-                focusField(firstInvalidStepField);
+            if (reportFieldErrors(stepErrors, fieldOrder, setFieldErrors, focusField)) {
                 return;
             }
 
@@ -318,12 +313,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
             return;
         }
 
-        setFieldErrors(nextFieldErrors);
-
-        const firstInvalidField = fieldOrder.find((field) => nextFieldErrors[field]);
-
-        if (firstInvalidField) {
-            focusField(firstInvalidField);
+        if (reportFieldErrors(nextFieldErrors, fieldOrder, setFieldErrors, focusField)) {
             return;
         }
 
@@ -388,22 +378,20 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                         ) : null}
 
                         {!isStepped || step === 0 ? (
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Anagrafica
-                                </h3>
-
+                            <FormSection title="Anagrafica">
                                 {/*
                                 `items-start` in tutte le griglie di campi: quando un campo mostra
                                 l'errore sotto di sé la riga si allunga, e senza le celle vicine si
                                 stiravano con lei spingendo in giù etichetta e campo.
                             */}
                                 <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid gap-1 lg:col-span-1">
-                                        <Label htmlFor="client" className="text-lg">
-                                            Cliente
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="client"
+                                        label="Cliente"
+                                        className="gap-1 lg:col-span-1"
+                                        required
+                                        error={fieldErrors.client}
+                                    >
                                         <div className="flex">
                                             <InputWithAdd
                                                 id="client"
@@ -435,14 +423,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 <TooltipContent>Crea nuovo cliente</TooltipContent>
                                             </Tooltip>
                                         </div>
-                                        <FieldError id="client" error={fieldErrors.client} />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-1">
-                                        <Label htmlFor="deviceType" className="text-lg">
-                                            Tipologia dispositivo
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="deviceType"
+                                        label="Tipologia dispositivo"
+                                        className="gap-1 lg:col-span-2 xl:col-span-1"
+                                        required
+                                        error={fieldErrors.deviceType}
+                                    >
                                         <div className="flex">
                                             <InputWithAdd
                                                 id="deviceType"
@@ -477,24 +466,21 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 <TooltipContent>Crea nuovo dispositivo</TooltipContent>
                                             </Tooltip>
                                         </div>
-                                        <FieldError id="deviceType" error={fieldErrors.deviceType} />
-                                    </div>
+                                    </FormField>
                                 </div>
-                            </section>
+                            </FormSection>
                         ) : null}
 
                         {!isStepped || step === 1 ? (
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Intervento
-                                </h3>
-
+                            <FormSection title="Intervento">
                                 <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-1">
-                                        <Label htmlFor="issue" className="text-lg">
-                                            Difetto
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="issue"
+                                        label="Difetto"
+                                        className="gap-1 lg:col-span-2 xl:col-span-1"
+                                        required
+                                        error={fieldErrors.issue}
+                                    >
                                         <div className="flex">
                                             <InputWithAdd
                                                 id="issue"
@@ -530,8 +516,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 <TooltipContent>Crea nuovo difetto</TooltipContent>
                                             </Tooltip>
                                         </div>
-                                        <FieldError id="issue" error={fieldErrors.issue} />
-                                    </div>
+                                    </FormField>
 
                                     {/*
                                     Solo con "Altro": è il caso in cui l'etichetta del catalogo non
@@ -540,11 +525,13 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                     qualunque altro difetto la casella non serve e non compare.
                                 */}
                                     {isCatchAllIssue(formValues.issue) ? (
-                                        <div className="grid gap-1 lg:col-span-2 xl:col-span-2">
-                                            <Label htmlFor="issueDescription" className="text-lg">
-                                                Problema riscontrato
-                                                <RequiredMark />
-                                            </Label>
+                                        <FormField
+                                            id="issueDescription"
+                                            label="Problema riscontrato"
+                                            className="gap-1 lg:col-span-2 xl:col-span-2"
+                                            required
+                                            error={fieldErrors.issueDescription}
+                                        >
                                             <Textarea
                                                 {...fieldProps("issueDescription", {
                                                     error: fieldErrors.issueDescription,
@@ -563,14 +550,10 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                     }));
                                                 }}
                                             />
-                                            <FieldError id="issueDescription" error={fieldErrors.issueDescription} />
-                                        </div>
+                                        </FormField>
                                     ) : null}
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="password" className="text-lg">
-                                            Password sblocco
-                                        </Label>
+                                    <FormField id="password" label="Password sblocco" className="gap-1">
                                         <Input
                                             id="password"
                                             placeholder="Password dispositivo"
@@ -579,12 +562,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 setFormValues((prev) => ({ ...prev, password: event.target.value }))
                                             }
                                         />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1 lg:col-span-2 xl:col-span-2">
-                                        <Label htmlFor="notes" className="text-lg">
-                                            Note
-                                        </Label>
+                                    <FormField id="notes" label="Note" className="gap-1 lg:col-span-2 xl:col-span-2">
                                         <Textarea
                                             id="notes"
                                             placeholder="Note"
@@ -594,23 +574,21 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 setFormValues((prev) => ({ ...prev, notes: event.target.value }))
                                             }
                                         />
-                                    </div>
+                                    </FormField>
                                 </div>
-                            </section>
+                            </FormSection>
                         ) : null}
 
                         {!isStepped || step === 2 ? (
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Stato
-                                </h3>
-
+                            <FormSection title="Stato">
                                 <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="charger" className="w-full text-lg">
-                                            Alimentatore presente
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="charger"
+                                        label="Alimentatore presente"
+                                        className="gap-1"
+                                        required
+                                        error={fieldErrors.charger}
+                                    >
                                         <Select
                                             value={formValues.charger}
                                             onValueChange={(value) => {
@@ -633,14 +611,15 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 <SelectItem value="no">No</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <FieldError id="charger" error={fieldErrors.charger} />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="dataBackup" className="w-full text-lg">
-                                            Backup dati
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="dataBackup"
+                                        label="Backup dati"
+                                        className="gap-1"
+                                        required
+                                        error={fieldErrors.dataBackup}
+                                    >
                                         <Select
                                             value={formValues.dataBackup}
                                             onValueChange={(value) => {
@@ -663,10 +642,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                                 <SelectItem value="no">No</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <FieldError id="dataBackup" error={fieldErrors.dataBackup} />
-                                    </div>
+                                    </FormField>
                                 </div>
-                            </section>
+                            </FormSection>
                         ) : null}
                     </div>
                 }

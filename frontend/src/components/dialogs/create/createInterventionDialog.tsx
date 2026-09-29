@@ -1,6 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, hasFormChanged } from "@/lib/formField";
+import FormField from "@/components/form-field";
+import FormSection from "@/components/dialogs/form-section";
+import { fieldErrorAria, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { findCustomerByText } from "@/lib/customerLookup";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
@@ -11,7 +12,6 @@ import {
 import StepProgress from "@/components/dialogs/step-progress";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import InputWithAdd from "@/components/inputWithAdd";
 import { createCustomer, getApiErrorMessage, listCollaborators, listCustomers } from "@/lib/api";
@@ -269,12 +269,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 stepErrors.customer = await checkCustomerExists();
             }
 
-            setErrors(stepErrors);
-
-            const firstInvalidStepField = fieldOrder.find((field) => stepErrors[field]);
-
-            if (firstInvalidStepField) {
-                focusField(firstInvalidStepField);
+            if (reportFieldErrors(stepErrors, fieldOrder, setErrors, focusField)) {
                 return;
             }
 
@@ -282,12 +277,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
             return;
         }
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            focusField(firstInvalidField);
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors, focusField)) {
             return;
         }
 
@@ -345,20 +335,18 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                         ) : null}
 
                         {!isStepped || step === 0 ? (
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Anagrafica
-                                </h3>
-
+                            <FormSection title="Anagrafica">
                                 <div className="grid items-start gap-4 lg:grid-cols-2">
                                     {/* `gap-1` fra etichetta e campo, come il collaboratore accanto e
                                         tutti i campi dei dialoghi: senza, il campo del cliente stava
                                         4px più in alto di quello del collaboratore sulla stessa riga. */}
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="customer" className="text-lg">
-                                            Cliente
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="customer"
+                                        label="Cliente"
+                                        className="gap-1"
+                                        required
+                                        error={errors.customer}
+                                    >
                                         <div className="flex">
                                             <InputWithAdd
                                                 id="customer"
@@ -387,8 +375,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                                 <TooltipContent>Crea nuovo cliente</TooltipContent>
                                             </Tooltip>
                                         </div>
-                                        <FieldError id="customer" error={errors.customer} />
-                                    </div>
+                                    </FormField>
 
                                     <InterventionCollaboratorField
                                         values={formValues}
@@ -397,7 +384,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         collaborators={collaborators}
                                     />
                                 </div>
-                            </section>
+                            </FormSection>
                         ) : null}
 
                         {!isStepped ? (

@@ -1,6 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
-import { FieldError, RequiredMark } from "@/components/form-field";
-import { fieldErrorAria, fieldProps, hasFormChanged } from "@/lib/formField";
+import FormField from "@/components/form-field";
+import FormSection from "@/components/dialogs/form-section";
+import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,37 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import PaymentMethodSelector from "@/components/payment-method-selector";
 import { getApiErrorMessage, getReport, listCollaborators, listDevices, listIssues, listTechnicians } from "@/lib/api";
 import { isCatchAllIssue } from "@/lib/issues";
-import { cn } from "@/lib/utils";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
-import { startTransition, useEffect, useEffectEvent, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import EuroInput from "@/components/euro-input";
 import { invalidEuroAmountMessage, parseEuroAmount } from "@/lib/euroAmount";
 import { formatPersonName } from "@/lib/people";
-
-/**
- * Un riquadro del dialogo. `content-start` tiene i campi in alto quando la sezione si allunga
- * per pareggiare le vicine nella riga in fondo: senza, la griglia distribuirebbe lo spazio in
- * più fra le righe e i campi finirebbero sparsi.
- *
- * Sotto `sm` il riquadro diventa solo una linea sopra il titolo: padding del dialogo più bordo e
- * padding della sezione lasciavano ai campi ~268px su 358, e i valori lunghi (il cliente col
- * telefono) finivano tagliati. Con la sola linea i campi guadagnano 34px, e le sezioni restano
- * distinte.
- */
-const FormSection = ({ title, className, children }: { title: string; className?: string; children: ReactNode }) => (
-    <section
-        className={cn(
-            "grid content-start gap-3 rounded-md border border-primary/15 bg-muted/20 p-4",
-            "max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:bg-transparent max-sm:px-0 max-sm:pt-3 max-sm:pb-0",
-            className
-        )}
-    >
-        <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
-        {children}
-    </section>
-);
 
 /**
  * Le spunte di stato, nell'ordine in cui contano: le due dell'accettazione (le stesse del dialogo
@@ -276,12 +253,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
             nextErrors.internalPrice = "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0";
         }
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors)) {
             return;
         }
 
@@ -351,17 +323,14 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                         // modulo sta tutto senza barra di scorrimento. Su mobile i pulsanti
                         // vanno uno sotto l'altro, quindi resta un po' più di margine.
                         <div className="grid max-h-[calc(100dvh-15rem)] gap-4 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
-                            <FormSection title="Anagrafica">
+                            <FormSection flatOnMobile title="Anagrafica">
                                 {/*
                                     `items-start` in tutte le griglie di campi: quando un campo
                                     mostra l'errore sotto di sé la riga si allunga, e senza le celle
                                     vicine si stiravano con lei spingendo in giù le etichette.
                                 */}
                                 <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="customerId" className="text-lg">
-                                            Cliente
-                                        </Label>
+                                    <FormField id="customerId" label="Cliente" className="gap-1">
                                         <Select disabled value={formValues.customerId}>
                                             <SelectTrigger id="customerId" className="w-full">
                                                 <SelectValue placeholder={customerName} />
@@ -370,13 +339,15 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 <SelectItem value={formValues.customerId}>{customerName}</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="deviceId" className="text-lg">
-                                            Dispositivo
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="deviceId"
+                                        label="Dispositivo"
+                                        className="gap-1"
+                                        required
+                                        error={errors.deviceId}
+                                    >
                                         <Select
                                             value={formValues.deviceId}
                                             onValueChange={(value) => {
@@ -399,14 +370,15 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        <FieldError id="deviceId" error={errors.deviceId} />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
-                                        <Label htmlFor="collaboratorId" className="text-lg">
-                                            Collaboratore
-                                            {formValues.closed ? <RequiredMark /> : null}
-                                        </Label>
+                                    <FormField
+                                        id="collaboratorId"
+                                        label="Collaboratore"
+                                        className="gap-1 sm:col-span-2 lg:col-span-1"
+                                        required={formValues.closed}
+                                        error={errors.collaboratorId}
+                                    >
                                         <Select
                                             value={formValues.collaboratorId}
                                             onValueChange={(value) => {
@@ -430,12 +402,11 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        <FieldError id="collaboratorId" error={errors.collaboratorId} />
-                                    </div>
+                                    </FormField>
                                 </div>
                             </FormSection>
 
-                            <FormSection title="Intervento">
+                            <FormSection flatOnMobile title="Intervento">
                                 <div className="grid items-start gap-4 sm:grid-cols-2">
                                     {/*
                                         Il difetto ha almeno mezza riga e non un quarto: è la voce
@@ -444,11 +415,13 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                         mezza riga non basta, quindi lì la prende tutta (e la
                                         password con lui, per non lasciare mezza riga vuota).
                                     */}
-                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
-                                        <Label htmlFor="issueId" className="text-lg">
-                                            Difetto catalogo
-                                            <RequiredMark />
-                                        </Label>
+                                    <FormField
+                                        id="issueId"
+                                        label="Difetto catalogo"
+                                        className="gap-1 sm:col-span-2 lg:col-span-1"
+                                        required
+                                        error={errors.issueId}
+                                    >
                                         <Select
                                             value={formValues.issueId}
                                             onValueChange={(value) => {
@@ -471,13 +444,13 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        <FieldError id="issueId" error={errors.issueId} />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
-                                        <Label htmlFor="password" className="text-lg">
-                                            Password sblocco
-                                        </Label>
+                                    <FormField
+                                        id="password"
+                                        label="Password sblocco"
+                                        className="gap-1 sm:col-span-2 lg:col-span-1"
+                                    >
                                         <Input
                                             id="password"
                                             placeholder="Password dispositivo"
@@ -486,14 +459,16 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 setFormValues((prev) => ({ ...prev, password: event.target.value }))
                                             }
                                         />
-                                    </div>
+                                    </FormField>
 
                                     {needsProblemText ? (
-                                        <div className="grid gap-1 sm:col-span-2">
-                                            <Label htmlFor="issueDescription" className="text-lg">
-                                                Problema riscontrato
-                                                <RequiredMark />
-                                            </Label>
+                                        <FormField
+                                            id="issueDescription"
+                                            label="Problema riscontrato"
+                                            className="gap-1 sm:col-span-2"
+                                            required
+                                            error={errors.issueDescription}
+                                        >
                                             <Textarea
                                                 {...fieldProps("issueDescription", {
                                                     error: errors.issueDescription,
@@ -509,14 +484,10 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                     setErrors((prev) => ({ ...prev, issueDescription: undefined }));
                                                 }}
                                             />
-                                            <FieldError id="issueDescription" error={errors.issueDescription} />
-                                        </div>
+                                        </FormField>
                                     ) : null}
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="serviceDescription" className="text-lg">
-                                            Descrizione intervento
-                                        </Label>
+                                    <FormField id="serviceDescription" label="Descrizione intervento" className="gap-1">
                                         <Textarea
                                             id="serviceDescription"
                                             className="min-h-24 resize-none"
@@ -529,12 +500,9 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 }))
                                             }
                                         />
-                                    </div>
+                                    </FormField>
 
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="note" className="text-lg">
-                                            Note
-                                        </Label>
+                                    <FormField id="note" label="Note" className="gap-1">
                                         <Textarea
                                             id="note"
                                             className="min-h-24 resize-none"
@@ -544,7 +512,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 setFormValues((prev) => ({ ...prev, note: event.target.value }))
                                             }
                                         />
-                                    </div>
+                                    </FormField>
                                 </div>
                             </FormSection>
 
@@ -554,12 +522,9 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                 riquadri si impilano e i campi si rimettono in riga.
                             */}
                             <div className="grid gap-4 lg:grid-cols-3">
-                                <FormSection title="Tecnico esterno">
+                                <FormSection flatOnMobile title="Tecnico esterno">
                                     <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="technicianId" className="text-lg">
-                                                Tecnico
-                                            </Label>
+                                        <FormField id="technicianId" label="Tecnico" className="gap-1">
                                             <Select
                                                 value={formValues.technicianId}
                                                 onValueChange={(value) =>
@@ -578,12 +543,14 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                        </div>
+                                        </FormField>
 
-                                        <div className="grid gap-1">
-                                            <Label htmlFor="technicianPrice" className="text-lg">
-                                                Prezzo lavoro tecnico
-                                            </Label>
+                                        <FormField
+                                            id="technicianPrice"
+                                            label="Prezzo lavoro tecnico"
+                                            className="gap-1"
+                                            error={errors.technicianPrice}
+                                        >
                                             <EuroInput
                                                 {...fieldProps("technicianPrice", { error: errors.technicianPrice })}
                                                 value={formValues.technicianPrice}
@@ -595,8 +562,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                     setErrors((prev) => ({ ...prev, technicianPrice: undefined }));
                                                 }}
                                             />
-                                            <FieldError id="technicianPrice" error={errors.technicianPrice} />
-                                        </div>
+                                        </FormField>
                                     </div>
                                 </FormSection>
 
@@ -605,11 +571,13 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     l'uno dall'altro: "Non pagato" riporta il prezzo a zero, e con
                                     contanti o carta il prezzo non può restare a zero.
                                 */}
-                                <FormSection title="Pagamento">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="internalPrice" className="text-lg">
-                                            Prezzo interno
-                                        </Label>
+                                <FormSection flatOnMobile title="Pagamento">
+                                    <FormField
+                                        id="internalPrice"
+                                        label="Prezzo interno"
+                                        className="gap-1"
+                                        error={errors.internalPrice}
+                                    >
                                         <EuroInput
                                             {...fieldProps("internalPrice", { error: errors.internalPrice })}
                                             value={formValues.internalPrice}
@@ -621,8 +589,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 setErrors((prev) => ({ ...prev, internalPrice: undefined }));
                                             }}
                                         />
-                                        <FieldError id="internalPrice" error={errors.internalPrice} />
-                                    </div>
+                                    </FormField>
 
                                     <PaymentMethodSelector
                                         value={formValues.paymentMethod}
@@ -638,7 +605,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     />
                                 </FormSection>
 
-                                <FormSection title="Stato">
+                                <FormSection flatOnMobile title="Stato">
                                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                                         {statusOptions.map((option) => (
                                             // Tutto il riquadro è l'etichetta, quindi tutto il

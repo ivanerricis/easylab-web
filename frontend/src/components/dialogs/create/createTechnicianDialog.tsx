@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
-import { fieldProps, hasFormChanged } from "@/lib/formField";
+import { fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api";
 import type { TechnicianDto } from "@/types/dtos";
@@ -27,6 +27,9 @@ type Props = {
 };
 
 type FieldErrors = Partial<Record<"firstName" | "lastName", string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["firstName", "lastName"] as const;
 
 const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create", initialValues = null }: Props) => {
     const [formValues, setFormValues] = useState({
@@ -72,14 +75,9 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
             nextErrors.lastName = "Il cognome non può essere vuoto";
         }
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = (["firstName", "lastName"] as const).find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            // Il focus va sul primo campo da correggere: senza questo, su un form da quattro
-            // campi bisogna cercare a occhio quale sia quello segnalato.
-            document.getElementById(firstInvalidField)?.focus();
+        // Il focus va sul primo campo da correggere: senza questo, su un form da quattro
+        // campi bisogna cercare a occhio quale sia quello segnalato.
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors)) {
             return;
         }
 

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FieldError } from "@/components/form-field";
+import FormField, { FieldError } from "@/components/form-field";
 import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { SettingsField, SettingsFieldRow, SettingsGroup } from "@/components/settings/settingsUi";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
@@ -28,13 +28,21 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                 </Label>
             </div>
 
+            {/* Le etichette restano piccole come nel resto delle Impostazioni (`FormField` di serie le
+                fa `text-lg`, la misura dei dialoghi). `contents` toglie il contenitore di
+                `FormField`: etichetta e blocco controllo+errore diventano le due righe di
+                `SettingsField`, che le allinea con il campo accanto (subgrid); con un contenitore
+                in mezzo l'allineamento si perderebbe. */}
             <SettingsFieldRow>
                 <SettingsField>
-                    <Label htmlFor="frequencyDays">Ogni quanti giorni</Label>
-                    {/* Controllo ed errore in un blocco solo: `SettingsField` è una griglia a due
-                        righe condivise con il campo accanto, e un terzo figlio finirebbe
-                        sovrapposto al controllo. */}
-                    <div>
+                    <FormField
+                        id="frequencyDays"
+                        label="Ogni quanti giorni"
+                        error={errors.frequencyDays}
+                        className="contents"
+                        labelSize="sm"
+                        groupControlAndError
+                    >
                         <Input
                             {...fieldProps("frequencyDays", { error: errors.frequencyDays })}
                             type="number"
@@ -44,13 +52,18 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                             value={formValues.frequencyDays}
                             onChange={(event) => changeFormValues({ frequencyDays: Number(event.target.value) })}
                         />
-                        <FieldError id="frequencyDays" error={errors.frequencyDays} />
-                    </div>
+                    </FormField>
                 </SettingsField>
 
                 <SettingsField>
-                    <Label htmlFor="runAt">Orario</Label>
-                    <div>
+                    <FormField
+                        id="runAt"
+                        label="Orario"
+                        error={errors.runAt}
+                        className="contents"
+                        labelSize="sm"
+                        groupControlAndError
+                    >
                         <Input
                             {...fieldProps("runAt", { error: errors.runAt })}
                             type="time"
@@ -58,28 +71,28 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                             value={formValues.runAt}
                             onChange={(event) => changeFormValues({ runAt: event.target.value })}
                         />
-                        <FieldError id="runAt" error={errors.runAt} />
-                    </div>
+                    </FormField>
                 </SettingsField>
             </SettingsFieldRow>
 
-            <div className="grid gap-2">
-                <Label htmlFor="maxBackupsToKeep">Numero di backup da mantenere</Label>
-                <div>
-                    <Input
-                        {...fieldProps("maxBackupsToKeep", { error: errors.maxBackupsToKeep })}
-                        type="number"
-                        min={1}
-                        max={365}
-                        value={formValues.maxBackupsToKeep}
-                        onChange={(event) => changeFormValues({ maxBackupsToKeep: Number(event.target.value) })}
-                    />
-                    <FieldError id="maxBackupsToKeep" error={errors.maxBackupsToKeep} />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                    I dump più vecchi oltre questo numero vengono eliminati automaticamente ad ogni nuovo backup.
-                </p>
-            </div>
+            <FormField
+                id="maxBackupsToKeep"
+                label="Numero di backup da mantenere"
+                error={errors.maxBackupsToKeep}
+                className="gap-2"
+                labelSize="sm"
+                groupControlAndError
+                description="I dump più vecchi oltre questo numero vengono eliminati automaticamente ad ogni nuovo backup."
+            >
+                <Input
+                    {...fieldProps("maxBackupsToKeep", { error: errors.maxBackupsToKeep })}
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={formValues.maxBackupsToKeep}
+                    onChange={(event) => changeFormValues({ maxBackupsToKeep: Number(event.target.value) })}
+                />
+            </FormField>
 
             <div className="grid gap-2">
                 {/* Senza email configurata l'avviso non si può accendere, ma deve potersi spegnere:

@@ -3,8 +3,9 @@ import {
     InterventionCollaboratorField,
     InterventionDetailsSection,
 } from "@/components/dialogs/intervention-form-fields";
-import { hasFormChanged } from "@/lib/formField";
-import { Label } from "@/components/ui/label";
+import FormField from "@/components/form-field";
+import FormSection from "@/components/dialogs/form-section";
+import { hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage, getIntervention, listCollaborators } from "@/lib/api";
 import {
@@ -164,12 +165,7 @@ const EditInterventionDialog = ({
         // controllo usciva dalla funzione con un toast, che non diceva quale campo correggere.
         const nextErrors = validateInterventionForm(formValues);
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = interventionFieldOrder.find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+        if (reportFieldErrors(nextErrors, interventionFieldOrder, setErrors)) {
             return;
         }
 
@@ -211,21 +207,14 @@ const EditInterventionDialog = ({
                         // su un telefono basso intestazione, pulsanti e margini non ci stavano nel
                         // 30% che restava, e il dialogo usciva dallo schermo.
                         <div className="grid max-h-[calc(100dvh-15rem)] gap-2 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
-                            <section className="grid gap-3 rounded-md border border-primary/15 bg-muted/20 p-4">
-                                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Anagrafica
-                                </h3>
-
+                            <FormSection title="Anagrafica">
                                 {/*
                                     `items-start` in tutte le griglie di campi: quando un campo
                                     mostra l'errore sotto di sé la riga si allunga, e senza le celle
                                     vicine si stiravano con lei spingendo in giù etichetta e campo.
                                 */}
                                 <div className="grid items-start gap-4 lg:grid-cols-2">
-                                    <div className="grid gap-1">
-                                        <Label htmlFor="customerName" className="text-lg">
-                                            Cliente
-                                        </Label>
+                                    <FormField id="customerName" label="Cliente" className="gap-1">
                                         <Select disabled value={customerName}>
                                             <SelectTrigger id="customerName" className="w-full">
                                                 <SelectValue placeholder={customerName} />
@@ -234,7 +223,7 @@ const EditInterventionDialog = ({
                                                 <SelectItem value={customerName}>{customerName}</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </FormField>
 
                                     <InterventionCollaboratorField
                                         values={formValues}
@@ -243,7 +232,7 @@ const EditInterventionDialog = ({
                                         collaborators={collaborators}
                                     />
                                 </div>
-                            </section>
+                            </FormSection>
 
                             <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
                         </div>

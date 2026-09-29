@@ -6,7 +6,7 @@ import FormField from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { changeOwnPassword, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
-import { fieldProps, hasFormChanged } from "@/lib/formField";
+import { fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { isPasswordCompliant, passwordRequirements } from "@/lib/passwordPolicy";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,9 @@ type Props = {
 const emptyForm = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
 type FieldErrors = Partial<Record<keyof typeof emptyForm, string>>;
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["currentPassword", "newPassword", "confirmPassword"] as const;
 
 const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
     const [formValues, setFormValues] = useState(emptyForm);
@@ -66,14 +69,7 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             nextErrors.confirmPassword = "Le due password inserite non coincidono";
         }
 
-        setErrors(nextErrors);
-
-        const firstInvalidField = (["currentPassword", "newPassword", "confirmPassword"] as const).find(
-            (field) => nextErrors[field]
-        );
-
-        if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors)) {
             return;
         }
 
@@ -93,8 +89,7 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             // riguardano quel campo, e il messaggio va lì come nella pagina di accesso. Il resto
             // (rete, sessione scaduta, errore del server) non è colpa di un campo e resta un toast.
             if (status === 400 || status === 429) {
-                setErrors({ currentPassword: message });
-                document.getElementById("currentPassword")?.focus();
+                reportFieldErrors({ currentPassword: message }, fieldOrder, setErrors);
             } else {
                 toast.error(message);
             }

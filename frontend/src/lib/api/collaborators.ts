@@ -1,7 +1,6 @@
 import type { CollaboratorDto } from "@/types/dtos";
-import { api, mapEntityTimestamps } from "./client";
-import type { EntityWithRawTimestamps } from "./client";
-import type { PaginatedResponse } from "./client";
+import { api, createEntityApi } from "./client";
+import type { EntityListParams } from "./client";
 
 export type CollaboratorCreateInput = {
     firstName: string;
@@ -11,57 +10,21 @@ export type CollaboratorCreateInput = {
 
 export type CollaboratorUpdateInput = Partial<CollaboratorCreateInput>;
 
-export type ListCollaboratorsParams = {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-    /**
-     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
-     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
-     * Lo fornisce `usePaginatedRows`.
-     */
-    signal?: AbortSignal;
-};
+export type ListCollaboratorsParams = EntityListParams;
 
-export function listCollaborators(): Promise<CollaboratorDto[]>;
-export function listCollaborators(params: ListCollaboratorsParams): Promise<PaginatedResponse<CollaboratorDto>>;
-export async function listCollaborators(params?: ListCollaboratorsParams) {
-    if (!params) {
-        const response = await api.get<EntityWithRawTimestamps<CollaboratorDto>[]>("/collaborators");
-        return response.data.map((collaborator) => mapEntityTimestamps(collaborator));
-    }
+// Le chiamate CRUD vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano i nomi
+// che il resto dell'app già usa e le rotte proprie dei collaboratori (le stampe).
+const collaboratorsApi = createEntityApi<CollaboratorDto, CollaboratorCreateInput, CollaboratorUpdateInput>(
+    "/collaborators"
+);
 
-    const response = await api.get<PaginatedResponse<EntityWithRawTimestamps<CollaboratorDto>>>("/collaborators", {
-        params: {
-            page: params.page ?? 1,
-            pageSize: params.pageSize ?? 1000,
-            search: params.search?.trim() || undefined,
-        },
-        signal: params.signal,
-    });
-
-    const items = response.data.items.map((collaborator) => mapEntityTimestamps(collaborator));
-
-    return {
-        ...response.data,
-        items,
-    };
-}
-
+/** Senza parametri l'elenco completo (per i select dei moduli), con i parametri la pagina. */
+export const listCollaborators = collaboratorsApi.list;
 /** Un collaboratore solo, per id: la sua scheda non ha bisogno dell'elenco intero. */
-export const getCollaborator = async (id: number) =>
-    mapEntityTimestamps((await api.get<EntityWithRawTimestamps<CollaboratorDto>>(`/collaborators/${id}`)).data);
-
-export const createCollaborator = async (payload: CollaboratorCreateInput) =>
-    mapEntityTimestamps((await api.post<EntityWithRawTimestamps<CollaboratorDto>>("/collaborators", payload)).data);
-
-export const updateCollaborator = async (id: number, payload: CollaboratorUpdateInput) =>
-    mapEntityTimestamps(
-        (await api.put<EntityWithRawTimestamps<CollaboratorDto>>(`/collaborators/${id}`, payload)).data
-    );
-
-export const deleteCollaborator = async (id: number) =>
-    mapEntityTimestamps((await api.delete<EntityWithRawTimestamps<CollaboratorDto>>(`/collaborators/${id}`)).data);
+export const getCollaborator = collaboratorsApi.get;
+export const createCollaborator = collaboratorsApi.create;
+export const updateCollaborator = collaboratorsApi.update;
+export const deleteCollaborator = collaboratorsApi.remove;
 
 /** Stessa forma del resoconto del cliente: un periodo facoltativo sulla data di creazione. */
 export const getCollaboratorReportsPrintUrl = (id: number, params?: { dateFrom?: string; dateTo?: string }) =>

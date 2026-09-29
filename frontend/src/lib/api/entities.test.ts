@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "./client";
+import { api, createEntityApi } from "./client";
 import {
     createCollaborator,
     deleteCollaborator,
@@ -21,10 +21,11 @@ import { createIssue, deleteIssue, listIssues, updateIssue } from "./issues";
 import { createTechnician, deleteTechnician, getTechnician, listTechnicians, updateTechnician } from "./technicians";
 
 /**
- * Le cinque anagrafiche hanno lo stesso contratto con il backend: righe con `created_at` /
- * `updated_at` da rinominare, e `list*` che senza parametri restituisce l'array nudo e con
- * i parametri la pagina. Un solo elenco di casi le prova tutte allo stesso modo, così una
- * che se ne discosta salta all'occhio.
+ * Le cinque anagrafiche hanno lo stesso contratto con il backend (sono tutte costruite da
+ * `createEntityApi`): righe con `created_at` / `updated_at` da rinominare, e `list*` che senza
+ * parametri restituisce l'array nudo e con i parametri la pagina. Un solo elenco di casi le
+ * prova tutte allo stesso modo, così una che se ne discosta salta all'occhio. Fanno eccezione
+ * i clienti, che non hanno più l'elenco completo (`listAll: false`) e aggiungono l'ordinamento.
  */
 const entities = [
     {
@@ -34,6 +35,8 @@ const entities = [
         update: updateCustomer,
         remove: deleteCustomer,
         payload: { firstName: "Mario" },
+        listAll: false,
+        extraParams: { sortBy: undefined, sortOrder: undefined },
     },
     {
         name: "collaborators",
@@ -42,6 +45,8 @@ const entities = [
         update: updateCollaborator,
         remove: deleteCollaborator,
         payload: { firstName: "Luca" },
+        listAll: true,
+        extraParams: {},
     },
     {
         name: "devices",
@@ -50,6 +55,8 @@ const entities = [
         update: updateDevice,
         remove: deleteDevice,
         payload: { name: "Notebook" },
+        listAll: true,
+        extraParams: {},
     },
     {
         name: "issues",
@@ -58,6 +65,8 @@ const entities = [
         update: updateIssue,
         remove: deleteIssue,
         payload: { description: "Schermo rotto" },
+        listAll: true,
+        extraParams: {},
     },
     {
         name: "technicians",
@@ -66,6 +75,8 @@ const entities = [
         update: updateTechnician,
         remove: deleteTechnician,
         payload: { firstName: "Paolo" },
+        listAll: true,
+        extraParams: {},
     },
 ] as const;
 
@@ -79,8 +90,8 @@ beforeEach(() => {
     vi.restoreAllMocks();
 });
 
-describe.each(entities)("api $name", ({ name, list, create, update, remove, payload }) => {
-    it("senza parametri restituisce l'elenco completo con i timestamp rinominati", async () => {
+describe.each(entities)("api $name", ({ name, list, create, update, remove, payload, listAll, extraParams }) => {
+    it.runIf(listAll)("senza parametri restituisce l'elenco completo con i timestamp rinominati", async () => {
         const get = mockResponse("get", [rawRow]);
 
         await expect((list as () => Promise<unknown>)()).resolves.toEqual([mappedRow]);
@@ -99,10 +110,18 @@ describe.each(entities)("api $name", ({ name, list, create, update, remove, payl
         });
 
         expect(result).toEqual({ items: [mappedRow], totalItems: 1, page: 2, pageSize: 20, totalPages: 1 });
+        // Esatta, non `objectContaining`: la fabbrica non deve aggiungere parametri di query
+        // che il modulo non ha chiesto (solo i clienti portano l'ordinamento).
         expect(get).toHaveBeenCalledWith(`/${name}`, {
-            params: expect.objectContaining({ page: 2, pageSize: 20, search: "mario" }),
+            params: { page: 2, pageSize: 20, search: "mario", ...extraParams },
             signal,
         });
+        expect(Object.keys((get.mock.calls[0][1] as { params?: object } | undefined)?.params ?? {})).toEqual([
+            "page",
+            "pageSize",
+            "search",
+            ...Object.keys(extraParams),
+        ]);
     });
 
     /** Una ricerca di soli spazi non deve filtrare: il parametro sparisce dalla query. */
@@ -129,6 +148,40 @@ describe.each(entities)("api $name", ({ name, list, create, update, remove, payl
         expect(post).toHaveBeenCalledWith(`/${name}`, payload);
         expect(put).toHaveBeenCalledWith(`/${name}/7`, payload);
         expect(del).toHaveBeenCalledWith(`/${name}/7`);
+    });
+});
+
+describe("createEntityApi", () => {
+    /**
+     * `listCustomers()` senza parametri scaricava l'intera tabella clienti ed è stata tolta:
+     * la lista dei clienti è la sola forma paginata (`listPage`), anche chiamata senza nulla.
+     */
+    it("la lista dei clienti chiede sempre una pagina", async () => {
+        const get = mockResponse("get", { items: [], totalItems: 0, page: 1, pageSize: 1000, totalPages: 0 });
+
+        // Anche per il compilatore: se la forma senza parametri tornasse, `npm run typecheck`
+        // segnalerebbe questa direttiva come inutile.
+        // @ts-expect-error -- `listCustomers` vuole sempre i parametri della pagina.
+        await listCustomers().catch(() => undefined);
+
+        expect(get).not.toHaveBeenCalledWith("/customers");
+    });
+
+    it("unisce i parametri propri dell'anagrafica a pagina e ricerca", async () => {
+        const get = mockResponse("get", { items: [], totalItems: 0, page: 1, pageSize: 5, totalPages: 0 });
+        const widgets = createEntityApi<
+            { id: number; createdAt: string; updatedAt: string | null },
+            { name: string },
+            { name?: string },
+            { page?: number; pageSize?: number; search?: string; color?: string }
+        >("/widgets", { extraListParams: ({ color }) => ({ color }) });
+
+        await widgets.listPage({ pageSize: 5, color: "rosso" });
+
+        expect(get).toHaveBeenCalledWith("/widgets", {
+            params: { page: 1, pageSize: 5, search: undefined, color: "rosso" },
+            signal: undefined,
+        });
     });
 });
 

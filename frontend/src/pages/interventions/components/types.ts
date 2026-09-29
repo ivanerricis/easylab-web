@@ -1,6 +1,10 @@
-export type InterventionStatusFilter = "all" | "programmato" | "in_lavorazione" | "completato";
+import type { InterventionStatus, InterventionType } from "@/types/dtos";
 
-export type InterventionTypeFilter = "all" | "consegna_materiale" | "intervento_sede" | "intervento_remoto";
+// Derivati dai tipi del DTO invece di ripeterne i valori: uno stato o un tipo nuovo entra nei
+// filtri da sé, e uno rinominato fa fallire la compilazione qui invece di restare un filtro morto.
+export type InterventionStatusFilter = "all" | InterventionStatus;
+
+export type InterventionTypeFilter = "all" | InterventionType;
 
 export type InterventionSortOption =
     | "createdAt:desc"

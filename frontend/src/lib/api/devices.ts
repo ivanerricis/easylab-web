@@ -1,7 +1,6 @@
 import type { DeviceDto } from "@/types/dtos";
-import { api, mapEntityTimestamps } from "./client";
-import type { EntityWithRawTimestamps } from "./client";
-import type { PaginatedResponse } from "./client";
+import { createEntityApi } from "./client";
+import type { EntityListParams } from "./client";
 
 export type DeviceCreateInput = {
     name: string;
@@ -9,48 +8,14 @@ export type DeviceCreateInput = {
 
 export type DeviceUpdateInput = Partial<DeviceCreateInput>;
 
-export type ListDevicesParams = {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-    /**
-     * Annulla la richiesta quando il chiamante la supera con una più recente o smonta la
-     * pagina: senza, il server porta comunque a termine una lista che nessuno leggerà.
-     * Lo fornisce `usePaginatedRows`.
-     */
-    signal?: AbortSignal;
-};
+export type ListDevicesParams = EntityListParams;
 
-export function listDevices(): Promise<DeviceDto[]>;
-export function listDevices(params: ListDevicesParams): Promise<PaginatedResponse<DeviceDto>>;
-export async function listDevices(params?: ListDevicesParams) {
-    if (!params) {
-        const response = await api.get<EntityWithRawTimestamps<DeviceDto>[]>("/devices");
-        return response.data.map((device) => mapEntityTimestamps(device));
-    }
+// Le chiamate vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano solo i nomi
+// che il resto dell'app già usa.
+const devicesApi = createEntityApi<DeviceDto, DeviceCreateInput, DeviceUpdateInput>("/devices");
 
-    const response = await api.get<PaginatedResponse<EntityWithRawTimestamps<DeviceDto>>>("/devices", {
-        params: {
-            page: params.page ?? 1,
-            pageSize: params.pageSize ?? 1000,
-            search: params.search?.trim() || undefined,
-        },
-        signal: params.signal,
-    });
-
-    const items = response.data.items.map((device) => mapEntityTimestamps(device));
-
-    return {
-        ...response.data,
-        items,
-    };
-}
-
-export const createDevice = async (payload: DeviceCreateInput) =>
-    mapEntityTimestamps((await api.post<EntityWithRawTimestamps<DeviceDto>>("/devices", payload)).data);
-
-export const updateDevice = async (id: number, payload: DeviceUpdateInput) =>
-    mapEntityTimestamps((await api.put<EntityWithRawTimestamps<DeviceDto>>(`/devices/${id}`, payload)).data);
-
-export const deleteDevice = async (id: number) =>
-    mapEntityTimestamps((await api.delete<EntityWithRawTimestamps<DeviceDto>>(`/devices/${id}`)).data);
+/** Senza parametri l'elenco completo (per i select dei moduli), con i parametri la pagina. */
+export const listDevices = devicesApi.list;
+export const createDevice = devicesApi.create;
+export const updateDevice = devicesApi.update;
+export const deleteDevice = devicesApi.remove;

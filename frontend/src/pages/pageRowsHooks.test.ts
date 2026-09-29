@@ -194,4 +194,116 @@ describe("hook delle righe delle pagine", () => {
             expect(onReportsPageOutOfRange).toHaveBeenCalledWith(2);
         });
     });
+
+    /**
+     * `queryKey` è costruita dagli stessi parametri della richiesta: cambiare un filtro deve
+     * far ripartire il caricamento con il valore nuovo. Qui si cambiano filtri diversi dalla
+     * pagina (tipo di intervento, data finale dei report), quelli che una chiave copiata a mano
+     * rischiava di dimenticare.
+     */
+    it("ricaricano quando cambia un filtro, con il valore nuovo", async () => {
+        listInterventions.mockResolvedValue(page([]));
+        listReports.mockResolvedValue(page([]));
+
+        const interventions = renderHook(
+            ({ typeFilter }: { typeFilter: "all" | "intervento_sede" }) =>
+                useInterventionsRows({
+                    searchText: "",
+                    statusFilter: "all",
+                    typeFilter,
+                    sortOption: "createdAt:desc",
+                    currentPage: 1,
+                    pageSize: 10,
+                }),
+            { initialProps: { typeFilter: "all" } }
+        );
+        const reports = renderHook(
+            ({ dateTo }: { dateTo?: string }) =>
+                useReportsRows({
+                    searchText: "",
+                    visibilityFilter: "all",
+                    sortOption: "createdAt:desc",
+                    dateTo,
+                    currentPage: 1,
+                    pageSize: 10,
+                }),
+            { initialProps: { dateTo: undefined } as { dateTo?: string } }
+        );
+
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenCalledTimes(1);
+            expect(listReports).toHaveBeenCalledTimes(1);
+        });
+
+        interventions.rerender({ typeFilter: "intervento_sede" });
+        reports.rerender({ dateTo: "2026-09-30" });
+
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenCalledTimes(2);
+            expect(listReports).toHaveBeenCalledTimes(2);
+        });
+        expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ type: "intervento_sede" }));
+        expect(listReports).toHaveBeenLastCalledWith(expect.objectContaining({ dateTo: "2026-09-30" }));
+    });
+
+    it("non ricaricano se i parametri restano gli stessi", async () => {
+        listCustomers.mockResolvedValue(page([]));
+
+        const customers = renderHook(() =>
+            useCustomersRows({ searchText: "", sortOption: "name:asc", currentPage: 1, pageSize: 10 })
+        );
+
+        await waitFor(() => {
+            expect(listCustomers).toHaveBeenCalledTimes(1);
+        });
+        customers.rerender();
+        // Lascia girare gli effetti del nuovo render prima di contare le chiamate.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(listCustomers).toHaveBeenCalledTimes(1);
+    });
+
+    /** Un ordinamento che l'API non conosce (un indirizzo scritto a mano) ricade su quello predefinito. */
+    it("con un ordinamento sconosciuto usano quello predefinito della lista", async () => {
+        listCustomers.mockResolvedValue(page([]));
+        listInterventions.mockResolvedValue(page([]));
+        listReports.mockResolvedValue(page([]));
+
+        renderHook(() =>
+            useCustomersRows({
+                searchText: "",
+                sortOption: "total:asc" as never,
+                currentPage: 1,
+                pageSize: 10,
+            })
+        );
+        renderHook(() =>
+            useInterventionsRows({
+                searchText: "",
+                statusFilter: "all",
+                typeFilter: "all",
+                sortOption: "interventionDate:sideways" as never,
+                currentPage: 1,
+                pageSize: 10,
+            })
+        );
+        renderHook(() =>
+            useReportsRows({
+                searchText: "",
+                visibilityFilter: "all",
+                sortOption: "" as never,
+                currentPage: 1,
+                pageSize: 10,
+            })
+        );
+
+        await waitFor(() => {
+            expect(listCustomers).toHaveBeenCalledWith(expect.objectContaining({ sortBy: "name", sortOrder: "asc" }));
+            expect(listInterventions).toHaveBeenCalledWith(
+                expect.objectContaining({ sortBy: "createdAt", sortOrder: "desc" })
+            );
+            expect(listReports).toHaveBeenCalledWith(
+                expect.objectContaining({ sortBy: "createdAt", sortOrder: "desc" })
+            );
+        });
+    });
 });

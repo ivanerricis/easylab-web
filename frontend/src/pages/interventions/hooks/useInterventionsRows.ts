@@ -1,7 +1,18 @@
 import { listInterventions } from "@/lib/api";
+import type { InterventionSortBy } from "@/lib/api/interventions";
+import { parseSortParams } from "@/lib/tableSort";
 import type { InterventionDto } from "@/types/dtos";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
+import { DEFAULT_INTERVENTION_SORT_OPTION } from "../components/types";
 import type { InterventionSortOption, InterventionStatusFilter, InterventionTypeFilter } from "../components/types";
+
+/** I campi per cui l'API degli interventi sa ordinare: vedi `parseSortOption`. */
+const INTERVENTION_SORT_FIELDS: Record<InterventionSortBy, true> = {
+    createdAt: true,
+    interventionDate: true,
+    customer: true,
+    status: true,
+};
 
 type UseInterventionsRowsParams = {
     /** Già rallentato dal chiamante (vedi `useUrlSearchText`): qui si cerca subito. */
@@ -28,26 +39,27 @@ export const useInterventionsRows = ({
     pageSize,
     onPageOutOfRange,
 }: UseInterventionsRowsParams) => {
-    const [sortBy, sortOrder] = sortOption.split(":") as [
-        "createdAt" | "interventionDate" | "customer" | "status",
-        "asc" | "desc",
-    ];
+    const { sortBy, sortOrder } = parseSortParams(
+        sortOption,
+        INTERVENTION_SORT_FIELDS,
+        DEFAULT_INTERVENTION_SORT_OPTION
+    );
+    const params = {
+        page: currentPage,
+        pageSize,
+        search: searchText,
+        status: statusFilter,
+        type: typeFilter,
+        sortBy,
+        sortOrder,
+        dateFrom,
+        dateTo,
+    };
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         usePaginatedRows<InterventionDto>({
-            fetchRows: (signal) =>
-                listInterventions({
-                    page: currentPage,
-                    pageSize,
-                    search: searchText,
-                    status: statusFilter,
-                    type: typeFilter,
-                    sortBy,
-                    sortOrder,
-                    dateFrom,
-                    dateTo,
-                    signal,
-                }),
-            queryKey: [currentPage, pageSize, searchText, statusFilter, typeFilter, sortOption, dateFrom, dateTo],
+            fetchRows: (signal) => listInterventions({ ...params, signal }),
+            // Costruita dagli stessi parametri della richiesta: vedi `useReportsRows`.
+            queryKey: Object.values(params),
             errorMessage: "Impossibile caricare gli interventi",
             initialLoading: false,
             page: currentPage,

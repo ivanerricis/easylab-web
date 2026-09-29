@@ -1,7 +1,13 @@
 import { listCustomers } from "@/lib/api";
+import type { CustomerSortBy } from "@/lib/api/customers";
+import { parseSortParams } from "@/lib/tableSort";
 import type { CustomerDto } from "@/types/dtos";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
+import { DEFAULT_CUSTOMER_SORT_OPTION } from "../components/types";
 import type { CustomerSortOption } from "../components/types";
+
+/** I campi per cui l'API dei clienti sa ordinare: vedi `parseSortOption`. */
+const CUSTOMER_SORT_FIELDS: Record<CustomerSortBy, true> = { createdAt: true, name: true };
 
 type UseCustomersRowsParams = {
     /** Già rallentato dal chiamante (vedi `useUrlSearchText`): qui si cerca subito. */
@@ -20,12 +26,13 @@ export const useCustomersRows = ({
     pageSize,
     onPageOutOfRange,
 }: UseCustomersRowsParams) => {
-    const [sortBy, sortOrder] = sortOption.split(":") as ["createdAt" | "name", "asc" | "desc"];
+    const { sortBy, sortOrder } = parseSortParams(sortOption, CUSTOMER_SORT_FIELDS, DEFAULT_CUSTOMER_SORT_OPTION);
+    const params = { page: currentPage, pageSize, search: searchText, sortBy, sortOrder };
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         usePaginatedRows<CustomerDto>({
-            fetchRows: (signal) =>
-                listCustomers({ page: currentPage, pageSize, search: searchText, sortBy, sortOrder, signal }),
-            queryKey: [currentPage, pageSize, searchText, sortOption],
+            fetchRows: (signal) => listCustomers({ ...params, signal }),
+            // Costruita dagli stessi parametri della richiesta: vedi `useReportsRows`.
+            queryKey: Object.values(params),
             errorMessage: "Impossibile caricare i clienti",
             page: currentPage,
             onPageOutOfRange,

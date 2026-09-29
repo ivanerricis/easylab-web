@@ -27,6 +27,28 @@ export const sessionCookieOptions = {
     path: "/",
 };
 
+/**
+ * L'identità del dispositivo: un id casuale in un cookie di lunga durata, che a differenza di
+ * quello di sessione sopravvive a logout e scadenza. Serve solo a ritrovare il nome che una
+ * persona ha dato al proprio dispositivo (vedi `user_device`), non entra in nessuna decisione
+ * di sicurezza. Stesso prefisso `__Host-` e stessi attributi del cookie di sessione.
+ */
+export const deviceCookieName = secureSessionCookie ? "__Host-device" : "device";
+
+/** I browser limitano comunque a circa 400 giorni la vita di un cookie. */
+export const deviceCookieMaxAgeMs = 400 * 24 * 60 * 60 * 1000;
+
+export const deviceCookieOptions = { ...sessionCookieOptions, maxAge: deviceCookieMaxAgeMs };
+
+const deviceIdPattern = /^[0-9a-f]{32}$/;
+
+/** Il cookie del dispositivo se ha la forma giusta, altrimenti `null`: il valore arriva dal client. */
+export const readDeviceId = (req: Request): string | null => {
+    const value = req.cookies?.[deviceCookieName];
+
+    return typeof value === "string" && deviceIdPattern.test(value) ? value : null;
+};
+
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express {

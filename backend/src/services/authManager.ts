@@ -4,7 +4,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 import { and, asc, desc, eq, gt, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
-import { sessionTable, userTable } from "../db/schema";
+import { sessionTable, userDeviceTable, userTable } from "../db/schema";
 import {
     consumeRecoveryCode,
     countUnusedRecoveryCodes,
@@ -118,6 +118,9 @@ const generateSessionToken = () => crypto.randomBytes(sessionTokenBytes).toStrin
  * persona, e la ricerca deve restare una lookup su indice a ogni richiesta.
  */
 const hashSessionToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
+
+/** Stesso ragionamento del token di sessione: in tabella solo lo sha256 dell'identificativo. */
+const hashDeviceId = (deviceId: string) => crypto.createHash("sha256").update(deviceId).digest("hex");
 
 // Hash "esca" usato quando lo username non esiste, per far girare comunque scrypt e non
 // rivelare quali username esistono tramite il tempo di risposta del login.
@@ -376,7 +379,11 @@ const sendNewDeviceEmail = async (user: UserRow, label: string): Promise<void> =
  * L'unico punto che scrive in `sessionTable`: i due passi del login ci arrivano da strade
  * diverse ma devono produrre esattamente la stessa sessione, cookie compreso.
  */
-const createSessionForUser = async (user: UserRow, userAgent?: string | null): Promise<LoginResult> => {
+const createSessionForUser = async (
+    user: UserRow,
+    userAgent?: string | null,
+    deviceId?: string | null
+): Promise<LoginResult> => {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + sessionDurationMs);
     const sanitizedUserAgent = sanitizeUserAgent(userAgent);
@@ -388,6 +395,7 @@ const createSessionForUser = async (user: UserRow, userAgent?: string | null): P
         userId: user.id,
         expiresAt,
         userAgent: sanitizedUserAgent,
+        deviceHash: deviceId ? hashDeviceId(deviceId) : null,
     });
 
     await notifyIfNewDevice(user, describeUserAgent(sanitizedUserAgent));
@@ -399,7 +407,8 @@ export const login = async (
     username: string,
     password: string,
     ip: string,
-    userAgent?: string | null
+    userAgent?: string | null,
+    deviceId?: string | null
 ): Promise<LoginResult> => {
     const subject = rateLimitSubject(ip);
     const accountRateLimitKey = loginAttemptRateLimitKey(subject, username);
@@ -441,7 +450,7 @@ export const login = async (
 
     registerSuccessfulLogin(accountRateLimitKey);
     rememberLoginSource(username, subject);
-    return createSessionForUser(user, userAgent);
+    return createSessionForUser(user, userAgent, deviceId);
 };
 
 /**
@@ -562,6 +571,8 @@ export type SessionSummary = {
     lastSeenAt: string;
     /** "Chrome su Windows", o `null` se l'header non dice abbastanza (vedi `describeUserAgent`). */
     device: string | null;
+    /** Il nome dato a questo dispositivo da chi lo usa (vedi `setDeviceName`), se ne ha uno. */
+    deviceName: string | null;
     isCurrent: boolean;
 };
 
@@ -576,8 +587,16 @@ export const listSessionsForUser = async (userId: number, currentToken?: string)
             expiresAt: sessionTable.expiresAt,
             lastSeenAt: sessionTable.lastSeenAt,
             userAgent: sessionTable.userAgent,
+            deviceName: userDeviceTable.name,
         })
         .from(sessionTable)
+        .leftJoin(
+            userDeviceTable,
+            and(
+                eq(userDeviceTable.userId, sessionTable.userId),
+                eq(userDeviceTable.deviceHash, sessionTable.deviceHash)
+            )
+        )
         // Le scadute non sono sessioni aperte: restano in tabella al massimo un'ora, finché
         // non passa `deleteExpiredSessions`, ma nel frattempo comparivano nell'elenco come
         // tutte le altre. Il filtro le esclude a prescindere da quando gira la pulizia.
@@ -593,8 +612,40 @@ export const listSessionsForUser = async (userId: number, currentToken?: string)
         // Fuori esce l'etichetta, non l'header: al chiamante serve riconoscere il dispositivo,
         // non la stringa con cui il browser si presenta.
         device: describeUserAgent(row.userAgent),
+        deviceName: row.deviceName,
         isCurrent: row.tokenHash === currentTokenHash,
     }));
+};
+
+/**
+ * Dà (o toglie, con `null`) il nome al dispositivo della sessione con cui si sta chiamando. Solo
+ * il proprio dispositivo e solo da lì: un amministratore che guarda le sessioni altrui non sa
+ * quale sia il portatile di chi, e sbaglierebbe il nome. Una sessione senza identità di
+ * dispositivo (aperta prima di questa funzione, o con il cookie bloccato) risponde 409: il nome
+ * non avrebbe dove restare, e con un nuovo accesso il dispositivo prende la sua identità.
+ */
+export const setDeviceName = async (userId: number, currentToken: string, name: string | null): Promise<void> => {
+    const [session] = await db
+        .select({ deviceHash: sessionTable.deviceHash })
+        .from(sessionTable)
+        .where(and(eq(sessionTable.userId, userId), eq(sessionTable.tokenHash, hashSessionToken(currentToken))))
+        .limit(1);
+
+    if (!session?.deviceHash) {
+        throw new AuthManagerError("Per dare un nome a questo dispositivo esci e accedi di nuovo.", 409);
+    }
+
+    if (name === null) {
+        await db
+            .delete(userDeviceTable)
+            .where(and(eq(userDeviceTable.userId, userId), eq(userDeviceTable.deviceHash, session.deviceHash)));
+        return;
+    }
+
+    await db
+        .insert(userDeviceTable)
+        .values({ userId, deviceHash: session.deviceHash, name })
+        .onConflictDoUpdate({ target: [userDeviceTable.userId, userDeviceTable.deviceHash], set: { name } });
 };
 
 /** Filtrata per userId: anche se l'hash non si indovina, resta scorretto revocare la
@@ -864,7 +915,8 @@ export const completeTwoFactorLogin = async (
     challengeId: string,
     code: string,
     ip: string,
-    userAgent?: string | null
+    userAgent?: string | null,
+    deviceId?: string | null
 ): Promise<LoginResult> => {
     const subject = rateLimitSubject(ip);
     assertIpLoginRateLimit(subject);
@@ -926,7 +978,7 @@ export const completeTwoFactorLogin = async (
         });
     }
 
-    return createSessionForUser(user, userAgent);
+    return createSessionForUser(user, userAgent, deviceId);
 };
 
 export type TwoFactorStatus = { enabled: boolean; remainingRecoveryCodes: number };

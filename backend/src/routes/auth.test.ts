@@ -20,6 +20,7 @@ vi.mock("../services/authManager", () => ({
     deleteSession: vi.fn(),
     listSessionsForUser: vi.fn(),
     revokeSession: vi.fn(),
+    setDeviceName: vi.fn(),
 }));
 
 import {
@@ -34,11 +35,12 @@ import {
     login,
     regenerateRecoveryCodes,
     revokeSession,
+    setDeviceName,
     startTwoFactorSetup,
 } from "../services/authManager";
 import authRouter from "./auth";
 import { errorHandler } from "../middleware/errorHandler";
-import { sessionCookieName } from "../middleware/requireAuth";
+import { deviceCookieName, sessionCookieName } from "../middleware/requireAuth";
 
 const sessionCookie = (token: string) => `${sessionCookieName}=${token}`;
 import { ApiError } from "../services/apiError";
@@ -508,5 +510,134 @@ describe("attivazione, disattivazione e codici di recupero", () => {
 
         expect(response.status).toBe(403);
         expect(disableTwoFactor).not.toHaveBeenCalled();
+    });
+});
+
+describe("identità del dispositivo", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const deviceCookieOf = (response: request.Response) =>
+        (response.headers["set-cookie"] as unknown as string[] | undefined)?.find((cookie) =>
+            cookie.startsWith(`${deviceCookieName}=`)
+        );
+
+    const authenticated = () =>
+        vi.mocked(login).mockResolvedValue({
+            status: "authenticated",
+            token: "un-token",
+            expiresAt: new Date("2030-01-08T10:00:00Z"),
+            user: { ...publicUser, twoFactorEnabled: false },
+        });
+
+    it("al primo accesso crea l'identità, la passa al servizio e la consegna in un cookie di lunga durata", async () => {
+        authenticated();
+
+        const response = await request(buildApp())
+            .post("/api/auth/login")
+            .send({ username: "mario", password: "segreta1!" });
+
+        const deviceId = vi.mocked(login).mock.calls[0][4];
+        expect(deviceId).toMatch(/^[0-9a-f]{32}$/);
+        expect(deviceCookieOf(response)).toContain(`${deviceCookieName}=${deviceId}`);
+        expect(deviceCookieOf(response)).toContain("HttpOnly");
+        expect(deviceCookieOf(response)).toMatch(/Max-Age=\d{8}/);
+    });
+
+    it("riusa quella già nel cookie, così il nome dato al dispositivo sopravvive ai login", async () => {
+        authenticated();
+        const known = "a".repeat(32);
+
+        const response = await request(buildApp())
+            .post("/api/auth/login")
+            .set("Cookie", `${deviceCookieName}=${known}`)
+            .send({ username: "mario", password: "segreta1!" });
+
+        expect(vi.mocked(login).mock.calls[0][4]).toBe(known);
+        expect(deviceCookieOf(response)).toContain(`${deviceCookieName}=${known}`);
+    });
+
+    it("scarta un cookie che non ha la forma di un'identità: arriva dal client", async () => {
+        authenticated();
+
+        await request(buildApp())
+            .post("/api/auth/login")
+            .set("Cookie", `${deviceCookieName}=non-valido'; DROP`)
+            .send({ username: "mario", password: "segreta1!" });
+
+        expect(vi.mocked(login).mock.calls[0][4]).toMatch(/^[0-9a-f]{32}$/);
+    });
+
+    it("non consegna il cookie quando manca ancora il secondo fattore né quando l'accesso fallisce", async () => {
+        vi.mocked(login).mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        const pending = await request(buildApp())
+            .post("/api/auth/login")
+            .send({ username: "mario", password: "segreta1!" });
+
+        expect(deviceCookieOf(pending)).toBeUndefined();
+
+        vi.mocked(login).mockRejectedValue(new ApiError("Nome utente o password non validi", 401));
+        const failed = await request(buildApp()).post("/api/auth/login").send({ username: "mario", password: "x" });
+
+        expect(deviceCookieOf(failed)).toBeUndefined();
+    });
+
+    it("il secondo passo della 2FA passa la stessa identità al servizio e la consegna", async () => {
+        vi.mocked(completeTwoFactorLogin).mockResolvedValue({
+            status: "authenticated",
+            token: "un-token",
+            expiresAt: new Date("2030-01-08T10:00:00Z"),
+            user: publicUser,
+        });
+        const known = "b".repeat(32);
+
+        const response = await request(buildApp())
+            .post("/api/auth/login/2fa")
+            .set("Cookie", `${deviceCookieName}=${known}`)
+            .send({ challengeId: "abc123", code: "123456" });
+
+        expect(vi.mocked(completeTwoFactorLogin).mock.calls[0][4]).toBe(known);
+        expect(deviceCookieOf(response)).toContain(`${deviceCookieName}=${known}`);
+    });
+
+    describe("PUT /api/auth/device-name", () => {
+        it("dà il nome al dispositivo della sessione in uso", async () => {
+            vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+            const response = await request(buildApp())
+                .put("/api/auth/device-name")
+                .set("Cookie", sessionCookie("un-token"))
+                .send({ name: "  Portatile del banco " });
+
+            expect(response.status).toBe(204);
+            expect(setDeviceName).toHaveBeenCalledWith(1, "un-token", "Portatile del banco");
+        });
+
+        it.each([[""], ["   "], [null]])("con %j toglie il nome", async (name) => {
+            vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+            await request(buildApp())
+                .put("/api/auth/device-name")
+                .set("Cookie", sessionCookie("un-token"))
+                .send({ name });
+
+            expect(setDeviceName).toHaveBeenCalledWith(1, "un-token", null);
+        });
+
+        it("rifiuta un nome troppo lungo e chi non ha fatto l'accesso", async () => {
+            vi.mocked(getSessionUser).mockResolvedValue(publicUser);
+
+            const tooLong = await request(buildApp())
+                .put("/api/auth/device-name")
+                .set("Cookie", sessionCookie("un-token"))
+                .send({ name: "x".repeat(61) });
+            const anonymous = await request(buildApp()).put("/api/auth/device-name").send({ name: "Banco" });
+
+            expect(tooLong.status).toBe(400);
+            expect(anonymous.status).toBe(401);
+            expect(setDeviceName).not.toHaveBeenCalled();
+        });
     });
 });

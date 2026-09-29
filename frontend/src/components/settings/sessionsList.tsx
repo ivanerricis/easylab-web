@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsEmptyBox, SettingsLoadingBox } from "@/components/settings/settingsUi";
 import StatusBadge from "@/components/status-badge";
@@ -29,6 +29,11 @@ type SessionsListProps = {
     loadedAt: number;
     revokingId: string | null;
     onRevoke: (session: SessionDto) => void;
+    /**
+     * Dare un nome al dispositivo della sessione in uso. Assente nell'elenco che un admin guarda
+     * su un altro utente: il nome lo può dare solo chi è su quel dispositivo, e da lì.
+     */
+    onRename?: (session: SessionDto) => void;
     emptyLabel?: string;
 };
 
@@ -38,6 +43,7 @@ const SessionsList = ({
     loadedAt,
     revokingId,
     onRevoke,
+    onRename,
     emptyLabel = "Nessuna sessione aperta.",
 }: SessionsListProps) => {
     // Il riquadro di caricamento e quello vuoto delle altre sezioni di Impostazioni: qui erano
@@ -68,8 +74,13 @@ const SessionsList = ({
                             <span className="font-medium">
                                 {/* Il dispositivo per primo: è il dato con cui si riconosce
                                     la propria sessione fra più accessi dello stesso utente. */}
-                                {session.device ?? "Dispositivo sconosciuto"}
+                                {session.deviceName ?? session.device ?? "Dispositivo sconosciuto"}
                             </span>
+                            {/* Con un nome dato, il dispositivo tecnico ("Chrome su Windows") passa
+                                sotto: è ciò che distingue un browser da un altro sulla stessa macchina. */}
+                            {session.deviceName && session.device ? (
+                                <span className="text-xs text-muted-foreground">{session.device}</span>
+                            ) : null}
                             <span className="text-xs text-muted-foreground">
                                 {session.isCurrent
                                     ? "In uso adesso"
@@ -85,7 +96,15 @@ const SessionsList = ({
                             pulsante c'era ma disabilitato, al 50% e senza spiegazione, e sembrava
                             un guasto. Per chiudere questa sessione c'è "Esci" nel menu utente. */}
                         {session.isCurrent ? (
-                            <StatusBadge color="green">Questa sessione</StatusBadge>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {onRename ? (
+                                    <Button type="button" variant="outline" onClick={() => onRename(session)}>
+                                        <Pencil className="size-4" />
+                                        {session.deviceName ? "Rinomina" : "Dai un nome"}
+                                    </Button>
+                                ) : null}
+                                <StatusBadge color="green">Questa sessione</StatusBadge>
+                            </div>
                         ) : (
                             <Button
                                 type="button"

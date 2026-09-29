@@ -36,6 +36,8 @@ export type SessionDto = {
     lastSeenAt: string;
     /** "Chrome su Windows": lo ricava il server dallo User-Agent del login, `null` se non basta. */
     device: string | null;
+    /** Il nome dato al dispositivo da chi lo usa ("Portatile del banco"), se ne ha uno. */
+    deviceName: string | null;
     isCurrent: boolean;
 };
 

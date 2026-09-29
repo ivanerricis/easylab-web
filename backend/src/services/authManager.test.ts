@@ -52,6 +52,7 @@ const createBuilder = (op: DbCall["op"], table?: unknown) => {
         },
         where: () => builder,
         innerJoin: () => builder,
+        leftJoin: () => builder,
         orderBy: () => builder,
         limit: () => builder,
         returning: () => builder,
@@ -1259,6 +1260,7 @@ describe("listSessionsForUser / revokeSession", () => {
                 lastSeenAt: new Date("2026-01-05T10:00:00Z"),
                 userAgent:
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+                deviceName: "Portatile del banco",
             },
             {
                 tokenHash: "altro-hash",
@@ -1267,6 +1269,7 @@ describe("listSessionsForUser / revokeSession", () => {
                 lastSeenAt: new Date("2026-01-01T00:10:00Z"),
                 // Aperta prima che l'header venisse salvato: fuori esce `device: null`.
                 userAgent: null,
+                deviceName: null,
             },
         ]);
 
@@ -1279,6 +1282,7 @@ describe("listSessionsForUser / revokeSession", () => {
                 expiresAt: "2026-01-09T00:00:00.000Z",
                 lastSeenAt: "2026-01-05T10:00:00.000Z",
                 device: "Chrome su Windows",
+                deviceName: "Portatile del banco",
                 isCurrent: true,
             },
             {
@@ -1287,6 +1291,7 @@ describe("listSessionsForUser / revokeSession", () => {
                 expiresAt: "2026-01-08T00:00:00.000Z",
                 lastSeenAt: "2026-01-01T00:10:00.000Z",
                 device: null,
+                deviceName: null,
                 isCurrent: false,
             },
         ]);

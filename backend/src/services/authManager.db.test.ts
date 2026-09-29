@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
-import { sessionTable } from "../db/schema";
+import { sessionTable, userDeviceTable, userTable } from "../db/schema";
 import { insertSession, insertUser } from "../test/db/fixtures";
-import { deleteSession, getSessionUser, login } from "./authManager";
+import { deleteSession, getSessionUser, listSessionsForUser, login, setDeviceName } from "./authManager";
 import { resetLoginRateLimit } from "./loginRateLimit";
 
 /**
@@ -170,5 +170,99 @@ describe("deleteSession: con un database vero", () => {
         await expect(deleteSession("token-mai-emesso")).resolves.not.toThrow();
 
         expect(await db.select().from(sessionTable)).toHaveLength(1);
+    });
+});
+
+describe("nome del dispositivo: con un database vero", () => {
+    const password = "Password-Giusta-1!";
+    const deviceId = "c".repeat(32);
+
+    const loginAs = async (username: string, device: string | null) => {
+        const result = await login(username, password, freshIp(), "Mozilla/5.0 (Windows NT 10.0) Chrome/140.0", device);
+
+        if (result.status !== "authenticated") {
+            throw new Error("atteso un accesso riuscito");
+        }
+
+        return result.token;
+    };
+
+    it("il login salva solo l'hash dell'identità del dispositivo, mai l'identità", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+
+        await loginAs("mario", deviceId);
+
+        const [row] = await db.select().from(sessionTable).where(eq(sessionTable.userId, user.id));
+        expect(row.deviceHash).toBe(tokenHashOf(deviceId));
+        expect(JSON.stringify(row)).not.toContain(deviceId);
+    });
+
+    it("il nome resta al dispositivo fra un accesso e il successivo", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+
+        const firstToken = await loginAs("mario", deviceId);
+        await setDeviceName(user.id, firstToken, "Portatile del banco");
+        await deleteSession(firstToken);
+
+        const secondToken = await loginAs("mario", deviceId);
+        const sessions = await listSessionsForUser(user.id, secondToken);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({ deviceName: "Portatile del banco", isCurrent: true });
+    });
+
+    it("due dispositivi uguali si distinguono dal nome, e uno senza nome resta null", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+
+        const bancoToken = await loginAs("mario", deviceId);
+        await setDeviceName(user.id, bancoToken, "Banco");
+        await loginAs("mario", "d".repeat(32));
+
+        const sessions = await listSessionsForUser(user.id, bancoToken);
+
+        expect(sessions.map((session) => session.deviceName)).toHaveLength(2);
+        expect(sessions.map((session) => session.deviceName)).toContain("Banco");
+        expect(sessions.map((session) => session.deviceName)).toContain(null);
+        expect(sessions.every((session) => session.device === "Chrome su Windows")).toBe(true);
+    });
+
+    it("rinominare sostituisce il nome, e null lo toglie cancellando la riga", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+        const token = await loginAs("mario", deviceId);
+
+        await setDeviceName(user.id, token, "Banco");
+        await setDeviceName(user.id, token, "Laboratorio");
+        expect((await db.select().from(userDeviceTable)).map((row) => row.name)).toEqual(["Laboratorio"]);
+
+        await setDeviceName(user.id, token, null);
+        expect(await db.select().from(userDeviceTable)).toEqual([]);
+    });
+
+    it("lo stesso dispositivo usato da due utenti tiene un nome per ciascuno", async () => {
+        const mario = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+        const luca = await insertUser({ username: "luca", passwordHash: hashLikeTheAppDoes(password) });
+
+        await setDeviceName(mario.id, await loginAs("mario", deviceId), "Di Mario");
+        await setDeviceName(luca.id, await loginAs("luca", deviceId), "Di Luca");
+
+        const names = await db.select().from(userDeviceTable);
+        expect(names.map((row) => row.name).sort()).toEqual(["Di Luca", "Di Mario"]);
+    });
+
+    it("una sessione senza identità di dispositivo risponde 409 e non scrive niente", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+        const token = await loginAs("mario", null);
+
+        await expect(setDeviceName(user.id, token, "Banco")).rejects.toMatchObject({ statusCode: 409 });
+        expect(await db.select().from(userDeviceTable)).toEqual([]);
+    });
+
+    it("togliere l'utente toglie anche i nomi dei suoi dispositivi", async () => {
+        const user = await insertUser({ username: "mario", passwordHash: hashLikeTheAppDoes(password) });
+        await setDeviceName(user.id, await loginAs("mario", deviceId), "Banco");
+
+        await db.delete(userTable).where(eq(userTable.id, user.id));
+
+        expect(await db.select().from(userDeviceTable)).toEqual([]);
     });
 });

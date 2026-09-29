@@ -58,6 +58,14 @@ export const changeOwnPassword = async (payload: ChangePasswordInput) => {
 /** Le proprie sessioni aperte. La versione per l'admin, su un altro utente, sta in `users.ts`. */
 export const listOwnSessions = async () => (await api.get<SessionDto[]>("/auth/sessions")).data;
 
+/**
+ * Dà il nome al dispositivo da cui si sta chiamando, o lo toglie con `null`. Solo il proprio
+ * e solo da lì: il server lo ricava dalla sessione in uso, non da un id passato.
+ */
+export const setOwnDeviceName = async (name: string | null) => {
+    await api.put("/auth/device-name", { name });
+};
+
 export const revokeOwnSession = async (sessionId: string) => {
     await api.delete(`/auth/sessions/${encodeURIComponent(sessionId)}`);
 };

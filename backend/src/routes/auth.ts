@@ -1,4 +1,5 @@
-import { Router } from "express";
+import crypto from "node:crypto";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import {
     changeOwnPassword,
@@ -11,9 +12,13 @@ import {
     login,
     regenerateRecoveryCodes,
     revokeSession,
+    setDeviceName,
     startTwoFactorSetup,
 } from "../services/authManager";
 import {
+    deviceCookieName,
+    deviceCookieOptions,
+    readDeviceId,
     requireAuth,
     requirePasswordChangeCompleted,
     sessionCookieName,
@@ -27,6 +32,17 @@ const authRouter = Router();
 
 // Il cookie scade quando scade la sessione (`expiresAt` di `login`), invece di avere una durata
 // sua scritta qui: il passaggio da 30 a 7 giorni aveva dovuto toccare due costanti in due file.
+
+/**
+ * L'identità del dispositivo che sta facendo l'accesso: quella già nel cookie, o una nuova. Il
+ * cookie si scrive solo a login riuscito (`rememberDevice`), e a ogni accesso si rinnova, così
+ * un dispositivo usato di frequente non lo perde per scadenza.
+ */
+const deviceIdFor = (req: Request) => readDeviceId(req) ?? crypto.randomBytes(16).toString("hex");
+
+const rememberDevice = (res: Response, deviceId: string) => {
+    res.cookie(deviceCookieName, deviceId, deviceCookieOptions);
+};
 
 const loginBodySchema = z
     .object({
@@ -68,6 +84,8 @@ const twoFactorPasswordAndCodeBodySchema = z
     })
     .strict();
 
+const deviceNameBodySchema = z.object({ name: z.string().trim().max(60).nullable() }).strict();
+
 const sessionParamsSchema = z
     .object({
         // sha256 esadecimale, la stessa forma con cui la sessione è salvata in tabella.
@@ -89,7 +107,8 @@ const twoFactorGuards = [requireAuth, requirePasswordChangeCompleted] as const;
 
 authRouter.post("/login", validate({ body: loginBodySchema }), async (req, res) => {
     const { username, password } = req.body as { username: string; password: string };
-    const result = await login(username, password, getClientIp(req), req.get("user-agent"));
+    const deviceId = deviceIdFor(req);
+    const result = await login(username, password, getClientIp(req), req.get("user-agent"), deviceId);
 
     if (result.status === "twoFactorRequired") {
         // Nessun cookie: finché il secondo fattore manca non esiste una sessione. Il
@@ -100,12 +119,14 @@ authRouter.post("/login", validate({ body: loginBodySchema }), async (req, res) 
     }
 
     res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, expires: result.expiresAt });
+    rememberDevice(res, deviceId);
     res.json(result.user);
 });
 
 authRouter.post("/login/2fa", validate({ body: twoFactorLoginBodySchema }), async (req, res) => {
     const { challengeId, code } = req.body as { challengeId: string; code: string };
-    const result = await completeTwoFactorLogin(challengeId, code, getClientIp(req), req.get("user-agent"));
+    const deviceId = deviceIdFor(req);
+    const result = await completeTwoFactorLogin(challengeId, code, getClientIp(req), req.get("user-agent"), deviceId);
 
     if (result.status !== "authenticated") {
         // Irraggiungibile: `completeTwoFactorLogin` o autentica o solleva. Il ramo esiste
@@ -115,6 +136,7 @@ authRouter.post("/login/2fa", validate({ body: twoFactorLoginBodySchema }), asyn
     }
 
     res.cookie(sessionCookieName, result.token, { ...sessionCookieOptions, expires: result.expiresAt });
+    rememberDevice(res, deviceId);
     res.json(result.user);
 });
 
@@ -149,6 +171,18 @@ authRouter.get("/sessions", requireAuth, async (req, res) => {
     const currentToken = req.cookies?.[sessionCookieName] as string | undefined;
 
     res.json(await listSessionsForUser(req.user!.id, currentToken));
+});
+
+/**
+ * Il nome del dispositivo da cui si sta chiamando (la sessione in uso), non di uno qualunque
+ * dell'elenco: vedi `setDeviceName`. Stringa vuota o `null` tolgono il nome.
+ */
+authRouter.put("/device-name", requireAuth, validate({ body: deviceNameBodySchema }), async (req, res) => {
+    const { name } = req.body as { name: string | null };
+    const currentToken = req.cookies?.[sessionCookieName] as string;
+
+    await setDeviceName(req.user!.id, currentToken, name || null);
+    res.status(204).end();
 });
 
 authRouter.delete("/sessions/:sessionId", requireAuth, validate({ params: sessionParamsSchema }), async (req, res) => {

@@ -8,6 +8,7 @@ import DetailItem, { DetailGrid } from "@/components/detail-item";
 import StatusBadge from "@/components/status-badge";
 import SessionsList from "@/components/settings/sessionsList";
 import CustomDialog from "@/components/dialogs/customDialog";
+import DeviceNameDialog from "@/components/dialogs/settings/deviceNameDialog";
 import RecoveryCodesDialog from "@/components/dialogs/settings/recoveryCodesDialog";
 import TwoFactorConfirmDialog from "@/components/dialogs/settings/twoFactorConfirmDialog";
 import TwoFactorSetupDialog from "@/components/dialogs/settings/twoFactorSetupDialog";
@@ -23,6 +24,7 @@ import {
     listRecentFailedLogins,
     regenerateRecoveryCodes,
     revokeOwnSession,
+    setOwnDeviceName,
     type LogEntryDto,
     type SessionDto,
     type TwoFactorStatusDto,
@@ -68,6 +70,7 @@ const SecuritySettingsSection = () => {
     const [isLoadingSessions, setIsLoadingSessions] = useState(false);
     const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
     const [sessionToRevoke, setSessionToRevoke] = useState<SessionDto | null>(null);
+    const [sessionToRename, setSessionToRename] = useState<SessionDto | null>(null);
 
     const loadSessions = useCallback(async () => {
         setIsLoadingSessions(true);
@@ -104,6 +107,18 @@ const SecuritySettingsSection = () => {
         } finally {
             setRevokingSessionId(null);
             setSessionToRevoke(null);
+        }
+    };
+
+    const handleRenameDevice = async (name: string | null) => {
+        try {
+            await setOwnDeviceName(name);
+            toast.success(name ? "Nome del dispositivo salvato" : "Nome del dispositivo tolto");
+            // Il nome vale per tutte le sessioni di questo dispositivo: si rilegge l'elenco.
+            await loadSessions();
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile salvare il nome del dispositivo"));
+            throw error;
         }
     };
 
@@ -282,8 +297,21 @@ const SecuritySettingsSection = () => {
                     loadedAt={sessionsLoadedAt}
                     revokingId={revokingSessionId}
                     onRevoke={(session) => setSessionToRevoke(session)}
+                    onRename={(session) => setSessionToRename(session)}
                 />
             </SettingsCard>
+
+            <DeviceNameDialog
+                key={sessionToRename?.id ?? "nessuna"}
+                open={sessionToRename !== null}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                        setSessionToRename(null);
+                    }
+                }}
+                currentName={sessionToRename?.deviceName ?? null}
+                onSave={handleRenameDevice}
+            />
 
             <CustomDialog
                 open={sessionToRevoke !== null}

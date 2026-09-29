@@ -264,8 +264,37 @@ export const sessionTable = pgTable(
          * sessioni già aperte. Nullable perché le sessioni nate prima non l'hanno.
          */
         userAgent: varchar("user_agent", { length: 255 }),
+        /**
+         * sha256 dell'identificativo del dispositivo (cookie `__Host-device`, vedi
+         * `requireAuth`), con cui la sessione ritrova il nome dato al dispositivo in
+         * `user_device`. Solo l'hash, come per il token. Nullable: le sessioni nate prima non
+         * l'hanno, e senza il cookie (bloccato, o cancellato) resta NULL.
+         */
+        deviceHash: varchar("device_hash", { length: 64 }),
     },
     (table) => [index("session_user_id_idx").on(table.userId)]
+);
+
+/**
+ * Il nome che una persona ha dato a un dispositivo ("Portatile del banco"), per distinguere
+ * due macchine uguali nell'elenco delle sessioni. Sopravvive ai login perché non sta sulla
+ * sessione ma sul dispositivo, che il browser ricorda con un cookie di lunga durata.
+ *
+ * Una riga esiste solo se il dispositivo ha un nome: senza nome non si scrive niente, e
+ * cancellare il nome cancella la riga. Non è un dato di sicurezza: il cookie lo può
+ * cancellare o spostare chiunque, e in quel caso il dispositivo risulta semplicemente nuovo.
+ */
+export const userDeviceTable = pgTable(
+    "user_device",
+    {
+        userId: integer("user_id")
+            .notNull()
+            .references(() => userTable.id, { onDelete: "cascade" }),
+        deviceHash: varchar("device_hash", { length: 64 }).notNull(),
+        name: varchar("name", { length: 60 }).notNull(),
+        ...timestamps,
+    },
+    (table) => [primaryKey({ columns: [table.userId, table.deviceHash] })]
 );
 
 /**

@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
     revokeUserSession: vi.fn(),
     listOwnSessions: vi.fn(),
     revokeOwnSession: vi.fn(),
+    setOwnDeviceName: vi.fn(),
     disableUserTwoFactor: vi.fn(),
     getTwoFactorStatus: vi.fn(),
     startTwoFactorSetup: vi.fn(),
@@ -281,6 +282,7 @@ describe("UsersSettingsSection", () => {
                 expiresAt: "2026-09-21T10:00:00.000Z",
                 lastSeenAt: new Date().toISOString(),
                 device: "Chrome su Windows",
+                deviceName: null,
                 isCurrent: true,
             },
             {
@@ -292,6 +294,7 @@ describe("UsersSettingsSection", () => {
                 lastSeenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
                 // Le sessioni aperte prima che l'header venisse salvato non hanno dispositivo.
                 device: null,
+                deviceName: null,
                 isCurrent: false,
             },
         ]);
@@ -308,6 +311,8 @@ describe("UsersSettingsSection", () => {
         within(dialog).getByText("Dispositivo sconosciuto");
         within(dialog).getByText("In uso adesso");
         within(dialog).getByText("Ultimo utilizzo 3 giorni fa (inattiva)");
+        // Il nome del dispositivo lo dà solo chi è su quel dispositivo: un admin non lo vede.
+        expect(within(dialog).queryByRole("button", { name: "Dai un nome" })).not.toBeInTheDocument();
         // Sulla sessione in uso nessun "Disconnetti", solo l'etichetta: il pulsante è uno.
         const disconnectButtons = within(dialog).getAllByRole("button", { name: "Disconnetti" });
         expect(disconnectButtons).toHaveLength(1);
@@ -383,6 +388,71 @@ describe("SecuritySettingsSection", () => {
         });
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).toBeInTheDocument();
+    });
+
+    it("dà un nome al dispositivo in uso e ricarica l'elenco con il nome", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 8 });
+        const session = {
+            id: "hash-corrente",
+            createdAt: "2026-09-14T10:00:00.000Z",
+            expiresAt: "2026-09-21T10:00:00.000Z",
+            lastSeenAt: new Date().toISOString(),
+            device: "Chrome su Windows",
+            deviceName: null,
+            isCurrent: true,
+        };
+        api.listOwnSessions
+            .mockResolvedValueOnce([session])
+            .mockResolvedValue([{ ...session, deviceName: "Portatile del banco" }]);
+        api.setOwnDeviceName.mockResolvedValue(undefined);
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Dai un nome" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nome del dispositivo" });
+        await userEvent.type(within(dialog).getByLabelText("Nome"), "  Portatile del banco ");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(api.setOwnDeviceName).toHaveBeenCalledWith("Portatile del banco");
+        });
+        expect(await screen.findByText("Portatile del banco")).toBeInTheDocument();
+        // Il dispositivo tecnico passa sotto il nome, non sparisce.
+        expect(screen.getByText("Chrome su Windows")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Rinomina" })).toBeInTheDocument();
+        expect(toast.success).toHaveBeenCalledWith("Nome del dispositivo salvato");
+    });
+
+    it("lasciando vuoto il nome lo toglie, e un errore lascia il dialogo aperto", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 8 });
+        api.listOwnSessions.mockResolvedValue([
+            {
+                id: "hash-corrente",
+                createdAt: "2026-09-14T10:00:00.000Z",
+                expiresAt: "2026-09-21T10:00:00.000Z",
+                lastSeenAt: new Date().toISOString(),
+                device: "Chrome su Windows",
+                deviceName: "Banco",
+                isCurrent: true,
+            },
+        ]);
+        api.setOwnDeviceName.mockRejectedValueOnce(
+            new Error("Per dare un nome a questo dispositivo esci e accedi di nuovo.")
+        );
+        api.setOwnDeviceName.mockResolvedValue(undefined);
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rinomina" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nome del dispositivo" });
+        const input = within(dialog).getByLabelText("Nome");
+        expect(input).toHaveValue("Banco");
+        await userEvent.clear(input);
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Per dare un nome a questo dispositivo esci e accedi di nuovo.");
+        });
+        expect(api.setOwnDeviceName).toHaveBeenCalledWith(null);
+        expect(screen.getByRole("dialog", { name: "Nome del dispositivo" })).toBeInTheDocument();
     });
 
     it("se lo stato non si legge lo dice", async () => {

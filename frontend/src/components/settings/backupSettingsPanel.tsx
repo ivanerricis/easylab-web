@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { SettingsSection } from "@/components/settings/settingsUi";
 import BackupConfigurationCard from "./backup/backupConfigurationCard";
 import BackupDumpsCard from "./backup/backupDumpsCard";
@@ -21,17 +20,8 @@ type Props = {
  * aggiungerebbe informazione.
  */
 const BackupSettingsPanel = ({ onDirtyChange }: Props) => {
-    const panel = useBackupPanel();
-    const { isDirty } = panel;
-
-    // La pagina Impostazioni chiede conferma prima di lasciare la sezione con modifiche non
-    // salvate: le serve sapere quando il modulo è diverso da quanto salvato. Allo smontaggio
-    // (sezione cambiata) non ci sono più modifiche in sospeso.
-    useEffect(() => {
-        onDirtyChange?.(isDirty);
-    }, [isDirty, onDirtyChange]);
-
-    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+    // La segnalazione delle modifiche non salvate alla pagina la fa `useSettingsForm`, dentro l'hook.
+    const panel = useBackupPanel({ onDirtyChange });
 
     return (
         <SettingsSection>

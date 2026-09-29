@@ -44,3 +44,38 @@ export const fieldErrorAria = (id: string, error?: string) => ({
  */
 export const hasFormChanged = <T extends object>(current: T, initial: T) =>
     JSON.stringify(current) !== JSON.stringify(initial);
+
+/** Mette a fuoco il controllo con quell'id: il comportamento di serie di `reportFieldErrors`. */
+const focusFieldById = (field: string) => {
+    document.getElementById(field)?.focus();
+};
+
+/**
+ * Mostra gli errori di validazione e porta il focus sul primo campo sbagliato, nell'ordine in
+ * cui i campi stanno nella pagina. Restituisce vero se c'è almeno un errore, così chi chiama
+ * scrive solo `if (reportFieldErrors(...)) return;`.
+ *
+ * Il focus serve perché il messaggio sotto il campo dice *quale* campo correggere, ma su un
+ * modulo lungo quel campo può essere fuori vista: senza focus si cercava a occhio. Gli errori
+ * vanno sempre impostati, anche vuoti, così un nuovo tentativo riuscito toglie quelli vecchi.
+ *
+ * `fieldOrder` contiene gli id dei controlli (la stessa convenzione di `fieldProps`), e
+ * `focusField` si sostituisce solo dove mettere a fuoco un campo richiede di più di
+ * `getElementById`, come nei dialoghi a passi che prima devono aprire il passo del campo.
+ */
+export const reportFieldErrors = <TField extends string>(
+    nextErrors: Partial<Record<TField, string>>,
+    fieldOrder: readonly TField[],
+    setErrors: (errors: Partial<Record<TField, string>>) => void,
+    focusField: (field: TField) => void = focusFieldById
+): boolean => {
+    setErrors(nextErrors);
+    const firstInvalidField = fieldOrder.find((field) => nextErrors[field]);
+
+    if (firstInvalidField === undefined) {
+        return false;
+    }
+
+    focusField(firstInvalidField);
+    return true;
+};

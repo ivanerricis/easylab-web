@@ -20,6 +20,7 @@ import {
     type BackupSettingsInput,
 } from "@/lib/api";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 
 export const restoreConfirmKeyword = "RESTORE";
 
@@ -72,9 +73,9 @@ const defaultOutputDir = "backups";
  * anche un form da modificare, quindi serve la proiezione sui soli campi che il form scrive
  * (più `smbPassword`, che il server non restituisce mai).
  *
- * Prima questa stessa conversione era scritta due volte, identica, in `loadSettings` e
- * `handleSave`; e le 16 informazioni di sola lettura (`lastRunAt`, `smbLastStatus`, ...)
- * erano altrettanti `useState` riassegnati con un sottoinsieme diverso di setter in ognuno
+ * Prima questa stessa conversione era scritta due volte, identica, nel caricamento e nel
+ * salvataggio (ora li fa `useSettingsForm`); e le 16 informazioni di sola lettura
+ * (`lastRunAt`, `smbLastStatus`, ...) erano altrettanti `useState` riassegnati con un sottoinsieme diverso di setter in ognuno
  * dei quattro punti che ricevono il DTO intero dal server (caricamento, salvataggio,
  * esecuzione del dump, ripristino) — tanto che `lastRunOrigin` non veniva mai ripreso da
  * nessuno dei quattro.
@@ -95,6 +96,70 @@ const toFormValues = (settings: BackupSettingsDto): BackupSettingsInput => ({
     smbPassword: "",
 });
 
+/** Host, condivisione e utente del NAS, che salvataggio e prova di connessione chiedono entrambi. */
+const smbRequiredErrors = (values: BackupSettingsInput, prefix: string): BackupFieldErrors => {
+    const nextErrors: BackupFieldErrors = {};
+    const message = (what: string) => (prefix ? `${prefix} specifica ${what}` : `Specifica ${what}`);
+
+    if (!values.smbHost.trim()) {
+        nextErrors.smbHost = message("l'host del NAS");
+    }
+
+    if (!values.smbShare.trim()) {
+        nextErrors.smbShare = message("il nome della condivisione");
+    }
+
+    if (!values.smbUsername.trim()) {
+        nextErrors.smbUsername = message("l'utente del NAS");
+    }
+
+    return nextErrors;
+};
+
+/**
+ * Le regole del salvataggio. Gli errori vanno sotto i campi, non in un toast: il messaggio resta
+ * finché non lo si corregge e dice *quale* campo è il problema, mentre un toast spariva dopo
+ * pochi secondi senza dirlo. I toast restano per il server.
+ */
+const validateBackupForm = (values: BackupSettingsInput, settings: BackupSettingsDto | null): BackupFieldErrors => {
+    const nextErrors: BackupFieldErrors = {};
+
+    if (!Number.isInteger(values.frequencyDays) || values.frequencyDays <= 0) {
+        nextErrors.frequencyDays = "La frequenza deve essere un numero intero positivo";
+    }
+
+    if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(values.runAt)) {
+        nextErrors.runAt = "L'orario deve essere nel formato HH:mm";
+    }
+
+    if (!Number.isInteger(values.maxBackupsToKeep) || values.maxBackupsToKeep <= 0) {
+        nextErrors.maxBackupsToKeep = "Il numero di backup da mantenere deve essere un numero intero positivo";
+    }
+
+    if (values.notifyEmailOnFailure && !settings?.emailConfigured) {
+        nextErrors.notifyEmailOnFailure = "Configura prima l'invio email nelle impostazioni per attivare questo avviso";
+    }
+
+    if (values.smbEnabled) {
+        Object.assign(nextErrors, smbRequiredErrors(values, ""));
+
+        if (!settings?.smbPasswordSet && !values.smbPassword?.trim()) {
+            nextErrors.smbPassword = "Specifica una password per la connessione al NAS";
+        }
+
+        if (!Number.isInteger(values.smbPort) || values.smbPort <= 0 || values.smbPort > 65535) {
+            nextErrors.smbPort = "La porta SMB deve essere un numero valido";
+        }
+    }
+
+    return nextErrors;
+};
+
+type Options = {
+    /** Chiamata a ogni cambio di "ci sono modifiche non salvate", e con `false` allo smontaggio. */
+    onDirtyChange?: (isDirty: boolean) => void;
+};
+
 /**
  * Tutto lo stato e le azioni del pannello backup. Sta in un hook separato dalle schede
  * che lo mostrano perché il pannello ha una ventina di variabili di stato condivise fra
@@ -102,22 +167,53 @@ const toFormValues = (settings: BackupSettingsDto): BackupSettingsInput => ({
  * duplicarle per scheda le disallineerebbe (lo stesso `lastRunStatus` è aggiornato sia
  * dal salvataggio sia dall'esecuzione del dump).
  */
-export const useBackupPanel = () => {
+export const useBackupPanel = ({ onDirtyChange }: Options = {}) => {
     const { setBusy } = useBusyGuard();
     const { logout } = useAuth();
     const navigate = useNavigate();
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+    // `settings` è l'ultimo DTO arrivato dal server: unica fonte sia dei campi di sola lettura
+    // (stato dell'ultima esecuzione, del NAS, del ripristino...) sia dei valori salvati, con cui
+    // si confronta il form per `isDirty`. `null` finché non è ancora arrivato nulla.
+    const {
+        data: settings,
+        setData: setSettings,
+        formValues,
+        setFormValues,
+        isDirty,
+        isLoading,
+        isSaving,
+        errors,
+        setErrors,
+        reportErrors,
+        handleSave,
+    } = useSettingsForm({
+        load: getBackupSettings,
+        save: (values) =>
+            updateBackupSettings({
+                ...values,
+                smbHost: values.smbHost.trim(),
+                smbShare: values.smbShare.trim(),
+                smbPath: values.smbPath.trim(),
+                smbDomain: values.smbDomain.trim(),
+                smbUsername: values.smbUsername.trim(),
+            }),
+        toForm: toFormValues,
+        defaultValues: defaultForm,
+        validate: validateBackupForm,
+        fieldOrder: validatedFields,
+        // La password del NAS non torna mai dal server: scriverne una nuova è di per sé una modifica.
+        isDirty: (current, saved) => isSettingsFormDirty(current, saved, ["smbPassword"]),
+        onDirtyChange,
+        messages: {
+            loadError: "Impossibile caricare le impostazioni backup",
+            saveError: "Impossibile salvare le impostazioni backup",
+            saved: "Impostazioni backup salvate",
+        },
+    });
     const [isRunningBackup, setIsRunningBackup] = useState(false);
-    const [formValues, setFormValues] = useState<BackupSettingsInput>(defaultForm);
-    // L'ultimo DTO arrivato dal server: unica fonte sia dei campi di sola lettura (stato
-    // dell'ultima esecuzione, del NAS, del ripristino...) sia di `savedValues`, con cui si
-    // confronta il form per `isDirty`. `null` finché non è ancora arrivato nulla.
-    const [settings, setSettings] = useState<BackupSettingsDto | null>(null);
     const [dumpFiles, setDumpFiles] = useState<BackupDumpFileDto[]>([]);
     const [isLoadingDumps, setIsLoadingDumps] = useState(false);
     const [isTestingSmb, setIsTestingSmb] = useState(false);
-    const [errors, setErrors] = useState<BackupFieldErrors>({});
 
     const [restoreUploadFile, setRestoreUploadFile] = useState<File | null>(null);
     const [resetSchemaOnRestore, setResetSchemaOnRestore] = useState(false);
@@ -131,23 +227,6 @@ export const useBackupPanel = () => {
     const [isBackupKeyDialogOpen, setIsBackupKeyDialogOpen] = useState(false);
     const [backupKeyPassword, setBackupKeyPassword] = useState("");
 
-    const savedValues = settings ? toFormValues(settings) : defaultForm;
-    const isDirty = isSettingsFormDirty(formValues, savedValues, ["smbPassword"]);
-
-    const loadSettings = async () => {
-        setIsLoading(true);
-
-        try {
-            const result = await getBackupSettings();
-            setSettings(result);
-            setFormValues(toFormValues(result));
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare le impostazioni backup"));
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const loadDumpFiles = async () => {
         setIsLoadingDumps(true);
 
@@ -160,10 +239,10 @@ export const useBackupPanel = () => {
         }
     };
 
-    // Caricamento iniziale: gira una volta sola al montaggio del pannello.
+    // Caricamento iniziale dell'elenco dei dump: gira una volta sola al montaggio del pannello
+    // (le impostazioni le carica `useSettingsForm`).
     useEffect(() => {
         startTransition(() => {
-            void loadSettings();
             void loadDumpFiles();
         });
     }, []);
@@ -181,115 +260,13 @@ export const useBackupPanel = () => {
         });
     };
 
-    /**
-     * Mostra gli errori sotto i campi e mette a fuoco il primo; vero se ce n'è almeno uno. Il
-     * messaggio sotto il campo resta finché non lo si corregge, e dice *quale* campo è il
-     * problema: un toast spariva dopo pochi secondi senza dirlo. I toast restano per il server.
-     */
-    const reportErrors = (nextErrors: BackupFieldErrors) => {
-        setErrors(nextErrors);
-        const firstInvalidField = validatedFields.find((field) => nextErrors[field]);
-
-        if (!firstInvalidField) {
-            return false;
-        }
-
-        document.getElementById(firstInvalidField)?.focus();
-        return true;
-    };
-
-    /** Host, condivisione e utente del NAS, che salvataggio e prova di connessione chiedono entrambi. */
-    const smbRequiredErrors = (prefix: string): BackupFieldErrors => {
-        const nextErrors: BackupFieldErrors = {};
-        const message = (what: string) => (prefix ? `${prefix} specifica ${what}` : `Specifica ${what}`);
-
-        if (!formValues.smbHost.trim()) {
-            nextErrors.smbHost = message("l'host del NAS");
-        }
-
-        if (!formValues.smbShare.trim()) {
-            nextErrors.smbShare = message("il nome della condivisione");
-        }
-
-        if (!formValues.smbUsername.trim()) {
-            nextErrors.smbUsername = message("l'utente del NAS");
-        }
-
-        return nextErrors;
-    };
-
-    const handleSave = async () => {
-        if (isSaving || isLoading) {
-            return;
-        }
-
-        const nextErrors: BackupFieldErrors = {};
-
-        if (!Number.isInteger(formValues.frequencyDays) || formValues.frequencyDays <= 0) {
-            nextErrors.frequencyDays = "La frequenza deve essere un numero intero positivo";
-        }
-
-        if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(formValues.runAt)) {
-            nextErrors.runAt = "L'orario deve essere nel formato HH:mm";
-        }
-
-        if (!Number.isInteger(formValues.maxBackupsToKeep) || formValues.maxBackupsToKeep <= 0) {
-            nextErrors.maxBackupsToKeep = "Il numero di backup da mantenere deve essere un numero intero positivo";
-        }
-
-        if (formValues.notifyEmailOnFailure && !settings?.emailConfigured) {
-            nextErrors.notifyEmailOnFailure =
-                "Configura prima l'invio email nelle impostazioni per attivare questo avviso";
-        }
-
-        if (formValues.smbEnabled) {
-            Object.assign(nextErrors, smbRequiredErrors(""));
-
-            if (!settings?.smbPasswordSet && !formValues.smbPassword?.trim()) {
-                nextErrors.smbPassword = "Specifica una password per la connessione al NAS";
-            }
-
-            if (!Number.isInteger(formValues.smbPort) || formValues.smbPort <= 0 || formValues.smbPort > 65535) {
-                nextErrors.smbPort = "La porta SMB deve essere un numero valido";
-            }
-        }
-
-        if (reportErrors(nextErrors)) {
-            return;
-        }
-
-        try {
-            setIsSaving(true);
-            const result = await updateBackupSettings({
-                ...formValues,
-                smbHost: formValues.smbHost.trim(),
-                smbShare: formValues.smbShare.trim(),
-                smbPath: formValues.smbPath.trim(),
-                smbDomain: formValues.smbDomain.trim(),
-                smbUsername: formValues.smbUsername.trim(),
-            });
-
-            setSettings(result);
-            // Il form prende i valori salvati, non resta com'era: quelli inviati sono ripuliti
-            // dagli spazi, e un " nas.local " rimasto nel campo contro il "nas.local" salvato
-            // lasciava il form "modificato" (e Salva attivo) subito dopo il salvataggio.
-            // Come in `CompanySettingsPanel`.
-            setFormValues(toFormValues(result));
-            toast.success("Impostazioni backup salvate");
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile salvare le impostazioni backup"));
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     const handleTestSmbConnection = async () => {
         if (isTestingSmb) {
             return;
         }
 
         const password = formValues.smbPassword?.trim();
-        const nextErrors = smbRequiredErrors("Per testare la connessione");
+        const nextErrors = smbRequiredErrors(formValues, "Per testare la connessione");
 
         // Anche con una password già salvata: quella resta sul server, la prova usa la scritta.
         if (!password) {

@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,12 @@ import {
     getEmailSettings,
     testEmailConnection,
     updateEmailSettings,
+    type EmailSettingsDto,
     type EmailSettingsInput,
 } from "@/lib/api";
 import { fieldProps } from "@/lib/formField";
 import { isSettingsFormDirty } from "@/lib/settingsForm";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { isValidEmail } from "@/lib/utils";
 
 const defaultForm: EmailSettingsInput = {
@@ -44,17 +46,55 @@ type EmailFieldErrors = Partial<Record<EmailField, string>>;
 /** Nell'ordine in cui i campi stanno nella pagina: il primo sbagliato riceve il focus. */
 const emailFieldOrder: EmailField[] = ["emailHost", "emailPort", "emailUsername", "emailPassword", "emailFromAddress"];
 
-/** Mostra gli errori e porta il focus sul primo campo sbagliato. Vero se ce n'è almeno uno. */
-const reportErrors = (nextErrors: EmailFieldErrors, setErrors: (errors: EmailFieldErrors) => void) => {
-    setErrors(nextErrors);
-    const firstInvalidField = emailFieldOrder.find((field) => nextErrors[field]);
+/**
+ * I campi del modulo letti dal DTO del server. Prima questa stessa conversione era scritta due
+ * volte, identica, nel caricamento e nel salvataggio. La password riparte vuota: il server non
+ * la restituisce mai, e vuota vuol dire "tieni quella salvata".
+ */
+const toFormValues = (settings: EmailSettingsDto): EmailSettingsInput => ({
+    enabled: settings.enabled,
+    host: settings.host,
+    port: settings.port,
+    secure: settings.secure,
+    username: settings.username,
+    fromName: settings.fromName,
+    fromEmail: settings.fromEmail,
+    password: "",
+});
 
-    if (!firstInvalidField) {
-        return false;
+/** Obbligatori solo con l'invio attivo: da spento i campi sono disattivati e non si validano. */
+const validateEmailForm = (values: EmailSettingsInput, settings: EmailSettingsDto | null): EmailFieldErrors => {
+    const nextErrors: EmailFieldErrors = {};
+
+    if (!values.enabled) {
+        return nextErrors;
     }
 
-    document.getElementById(firstInvalidField)?.focus();
-    return true;
+    if (!values.host.trim()) {
+        nextErrors.emailHost = "Specifica l'host SMTP";
+    }
+
+    if (!Number.isInteger(values.port) || values.port <= 0 || values.port > 65535) {
+        nextErrors.emailPort = "La porta SMTP deve essere un numero valido";
+    }
+
+    if (!values.username.trim()) {
+        nextErrors.emailUsername = "Specifica l'utente dell'account email";
+    }
+
+    if (!settings?.passwordSet && !values.password?.trim()) {
+        nextErrors.emailPassword = "Specifica una password per l'account email";
+    }
+
+    const fromEmail = values.fromEmail.trim();
+
+    if (!fromEmail) {
+        nextErrors.emailFromAddress = "Specifica l'email mittente";
+    } else if (!isValidEmail(fromEmail)) {
+        nextErrors.emailFromAddress = "L'email mittente non è valida";
+    }
+
+    return nextErrors;
 };
 
 type Props = {
@@ -63,56 +103,43 @@ type Props = {
 };
 
 const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+    const {
+        data: settings,
+        formValues,
+        setFormValues,
+        isDirty,
+        isLoading,
+        isSaving,
+        errors,
+        setErrors,
+        reportErrors,
+        handleSave,
+    } = useSettingsForm({
+        load: getEmailSettings,
+        save: (values) =>
+            updateEmailSettings({
+                ...values,
+                host: values.host.trim(),
+                username: values.username.trim(),
+                fromName: values.fromName.trim(),
+                fromEmail: values.fromEmail.trim(),
+            }),
+        toForm: toFormValues,
+        defaultValues: defaultForm,
+        validate: validateEmailForm,
+        fieldOrder: emailFieldOrder,
+        // La password non torna mai dal server: scriverne una nuova è di per sé una modifica.
+        isDirty: (current, saved) => isSettingsFormDirty(current, saved, ["password"]),
+        onDirtyChange,
+        messages: {
+            loadError: "Impossibile caricare le impostazioni email",
+            saveError: "Impossibile salvare le impostazioni email",
+            saved: "Impostazioni email salvate",
+        },
+    });
     const [isTesting, setIsTesting] = useState(false);
-    const [formValues, setFormValues] = useState<EmailSettingsInput>(defaultForm);
-    const [savedValues, setSavedValues] = useState<EmailSettingsInput>(defaultForm);
-    const [passwordSet, setPasswordSet] = useState(false);
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-    const [errors, setErrors] = useState<EmailFieldErrors>({});
-
-    const isDirty = isSettingsFormDirty(formValues, savedValues, ["password"]);
-
-    // La pagina Impostazioni chiede conferma prima di lasciare la sezione con modifiche non
-    // salvate: le serve sapere quando il modulo è diverso da quanto salvato. Allo smontaggio
-    // (sezione cambiata) non ci sono più modifiche in sospeso.
-    useEffect(() => {
-        onDirtyChange?.(isDirty);
-    }, [isDirty, onDirtyChange]);
-
-    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
-
-    const loadSettings = async () => {
-        setIsLoading(true);
-
-        try {
-            const settings = await getEmailSettings();
-            const nextValues: EmailSettingsInput = {
-                enabled: settings.enabled,
-                host: settings.host,
-                port: settings.port,
-                secure: settings.secure,
-                username: settings.username,
-                fromName: settings.fromName,
-                fromEmail: settings.fromEmail,
-                password: "",
-            };
-            setFormValues(nextValues);
-            setSavedValues(nextValues);
-            setPasswordSet(settings.passwordSet);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare le impostazioni email"));
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        startTransition(() => {
-            void loadSettings();
-        });
-    }, []);
+    const passwordSet = settings?.passwordSet ?? false;
 
     /** Aggiorna un campo e ne toglie l'errore: chi lo sta correggendo non deve rivederlo. */
     const changeField = (field: EmailField, values: Partial<EmailSettingsInput>) => {
@@ -122,76 +149,6 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
 
     // Obbligatori solo con l'invio attivo: da spento i campi sono disattivati e non si validano.
     const isRequired = formValues.enabled;
-
-    const handleSave = async () => {
-        if (isSaving || isLoading) {
-            return;
-        }
-
-        const nextErrors: EmailFieldErrors = {};
-
-        if (formValues.enabled) {
-            if (!formValues.host.trim()) {
-                nextErrors.emailHost = "Specifica l'host SMTP";
-            }
-
-            if (!Number.isInteger(formValues.port) || formValues.port <= 0 || formValues.port > 65535) {
-                nextErrors.emailPort = "La porta SMTP deve essere un numero valido";
-            }
-
-            if (!formValues.username.trim()) {
-                nextErrors.emailUsername = "Specifica l'utente dell'account email";
-            }
-
-            if (!passwordSet && !formValues.password?.trim()) {
-                nextErrors.emailPassword = "Specifica una password per l'account email";
-            }
-
-            const fromEmail = formValues.fromEmail.trim();
-
-            if (!fromEmail) {
-                nextErrors.emailFromAddress = "Specifica l'email mittente";
-            } else if (!isValidEmail(fromEmail)) {
-                nextErrors.emailFromAddress = "L'email mittente non è valida";
-            }
-        }
-
-        if (reportErrors(nextErrors, setErrors)) {
-            return;
-        }
-
-        try {
-            setIsSaving(true);
-            const settings = await updateEmailSettings({
-                ...formValues,
-                host: formValues.host.trim(),
-                username: formValues.username.trim(),
-                fromName: formValues.fromName.trim(),
-                fromEmail: formValues.fromEmail.trim(),
-            });
-
-            setPasswordSet(settings.passwordSet);
-            const nextSavedValues: EmailSettingsInput = {
-                enabled: settings.enabled,
-                host: settings.host,
-                port: settings.port,
-                secure: settings.secure,
-                username: settings.username,
-                fromName: settings.fromName,
-                fromEmail: settings.fromEmail,
-                password: "",
-            };
-            // Il form prende i valori salvati (ripuliti dagli spazi): altrimenti restava
-            // "modificato" subito dopo il salvataggio. Vedi lo stesso punto in `useBackupPanel`.
-            setFormValues(nextSavedValues);
-            setSavedValues(nextSavedValues);
-            toast.success("Impostazioni email salvate");
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile salvare le impostazioni email"));
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     const handleTestConnection = async () => {
         if (isTesting) {
@@ -220,7 +177,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
         }
 
         // `!password` è già fra gli errori: qui serve a TypeScript, che non lo sa.
-        if (reportErrors(nextErrors, setErrors) || !password) {
+        if (reportErrors(nextErrors) || !password) {
             return;
         }
 

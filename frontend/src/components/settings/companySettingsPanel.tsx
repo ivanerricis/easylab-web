@@ -28,15 +28,19 @@ import {
 } from "@/lib/api";
 import TimeZoneField from "@/components/settings/timeZoneField";
 import SettingsFileInput from "@/components/settings/settingsFileInput";
-import { isSettingsFormDirty } from "@/lib/settingsForm";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { formatDateTime } from "@/lib/utils";
 import { brandLogoUrl } from "@/lib/brand";
 import BrandLogo from "@/components/brand-logo";
 
 const maxLogoSizeBytes = 5 * 1024 * 1024;
 
-/** Gli errori di validazione, ognuno sotto il proprio campo (vedi `FormField`), per id del controllo. */
-type CompanyFieldErrors = Partial<Record<"companyName" | "companyTimeZone" | "logoUpload", string>>;
+/**
+ * I campi validati al salvataggio, per id del controllo e nell'ordine della pagina: l'errore va
+ * sotto il proprio campo (vedi `FormField`) e il primo sbagliato riceve il focus.
+ */
+type CompanyField = "companyName" | "companyTimeZone";
+const companyFieldOrder: CompanyField[] = ["companyName", "companyTimeZone"];
 
 const defaultForm: CompanySettingsInput = {
     name: "",
@@ -55,6 +59,24 @@ const canonicalTimeZone = (value: string): string | null => {
     }
 };
 
+/** Il fuso scelto nel modulo in forma canonica, o null se è vuoto o sconosciuto. */
+const selectedTimeZoneOf = (values: CompanySettingsInput) =>
+    values.timeZone.trim() ? canonicalTimeZone(values.timeZone) : null;
+
+const validateCompanyForm = (values: CompanySettingsInput): Partial<Record<CompanyField, string>> => {
+    const nextErrors: Partial<Record<CompanyField, string>> = {};
+
+    if (!values.name.trim()) {
+        nextErrors.companyName = "Il nome dell'azienda è obbligatorio";
+    }
+
+    if (!selectedTimeZoneOf(values)) {
+        nextErrors.companyTimeZone = "Scegli un fuso orario dall'elenco, per esempio Europe/Rome";
+    }
+
+    return nextErrors;
+};
+
 /** L'ora di adesso in quel fuso: la prova, per chi lo sceglie, di aver preso quello giusto. */
 const currentTimeIn = (timeZone: string) =>
     new Intl.DateTimeFormat("it-IT", { timeZone, hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -65,11 +87,31 @@ type Props = {
 };
 
 const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [formValues, setFormValues] = useState<CompanySettingsInput>(defaultForm);
-    const [savedValues, setSavedValues] = useState<CompanySettingsInput>(defaultForm);
-    const [errors, setErrors] = useState<CompanyFieldErrors>({});
+    // Il DTO dell'azienda ha gli stessi campi del modulo: nessuna conversione.
+    const { formValues, setFormValues, isDirty, isLoading, isSaving, errors, setErrors, handleSave } = useSettingsForm({
+        load: getCompanySettings,
+        save: (values) =>
+            updateCompanySettings({
+                name: values.name.trim(),
+                email: values.email.trim(),
+                address: values.address.trim(),
+                phone: values.phone.trim(),
+                // Mai null qui: la validazione ha già respinto un fuso vuoto o sconosciuto.
+                timeZone: selectedTimeZoneOf(values) ?? values.timeZone,
+            }),
+        toForm: (settings) => settings,
+        defaultValues: defaultForm,
+        validate: validateCompanyForm,
+        fieldOrder: companyFieldOrder,
+        onDirtyChange,
+        messages: {
+            loadError: "Impossibile caricare i dati dell'azienda",
+            saveError: "Impossibile salvare i dati dell'azienda",
+            saved: "Dati azienda salvati",
+        },
+    });
+    // L'errore del logo sta a parte: non c'entra con "Salva", che non deve cancellarlo.
+    const [logoError, setLogoError] = useState<string>();
 
     const [isLoadingLogo, setIsLoadingLogo] = useState(false);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -78,31 +120,7 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
     const [hasCustomLogo, setHasCustomLogo] = useState(false);
     const [logoUpdatedAt, setLogoUpdatedAt] = useState<string | null>(null);
 
-    const isDirty = isSettingsFormDirty(formValues, savedValues);
-
-    // La pagina Impostazioni chiede conferma prima di lasciare la sezione con modifiche non
-    // salvate: le serve sapere quando il modulo è diverso da quanto salvato. Allo smontaggio
-    // (sezione cambiata) non ci sono più modifiche in sospeso.
-    useEffect(() => {
-        onDirtyChange?.(isDirty);
-    }, [isDirty, onDirtyChange]);
-
-    useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
-    const selectedTimeZone = formValues.timeZone.trim() ? canonicalTimeZone(formValues.timeZone) : null;
-
-    const loadSettings = async () => {
-        setIsLoading(true);
-
-        try {
-            const settings = await getCompanySettings();
-            setFormValues(settings);
-            setSavedValues(settings);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dell'azienda"));
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const selectedTimeZone = selectedTimeZoneOf(formValues);
 
     const loadLogoStatus = async () => {
         setIsLoadingLogo(true);
@@ -120,59 +138,9 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
 
     useEffect(() => {
         startTransition(() => {
-            void loadSettings();
             void loadLogoStatus();
         });
     }, []);
-
-    const handleSave = async () => {
-        if (isSaving || isLoading) {
-            return;
-        }
-
-        const nextErrors: CompanyFieldErrors = {};
-
-        if (!formValues.name.trim()) {
-            nextErrors.companyName = "Il nome dell'azienda è obbligatorio";
-        }
-
-        if (!selectedTimeZone) {
-            nextErrors.companyTimeZone = "Scegli un fuso orario dall'elenco, per esempio Europe/Rome";
-        }
-
-        // L'errore del logo non c'entra con questo pulsante: resta com'è.
-        setErrors((prev) => ({ logoUpload: prev.logoUpload, ...nextErrors }));
-
-        const firstInvalidField = (["companyName", "companyTimeZone"] as const).find((field) => nextErrors[field]);
-
-        if (firstInvalidField) {
-            document.getElementById(firstInvalidField)?.focus();
-            return;
-        }
-
-        // Già fra gli errori qui sopra: il controllo serve a TypeScript, che non lo sa.
-        if (!selectedTimeZone) {
-            return;
-        }
-
-        try {
-            setIsSaving(true);
-            const settings = await updateCompanySettings({
-                name: formValues.name.trim(),
-                email: formValues.email.trim(),
-                address: formValues.address.trim(),
-                phone: formValues.phone.trim(),
-                timeZone: selectedTimeZone,
-            });
-            setFormValues(settings);
-            setSavedValues(settings);
-            toast.success("Dati azienda salvati");
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile salvare i dati dell'azienda"));
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     const handleLogoFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -183,11 +151,11 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
         }
 
         if (file.size > maxLogoSizeBytes) {
-            setErrors((prev) => ({ ...prev, logoUpload: "Il file supera la dimensione massima di 5 MB" }));
+            setLogoError("Il file supera la dimensione massima di 5 MB");
             return;
         }
 
-        setErrors((prev) => ({ ...prev, logoUpload: undefined }));
+        setLogoError(undefined);
 
         try {
             setIsUploadingLogo(true);
@@ -426,7 +394,7 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
                                 {/* Con `role="alert"` si legge appena compare: il pulsante di
                                     `SettingsFileInput` ha già la sua descrizione (etichetta e file
                                     scelto), e non gli si può aggiungere questa. */}
-                                <FieldError id="logoUpload" error={errors.logoUpload} />
+                                <FieldError id="logoUpload" error={logoError} />
                                 <p className="text-xs text-muted-foreground">
                                     Formati supportati: JPG, PNG, WEBP, GIF, SVG. Dimensione massima 5 MB. Il logo viene
                                     applicato subito dopo il caricamento.

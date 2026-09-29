@@ -16,6 +16,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import {
     getApiErrorMessage,
     getLogDownloadUrl,
@@ -25,11 +26,15 @@ import {
     updateLogRetention,
     type LogEntryDto,
     type LogFileDto,
+    type LogRetentionDto,
 } from "@/lib/api";
 import { cn, formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 
 const minRetentionDays = 1;
 const maxRetentionDays = 90;
+
+type RetentionForm = { maxDays: number | null };
+const emptyRetentionForm: RetentionForm = { maxDays: null };
 
 // Il giorno del file ("2026-09-20") passa com'è: `formatDate` legge una data solo-giorno come
 // mezzanotte locale. Prima diventava "…T00:00:00.000Z", mezzanotte UTC, e su un dispositivo con
@@ -77,46 +82,32 @@ const LogsSettingsPanel = () => {
     const { currentPage, setCurrentPage } = useTablePagination({
         resetDependencies: [selectedDayKey, debouncedSearchText, pageSize],
     });
-    const [retentionDays, setRetentionDays] = useState<number | null>(null);
-    const [isLoadingRetention, setIsLoadingRetention] = useState(false);
-    const [isSavingRetention, setIsSavingRetention] = useState(false);
-
-    const loadRetention = useCallback(async () => {
-        setIsLoadingRetention(true);
-
-        try {
-            const result = await getLogRetention();
-            setRetentionDays(result.maxDays);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile caricare la conservazione dei log"));
-        } finally {
-            setIsLoadingRetention(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        startTransition(() => {
-            void loadRetention();
-        });
-    }, [loadRetention]);
-
-    const handleSaveRetention = async () => {
-        if (retentionDays === null || !Number.isInteger(retentionDays)) {
-            return;
-        }
-
-        setIsSavingRetention(true);
-
-        try {
-            const result = await updateLogRetention(retentionDays);
-            setRetentionDays(result.maxDays);
-            toast.success("Conservazione log aggiornata");
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile salvare la conservazione dei log"));
-        } finally {
-            setIsSavingRetention(false);
-        }
-    };
+    // La conservazione è un modulo di un solo campo, con lo stesso ciclo degli altri pannelli:
+    // caricamento, salvataggio e riallineamento alla risposta del server. `null` finché non è
+    // arrivata (o se il caricamento è fallito): il campo resta vuoto e "Salva" spento.
+    const {
+        formValues: { maxDays: retentionDays },
+        setFormValues: setRetentionForm,
+        isLoading: isLoadingRetention,
+        isSaving: isSavingRetention,
+        handleSave: handleSaveRetention,
+    } = useSettingsForm<LogRetentionDto, RetentionForm>({
+        load: getLogRetention,
+        // Mai null qui: "Salva" è spento finché il valore non è un intero nell'intervallo.
+        save: (values) => updateLogRetention(values.maxDays ?? minRetentionDays),
+        toForm: (retention) => ({ maxDays: retention.maxDays }),
+        defaultValues: emptyRetentionForm,
+        messages: {
+            loadError: "Impossibile caricare la conservazione dei log",
+            saveError: "Impossibile salvare la conservazione dei log",
+            saved: "Conservazione log aggiornata",
+        },
+    });
+    const isRetentionValid =
+        retentionDays !== null &&
+        Number.isInteger(retentionDays) &&
+        retentionDays >= minRetentionDays &&
+        retentionDays <= maxRetentionDays;
 
     const loadLogFiles = useCallback(async () => {
         setIsLoadingFiles(true);
@@ -199,7 +190,7 @@ const LogsSettingsPanel = () => {
                                 className="w-16 text-center"
                                 disabled={isLoadingRetention}
                                 value={retentionDays ?? ""}
-                                onChange={(event) => setRetentionDays(Number(event.target.value))}
+                                onChange={(event) => setRetentionForm({ maxDays: Number(event.target.value) })}
                             />
                             <span className="text-sm whitespace-nowrap text-muted-foreground">giorni</span>
                             {/* Misura di serie (36px) come il campo accanto e "Scarica log
@@ -207,14 +198,7 @@ const LogsSettingsPanel = () => {
                             <Button
                                 type="button"
                                 variant="outline"
-                                disabled={
-                                    isLoadingRetention ||
-                                    isSavingRetention ||
-                                    retentionDays === null ||
-                                    !Number.isInteger(retentionDays) ||
-                                    retentionDays < minRetentionDays ||
-                                    retentionDays > maxRetentionDays
-                                }
+                                disabled={isLoadingRetention || isSavingRetention || !isRetentionValid}
                                 onClick={() => void handleSaveRetention()}
                             >
                                 <Save className="size-4" />

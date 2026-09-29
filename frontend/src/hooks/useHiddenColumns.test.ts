@@ -54,3 +54,37 @@ describe("useHiddenColumns", () => {
         expect(result.current.hiddenColumnKeys).toEqual(["status"]);
     });
 });
+
+describe("useHiddenColumns: mostrare e nascondere", () => {
+    it("rimostra una colonna nascosta, e nasconderla due volte non la duplica", () => {
+        const { result } = renderHook(() => useHiddenColumns("reports"));
+
+        act(() => result.current.setColumnVisible("password", false));
+        act(() => result.current.setColumnVisible("password", false));
+        expect(result.current.hiddenColumnKeys).toEqual(["password"]);
+
+        act(() => result.current.setColumnVisible("password", true));
+        expect(result.current.hiddenColumnKeys).toEqual([]);
+        expect(getStoredHiddenColumns("reports")).toEqual([]);
+    });
+
+    it('"Mostra tutte" svuota le nascoste e la preferenza salvata', () => {
+        setStoredHiddenColumns("reports", ["id", "password"]);
+        const { result } = renderHook(() => useHiddenColumns("reports"));
+
+        act(() => result.current.showAllColumns());
+
+        expect(result.current.hiddenColumnKeys).toEqual([]);
+        expect(getStoredHiddenColumns("reports")).toEqual([]);
+    });
+
+    it("ogni tabella ha le sue colonne nascoste", () => {
+        setStoredHiddenColumns("customers", ["phone"]);
+        const { result } = renderHook(() => useHiddenColumns("reports"));
+
+        act(() => result.current.setColumnVisible("password", false));
+
+        expect(getStoredHiddenColumns("customers")).toEqual(["phone"]);
+        expect(getStoredHiddenColumns("reports")).toEqual(["password"]);
+    });
+});

@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
     createCustomer,
     deleteCustomer,
-    getApiErrorMessage,
     updateCustomer,
     getCustomerReportsPrintUrl,
     getCustomerInterventionsPrintUrl,
@@ -29,6 +28,7 @@ import { useCustomersRows } from "./hooks/useCustomersRows";
 import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import { openPrintWindow } from "@/lib/utils";
 import { toCustomerPayload } from "@/lib/customers";
 import { entityPaths } from "@/lib/entityPaths";
@@ -52,8 +52,6 @@ const CustomersPage = () => {
     // Un solo stato per dialogo + bersaglio: `open={customerToEdit != null}` basta da solo,
     // niente booleano separato da tenere allineato.
     const [customerToEdit, setCustomerToEdit] = useState<CustomerDto | null>(null);
-    const [customerToDelete, setCustomerToDelete] = useState<CustomerDto | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [printCustomerId, setPrintCustomerId] = useState<number | null>(null);
     const [printKind, setPrintKind] = useState<CustomerPrintKind>("reports");
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("customers");
@@ -74,6 +72,12 @@ const CustomersPage = () => {
         pageSize,
         onPageOutOfRange: setCurrentPage,
     });
+    const deleteAction = usePendingAction({
+        run: (customer: CustomerDto) => deleteCustomer(customer.id),
+        successMessage: "Cliente eliminato con successo",
+        errorMessage: "Impossibile eliminare il cliente",
+        onDone: () => loadCustomers(),
+    });
 
     const handleSortOptionChange = (value: CustomerSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_CUSTOMER_SORT_OPTION ? null : value });
@@ -92,10 +96,6 @@ const CustomersPage = () => {
         await createCustomer(toCustomerPayload(values));
 
         await loadCustomers();
-    };
-
-    const handleOpenDeleteDialog = (customer: CustomerDto) => {
-        setCustomerToDelete(customer);
     };
 
     const handleOpenEditDialog = (id: number) => {
@@ -138,24 +138,6 @@ const CustomersPage = () => {
                 ? getCustomerInterventionsPrintUrl(printCustomerId, range)
                 : getCustomerReportsPrintUrl(printCustomerId, range)
         );
-    };
-
-    const handleDeleteCustomer = async () => {
-        if (!customerToDelete || isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await deleteCustomer(customerToDelete.id);
-            toast.success("Cliente eliminato con successo");
-            setCustomerToDelete(null);
-            await loadCustomers();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile eliminare il cliente"));
-        } finally {
-            setIsDeleting(false);
-        }
     };
 
     return (
@@ -217,22 +199,18 @@ const CustomersPage = () => {
                 }
             />
 
-            {customerToDelete && (
+            {deleteAction.pending && (
                 <ConfirmDeleteDialog
-                    open={customerToDelete != null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setCustomerToDelete(null);
-                        }
-                    }}
+                    open={deleteAction.isOpen}
+                    onOpenChange={deleteAction.onOpenChange}
                     title="Elimina cliente"
                     description={
-                        customerToDelete
-                            ? `Sei sicuro di voler eliminare il cliente ${formatPersonName(customerToDelete)}?`
+                        deleteAction.pending
+                            ? `Sei sicuro di voler eliminare il cliente ${formatPersonName(deleteAction.pending)}?`
                             : "Sei sicuro di voler eliminare questo cliente?"
                     }
-                    isDeleting={isDeleting}
-                    onConfirm={handleDeleteCustomer}
+                    isDeleting={deleteAction.isRunning}
+                    onConfirm={deleteAction.confirm}
                 />
             )}
 
@@ -270,7 +248,7 @@ const CustomersPage = () => {
                         onOpenCustomer={handleOpenCustomer}
                         onPrintCustomer={handlePrintCustomer}
                         onEditCustomer={handleOpenEditDialog}
-                        onDeleteCustomer={handleOpenDeleteDialog}
+                        onDeleteCustomer={deleteAction.open}
                     />
                 </div>
                 <TablePagination

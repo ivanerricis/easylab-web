@@ -39,6 +39,7 @@ import type { StatusColor } from "@/lib/statusColors";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useAuth } from "@/components/use-auth";
 import { settleDialogHistory } from "@/hooks/useDialogHistoryEntry";
+import { usePendingAction } from "@/hooks/usePendingAction";
 
 /** Rosso per un account disabilitato: tinta della riga in tabella, striscia della scheda. */
 const getUserStatusColor = (user: UserDto): StatusColor | undefined => (user.active ? undefined : "red");
@@ -51,26 +52,83 @@ const UsersSettingsSection = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [generatedPasswordResult, setGeneratedPasswordResult] = useState<CreatedUserResult | null>(null);
-    const [userPendingRegeneration, setUserPendingRegeneration] = useState<UserDto | null>(null);
-    const [isRegenerating, setIsRegenerating] = useState(false);
-    const [userPendingDisable, setUserPendingDisable] = useState<UserDto | null>(null);
-    const [isTogglingActive, setIsTogglingActive] = useState(false);
-    const [userPendingDelete, setUserPendingDelete] = useState<UserDto | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [userPendingTwoFactorReset, setUserPendingTwoFactorReset] = useState<UserDto | null>(null);
-    const [isResettingTwoFactor, setIsResettingTwoFactor] = useState(false);
+    const [isEnabling, setIsEnabling] = useState(false);
     const [twoFactorResetPassword, setTwoFactorResetPassword] = useState("");
     // Sotto il campo e non in un toast, come nella pagina di accesso: anche il rifiuto del server
     // per password sbagliata, che è l'errore più probabile qui e riguarda proprio quel campo.
     const [twoFactorResetPasswordError, setTwoFactorResetPasswordError] = useState<string>();
     const [userViewingSessions, setUserViewingSessions] = useState<UserDto | null>(null);
-    const isResettingOwnTwoFactor =
-        userPendingTwoFactorReset != null && userPendingTwoFactorReset.id === currentUser?.id;
 
-    const closeTwoFactorReset = () => {
-        setUserPendingTwoFactorReset(null);
+    const clearTwoFactorResetPassword = () => {
         setTwoFactorResetPassword("");
         setTwoFactorResetPasswordError(undefined);
+    };
+
+    const regenerateAction = usePendingAction({
+        run: (user: UserDto) => regeneratePassword(user.id),
+        // Niente avviso: la password nuova compare nel suo dialogo, che è già l'esito.
+        errorMessage: "Impossibile rigenerare la password",
+        onDone: (_, result) => setGeneratedPasswordResult(result),
+    });
+    const disableAction = usePendingAction({
+        run: (user: UserDto) => disableUser(user.id),
+        successMessage: (_, updated) => `Account "${updated.username}" disabilitato`,
+        errorMessage: "Impossibile disabilitare l'account",
+        onDone: (_, updated) => setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user))),
+    });
+    // Disabilitare (dal dialogo) e riabilitare (dal menu, senza conferma) si escludono a vicenda,
+    // come quando avevano un solo stato "in corso": finché l'una lavora, l'altra resta spenta.
+    const isTogglingActive = isEnabling || disableAction.isRunning;
+    const deleteAction = usePendingAction({
+        run: (user: UserDto) => deleteUser(user.id),
+        successMessage: (user) => `Utente "${user.username}" eliminato`,
+        errorMessage: "Impossibile eliminare l'account: disabilitalo se è ancora in uso altrove",
+        onDone: (deleted) => setUsers((prev) => prev.filter((user) => user.id !== deleted.id)),
+    });
+    const isSelf = (user: UserDto) => user.id === currentUser?.id;
+    const twoFactorResetAction = usePendingAction({
+        run: (user: UserDto) => disableUserTwoFactor(user.id, isSelf(user) ? twoFactorResetPassword : undefined),
+        successMessage: (user, updated) =>
+            isSelf(user)
+                ? "Verifica in due passaggi disattivata. Accedi di nuovo con la tua password."
+                : `Verifica in due passaggi disattivata per "${updated.username}"`,
+        errorMessage: "Impossibile disattivare la verifica in due passaggi",
+        onDone: async (user, updated) => {
+            clearTwoFactorResetPassword();
+
+            // Sul proprio account il backend ha appena chiuso tutte le sessioni, compresa questa
+            // (vedi `adminDisableTwoFactor`): la pagina resterebbe aperta su una sessione che non
+            // esiste più, e la prima azione successiva finirebbe al login senza spiegazioni.
+            // `refresh` chiede di nuovo chi è l'utente, riceve 401 e `RequireAuth` porta subito
+            // al login; il messaggio dice perché.
+            if (isSelf(user)) {
+                // Prima si consuma la voce di cronologia del dialogo appena chiuso: il login arriva
+                // con un `replace`, che altrimenti potrebbe sostituire quella voce invece della
+                // pagina, e il `back()` del dialogo tornerebbe poi fuori posto.
+                await settleDialogHistory();
+                await refresh();
+                return;
+            }
+
+            setUsers((prev) => prev.map((existing) => (existing.id === updated.id ? updated : existing)));
+        },
+        onError: (message, error, user) => {
+            // Sul proprio account un 400 è la password rifiutata (vedi `assertOwnPassword` nel
+            // backend): va sotto il campo. Gli altri errori (rete, permessi) non sono del campo.
+            if (isSelf(user) && getApiErrorStatus(error) === 400) {
+                setTwoFactorResetPasswordError(message);
+                document.getElementById(ownTwoFactorResetPasswordId)?.focus();
+            } else {
+                toast.error(message);
+            }
+        },
+    });
+    const userPendingTwoFactorReset = twoFactorResetAction.pending;
+    const isResettingOwnTwoFactor = userPendingTwoFactorReset != null && isSelf(userPendingTwoFactorReset);
+
+    const closeTwoFactorReset = () => {
+        twoFactorResetAction.close();
+        clearTwoFactorResetPassword();
     };
 
     const loadUsers = async () => {
@@ -97,128 +155,32 @@ const UsersSettingsSection = () => {
         toast.success("Utente creato con successo");
     };
 
-    const handleConfirmRegenerate = async () => {
-        if (!userPendingRegeneration || isRegenerating) {
-            return;
-        }
-
-        try {
-            setIsRegenerating(true);
-            const result = await regeneratePassword(userPendingRegeneration.id);
-            setUserPendingRegeneration(null);
-            setGeneratedPasswordResult(result);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile rigenerare la password"));
-        } finally {
-            setIsRegenerating(false);
-        }
-    };
-
-    const handleConfirmDisable = async () => {
-        if (!userPendingDisable || isTogglingActive) {
-            return;
-        }
-
-        try {
-            setIsTogglingActive(true);
-            const updated = await disableUser(userPendingDisable.id);
-            setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
-            setUserPendingDisable(null);
-            toast.success(`Account "${updated.username}" disabilitato`);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile disabilitare l'account"));
-        } finally {
-            setIsTogglingActive(false);
-        }
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!userPendingDelete || isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await deleteUser(userPendingDelete.id);
-            setUsers((prev) => prev.filter((user) => user.id !== userPendingDelete.id));
-            toast.success(`Utente "${userPendingDelete.username}" eliminato`);
-            setUserPendingDelete(null);
-        } catch (error) {
-            toast.error(
-                getApiErrorMessage(error, "Impossibile eliminare l'account: disabilitalo se è ancora in uso altrove")
-            );
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     const handleEnable = async (user: UserDto) => {
         if (isTogglingActive) {
             return;
         }
 
         try {
-            setIsTogglingActive(true);
+            setIsEnabling(true);
             const updated = await enableUser(user.id);
             setUsers((prev) => prev.map((existing) => (existing.id === updated.id ? updated : existing)));
             toast.success(`Account "${updated.username}" riabilitato`);
         } catch (error) {
             toast.error(getApiErrorMessage(error, "Impossibile riabilitare l'account"));
         } finally {
-            setIsTogglingActive(false);
+            setIsEnabling(false);
         }
     };
 
-    const handleConfirmTwoFactorReset = async () => {
-        if (!userPendingTwoFactorReset || isResettingTwoFactor) {
-            return;
-        }
-
+    // A campo vuoto non si parte nemmeno: l'errore va sotto il campo, senza chiamare il server.
+    const handleConfirmTwoFactorReset = () => {
         if (isResettingOwnTwoFactor && !twoFactorResetPassword) {
             setTwoFactorResetPasswordError("Inserisci la tua password");
             document.getElementById(ownTwoFactorResetPasswordId)?.focus();
             return;
         }
 
-        try {
-            setIsResettingTwoFactor(true);
-            const updated = await disableUserTwoFactor(
-                userPendingTwoFactorReset.id,
-                isResettingOwnTwoFactor ? twoFactorResetPassword : undefined
-            );
-            closeTwoFactorReset();
-
-            // Sul proprio account il backend ha appena chiuso tutte le sessioni, compresa questa
-            // (vedi `adminDisableTwoFactor`): la pagina resterebbe aperta su una sessione che non
-            // esiste più, e la prima azione successiva finirebbe al login senza spiegazioni.
-            // `refresh` chiede di nuovo chi è l'utente, riceve 401 e `RequireAuth` porta subito
-            // al login; il messaggio dice perché.
-            if (isResettingOwnTwoFactor) {
-                toast.success("Verifica in due passaggi disattivata. Accedi di nuovo con la tua password.");
-                // Prima si consuma la voce di cronologia del dialogo appena chiuso: il login arriva
-                // con un `replace`, che altrimenti potrebbe sostituire quella voce invece della
-                // pagina, e il `back()` del dialogo tornerebbe poi fuori posto.
-                await settleDialogHistory();
-                await refresh();
-                return;
-            }
-
-            setUsers((prev) => prev.map((user) => (user.id === updated.id ? updated : user)));
-            toast.success(`Verifica in due passaggi disattivata per "${updated.username}"`);
-        } catch (error) {
-            const message = getApiErrorMessage(error, "Impossibile disattivare la verifica in due passaggi");
-
-            // Sul proprio account un 400 è la password rifiutata (vedi `assertOwnPassword` nel
-            // backend): va sotto il campo. Gli altri errori (rete, permessi) non sono del campo.
-            if (isResettingOwnTwoFactor && getApiErrorStatus(error) === 400) {
-                setTwoFactorResetPasswordError(message);
-                document.getElementById(ownTwoFactorResetPasswordId)?.focus();
-            } else {
-                toast.error(message);
-            }
-        } finally {
-            setIsResettingTwoFactor(false);
-        }
+        void twoFactorResetAction.confirm();
     };
 
     // Quali azioni offrire su un utente: una regola sola per le schede su telefono (pulsanti)
@@ -314,20 +276,20 @@ const UsersSettingsSection = () => {
                         {/* `w-auto`: di serie il menu è largo quanto il trigger, qui un'icona da 36px. */}
                         <DropdownMenuContent align="end" className="w-auto min-w-48">
                             {actions.canRegenerate ? (
-                                <DropdownMenuItem onSelect={() => setUserPendingRegeneration(user)}>
+                                <DropdownMenuItem onSelect={() => regenerateAction.open(user)}>
                                     <KeyRound />
                                     Rigenera password
                                 </DropdownMenuItem>
                             ) : null}
                             {actions.canResetTwoFactor ? (
-                                <DropdownMenuItem onSelect={() => setUserPendingTwoFactorReset(user)}>
+                                <DropdownMenuItem onSelect={() => twoFactorResetAction.open(user)}>
                                     <ShieldOff />
                                     Disattiva 2FA
                                 </DropdownMenuItem>
                             ) : null}
                             {actions.canToggleActive ? (
                                 user.active ? (
-                                    <DropdownMenuItem onSelect={() => setUserPendingDisable(user)}>
+                                    <DropdownMenuItem onSelect={() => disableAction.open(user)}>
                                         <UserX />
                                         Disabilita
                                     </DropdownMenuItem>
@@ -344,7 +306,7 @@ const UsersSettingsSection = () => {
                             {actions.canDelete ? (
                                 <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem variant="destructive" onSelect={() => setUserPendingDelete(user)}>
+                                    <DropdownMenuItem variant="destructive" onSelect={() => deleteAction.open(user)}>
                                         <Trash2 />
                                         Elimina
                                     </DropdownMenuItem>
@@ -471,69 +433,57 @@ const UsersSettingsSection = () => {
             <CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} onCreated={handleUserCreated} />
 
             <CustomDialog
-                open={userPendingRegeneration != null}
-                onOpenChange={(nextOpen) => {
-                    if (!nextOpen) {
-                        setUserPendingRegeneration(null);
-                    }
-                }}
+                open={regenerateAction.isOpen}
+                onOpenChange={regenerateAction.onOpenChange}
                 title="Rigenera password"
                 description={
-                    userPendingRegeneration
-                        ? `Verrà generata una nuova password casuale per "${userPendingRegeneration.username}". La password attuale smetterà di funzionare.`
+                    regenerateAction.pending
+                        ? `Verrà generata una nuova password casuale per "${regenerateAction.pending.username}". La password attuale smetterà di funzionare.`
                         : undefined
                 }
-                confirmLabel={isRegenerating ? "Rigenerazione..." : "Rigenera"}
+                confirmLabel={regenerateAction.isRunning ? "Rigenerazione..." : "Rigenera"}
                 confirmIcon={KeyRound}
                 cancelLabel="Annulla"
-                onCancel={() => setUserPendingRegeneration(null)}
-                onConfirm={() => void handleConfirmRegenerate()}
-                cancelDisabled={isRegenerating}
-                confirmDisabled={isRegenerating}
+                onCancel={regenerateAction.close}
+                onConfirm={() => void regenerateAction.confirm()}
+                cancelDisabled={regenerateAction.isRunning}
+                confirmDisabled={regenerateAction.isRunning}
             />
 
             <CustomDialog
-                open={userPendingDisable != null}
-                onOpenChange={(nextOpen) => {
-                    if (!nextOpen) {
-                        setUserPendingDisable(null);
-                    }
-                }}
+                open={disableAction.isOpen}
+                onOpenChange={disableAction.onOpenChange}
                 title="Disabilita account"
                 description={
-                    userPendingDisable
-                        ? `L'utente "${userPendingDisable.username}" non potrà più accedere all'applicazione finché non verrà riabilitato. Le sessioni aperte verranno terminate.`
+                    disableAction.pending
+                        ? `L'utente "${disableAction.pending.username}" non potrà più accedere all'applicazione finché non verrà riabilitato. Le sessioni aperte verranno terminate.`
                         : undefined
                 }
                 destructive
                 confirmLabel={isTogglingActive ? "Disabilitazione..." : "Disabilita"}
                 confirmIcon={UserX}
                 cancelLabel="Annulla"
-                onCancel={() => setUserPendingDisable(null)}
-                onConfirm={() => void handleConfirmDisable()}
+                onCancel={disableAction.close}
+                onConfirm={() => void disableAction.confirm()}
                 cancelDisabled={isTogglingActive}
                 confirmDisabled={isTogglingActive}
             />
 
             <ConfirmDeleteDialog
-                open={userPendingDelete != null}
-                onOpenChange={(nextOpen) => {
-                    if (!nextOpen) {
-                        setUserPendingDelete(null);
-                    }
-                }}
+                open={deleteAction.isOpen}
+                onOpenChange={deleteAction.onOpenChange}
                 title="Elimina utente"
                 description={
-                    userPendingDelete
-                        ? `L'account "${userPendingDelete.username}" verrà eliminato definitivamente. Se è ancora collegato a qualcosa nell'applicazione, disabilitalo invece di eliminarlo.`
+                    deleteAction.pending
+                        ? `L'account "${deleteAction.pending.username}" verrà eliminato definitivamente. Se è ancora collegato a qualcosa nell'applicazione, disabilitalo invece di eliminarlo.`
                         : ""
                 }
-                isDeleting={isDeleting}
-                onConfirm={handleConfirmDelete}
+                isDeleting={deleteAction.isRunning}
+                onConfirm={deleteAction.confirm}
             />
 
             <CustomDialog
-                open={userPendingTwoFactorReset != null}
+                open={twoFactorResetAction.isOpen}
                 onOpenChange={(nextOpen) => {
                     if (!nextOpen) {
                         closeTwoFactorReset();
@@ -574,13 +524,13 @@ const UsersSettingsSection = () => {
                 }
                 isDirty={twoFactorResetPassword !== ""}
                 destructive
-                confirmLabel={isResettingTwoFactor ? "Disattivazione..." : "Disattiva"}
+                confirmLabel={twoFactorResetAction.isRunning ? "Disattivazione..." : "Disattiva"}
                 confirmIcon={ShieldOff}
                 cancelLabel="Annulla"
                 onCancel={closeTwoFactorReset}
-                onConfirm={() => void handleConfirmTwoFactorReset()}
-                cancelDisabled={isResettingTwoFactor}
-                confirmDisabled={isResettingTwoFactor}
+                onConfirm={handleConfirmTwoFactorReset}
+                cancelDisabled={twoFactorResetAction.isRunning}
+                confirmDisabled={twoFactorResetAction.isRunning}
             />
 
             <UserSessionsDialog

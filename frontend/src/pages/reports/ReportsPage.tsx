@@ -7,10 +7,9 @@ import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
-import { createReport, deleteReport, getApiErrorMessage, getReportPrintUrl, updateReport } from "@/lib/api";
+import { createReport, deleteReport, getReportPrintUrl, updateReport } from "@/lib/api";
 import { Suspense, useState } from "react";
 import type { ReportDto } from "@/types/dtos";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { reportColumns } from "./components/report-columns";
 import ReportsFilters from "./components/reports-filters";
@@ -31,6 +30,7 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
@@ -65,10 +65,8 @@ const ReportsPage = () => {
     // separati che ogni `onOpenChange` doveva azzerare insieme: `open={reportToEdit != null}`
     // basta da solo a dire se il dialogo è aperto.
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
-    const [reportToDelete, setReportToDelete] = useState<ReportDto | null>(null);
     const hasOpenedCreateDialog = useHasBeenOpen(isCreateDialogOpen);
     const hasOpenedEditDialog = useHasBeenOpen(reportToEdit != null);
-    const [isDeleting, setIsDeleting] = useState(false);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     // "visibility" è il nome che usa già la dashboard nei suoi collegamenti.
     const visibilityFilter = readEnumParam(searchParams, "visibility", visibilityFilters, "open");
@@ -92,6 +90,12 @@ const ReportsPage = () => {
             pageSize,
             onPageOutOfRange: setCurrentPage,
         });
+    const deleteAction = usePendingAction({
+        run: (report: ReportDto) => deleteReport(report.id),
+        successMessage: "Report eliminato con successo",
+        errorMessage: "Impossibile eliminare il report",
+        onDone: () => loadReports(),
+    });
 
     usePrefetchWhenIdle(prefetchReportDialogs);
 
@@ -122,10 +126,6 @@ const ReportsPage = () => {
         });
     };
 
-    const handleOpenDeleteDialog = (report: ReportDto) => {
-        setReportToDelete(report);
-    };
-
     const handleOpenReport = (id: number) => {
         navigate(entityPaths.report(id));
     };
@@ -145,24 +145,6 @@ const ReportsPage = () => {
         // comunque (la riga può anche uscire dal filtro), e il ritocco copiava sul client regole
         // del server (il totale come prezzo interno più compenso del tecnico), mostrando per un istante una riga a metà.
         await loadReports();
-    };
-
-    const handleDeleteReport = async () => {
-        if (!reportToDelete || isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await deleteReport(reportToDelete.id);
-            toast.success("Report eliminato con successo");
-            setReportToDelete(null);
-            await loadReports();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile eliminare il report"));
-        } finally {
-            setIsDeleting(false);
-        }
     };
 
     const handlePrintReport = (id: number) => {
@@ -214,20 +196,16 @@ const ReportsPage = () => {
                 ) : null}
 
                 <ConfirmDeleteDialog
-                    open={reportToDelete != null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setReportToDelete(null);
-                        }
-                    }}
+                    open={deleteAction.isOpen}
+                    onOpenChange={deleteAction.onOpenChange}
                     title="Elimina report"
                     description={
-                        reportToDelete
-                            ? `Sei sicuro di voler eliminare il report ID ${reportToDelete.id}?`
+                        deleteAction.pending
+                            ? `Sei sicuro di voler eliminare il report ID ${deleteAction.pending.id}?`
                             : "Sei sicuro di voler eliminare questo report?"
                     }
-                    isDeleting={isDeleting}
-                    onConfirm={handleDeleteReport}
+                    isDeleting={deleteAction.isRunning}
+                    onConfirm={deleteAction.confirm}
                 />
 
                 <ReportsFilters
@@ -274,7 +252,7 @@ const ReportsPage = () => {
                             onOpenReport={handleOpenReport}
                             onEditReport={handleOpenEditDialog}
                             onPrintReport={handlePrintReport}
-                            onDeleteReport={handleOpenDeleteDialog}
+                            onDeleteReport={deleteAction.open}
                         />
                     </div>
                     <TablePagination

@@ -6,6 +6,7 @@ import CustomerLink from "@/components/customer-link";
 import LoadingPage from "@/components/loadingPage";
 import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
@@ -14,7 +15,6 @@ import EditInterventionDialog, {
     type EditInterventionSubmitValues,
 } from "@/components/dialogs/edit/editInterventionDialog";
 import {
-    getApiErrorMessage,
     getIntervention,
     getInterventionPrintUrl,
     updateIntervention,
@@ -36,7 +36,6 @@ import {
 import { Mail, Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { toast } from "sonner";
 
 const InterventionPage = () => {
     const { id } = useParams();
@@ -58,8 +57,13 @@ const InterventionPage = () => {
             : "Intervento"
     );
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    // Come nell'elenco interventi, da cui prima era l'unica strada: conferma, invio, e l'esito
+    // del server (a chi è andata, o perché no) in un avviso.
+    const emailAction = usePendingAction({
+        run: (interventionId: number) => sendInterventionEmail(interventionId),
+        successMessage: (_, result) => result.message,
+        errorMessage: "Impossibile inviare l'email",
+    });
 
     const handleBack = useGoBack("/interventions");
 
@@ -69,25 +73,6 @@ const InterventionPage = () => {
         }
 
         openPrintWindow(getInterventionPrintUrl(intervention.id));
-    };
-
-    // Come nell'elenco interventi, da cui prima era l'unica strada: conferma, invio, e l'esito
-    // del server (a chi è andata, o perché no) in un avviso.
-    const handleConfirmSendEmail = async () => {
-        if (!intervention || isSendingEmail) {
-            return;
-        }
-
-        try {
-            setIsSendingEmail(true);
-            const result = await sendInterventionEmail(intervention.id);
-            toast.success(result.message);
-            setIsEmailDialogOpen(false);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile inviare l'email"));
-        } finally {
-            setIsSendingEmail(false);
-        }
     };
 
     const handleEditIntervention = async (values: EditInterventionSubmitValues) => {
@@ -165,7 +150,7 @@ const InterventionPage = () => {
                     // due icone diverse fra lista e scheda.
                     icon={Mail}
                     text="Email"
-                    onClick={() => setIsEmailDialogOpen(true)}
+                    onClick={() => emailAction.open(intervention.id)}
                     aria-label="Invia email intervento"
                 />
 
@@ -253,16 +238,16 @@ const InterventionPage = () => {
             </div>
 
             <CustomDialog
-                open={isEmailDialogOpen}
-                onOpenChange={setIsEmailDialogOpen}
+                open={emailAction.isOpen}
+                onOpenChange={emailAction.onOpenChange}
                 title="Invia email intervento"
                 description={`Sei sicuro di voler inviare l'email per l'intervento ID ${intervention.id}?`}
                 confirmLabel="Invia"
                 confirmIcon={Mail}
                 cancelLabel="Annulla"
-                confirmDisabled={isSendingEmail}
-                onCancel={() => setIsEmailDialogOpen(false)}
-                onConfirm={handleConfirmSendEmail}
+                confirmDisabled={emailAction.isRunning}
+                onCancel={emailAction.close}
+                onConfirm={emailAction.confirm}
             />
 
             <EditInterventionDialog

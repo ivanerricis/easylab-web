@@ -11,7 +11,6 @@ import TablePagination from "@/components/table-pagination";
 import {
     createIntervention,
     deleteIntervention,
-    getApiErrorMessage,
     getInterventionPrintUrl,
     sendInterventionEmail,
     updateIntervention,
@@ -20,7 +19,6 @@ import { Suspense, useState } from "react";
 import type { InterventionDto } from "@/types/dtos";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { toInterventionCreatePayload, toInterventionUpdatePayload } from "@/lib/interventionForm";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
 import InterventionsFilters from "./components/interventions-filters";
@@ -42,6 +40,7 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
@@ -76,12 +75,8 @@ const InterventionsPage = () => {
     // Un solo stato per dialogo + bersaglio, invece di un booleano più uno o due stati
     // separati che ogni `onOpenChange` doveva azzerare insieme.
     const [interventionToEdit, setInterventionToEdit] = useState<InterventionDto | null>(null);
-    const [interventionToDelete, setInterventionToDelete] = useState<InterventionDto | null>(null);
     const hasOpenedCreateDialog = useHasBeenOpen(isCreateDialogOpen);
     const hasOpenedEditDialog = useHasBeenOpen(interventionToEdit != null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [interventionIdToEmail, setInterventionIdToEmail] = useState<number | null>(null);
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     // "status" è il nome che usa già la dashboard nei suoi collegamenti.
     const statusFilter = readEnumParam(searchParams, "status", statusFilters, "all");
@@ -123,6 +118,18 @@ const InterventionsPage = () => {
         pageSize,
         onPageOutOfRange: setCurrentPage,
     });
+    const deleteAction = usePendingAction({
+        run: (intervention: InterventionDto) => deleteIntervention(intervention.id),
+        successMessage: "Intervento eliminato con successo",
+        errorMessage: "Impossibile eliminare l'intervento",
+        onDone: () => loadInterventions(),
+    });
+    // L'avviso di riuscita è il messaggio del server: dice a chi è andata l'email.
+    const emailAction = usePendingAction({
+        run: (interventionId: number) => sendInterventionEmail(interventionId),
+        successMessage: (_, result) => result.message,
+        errorMessage: "Impossibile inviare l'email",
+    });
 
     usePrefetchWhenIdle(prefetchInterventionDialogs);
 
@@ -154,10 +161,6 @@ const InterventionsPage = () => {
         });
     };
 
-    const handleOpenDeleteDialog = (intervention: InterventionDto) => {
-        setInterventionToDelete(intervention);
-    };
-
     const handleOpenIntervention = (id: number) => {
         navigate(entityPaths.intervention(id));
     };
@@ -179,47 +182,8 @@ const InterventionsPage = () => {
         await loadInterventions();
     };
 
-    const handleDeleteIntervention = async () => {
-        if (!interventionToDelete || isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await deleteIntervention(interventionToDelete.id);
-            toast.success("Intervento eliminato con successo");
-            setInterventionToDelete(null);
-            await loadInterventions();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile eliminare l'intervento"));
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     const handlePrintIntervention = (id: number) => {
         openPrintWindow(getInterventionPrintUrl(id));
-    };
-
-    const handleOpenSendEmailDialog = (id: number) => {
-        setInterventionIdToEmail(id);
-    };
-
-    const handleConfirmSendEmailIntervention = async () => {
-        if (interventionIdToEmail == null || isSendingEmail) {
-            return;
-        }
-
-        try {
-            setIsSendingEmail(true);
-            const result = await sendInterventionEmail(interventionIdToEmail);
-            toast.success(result.message);
-            setInterventionIdToEmail(null);
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile inviare l'email"));
-        } finally {
-            setIsSendingEmail(false);
-        }
     };
 
     return (
@@ -265,38 +229,30 @@ const InterventionsPage = () => {
                 ) : null}
 
                 <ConfirmDeleteDialog
-                    open={interventionToDelete != null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setInterventionToDelete(null);
-                        }
-                    }}
+                    open={deleteAction.isOpen}
+                    onOpenChange={deleteAction.onOpenChange}
                     title="Elimina intervento"
                     description={
-                        interventionToDelete
-                            ? `Sei sicuro di voler eliminare l'intervento ID ${interventionToDelete.id}?`
+                        deleteAction.pending
+                            ? `Sei sicuro di voler eliminare l'intervento ID ${deleteAction.pending.id}?`
                             : "Sei sicuro di voler eliminare questo intervento?"
                     }
-                    isDeleting={isDeleting}
-                    onConfirm={handleDeleteIntervention}
+                    isDeleting={deleteAction.isRunning}
+                    onConfirm={deleteAction.confirm}
                 />
 
                 <CustomDialog
-                    open={interventionIdToEmail != null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setInterventionIdToEmail(null);
-                        }
-                    }}
+                    open={emailAction.isOpen}
+                    onOpenChange={emailAction.onOpenChange}
                     title="Invia email intervento"
-                    description={`Sei sicuro di voler inviare l'email per l'intervento ID ${interventionIdToEmail}?`}
+                    description={`Sei sicuro di voler inviare l'email per l'intervento ID ${emailAction.pending}?`}
                     confirmLabel="Invia"
                     // La busta come il pulsante della riga che apre questo dialogo.
                     confirmIcon={Mail}
                     cancelLabel="Annulla"
-                    confirmDisabled={isSendingEmail}
-                    onCancel={() => setInterventionIdToEmail(null)}
-                    onConfirm={handleConfirmSendEmailIntervention}
+                    confirmDisabled={emailAction.isRunning}
+                    onCancel={emailAction.close}
+                    onConfirm={emailAction.confirm}
                 />
 
                 <InterventionsFilters
@@ -347,8 +303,8 @@ const InterventionsPage = () => {
                             onOpenIntervention={handleOpenIntervention}
                             onEditIntervention={handleOpenEditDialog}
                             onPrintIntervention={handlePrintIntervention}
-                            onSendEmailIntervention={handleOpenSendEmailDialog}
-                            onDeleteIntervention={handleOpenDeleteDialog}
+                            onSendEmailIntervention={emailAction.open}
+                            onDeleteIntervention={deleteAction.open}
                         />
                     </div>
                     <TablePagination

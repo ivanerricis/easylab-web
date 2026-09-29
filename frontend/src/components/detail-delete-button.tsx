@@ -1,12 +1,10 @@
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getApiErrorMessage } from "@/lib/api";
 import { Trash2 } from "lucide-react";
 import { settleDialogHistory } from "@/hooks/useDialogHistoryEntry";
 import { useGoBack } from "@/hooks/useGoBack";
-import { useState } from "react";
-import { toast } from "sonner";
+import { usePendingAction } from "@/hooks/usePendingAction";
 
 type Props = {
     /** Etichetta accessibile e testo del suggerimento, es. "Elimina report". */
@@ -47,37 +45,26 @@ const DetailDeleteButton = ({
     redirectTo,
 }: Props) => {
     const goBack = useGoBack(redirectTo);
-    const [isOpen, setIsOpen] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-
-    const handleConfirm = async () => {
-        if (isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await onDelete();
-            toast.success(successMessage);
-            setIsOpen(false);
+    // Nessun elemento da tenere in attesa: la scheda è una sola, e `onDelete` sa già quale.
+    const deleteAction = usePendingAction({
+        run: onDelete,
+        successMessage,
+        errorMessage,
+        onDone: async () => {
             // Il dialogo aperto tiene una voce sua in cima alla cronologia (Indietro lo chiude:
             // vedi `useDialogHistoryEntry`). Senza aspettare che la chiusura la consumi, il
             // passo indietro di `goBack` toglierebbe quella voce invece della scheda, e si
             // resterebbe sulla scheda appena eliminata.
             await settleDialogHistory();
             goBack();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, errorMessage));
-        } finally {
-            setIsDeleting(false);
-        }
-    };
+        },
+    });
 
     return (
         <>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="destructive" size="lg" onClick={() => setIsOpen(true)} aria-label={label}>
+                    <Button variant="destructive" size="lg" onClick={() => deleteAction.open()} aria-label={label}>
                         <Trash2 className="size-5" />
                         {/* 14px come le altre azioni dell'intestazione (`DetailHeaderAction`), non più 18px. */}
                         <span className="hidden lg:inline">Elimina</span>
@@ -87,12 +74,12 @@ const DetailDeleteButton = ({
             </Tooltip>
 
             <ConfirmDeleteDialog
-                open={isOpen}
-                onOpenChange={setIsOpen}
+                open={deleteAction.isOpen}
+                onOpenChange={deleteAction.onOpenChange}
                 title={title}
                 description={description}
-                isDeleting={isDeleting}
-                onConfirm={handleConfirm}
+                isDeleting={deleteAction.isRunning}
+                onConfirm={deleteAction.confirm}
             />
         </>
     );

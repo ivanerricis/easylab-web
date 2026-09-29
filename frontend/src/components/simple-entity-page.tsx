@@ -11,7 +11,7 @@ import { useSearchableRows } from "@/hooks/useSearchableRows";
 import { listUrlParams, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
-import { getApiErrorMessage } from "@/lib/api";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import type { PaginatedResponse } from "@/lib/api/client";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -115,8 +115,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
     // Il dialogo è aperto se e solo se c'è una riga bersaglio: un booleano a parte poteva
     // disallinearsi da essa (aperto ma senza riga, o viceversa), come succedeva prima.
     const [rowToEdit, setRowToEdit] = useState<TRow | null>(null);
-    const [rowToDelete, setRowToDelete] = useState<TRow | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [pageSize, setStoredPageSize] = useTableRowsPerPage(tableKey);
     const { rows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, error, reload } =
         useSearchableRows<TRow>({
@@ -127,6 +125,12 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             errorMessage: loadErrorMessage,
             onPageOutOfRange: setCurrentPage,
         });
+    const deleteAction = usePendingAction({
+        run: onDelete,
+        successMessage: deleteSuccessMessage,
+        errorMessage: deleteErrorMessage,
+        onDone: () => reload(),
+    });
 
     // Lista vuota e ricerca senza esiti hanno frasi diverse: vedi `resolveEmptyListMessage`.
     const resolvedEmptyMessage = resolveEmptyListMessage({ emptyMessage, searchText: committedSearchText });
@@ -161,28 +165,6 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
         await reload();
     };
 
-    const handleOpenDeleteDialog = (row: TRow) => {
-        setRowToDelete(row);
-    };
-
-    const handleDelete = async () => {
-        if (!rowToDelete || isDeleting) {
-            return;
-        }
-
-        try {
-            setIsDeleting(true);
-            await onDelete(rowToDelete);
-            toast.success(deleteSuccessMessage);
-            setRowToDelete(null);
-            await reload();
-        } catch (error) {
-            toast.error(getApiErrorMessage(error, deleteErrorMessage));
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     return (
         <div className="relative flex h-full min-h-0 w-full flex-col gap-4">
             <PageHeader
@@ -206,16 +188,12 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             />
 
             <ConfirmDeleteDialog
-                open={rowToDelete != null}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setRowToDelete(null);
-                    }
-                }}
+                open={deleteAction.isOpen}
+                onOpenChange={deleteAction.onOpenChange}
                 title={deleteTitle}
-                description={rowToDelete ? deleteDescription(rowToDelete) : deleteFallbackDescription}
-                isDeleting={isDeleting}
-                onConfirm={handleDelete}
+                description={deleteAction.pending ? deleteDescription(deleteAction.pending) : deleteFallbackDescription}
+                isDeleting={deleteAction.isRunning}
+                onConfirm={deleteAction.confirm}
             />
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -233,7 +211,7 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
                         entityLabel={entityLabel}
                         getOpenPath={getOpenPath}
                         onEdit={handleOpenEditDialog}
-                        onDelete={handleOpenDeleteDialog}
+                        onDelete={deleteAction.open}
                         isRowLocked={isRowLocked}
                         isInitialLoading={isInitialLoading}
                         isRefetching={isRefetching}

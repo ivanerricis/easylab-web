@@ -11,6 +11,32 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-29 — Impostazioni admin controllate a schermo: scorrimento vuoto, errori vuoti nei Log
+
+Le sezioni admin delle Impostazioni (Sicurezza, Utenti, Azienda, Email, Esportazione, Backup,
+Aggiornamenti, Log) erano rimaste fuori dal controllo visivo della scansione del 2026-09-28, fatto
+con l'utente di prova non admin. Controllate ora con la sessione admin, a 390 e 1366px, chiaro e
+scuro, con ogni scrittura verso l'API bloccata dallo script. Nessuna pagina scorre in orizzontale;
+la domanda "Modifiche non salvate" funziona (Azienda → Email: resta con "Continua a modificare",
+cambia sezione con "Chiudi senza salvare").
+
+- **Scorrimento su uno schermo vuoto in Backup e Azienda.** Il campo file nascosto di
+  `SettingsFileInput` (`sr-only`, quindi `position: absolute`) non aveva un antenato posizionato
+  vicino e si ancorava al `<main>` del layout, fuori dalla sezione che scorre. Lì, alla sua altezza
+  naturale, allungava l'area di scorrimento del `<main>`: in Backup 2715px invece di 792 su
+  telefono (1961 invece di 848 su desktop), in Azienda 1014. Su telefono, finita la sezione, il
+  dito continuava a scorrere il `<main>` e la pagina spariva su uno sfondo vuoto. Ora il contenitore
+  del campo è `relative` e il `<main>` è alto quanto lo schermo (misurato); una scansione di tutte
+  le rotte non trova altri elementi che lo allunghino.
+- **Riga "Errore" vuota nelle schede dei Log.** Su telefono la riga "Errore" si toglieva solo se
+  nessuna voce della pagina aveva un errore: bastava un accesso fallito perché tutte le schede
+  riuscite mostrassero "Errore" senza valore, accanto a "Utente: -", come un dato mancante. Ora
+  `EntityCardColumn` ha `cardHiddenWhen(row)`, che toglie la riga da una singola scheda, e i Log lo
+  usano per l'errore: compare solo sulle voci fallite.
+
+File: `frontend/src/components/settings/{settingsFileInput,logsSettingsPanel}.tsx`,
+`frontend/src/components/entity-card-list.tsx`, con i test.
+
 ## 2026-09-29 — Scansione del frontend, fase 2: meno copie, più test
 
 Seconda parte della scansione del 2026-09-28: i refactoring e i test mancanti, sopra il codice già

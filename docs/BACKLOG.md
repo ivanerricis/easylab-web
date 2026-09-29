@@ -30,8 +30,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Da provare su telefoni veri:** pressione lunga sul calendario per creare un intervento,
     tastiera a schermo aperta nei dialoghi (restringe `dvh`), Indietro di Android con un dialogo
     aperto, maiuscole di iOS su "ELIMINA". Gli screenshot erano Playwright + Edge in emulazione.
-  - **Sezioni admin delle Impostazioni non viste a schermo** (Utenti, Azienda, Email, Backup,
-    Aggiornamenti, Log): la verifica visiva è stata fatta con l'utente di prova non admin.
 - [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
   aree da toccare sotto i 44px, colonna Azioni fuori vista nelle tabelle larghe, alcune
   proposte non ancora decise.

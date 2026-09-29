@@ -50,5 +50,11 @@ nav:
   - Deploy e configurazione server: DEPLOY.md
   - Backup, restore e migrazione: BACKUP.md
   - Sicurezza account e accesso: OPERATIONS.md
-  - Changelog: CHANGELOG.md
+  - Changelog:
+      - Indice: CHANGELOG.md
+      - "Settembre 2026, 21-30": changelog/2026-09-21-30.md
+      - "Settembre 2026, 11-20": changelog/2026-09-11-20.md
+      - "Settembre 2026, 1-10": changelog/2026-09-01-10.md
+      - Agosto 2026: changelog/2026-08.md
+      - Luglio 2026: changelog/2026-07.md
   - Backlog: BACKLOG.md

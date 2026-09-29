@@ -26,8 +26,7 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     tastiera a schermo aperta nei dialoghi (restringe `dvh`), Indietro di Android con un dialogo
     aperto, maiuscole di iOS su "ELIMINA". Gli screenshot erano Playwright + Edge in emulazione.
 - [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
-  aree da toccare sotto i 44px, colonna Azioni fuori vista nelle tabelle larghe, alcune
-  proposte non ancora decise.
+  colonna Azioni fuori vista nelle tabelle larghe, alcune proposte non ancora decise.
 - Tabelle di Impostazioni (utenti, tentativi falliti, log, dump) ancora scritte a mano fuori da
   `EntityTable`: niente colonne ridimensionabili (CHANGELOG del 2026-09-08). Dal 2026-09-28 le
   loro schede su telefono sono già `EntityCardList`; per passare anche le tabelle serve prima
@@ -119,35 +118,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     `backupState.ts` (l'altra copia, in `routes/interventions.ts`, è sparita il 2026-09-23
     insieme al ripiego che la usava, vedi CHANGELOG). Un `localDayKey(date, timeZone)` accanto a
     `currentMonthKey`, da fare insieme alla voce `process.env.TZ` qui sopra.
-  - **Le cinque preferenze d'aspetto** (accento, intensità, raggio, densità, dimensione del
-    testo) hanno ciascuna le sue `getStored*`/`setStored*`/`apply*` in `lib/theme.ts`, quindici
-    funzioni che cambiano solo per chiave e attributo, più cinque handler uguali in
-    `themeSettingsSection.tsx`. Candidata a una mappa unica; rimandata perché è codice stabile
-    che funziona.
-  - Piccola: il clic fuori da `CustomDialog` non ha un test automatico, perché jsdom non simula
-    un vero clic fuori da un dialogo Radix (verificato a mano nel browser, vedi CHANGELOG del
-    2026-09-23).
-- Dagli aggiornamenti delle dipendenze del 2026-09-25 (vedi CHANGELOG dello stesso giorno):
-  - **`backupKey.test.ts` è instabile.** Il test "genera una chiave al primo utilizzo e la
-    persiste su disco" legge e scrive il vero `data/backup.key`, che altri file di test creano e
-    cancellano in parallelo: ogni tanto trova la chiave di un altro test e il confronto dei
-    `Buffer` fallisce (è successo nella CI della pull request #11, rilanciata e passata). Gli
-    altri test dello stesso file usano già `node:fs` finto proprio per questo. La strada: lo
-    stesso `fs` finto anche qui, oppure un percorso della chiave configurabile e diverso per ogni
-    file di test.
-  - **jsdom 30.1 rompe i menu di Radix nei test.** La pull request #13 (gruppo delle dipendenze
-    del frontend) lo porta da 30.0.1 a 30.1.0, e con quella versione select e dropdown di Radix
-    non si aprono più in jsdom: 12 test falliti in `ReportsPage`, `CustomerPage` e `layout`, nessun
-    difetto dell'app. Gli altri sei aggiornamenti del gruppo sono minori e passano. La strada:
-    escludere `jsdom` dal gruppo in `.github/dependabot.yml` (come già per le versioni maggiori),
-    unire il resto, e capire a parte cosa è cambiato nella 30.1 (eventi del puntatore o
-    `hasPointerCapture`, che Radix usa per aprire i menu).
-  - **Il suggerimento del cliente non compariva su CI nei test dei dialoghi a passi** (2026-09-24),
-    mentre in locale sì, anche ripetendo il test, e nel browser vero pure. Un'attesa più lunga non
-    è servita. Aggirato facendo scrivere il cliente a mano in quei due test; la causa non è
-    chiarita. Da guardare insieme alla voce su jsdom qui sopra: stesso ambiente di test, e CI
-    installa da `package-lock.json` le stesse versioni del locale, quindi la differenza è altrove
-    (Linux, tempi, ordine dei file).
 - [Test sul database vero, seconda parte](#test-sul-database-vero-seconda-parte): fatta per intero
   il 2026-09-21, tranne la 2FA di `authManager`, ancora provata solo con un `db` finto.
 
@@ -297,11 +267,6 @@ un campo `audience` sulla tabella.
 *Le correzioni fatte sono nel CHANGELOG dello stesso giorno. Queste sono rimaste fuori per
 scelta.*
 
-- **Aree da toccare sotto i 44px su telefono.** Quasi ovunque: pulsanti da 36–40px, la X dei
-  dialoghi da 32px, le frecce della paginazione (42×36), il selettore delle righe per pagina
-  (57×32). Deciso di non toccarle in quel giro: è una
-  scelta di misura di base dei pulsanti che cambia l'aspetto di tutta l'app, da fare in un
-  colpo solo e da riverificare ovunque.
 - **Colonna Azioni fuori vista nelle tabelle larghe.** Con la barra laterale aperta, report e
   interventi sono più larghi del contenitore anche a 1440px (report: 1623px in 1160), e i
   pulsanti di riga stanno in fondo allo scorrimento orizzontale. Una colonna Azioni fissa a

@@ -7,7 +7,7 @@ import {
     updateCustomerById,
 } from "../db/queries/customer";
 import { personDisplayName } from "../db/queries/personName";
-import { getLabConfig } from "../config/lab";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
 import { formatPhoneLabel } from "./formatting";
@@ -81,16 +81,24 @@ const customersRouter = createCrudRouter({
             const customersResult = await listCustomers({ search, unpaginatedLimit: exportRowLimit });
             const customers = Array.isArray(customersResult) ? customersResult : customersResult.items;
 
-            const csv = toCsv(customers, [
-                { header: "ID", value: (customer) => customer.id },
-                { header: "Nome", value: (customer) => customer.firstName },
-                { header: "Cognome", value: (customer) => customer.lastName },
-                { header: "Email", value: (customer) => customer.email },
-                { header: "Telefono", value: (customer) => customer.phoneNumber },
-                { header: "Telefono secondario", value: (customer) => customer.phoneNumberSecondary },
-                { header: "Città", value: (customer) => customer.city },
-                { header: "Creato il", value: (customer) => customer.created_at },
-            ]);
+            const csv = toCsv(
+                customers,
+                [
+                    { header: "ID", value: (customer) => customer.id },
+                    { header: "Nome", value: (customer) => customer.firstName },
+                    { header: "Cognome", value: (customer) => customer.lastName },
+                    { header: "Email", value: (customer) => customer.email },
+                    { header: "Telefono", value: (customer) => customer.phoneNumber, asText: true },
+                    {
+                        header: "Telefono secondario",
+                        value: (customer) => customer.phoneNumberSecondary,
+                        asText: true,
+                    },
+                    { header: "Città", value: (customer) => customer.city },
+                    { header: "Creato il", value: (customer) => customer.created_at },
+                ],
+                { timeZone: await getAppTimeZone() }
+            );
 
             res.setHeader("Content-Type", "text/csv; charset=utf-8");
             res.setHeader("Content-Disposition", "attachment; filename=clienti.csv");

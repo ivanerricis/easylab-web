@@ -1,6 +1,19 @@
 export type CsvColumn<TRow> = {
     header: string;
     value: (row: TRow) => string | number | boolean | Date | null | undefined;
+    /**
+     * Il valore è un codice o un numero di telefono, non una quantità: Excel deve leggerlo come
+     * testo. Vedi `toTextCell`.
+     */
+    asText?: boolean;
+};
+
+export type CsvOptions = {
+    /**
+     * Il fuso in cui scrivere le date-ora (`Date`). Senza, restano l'istante in UTC in formato
+     * ISO. Con il fuso del laboratorio escono come `2026-09-22 00:30`, che Excel legge come data.
+     */
+    timeZone?: string;
 };
 
 /**
@@ -36,13 +49,54 @@ const plainNumberPattern = /^[+-]?\d+(?:\.\d+)?$/;
 const neutralizeFormula = (text: string): string =>
     formulaTriggerPattern.test(text) && !plainNumberPattern.test(text) ? `'${text}` : text;
 
-const toCsvText = (value: string | number | boolean | Date | null | undefined): string => {
+/**
+ * Un telefono `0612345678` in una cella CSV diventa per Excel il numero 612345678 (lo zero
+ * sparisce) e con la colonna stretta un cellulare si legge `3,33E+09`. Il CSV non ha un modo per
+ * dire "questo è testo": l'unico che Excel, LibreOffice e Fogli Google rispettano tutti è la
+ * formula costante `="0612345678"`, che vale il testo scritto tra le virgolette.
+ *
+ * È una formula, quindi vale solo per ciò che non può contenere altro: cifre, spazi, `+`, `-`,
+ * parentesi e punti, mai virgolette né `=` interni. Tutto il resto passa dalla difesa
+ * ordinaria di `neutralizeFormula`, che una formula vera la disarma.
+ */
+const phoneLikePattern = /^[\d\s+().-]+$/;
+
+const toTextCell = (text: string): string => (phoneLikePattern.test(text) ? `="${text}"` : neutralizeFormula(text));
+
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** `2026-09-22 00:30` nel fuso dato: la data e l'ora che vede chi lavora nel laboratorio. */
+const formatLocalDateTime = (value: Date, timeZone: string): string => {
+    let formatter = dateTimeFormatters.get(timeZone);
+
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+        });
+        dateTimeFormatters.set(timeZone, formatter);
+    }
+
+    const parts = Object.fromEntries(formatter.formatToParts(value).map((part) => [part.type, part.value]));
+
+    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+};
+
+const toCsvText = (
+    value: string | number | boolean | Date | null | undefined,
+    { asText, timeZone }: { asText?: boolean; timeZone?: string }
+): string => {
     if (value == null) {
         return "";
     }
 
     if (value instanceof Date) {
-        return value.toISOString();
+        return timeZone ? formatLocalDateTime(value, timeZone) : value.toISOString();
     }
 
     if (typeof value === "boolean") {
@@ -50,7 +104,7 @@ const toCsvText = (value: string | number | boolean | Date | null | undefined): 
     }
 
     if (typeof value === "string") {
-        return neutralizeFormula(value);
+        return asText ? toTextCell(value) : neutralizeFormula(value);
     }
 
     return String(value);
@@ -63,10 +117,14 @@ const toCsvText = (value: string | number | boolean | Date | null | undefined): 
  */
 const byteOrderMark = String.fromCharCode(0xfeff);
 
-export const toCsv = <TRow>(rows: TRow[], columns: CsvColumn<TRow>[]): string => {
+export const toCsv = <TRow>(rows: TRow[], columns: CsvColumn<TRow>[], options: CsvOptions = {}): string => {
     const lines = [
         columns.map((column) => escapeCsvField(column.header)),
-        ...rows.map((row) => columns.map((column) => escapeCsvField(toCsvText(column.value(row))))),
+        ...rows.map((row) =>
+            columns.map((column) =>
+                escapeCsvField(toCsvText(column.value(row), { asText: column.asText, timeZone: options.timeZone }))
+            )
+        ),
     ];
 
     return `${byteOrderMark}${lines.map((line) => line.join(separator)).join("\r\n")}\r\n`;

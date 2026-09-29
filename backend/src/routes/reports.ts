@@ -137,39 +137,44 @@ const reportExportQuerySchema = reportListQuerySchema.omit({ page: true, pageSiz
 reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), async (req, res) => {
     const query = req.query as unknown as z.infer<typeof reportExportQuerySchema>;
 
+    const timeZone = await getAppTimeZone();
     const reports = await listReports({
         ...query,
         visibility: query.visibility ?? "all",
-        timeZone: await getAppTimeZone(),
+        timeZone,
         unpaginatedLimit: exportRowLimit,
     });
     const rows = Array.isArray(reports) ? reports : reports.items;
 
-    const csv = toCsv(rows, [
-        { header: "ID", value: (report) => report.id },
-        { header: "Cliente", value: (report) => report.customer },
-        { header: "Telefono cliente", value: (report) => report.customerPhone },
-        { header: "Dispositivo", value: (report) => report.device },
-        { header: "Difetto", value: (report) => report.issue },
-        { header: "Descrizione problema", value: (report) => report.issueDescription },
-        { header: "Intervento", value: (report) => report.serviceDescription },
-        // Il collaboratore che ha in carico il report e il tecnico esterno vero (prima questa
-        // colonna leggeva `technician`, che nonostante il nome era il collaboratore: vedi D4
-        // nel CHANGELOG). `technicianName` è null quando il report non ha un tecnico esterno.
-        { header: "Collaboratore", value: (report) => report.collaborator },
-        { header: "Tecnico esterno", value: (report) => report.technicianName },
-        { header: "Prezzo interno", value: (report) => report.price },
-        { header: "Compenso tecnico", value: (report) => report.technicianPrice },
-        { header: "Prezzo totale", value: (report) => report.totalPrice },
-        {
-            header: "Metodo di pagamento",
-            value: (report) => formatReportPaymentMethod(report.paymentMethod),
-        },
-        { header: "Chiuso", value: (report) => report.closed },
-        { header: "Note", value: (report) => report.note },
-        { header: "Password", value: (report) => report.password },
-        { header: "Creato il", value: (report) => report.createdAt },
-    ]);
+    const csv = toCsv(
+        rows,
+        [
+            { header: "ID", value: (report) => report.id },
+            { header: "Cliente", value: (report) => report.customer },
+            { header: "Telefono cliente", value: (report) => report.customerPhone, asText: true },
+            { header: "Dispositivo", value: (report) => report.device },
+            { header: "Difetto", value: (report) => report.issue },
+            { header: "Descrizione problema", value: (report) => report.issueDescription },
+            { header: "Intervento", value: (report) => report.serviceDescription },
+            // Il collaboratore che ha in carico il report e il tecnico esterno vero (prima questa
+            // colonna leggeva `technician`, che nonostante il nome era il collaboratore: vedi D4
+            // nel CHANGELOG). `technicianName` è null quando il report non ha un tecnico esterno.
+            { header: "Collaboratore", value: (report) => report.collaborator },
+            { header: "Tecnico esterno", value: (report) => report.technicianName },
+            { header: "Prezzo interno", value: (report) => report.price },
+            { header: "Compenso tecnico", value: (report) => report.technicianPrice },
+            { header: "Prezzo totale", value: (report) => report.totalPrice },
+            {
+                header: "Metodo di pagamento",
+                value: (report) => formatReportPaymentMethod(report.paymentMethod),
+            },
+            { header: "Chiuso", value: (report) => report.closed },
+            { header: "Note", value: (report) => report.note },
+            { header: "Password", value: (report) => report.password },
+            { header: "Creato il", value: (report) => report.createdAt },
+        ],
+        { timeZone }
+    );
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=report.csv");

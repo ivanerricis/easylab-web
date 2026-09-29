@@ -192,36 +192,41 @@ const interventionExportQuerySchema = interventionListQuerySchema.omit({ page: t
 interventionsRouter.get("/export.csv", validate({ query: interventionExportQuerySchema }), async (req, res) => {
     const query = req.query as unknown as z.infer<typeof interventionExportQuerySchema>;
 
+    const timeZone = await getAppTimeZone();
     const interventions = await listInterventions({
         ...query,
         status: query.status ?? "all",
         type: query.type ?? "all",
-        timeZone: await getAppTimeZone(),
+        timeZone,
         unpaginatedLimit: exportRowLimit,
     });
     const rows = Array.isArray(interventions) ? interventions : interventions.items;
 
-    const csv = toCsv(rows, [
-        { header: "ID", value: (intervention) => intervention.id },
-        { header: "Cliente", value: (intervention) => intervention.customer },
-        { header: "Telefono cliente", value: (intervention) => intervention.customerPhone },
-        { header: "Collaboratore", value: (intervention) => intervention.collaborator },
-        { header: "Tipo", value: (intervention) => formatInterventionType(intervention.type) },
-        {
-            header: "Stato",
-            value: (intervention) => formatInterventionStatus(intervention.status),
-        },
-        { header: "Data intervento", value: (intervention) => intervention.interventionDate },
-        { header: "Ora inizio", value: (intervention) => intervention.startTime },
-        { header: "Ora fine", value: (intervention) => intervention.endTime },
-        { header: "Problema", value: (intervention) => intervention.problem },
-        { header: "Descrizione", value: (intervention) => intervention.description },
-        { header: "Note", value: (intervention) => intervention.note },
-        { header: "Prezzo", value: (intervention) => intervention.price },
-        { header: "Pagato", value: (intervention) => intervention.paid },
-        { header: "Da fatturare", value: (intervention) => intervention.toInvoice },
-        { header: "Creato il", value: (intervention) => intervention.createdAt },
-    ]);
+    const csv = toCsv(
+        rows,
+        [
+            { header: "ID", value: (intervention) => intervention.id },
+            { header: "Cliente", value: (intervention) => intervention.customer },
+            { header: "Telefono cliente", value: (intervention) => intervention.customerPhone, asText: true },
+            { header: "Collaboratore", value: (intervention) => intervention.collaborator },
+            { header: "Tipo", value: (intervention) => formatInterventionType(intervention.type) },
+            {
+                header: "Stato",
+                value: (intervention) => formatInterventionStatus(intervention.status),
+            },
+            { header: "Data intervento", value: (intervention) => intervention.interventionDate },
+            { header: "Ora inizio", value: (intervention) => intervention.startTime },
+            { header: "Ora fine", value: (intervention) => intervention.endTime },
+            { header: "Problema", value: (intervention) => intervention.problem },
+            { header: "Descrizione", value: (intervention) => intervention.description },
+            { header: "Note", value: (intervention) => intervention.note },
+            { header: "Prezzo", value: (intervention) => intervention.price },
+            { header: "Pagato", value: (intervention) => intervention.paid },
+            { header: "Da fatturare", value: (intervention) => intervention.toInvoice },
+            { header: "Creato il", value: (intervention) => intervention.createdAt },
+        ],
+        { timeZone }
+    );
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=interventi.csv");

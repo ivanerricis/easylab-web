@@ -11,6 +11,67 @@ solo l'evoluzione del codice e dell'infrastruttura.
 
 ---
 
+## 2026-09-29 — Menu delle Impostazioni a categorie, evidenziazione condivisa con la barra principale
+
+Il menu laterale delle Impostazioni era una colonna di riquadri bordati, ciascuno con titolo e
+descrizione: nove pulsanti-scatola che pesavano più della sezione che aprivano. Ora è un elenco
+compatto (icona e nome, la descrizione resta come suggerimento al passaggio del mouse) in un
+pannello a sfondo pieno, diviso in tre categorie con titolo e linea divisoria: Preferenze (Tema,
+Sicurezza), Laboratorio (Utenti, Azienda, Email), Dati e sistema (Esportazione, Backup,
+Aggiornamenti, Log). Una categoria senza voci apribili (per un non-admin, "Laboratorio") sparisce;
+il selettore sotto `xl` è raggruppato con gli stessi titoli. La voce attiva ha lo sfondo tenue e una
+barra verticale a sinistra: la stessa evidenziazione è ora anche nella barra laterale principale
+(`sidebarMenuButtonVariants`, `data-active:before:*`). Ora è un `<nav>` con `aria-current`.
+Controllato a schermo a 390 e 1366px, chiaro e scuro, senza scorrimento orizzontale.
+
+File: `frontend/src/pages/settings/SettingsPage.tsx` (e test), `frontend/src/components/ui/sidebar.tsx`.
+
+## 2026-09-29 — Quattro voci del backlog: font, rosso su fondo tenue, export per Excel, nome del dispositivo
+
+**Preload del font Inter.** Il sottoinsieme latin (48 KB) si scopriva solo dopo aver letto il CSS,
+con un breve cambio di carattere al primo caricamento. Un `<link rel="preload">` in `index.html` lo
+anticipa; Vite lo riscrive verso lo stesso file con hash che usa il CSS (verificato sulla build:
+`/static/inter-latin-wght-normal-….woff2`), quindi il browser scarica un file solo. Nessun plugin.
+
+**Testo rosso su fondo rosso tenue.** Il rosso pieno sul 10% di rosso faceva 3,79:1 sul fondo
+pagina e 4,36:1 sulle card; al passaggio del mouse (20%) e in scuro (20-30%) scendeva ancora, fino
+a 3,69:1. Nuovo token `--destructive-text` (`index.css`): in chiaro il rosso scurito di un quarto
+verso il nero (4,9:1 nel caso peggiore), in scuro schiarito verso il bianco (5,0:1). Lo usano il
+pulsante `destructive`, la voce di menu distruttiva e il riquadro d'errore delle Impostazioni.
+Il rosso pieno resta per i testi su fondo neutro, che erano già sopra 4,5:1.
+
+**Export CSV aperti in Excel.** Verificato con Excel 16 in italiano prima e dopo.
+- *Telefoni.* `0612345678` diventava il numero 612345678 e un cellulare `3,33E+09`. Le colonne
+  marcate `asText` escono come `="0612345678"`, la formula costante che Excel, LibreOffice e Fogli
+  leggono come testo. È una formula, quindi solo per ciò che non può contenere altro (cifre,
+  spazi, `+ - ( ) .`): tutto il resto passa da `neutralizeFormula` come prima, e ci sono test che
+  una formula vera non può passare di lì. Non è la soluzione completa (un `.xlsx` con celle di
+  testo); è quella che non cambia il formato del file.
+- *"Creato il".* Usciva come `2026-09-21T22:30:00.000Z` (UTC, testo per Excel). Ora è
+  `2026-09-22 00:30` nel fuso del laboratorio, che Excel legge come data vera.
+
+**Nome del dispositivo.** Due macchine uguali (due PC Windows con Chrome) restavano due righe
+identiche nell'elenco delle sessioni. Come previsto in BACKLOG, il nome non sta sulla sessione
+(dura al massimo sette giorni e muore al logout) ma su un'identità di dispositivo:
+- cookie `__Host-device` (in sviluppo `device`), un id casuale di 128 bit, `HttpOnly`, 400 giorni,
+  scritto a ogni accesso riuscito (mai al primo passo della 2FA) e scartato se non ha la forma
+  giusta: arriva dal client;
+- migrazione `0039_user_device_names`: `session.device_hash` e la tabella `user_device(user_id,
+  device_hash, name)`, una riga per (utente, dispositivo), che sparisce con l'utente. In tabella
+  solo lo sha256 dell'id, come per i token di sessione;
+- `PUT /api/auth/device-name`: dà o toglie il nome del dispositivo della sessione in uso, e solo
+  di quello, perché un amministratore non sa quale sia il portatile di chi. Una sessione aperta
+  prima (senza identità) risponde 409 con "esci e accedi di nuovo";
+- l'elenco delle sessioni (proprie e, per l'admin, altrui) porta `deviceName`; in Sicurezza il
+  pulsante "Dai un nome" / "Rinomina" sulla sessione in uso, in Utenti solo la lettura.
+Cancellare i cookie fa comparire un dispositivo nuovo, senza nome: è previsto.
+
+File: `frontend/index.html`, `frontend/src/index.css`, `frontend/src/components/ui/{button,dropdown-menu}.tsx`,
+`frontend/src/components/settings/{settingsUi,sessionsList,securitySettingsSection}.tsx`,
+`frontend/src/components/dialogs/settings/deviceNameDialog.tsx`, `frontend/src/lib/api/{auth,users}.ts`;
+`backend/src/services/{csv,authManager}.ts`, `backend/src/routes/{auth,customers,reports,interventions}.ts`,
+`backend/src/middleware/requireAuth.ts`, `backend/src/db/schema.ts`, `backend/drizzle/0039_user_device_names.sql`, con i test.
+
 ## 2026-09-29 — Impostazioni admin controllate a schermo: scorrimento vuoto, errori vuoti nei Log
 
 Le sezioni admin delle Impostazioni (Sicurezza, Utenti, Azienda, Email, Esportazione, Backup,

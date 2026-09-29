@@ -22,11 +22,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     chiusura della scheda chiedono conferma; il tasto Indietro e le navigazioni fatte in codice
     (ricerca globale, logout dal menu utente) no. Serve `createBrowserRouter` + `useBlocker` in
     `App.tsx` al posto di `BrowserRouter`: cambio di router da fare con calma, tocca tutte le rotte.
-  - **Preload del font Inter.** Il sottoinsieme latin (48 KB) si scopre solo dopo il CSS, con un
-    breve cambio di carattere al primo caricamento. Da verificare se Vite riscrive un
-    `<link rel=preload>` in `index.html` verso lo stesso file con hash; senza, serve un plugin.
-  - **Testo rosso su fondo rosso tenue** (`bg-destructive/10`): 3,79:1 sul fondo pagina, 4,35:1 sulle
-    card, sotto il 4,5:1. Il rosso pieno è stato corretto; questo caso no.
   - **Da provare su telefoni veri:** pressione lunga sul calendario per creare un intervento,
     tastiera a schermo aperta nei dialoghi (restringe `dvh`), Indietro di Android con un dialogo
     aperto, maiuscole di iOS su "ELIMINA". Gli screenshot erano Playwright + Edge in emulazione.
@@ -58,33 +53,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     collaboratore e tecnico.
   - **Selezione multipla nelle liste.** Per esempio chiudere o stampare più report insieme.
     Priorità bassa: ha senso solo se capita spesso.
-
-- Nome scelto per il dispositivo di una sessione. Oggi l'elenco di Impostazioni → Utenti mostra
-  l'etichetta ricavata dallo `User-Agent` ("Chrome su Windows", vedi CHANGELOG del 2026-09-16):
-  basta finché i dispositivi di una persona si distinguono fra loro, non se ha due macchine
-  uguali (due PC Windows con Chrome), dove le due righe restano identiche. La strada *non* è un
-  nome sulla sessione — dura al massimo sette giorni e muore al logout, quindi andrebbe riscritto
-  a ogni accesso — ma un'identità di dispositivo: un secondo cookie di lunga durata
-  (`__Host-device`, un id casuale) più una tabella `user_device(user_id, device_id, nome)` a cui
-  la sessione si collega, così il nome sopravvive ai login. Da tenere presente: il nome può
-  darlo solo chi è su quel dispositivo (un amministratore che guarda le sessioni altrui non sa
-  quale sia il portatile di chi), e cancellare i cookie fa comparire un dispositivo nuovo senza
-  nome. Rimandato il 2026-09-16 dopo averlo valutato: si fa se in pratica due macchine risultano
-  indistinguibili.
-
-- Esportazioni CSV aperte in Excel: telefoni e "Creato il". Da quando il separatore è il punto e
-  virgola (CHANGELOG del 2026-09-22) le colonne si vedono, e con loro due letture di Excel che
-  prima restavano nascoste nella colonna A. Verificate il 2026-09-22 con Excel 16 in italiano:
-  - I telefoni scritti tutti attaccati diventano numeri: il fisso `0612345678` perde lo zero
-    (`612345678`), e con la colonna stretta un cellulare si legge `3,33E+09`. Quelli con uno
-    spazio (`06 12345678`) restano testo. Il CSV non ha un modo pulito per dire "questo è
-    testo": `="0612345678"` funziona, ma è una formula, proprio quello che `neutralizeFormula`
-    in `csv.ts` impedisce di scrivere. La soluzione completa è esportare in `.xlsx`, con celle
-    di tipo testo.
-  - "Creato il" esce come testo ISO in UTC (`2026-09-21T22:30:00.000Z` per un report delle 00:30
-    del 22): per Excel non è una data, e l'ora non è quella del laboratorio. Scritta nel fuso
-    del laboratorio come `2026-09-22 00:30`, Excel la legge come data vera. La data
-    dell'intervento (`2026-09-22`) e gli orari (`10:30:00`) sono già letti come date e ore.
 
 **Prestazioni**
 - Ordinare i report per "Cliente" costa circa 100 ms a pagina (20.000 report), contro i 15-25 ms

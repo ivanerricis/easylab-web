@@ -3,8 +3,7 @@ import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item"
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import DetailStats, { DetailStatBadge } from "@/components/detail-stats";
 import CustomerLink from "@/components/customer-link";
-import LoadingPage from "@/components/loadingPage";
-import NotFoundState from "@/components/not-found-state";
+import EntityDetailGate from "@/components/entity-detail-gate";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import RefreshButton from "@/components/refresh-button";
@@ -52,28 +51,23 @@ const ReportPage = () => {
         await reload();
     };
 
-    if (isNotFound) {
-        return (
-            <NotFoundState
-                title="Report non trovato"
-                description="Il report che cerchi non esiste, oppure è stato eliminato."
-                backTo="/reports"
-                backLabel="Vai ai report"
-            />
-        );
-    }
-
     // Il caricamento a tutta pagina solo quando non c'è ancora niente da mostrare. Prima valeva
     // anche per i ricaricamenti: "Aggiorna" faceva lampeggiare la scheda, e il `reload()` dopo
     // "Salva" smontava a metà salvataggio il dialogo di modifica (che sta qui sotto) e lo
     // rimontava da capo. Ora durante un ricaricamento la scheda resta, attenuata (sotto).
-    if (isLoading && !report) {
-        return <LoadingPage />;
-    }
-
-    if (!report) {
+    if (isNotFound || !report) {
         return (
-            <div className="flex h-full items-center justify-center text-muted-foreground">Report non disponibile.</div>
+            <EntityDetailGate
+                isNotFound={isNotFound}
+                isLoading={isLoading}
+                notFound={{
+                    title: "Report non trovato",
+                    description: "Il report che cerchi non esiste, oppure è stato eliminato.",
+                    backTo: "/reports",
+                    backLabel: "Vai ai report",
+                }}
+                unavailableLabel="Report non disponibile."
+            />
         );
     }
 

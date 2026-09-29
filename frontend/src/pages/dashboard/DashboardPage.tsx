@@ -15,8 +15,6 @@ import CardDashboard, {
     dashboardCardLayoutClassName,
     dashboardCardValueClassName,
 } from "./components/cardDashboard";
-import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
-import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import LoadingPage from "@/components/loadingPage";
 import PageHeader from "@/components/page-header";
 import RefreshButton from "@/components/refresh-button";
@@ -30,7 +28,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import TableActionButton from "@/components/table-action-button";
-import { lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 
 const InterventionsCalendar = lazy(() => import("@/pages/calendar/components/interventions-calendar"));
 
@@ -49,58 +47,14 @@ const { Component: CreateInterventionDialog, prefetch: prefetchCreateInterventio
     () => import("@/components/dialogs/create/createInterventionDialog")
 );
 import CreateEntityButton from "@/components/create-entity-button";
-import {
-    createIntervention,
-    createReport,
-    getReportPrintUrl,
-    getInterventionPrintUrl,
-    getApiErrorMessage,
-    getInterventionStats,
-    getReportStats,
-} from "@/lib/api";
-import type { InterventionStatsDto } from "@/lib/api/interventions";
-import type { ReportStatsDto } from "@/lib/api/reports";
-import { cn, formatEuro, openPrintWindow } from "@/lib/utils";
-import { resolveReportReferences, toReportCreatePayload } from "@/lib/reportForm";
-import { showCreatedToast } from "@/lib/createdToast";
-import { entityPaths } from "@/lib/entityPaths";
-import { resolveCustomerId } from "@/lib/customerLookup";
-import { toInterventionCreatePayload } from "@/lib/interventionForm";
-import { toast } from "sonner";
+import { cn, formatEuro } from "@/lib/utils";
+import { getMonthLabel, getMonthShortLabel } from "@/lib/monthKey";
 import { useNavigate } from "react-router-dom";
 import { useCalendarInterventions, type CalendarRange } from "@/pages/calendar/hooks/useCalendarInterventions";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
+import { useCreateInterventionFlow, useCreateReportFlow } from "@/hooks/useCreateEntityFlow";
 import { lazyWithPrefetch, useHasBeenOpen } from "@/lib/lazyDialog";
-
-const getMonthKey = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-
-    return `${year}-${month}`;
-};
-
-const getMonthLabel = (monthKey: string) => {
-    const [yearPart, monthPart] = monthKey.split("-");
-    const year = Number(yearPart);
-    const month = Number(monthPart);
-
-    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        return monthKey;
-    }
-
-    return new Intl.DateTimeFormat("it-IT", {
-        month: "long",
-        year: "numeric",
-    }).format(new Date(year, month - 1, 1));
-};
-
-const getMonthShortLabel = (monthKey: string) => {
-    const [yearPart, monthPart] = monthKey.split("-");
-
-    return new Intl.DateTimeFormat("it-IT", { month: "short" }).format(
-        new Date(Number(yearPart), Number(monthPart) - 1, 1)
-    );
-};
+import { useDashboardStats } from "./useDashboardStats";
 
 /**
  * L'importo sopra la barra, in forma corta: una colonna su sei è larga ~50px su telefono e ~60px
@@ -121,13 +75,6 @@ const percentFormatter = new Intl.NumberFormat("it-IT", {
 /** "—" finché il dato non è arrivato (o se il caricamento è fallito), non un falso zero. */
 const formatCount = (value: number | null | undefined) => (value == null ? "—" : String(value));
 const formatAmount = (value: number | null | undefined) => (value == null ? "—" : formatEuro(value));
-
-const shiftMonthKey = (monthKey: string, deltaMonths: number) => {
-    const [yearPart, monthPart] = monthKey.split("-");
-    const date = new Date(Number(yearPart), Number(monthPart) - 1 + deltaMonths, 1);
-
-    return getMonthKey(date);
-};
 
 const DashboardPage = () => {
     const navigate = useNavigate();
@@ -155,226 +102,47 @@ const DashboardPage = () => {
         isInitialLoading: isCalendarInitialLoading,
         loadEvents: loadCalendarEvents,
     } = useCalendarInterventions(calendarRange);
-    const [selectedRevenueMonth, setSelectedRevenueMonth] = useState(() => getMonthKey(new Date()));
-    // Il mese scelto anche in un ref, per chi lo legge dopo un `await`: la creazione di un report
-    // ricaricava gli incassi del mese catturato all'apertura del dialogo, anche se nel frattempo
-    // se n'era scelto un altro.
-    const selectedRevenueMonthRef = useRef(selectedRevenueMonth);
-    // L'ultimo mese i cui dati sono arrivati davvero: se il caricamento di un altro fallisce,
-    // l'etichetta torna qui, sui numeri che sono ancora a schermo.
-    const loadedRevenueMonthRef = useRef<string | null>(null);
-    // `null` finché non arriva una risposta: su errore la scheda mostra "—" e non un falso
-    // "0,00 €" (o "0 report aperti"), indistinguibile da un mese davvero vuoto.
-    const [reportStats, setReportStats] = useState<ReportStatsDto | null>(null);
-    const [interventionStats, setInterventionStats] = useState<InterventionStatsDto | null>(null);
-    const [isReportStatsLoading, setIsReportStatsLoading] = useState(true);
-    const [isInterventionStatsLoading, setIsInterventionStatsLoading] = useState(true);
-    const isLoading = isReportStatsLoading || isInterventionStatsLoading;
-    // Come nelle liste: il velo che copre tutto ha senso solo quando non c'è ancora niente
-    // da vedere. Dal secondo caricamento in poi (cambio mese, pulsante Aggiorna) i numeri
-    // precedenti restano leggibili e attenuati, così cliccare due volte la freccia del mese
-    // non finisce contro un velo che intercetta il clic.
-    const [hasLoadedMetricsOnce, setHasLoadedMetricsOnce] = useState(false);
-    // Come in `usePaginatedRows` e `useCalendarInterventions`: vale solo la risposta più recente.
-    // Sfogliando i mesi in fretta partiva una richiesta per mese, e quella di un mese già
-    // superato poteva arrivare per ultima e scrivere i suoi incassi sotto l'etichetta dell'altro.
-    const latestReportStatsRequestIdRef = useRef(0);
-    const latestInterventionStatsRequestIdRef = useRef(0);
-    const reportStatsAbortRef = useRef<AbortController | null>(null);
-
-    // All'uscita dalla dashboard non resta in volo una richiesta di incassi.
-    useEffect(() => () => reportStatsAbortRef.current?.abort(), []);
-
-    const monthlyRevenue = reportStats?.monthlyRevenue ?? null;
-    const monthlyRevenueSeries = useMemo(() => reportStats?.series ?? [], [reportStats]);
-    const previousMonthToDate = reportStats?.previousMonthToDate ?? null;
+    // Contatori, incassi e mese scelto: stato e caricamenti stanno in `useDashboardStats`, con
+    // il perché di ogni dettaglio (id della richiesta, annullamento, ritorno dell'etichetta).
+    const {
+        selectedMonth: selectedRevenueMonth,
+        isCurrentMonth: isCurrentRevenueMonth,
+        selectMonth: selectRevenueMonth,
+        selectPreviousMonth: handlePreviousRevenueMonth,
+        selectNextMonth: handleNextRevenueMonth,
+        reportStats,
+        interventionStats,
+        monthlyRevenue,
+        monthlyRevenueSeries,
+        revenueComparison,
+        isLoading,
+        hasLoadedOnce: hasLoadedMetricsOnce,
+        reloadReportStats,
+        reloadInterventionStats,
+    } = useDashboardStats();
 
     const selectedRevenueLabel = useMemo(() => getMonthLabel(selectedRevenueMonth), [selectedRevenueMonth]);
-
-    const isCurrentRevenueMonth = selectedRevenueMonth === getMonthKey(new Date());
-
-    /**
-     * Gli incassi (e i contatori dei report) di un mese. Il mese si chiede qui, non con un
-     * effetto sul mese scelto: così su errore l'etichetta può tornare all'ultimo mese caricato
-     * senza che quel ritorno faccia partire un'altra richiesta, destinata a fallire di nuovo.
-     *
-     * La richiesta superata viene anche annullata, come nel calendario: il controllo sull'id
-     * basterebbe a scartarne la risposta, ma così il server non calcola un mese che nessuno
-     * guarderà più.
-     */
-    const loadReportStats = useCallback(async (month: string) => {
-        const requestId = latestReportStatsRequestIdRef.current + 1;
-        latestReportStatsRequestIdRef.current = requestId;
-        reportStatsAbortRef.current?.abort();
-        const controller = new AbortController();
-        reportStatsAbortRef.current = controller;
-        setIsReportStatsLoading(true);
-
-        try {
-            const stats = await getReportStats(month, controller.signal);
-
-            if (requestId !== latestReportStatsRequestIdRef.current) {
-                return;
-            }
-
-            loadedRevenueMonthRef.current = month;
-            setReportStats(stats);
-        } catch (error) {
-            if (requestId !== latestReportStatsRequestIdRef.current) {
-                return;
-            }
-
-            toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
-
-            // L'etichetta torna al mese dei numeri a schermo. Senza un mese caricato resta
-            // quella scelta, e i numeri sono "—".
-            const loadedMonth = loadedRevenueMonthRef.current;
-            if (loadedMonth) {
-                selectedRevenueMonthRef.current = loadedMonth;
-                setSelectedRevenueMonth(loadedMonth);
-            }
-        } finally {
-            if (requestId === latestReportStatsRequestIdRef.current) {
-                setIsReportStatsLoading(false);
-            }
-        }
-    }, []);
-
-    /**
-     * I contatori degli interventi non dipendono dal mese: prima si richiedevano a ogni freccia
-     * del grafico degli incassi. Ora al montaggio, con "Aggiorna" e dopo la creazione di un
-     * intervento, cioè quando possono essere cambiati.
-     */
-    const loadInterventionStats = useCallback(async () => {
-        const requestId = latestInterventionStatsRequestIdRef.current + 1;
-        latestInterventionStatsRequestIdRef.current = requestId;
-        setIsInterventionStatsLoading(true);
-
-        try {
-            const stats = await getInterventionStats();
-
-            if (requestId === latestInterventionStatsRequestIdRef.current) {
-                setInterventionStats(stats);
-            }
-        } catch (error) {
-            if (requestId === latestInterventionStatsRequestIdRef.current) {
-                toast.error(getApiErrorMessage(error, "Impossibile caricare i dati dashboard"));
-            }
-        } finally {
-            if (requestId === latestInterventionStatsRequestIdRef.current) {
-                setIsInterventionStatsLoading(false);
-            }
-        }
-    }, []);
-
-    const selectRevenueMonth = (month: string) => {
-        selectedRevenueMonthRef.current = month;
-        setSelectedRevenueMonth(month);
-        void loadReportStats(month);
-    };
-
-    // Dal ref e non dallo stato: due clic nello stesso istante partono entrambi dal mese giusto.
-    const handlePreviousRevenueMonth = () => selectRevenueMonth(shiftMonthKey(selectedRevenueMonthRef.current, -1));
-    const handleNextRevenueMonth = () => {
-        if (selectedRevenueMonthRef.current === getMonthKey(new Date())) {
-            return;
-        }
-        selectRevenueMonth(shiftMonthKey(selectedRevenueMonthRef.current, 1));
-    };
-
-    /**
-     * Il confronto con il mese prima di quello scelto. Prima il riquadro diceva solo la cifra, e
-     * per capire se il mese andava bene bisognava passare il mouse sulle barre una per una.
-     *
-     * Il mese precedente si prende dalla serie (gli ultimi sei mesi): per un mese più vecchio
-     * non c'è, e il confronto non si mostra. Con un mese precedente a zero la percentuale non
-     * ha senso, e anche lì non si mostra.
-     *
-     * Per il mese in corso il confronto è con il mese prima fino allo stesso giorno
-     * (`previousMonthToDate`, dal backend): contro il mese intero, il 25 settembre si
-     * confrontavano 25 giorni con 31 e il calo usciva quasi sempre, rosso, anche a parità di
-     * lavoro. `days` pari alla lunghezza del mese prima (il 30 aprile contro marzo non lo è, il
-     * 31 marzo contro febbraio sì) vuol dire che il confronto è già con il mese intero.
-     */
-    const revenueComparison = useMemo(() => {
-        if (monthlyRevenue == null) {
-            return null;
-        }
-
-        const previousMonthKey = shiftMonthKey(selectedRevenueMonth, -1);
-        const previousPoint = monthlyRevenueSeries.find((point) => point.monthKey === previousMonthKey);
-        const [previousYear, previousMonth] = previousMonthKey.split("-").map(Number);
-        const previousMonthLength = new Date(previousYear, previousMonth, 0).getDate();
-        const partial =
-            isCurrentRevenueMonth && previousMonthToDate && previousMonthToDate.days < previousMonthLength
-                ? previousMonthToDate
-                : null;
-        const previousValue =
-            isCurrentRevenueMonth && previousMonthToDate ? previousMonthToDate.revenue : previousPoint?.value;
-
-        if (previousValue == null || previousValue <= 0) {
-            return null;
-        }
-
-        return {
-            change: (monthlyRevenue - previousValue) / previousValue,
-            previousMonthLabel: getMonthLabel(previousMonthKey),
-            previousDays: partial?.days ?? null,
-        };
-    }, [isCurrentRevenueMonth, monthlyRevenue, monthlyRevenueSeries, previousMonthToDate, selectedRevenueMonth]);
 
     const maxMonthlyRevenue = useMemo(
         () => monthlyRevenueSeries.reduce((max, point) => Math.max(max, point.value), 0),
         [monthlyRevenueSeries]
     );
 
-    const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
+    // Un report nuovo cambia contatori e incassi: si ricaricano quelli del mese scelto adesso
+    // (`reloadReportStats` lo legge dal ref), non di quello di quando si è aperto il dialogo.
+    const handleCreateReport = useCreateReportFlow(reloadReportStats);
 
-        await loadReportStats(selectedRevenueMonthRef.current);
-
-        showCreatedToast({
-            message: `Report #${createdReport.id} creato`,
-            onOpen: () => navigate(entityPaths.report(createdReport.id)),
-            onPrint: () => openPrintWindow(getReportPrintUrl(createdReport.id)),
-        });
-    };
-
-    // Come `handleCreateReport` qui sopra, niente try/catch: l'errore lo mostra il dialogo.
-    // `useCallback` perché passa al calendario, che è in `memo`: una funzione nuova a ogni
-    // ridisegno della dashboard lo ridisegnerebbe ogni volta. Il mese degli incassi si legge dal
-    // ref, quindi non serve fra le dipendenze.
-    const handleCreateIntervention = useCallback(
-        async (values: CreateInterventionSubmitValues) => {
-            const customerId = await resolveCustomerId(values.customerId, values.customer);
-            const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
-
-            await Promise.all([loadCalendarEvents(), loadInterventionStats()]);
-
-            showCreatedToast({
-                message: `Intervento #${createdIntervention.id} creato`,
-                onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
-                onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
-            });
-        },
-        [loadCalendarEvents, loadInterventionStats, navigate]
+    // Un intervento cambia il calendario e i contatori degli interventi, non gli incassi.
+    // `useCallback` perché il gestore passa al calendario, che è in `memo`: una funzione nuova a
+    // ogni ridisegno della dashboard lo ridisegnerebbe ogni volta.
+    const reloadAfterInterventionCreated = useCallback(
+        () => Promise.all([loadCalendarEvents(), reloadInterventionStats()]),
+        [loadCalendarEvents, reloadInterventionStats]
     );
-
-    // Solo al montaggio: il cambio di mese chiede i suoi dati da sé (`selectRevenueMonth`).
-    useEffect(() => {
-        startTransition(() => {
-            void Promise.all([loadReportStats(selectedRevenueMonthRef.current), loadInterventionStats()]).finally(() =>
-                setHasLoadedMetricsOnce(true)
-            );
-        });
-    }, [loadInterventionStats, loadReportStats]);
+    const handleCreateIntervention = useCreateInterventionFlow(reloadAfterInterventionCreated);
 
     const handleRefreshDashboard = async () => {
-        await Promise.all([
-            loadReportStats(selectedRevenueMonthRef.current),
-            loadInterventionStats(),
-            loadCalendarEvents(),
-        ]);
+        await Promise.all([reloadReportStats(), reloadInterventionStats(), loadCalendarEvents()]);
     };
 
     const goToReportsPage = (visibilityFilter: "open" | "closed") => {

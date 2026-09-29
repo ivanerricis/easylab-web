@@ -1,17 +1,14 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
-import LoadingPage from "@/components/loadingPage";
+import EntityDetailGate from "@/components/entity-detail-gate";
 import RefreshButton from "@/components/refresh-button";
-import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
-import CreateReportDialog, { type CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
-import CreateInterventionDialog, {
-    type CreateInterventionSubmitValues,
-} from "@/components/dialogs/create/createInterventionDialog";
+import CreateReportDialog from "@/components/dialogs/create/createReportDialog";
+import CreateInterventionDialog from "@/components/dialogs/create/createInterventionDialog";
 import DetailDeleteButton from "@/components/detail-delete-button";
 import {
     DropdownMenu,
@@ -19,22 +16,15 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { showCreatedToast } from "@/lib/createdToast";
-import { resolveReportReferences, toReportCreatePayload } from "@/lib/reportForm";
-import { toInterventionCreatePayload } from "@/lib/interventionForm";
-import { resolveCustomerId } from "@/lib/customerLookup";
+import { useCreateInterventionFlow, useCreateReportFlow } from "@/hooks/useCreateEntityFlow";
 import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/dialogs/create/createCustomerDialog";
 import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import {
-    createIntervention,
-    createReport,
     deleteCustomer,
     getCustomer,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
-    getInterventionPrintUrl,
-    getReportPrintUrl,
     updateCustomer,
 } from "@/lib/api";
 import { cn, formatDateTime, openPrintWindow } from "@/lib/utils";
@@ -147,52 +137,28 @@ const CustomerPage = () => {
     // dialoghi): prima bisognava aprire il dialogo altrove e ricercarlo. Il resto è come
     // nell'elenco: niente try/catch, l'errore lo mostra il dialogo; dopo si ricarica la lista
     // e l'avviso offre di aprire o stampare.
-    const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
-
-        await reloadReports();
-
-        showCreatedToast({
-            message: `Report #${createdReport.id} creato`,
-            onOpen: () => navigate(entityPaths.report(createdReport.id)),
-            onPrint: () => openPrintWindow(getReportPrintUrl(createdReport.id)),
-        });
-    };
-
-    const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
-        const interventionCustomerId = await resolveCustomerId(values.customerId, values.customer);
-        const createdIntervention = await createIntervention(
-            toInterventionCreatePayload(values, interventionCustomerId)
-        );
-
-        await reloadInterventions();
-
-        showCreatedToast({
-            message: `Intervento #${createdIntervention.id} creato`,
-            onOpen: () => navigate(entityPaths.intervention(createdIntervention.id)),
-            onPrint: () => openPrintWindow(getInterventionPrintUrl(createdIntervention.id)),
-        });
-    };
+    const handleCreateReport = useCreateReportFlow(reloadReports);
+    const handleCreateIntervention = useCreateInterventionFlow(reloadInterventions);
 
     const handleRefresh = useCallback(async () => {
         await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions()]);
     }, [reloadCustomer, reloadInterventions, reloadReports]);
 
-    if (isNotFound) {
-        return (
-            <NotFoundState
-                title="Cliente non trovato"
-                description="Il cliente che cerchi non esiste, oppure è stato eliminato."
-                backTo="/clients"
-                backLabel="Vai ai clienti"
-            />
-        );
-    }
-
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
-    if (isCustomerLoading && !customer) {
-        return <LoadingPage />;
+    if (isNotFound || (isCustomerLoading && !customer)) {
+        return (
+            <EntityDetailGate
+                isNotFound={isNotFound}
+                isLoading={isCustomerLoading}
+                notFound={{
+                    title: "Cliente non trovato",
+                    description: "Il cliente che cerchi non esiste, oppure è stato eliminato.",
+                    backTo: "/clients",
+                    backLabel: "Vai ai clienti",
+                }}
+            />
+        );
     }
 
     return (

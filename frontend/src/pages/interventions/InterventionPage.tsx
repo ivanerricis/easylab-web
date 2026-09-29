@@ -3,8 +3,7 @@ import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item"
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import DetailStats, { DetailStatBadge } from "@/components/detail-stats";
 import CustomerLink from "@/components/customer-link";
-import LoadingPage from "@/components/loadingPage";
-import NotFoundState from "@/components/not-found-state";
+import EntityDetailGate from "@/components/entity-detail-gate";
 import { useGoBack } from "@/hooks/useGoBack";
 import { usePendingAction } from "@/hooks/usePendingAction";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
@@ -81,28 +80,21 @@ const InterventionPage = () => {
         await reload();
     };
 
-    if (isNotFound) {
-        return (
-            <NotFoundState
-                title="Intervento non trovato"
-                description="L'intervento che cerchi non esiste, oppure è stato eliminato."
-                backTo="/interventions"
-                backLabel="Vai agli interventi"
-            />
-        );
-    }
-
     // Il caricamento a tutta pagina solo senza dati: sui ricaricamenti (Aggiorna, dopo "Salva")
     // la scheda resta, attenuata. Vedi lo stesso commento in `ReportPage`.
-    if (isLoading && !intervention) {
-        return <LoadingPage />;
-    }
-
-    if (!intervention) {
+    if (isNotFound || !intervention) {
         return (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-                Intervento non disponibile.
-            </div>
+            <EntityDetailGate
+                isNotFound={isNotFound}
+                isLoading={isLoading}
+                notFound={{
+                    title: "Intervento non trovato",
+                    description: "L'intervento che cerchi non esiste, oppure è stato eliminato.",
+                    backTo: "/interventions",
+                    backLabel: "Vai agli interventi",
+                }}
+                unavailableLabel="Intervento non disponibile."
+            />
         );
     }
 

@@ -93,20 +93,31 @@ vi.mock("@/pages/calendar/components/interventions-calendar", async () => {
 /**
  * I dialoghi di creazione hanno i loro test: qui sono pulsanti che consegnano i valori scelti dal
  * test, e che esistono solo a dialogo aperto (la pagina li carica pigramente alla prima apertura).
+ * Il report arriva con dispositivo e difetto già risolti dal dialogo: il cliente lo risolve il
+ * mock di `resolveCustomerId`, e nessun catalogo viene chiesto.
  */
+const reportValues = {
+    customer: "Mario Rossi - 333",
+    deviceType: "Notebook",
+    issue: "Schermo rotto",
+    issueDescription: null,
+    password: "",
+    notes: "",
+    charger: false,
+    dataBackup: false,
+    customerId: 30,
+    deviceId: 10,
+    issueId: 20,
+};
+
 vi.mock("@/components/dialogs/create/createReportDialog", () => ({
     default: ({ open, onSubmit }: { open: boolean; onSubmit: (values: unknown) => Promise<void> }) =>
-        open ? <button onClick={() => void onSubmit({})}>Invia report</button> : null,
+        open ? <button onClick={() => void onSubmit(reportValues)}>Invia report</button> : null,
 }));
 
 vi.mock("@/components/dialogs/create/createInterventionDialog", () => ({
     default: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Nuovo intervento" /> : null),
 }));
-
-vi.mock("@/lib/reportForm", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/reportForm")>("@/lib/reportForm");
-    return { ...actual, resolveReportReferences: vi.fn().mockResolvedValue({}), toReportCreatePayload: () => ({}) };
-});
 
 import DashboardPage from "./DashboardPage";
 import { renderWithProviders } from "@/test/render";
@@ -411,6 +422,7 @@ describe("DashboardPage", () => {
     });
 
     it("dopo aver creato un report ricarica gli incassi del mese scelto", async () => {
+        resolveCustomerId.mockResolvedValue(30);
         api.createReport.mockResolvedValue({ id: 5 });
         await renderPage();
 

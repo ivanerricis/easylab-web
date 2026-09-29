@@ -1,8 +1,7 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
-import LoadingPage from "@/components/loadingPage";
-import NotFoundState from "@/components/not-found-state";
+import EntityDetailGate from "@/components/entity-detail-gate";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
@@ -121,21 +120,21 @@ const CollaboratorPage = () => {
         );
     };
 
-    if (isNotFound) {
-        return (
-            <NotFoundState
-                title="Collaboratore non trovato"
-                description="Il collaboratore che cerchi non esiste, oppure è stato eliminato."
-                backTo="/collaborators"
-                backLabel="Vai ai collaboratori"
-            />
-        );
-    }
-
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
-    if (isCollaboratorLoading && !collaborator) {
-        return <LoadingPage />;
+    if (isNotFound || (isCollaboratorLoading && !collaborator)) {
+        return (
+            <EntityDetailGate
+                isNotFound={isNotFound}
+                isLoading={isCollaboratorLoading}
+                notFound={{
+                    title: "Collaboratore non trovato",
+                    description: "Il collaboratore che cerchi non esiste, oppure è stato eliminato.",
+                    backTo: "/collaborators",
+                    backLabel: "Vai ai collaboratori",
+                }}
+            />
+        );
     }
 
     return (

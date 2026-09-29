@@ -1,6 +1,7 @@
 import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
-import type { InterventionCreateInput } from "@/lib/api";
+import { createIntervention, type InterventionCreateInput } from "@/lib/api";
+import { resolveCustomerId } from "@/lib/customerLookup";
 import { invalidEuroAmountMessage, parseEuroAmount } from "@/lib/euroAmount";
 import {
     getInterventionValidationError,
@@ -156,6 +157,17 @@ export const toInterventionCreatePayload = (
     startTime: values.startTime,
     endTime: values.endTime,
 });
+
+/**
+ * Crea l'intervento dai valori del dialogo: risolve il cliente dal testo digitato (o dall'id già
+ * scelto) e manda il payload. Come `submitNewReport`: la stessa sequenza stava copiata nella
+ * pagina Interventi, nella scheda cliente e nella Dashboard. Il cliente si prende sempre dai
+ * valori, anche dalla scheda cliente: lì il dialogo parte da quel cliente, ma lo si può cambiare.
+ */
+export const submitNewIntervention = async (values: CreateInterventionSubmitValues) =>
+    createIntervention(
+        toInterventionCreatePayload(values, await resolveCustomerId(values.customerId, values.customer))
+    );
 
 /**
  * I campi dell'intervento da mandare a `updateIntervention`. Anche qui le copie erano due, la

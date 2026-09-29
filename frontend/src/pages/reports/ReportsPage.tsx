@@ -1,5 +1,4 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
@@ -7,7 +6,7 @@ import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
-import { createReport, deleteReport, getReportPrintUrl, updateReport } from "@/lib/api";
+import { deleteReport, getReportPrintUrl, updateReport } from "@/lib/api";
 import { Suspense, useState } from "react";
 import type { ReportDto } from "@/types/dtos";
 import { useNavigate } from "react-router-dom";
@@ -34,8 +33,8 @@ import { usePendingAction } from "@/hooks/usePendingAction";
 import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
-import { showCreatedToast } from "@/lib/createdToast";
-import { resolveReportReferences, toReportCreatePayload, toReportUpdatePayload } from "@/lib/reportForm";
+import { toReportUpdatePayload } from "@/lib/reportForm";
+import { useCreateReportFlow } from "@/hooks/useCreateEntityFlow";
 
 /**
  * I dialoghi di creazione e modifica si scaricano solo quando servono, non con la pagina (vedi
@@ -114,17 +113,7 @@ const ReportsPage = () => {
 
     // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
     // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
-    const handleCreateReport = async (values: CreateReportSubmitValues) => {
-        const createdReport = await createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
-
-        await loadReports();
-
-        showCreatedToast({
-            message: `Report #${createdReport.id} creato`,
-            onOpen: () => handleOpenReport(createdReport.id),
-            onPrint: () => handlePrintReport(createdReport.id),
-        });
-    };
+    const handleCreateReport = useCreateReportFlow(loadReports);
 
     const handleOpenReport = (id: number) => {
         navigate(entityPaths.report(id));

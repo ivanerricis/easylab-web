@@ -4,14 +4,16 @@ import { isCatchAllIssue } from "./issues";
 const listCustomers = vi.fn();
 const listDevices = vi.fn();
 const listIssues = vi.fn();
+const createReport = vi.fn();
 
 vi.mock("@/lib/api", () => ({
+    createReport: (payload: unknown) => createReport(payload) as Promise<unknown>,
     listCustomers: (params: unknown) => listCustomers(params) as Promise<unknown>,
     listDevices: () => listDevices() as Promise<unknown>,
     listIssues: () => listIssues() as Promise<unknown>,
 }));
 
-import { resolveReportReferences, toReportUpdatePayload } from "./reportForm";
+import { resolveReportReferences, submitNewReport, toReportUpdatePayload } from "./reportForm";
 import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
 
@@ -88,6 +90,39 @@ describe("resolveReportReferences", () => {
         );
 
         expect(risultato.issueDescription).toBe("Si spegne dopo 10 minuti");
+    });
+});
+
+describe("submitNewReport", () => {
+    /** La strada unica fra il dialogo e l'API: prima era una riga copiata in tre pagine. */
+    it("crea il report con i riferimenti risolti e i testi ripuliti, e restituisce quello creato", async () => {
+        createReport.mockResolvedValue({ id: 99 });
+
+        const creato = await submitNewReport(
+            buildCreateValues({ notes: " Graffio sul coperchio ", password: "  ", dataBackup: true })
+        );
+
+        expect(creato).toEqual({ id: 99 });
+        expect(createReport).toHaveBeenCalledWith({
+            customerId: 1,
+            deviceId: 2,
+            issueId: 3,
+            issueDescription: null,
+            note: "Graffio sul coperchio",
+            password: null,
+            dataBackup: true,
+            charger: true,
+        });
+    });
+
+    it("se un riferimento non esiste non crea niente e lascia l'errore al dialogo", async () => {
+        createReport.mockClear();
+        listDevices.mockResolvedValue([{ id: 2, name: "iPhone 13" }]);
+
+        await expect(submitNewReport(buildCreateValues({ deviceId: null, deviceType: "Tostapane" }))).rejects.toThrow(
+            /tipologia dispositivo esistente/i
+        );
+        expect(createReport).not.toHaveBeenCalled();
     });
 });
 

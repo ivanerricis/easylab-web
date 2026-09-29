@@ -1,5 +1,4 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import type { CreateInterventionSubmitValues } from "@/components/dialogs/create/createInterventionDialog";
 import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CustomDialog from "@/components/dialogs/customDialog";
@@ -8,17 +7,10 @@ import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
-import {
-    createIntervention,
-    deleteIntervention,
-    getInterventionPrintUrl,
-    sendInterventionEmail,
-    updateIntervention,
-} from "@/lib/api";
+import { deleteIntervention, getInterventionPrintUrl, sendInterventionEmail, updateIntervention } from "@/lib/api";
 import { Suspense, useState } from "react";
 import type { InterventionDto } from "@/types/dtos";
-import { resolveCustomerId } from "@/lib/customerLookup";
-import { toInterventionCreatePayload, toInterventionUpdatePayload } from "@/lib/interventionForm";
+import { toInterventionUpdatePayload } from "@/lib/interventionForm";
 import { useNavigate } from "react-router-dom";
 import { interventionColumns } from "./components/intervention-columns";
 import InterventionsFilters from "./components/interventions-filters";
@@ -44,7 +36,7 @@ import { usePendingAction } from "@/hooks/usePendingAction";
 import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
-import { showCreatedToast } from "@/lib/createdToast";
+import { useCreateInterventionFlow } from "@/hooks/useCreateEntityFlow";
 import { Mail } from "lucide-react";
 
 const statusFilters: InterventionStatusFilter[] = ["all", "programmato", "in_lavorazione", "completato"];
@@ -148,18 +140,7 @@ const InterventionsPage = () => {
 
     // Niente try/catch: l'errore lo mostra il dialogo, che resta aperto. Qui c'era un
     // `toast.error` seguito da `throw`, e ogni errore compariva due volte.
-    const handleCreateIntervention = async (values: CreateInterventionSubmitValues) => {
-        const customerId = await resolveCustomerId(values.customerId, values.customer);
-        const createdIntervention = await createIntervention(toInterventionCreatePayload(values, customerId));
-
-        await loadInterventions();
-
-        showCreatedToast({
-            message: `Intervento #${createdIntervention.id} creato`,
-            onOpen: () => handleOpenIntervention(createdIntervention.id),
-            onPrint: () => handlePrintIntervention(createdIntervention.id),
-        });
-    };
+    const handleCreateIntervention = useCreateInterventionFlow(loadInterventions);
 
     const handleOpenIntervention = (id: number) => {
         navigate(entityPaths.intervention(id));

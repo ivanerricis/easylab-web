@@ -2,7 +2,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import EntityTable from "@/components/entity-table";
-import LoadingPage from "@/components/loadingPage";
+import EntityDetailGate from "@/components/entity-detail-gate";
 import RefreshButton from "@/components/refresh-button";
 import DetailDeleteButton from "@/components/detail-delete-button";
 import EditReportDialog, { type EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
@@ -19,7 +19,6 @@ import type { ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
 import OpenEntityButton from "@/components/open-entity-button";
-import NotFoundState from "@/components/not-found-state";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
@@ -124,21 +123,21 @@ const TechnicianPage = () => {
         await Promise.all([reloadTechnician(), reloadReports()]);
     }, [reloadTechnician, reloadReports]);
 
-    if (isNotFound) {
-        return (
-            <NotFoundState
-                title="Tecnico non trovato"
-                description="Il tecnico che cerchi non esiste, oppure è stato eliminato."
-                backTo="/technicians"
-                backLabel="Vai ai tecnici esterni"
-            />
-        );
-    }
-
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
-    if (isTechnicianLoading && !technician) {
-        return <LoadingPage />;
+    if (isNotFound || (isTechnicianLoading && !technician)) {
+        return (
+            <EntityDetailGate
+                isNotFound={isNotFound}
+                isLoading={isTechnicianLoading}
+                notFound={{
+                    title: "Tecnico non trovato",
+                    description: "Il tecnico che cerchi non esiste, oppure è stato eliminato.",
+                    backTo: "/technicians",
+                    backLabel: "Vai ai tecnici esterni",
+                }}
+            />
+        );
     }
 
     return (

@@ -1,6 +1,6 @@
 import type { CreateReportSubmitValues } from "@/components/dialogs/create/createReportDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import { listDevices, listIssues, type ReportCreateInput } from "@/lib/api";
+import { createReport, listDevices, listIssues, type ReportCreateInput } from "@/lib/api";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { trimOrNull } from "@/lib/utils";
 
@@ -78,6 +78,15 @@ export const toReportCreatePayload = (
     dataBackup: values.dataBackup,
     charger: values.charger,
 });
+
+/**
+ * Crea il report dai valori del dialogo: risolve i riferimenti e manda il payload. Le tre
+ * pagine che creano un report (elenco, scheda cliente, Dashboard) ripetevano questa stessa riga
+ * in copia; qui resta una sola strada fra il dialogo e l'API. Niente try/catch: l'errore lo
+ * mostra il dialogo, che resta aperto.
+ */
+export const submitNewReport = async (values: CreateReportSubmitValues) =>
+    createReport(toReportCreatePayload(values, await resolveReportReferences(values)));
 
 /**
  * I campi del report da mandare a `updateReport`, tecnico esterno compreso.

@@ -35,11 +35,17 @@ vi.mock("@/lib/api", async () => {
     };
 });
 
-const resolveReportReferences = vi.fn();
+/**
+ * Il cliente si risolve sul server (`resolveCustomerId`): qui lo decide il test. Dispositivo e
+ * difetto arrivano già con l'id dal dialogo, quindi i cataloghi non si chiedono. Il mock sta un
+ * livello sotto `submitNewReport` — che chiama `resolveReportReferences` dall'interno del suo
+ * modulo, dove un mock di `@/lib/reportForm` non arriverebbe.
+ */
+const resolveCustomerId = vi.fn();
 
-vi.mock("@/lib/reportForm", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/reportForm")>("@/lib/reportForm");
-    return { ...actual, resolveReportReferences: (...args: unknown[]) => resolveReportReferences(...args) };
+vi.mock("@/lib/customerLookup", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/customerLookup")>("@/lib/customerLookup");
+    return { ...actual, resolveCustomerId: (...args: unknown[]) => resolveCustomerId(...args) };
 });
 
 const openPrintWindow = vi.fn();
@@ -548,12 +554,7 @@ describe("ReportsPage", () => {
     });
 
     it("crea il report con i riferimenti risolti e offre di aprirlo o stamparlo", async () => {
-        resolveReportReferences.mockResolvedValue({
-            customerId: 30,
-            deviceId: 10,
-            issueId: 20,
-            issueDescription: null,
-        });
+        resolveCustomerId.mockResolvedValue(30);
         api.createReport.mockResolvedValue({ id: 99 });
         createValues = {
             customer: "Mario Rossi - 333",
@@ -601,14 +602,18 @@ describe("ReportsPage", () => {
 
     /** Prima una finestra del browser bloccava la pagina con la domanda; ora si stampa solo se lo si chiede. */
     it("non stampa da solo dopo la creazione", async () => {
-        resolveReportReferences.mockResolvedValue({
+        resolveCustomerId.mockResolvedValue(30);
+        api.createReport.mockResolvedValue({ id: 99 });
+        createValues = {
+            notes: "",
+            password: "",
+            charger: false,
+            dataBackup: false,
+            issueDescription: null,
             customerId: 30,
             deviceId: 10,
             issueId: 20,
-            issueDescription: null,
-        });
-        api.createReport.mockResolvedValue({ id: 99 });
-        createValues = { notes: "", password: "", charger: false, dataBackup: false };
+        };
         await renderPage();
 
         await userEvent.click(screen.getByRole("button", { name: "Crea nuovo report" }));
@@ -626,7 +631,7 @@ describe("ReportsPage", () => {
      */
     it("lascia al dialogo l'errore di creazione, senza mostrarlo una seconda volta", async () => {
         createError = undefined;
-        resolveReportReferences.mockRejectedValueOnce(new Error("Seleziona un cliente esistente o creane uno nuovo."));
+        resolveCustomerId.mockRejectedValueOnce(new Error("Seleziona un cliente esistente o creane uno nuovo."));
         createValues = {};
         await renderPage();
 

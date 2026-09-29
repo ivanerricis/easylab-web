@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const createIntervention = vi.fn();
+const resolveCustomerId = vi.fn();
+
+vi.mock("@/lib/api", () => ({
+    createIntervention: (payload: unknown) => createIntervention(payload) as Promise<unknown>,
+}));
+
+vi.mock("@/lib/customerLookup", () => ({
+    resolveCustomerId: (...args: unknown[]) => resolveCustomerId(...args) as Promise<unknown>,
+}));
+
 import {
     emptyInterventionFormState,
+    submitNewIntervention,
     toInterventionCreatePayload,
     toInterventionSubmitFields,
     toInterventionUpdatePayload,
@@ -88,5 +101,29 @@ describe("validateInterventionForm / toInterventionSubmitFields", () => {
             endTime: null,
             price: null,
         });
+    });
+});
+
+describe("submitNewIntervention", () => {
+    /** Il cliente si prende dai valori del dialogo, anche quando è solo testo digitato. */
+    it("risolve il cliente dal dialogo e crea l'intervento con tutti i campi", async () => {
+        resolveCustomerId.mockResolvedValue(30);
+        createIntervention.mockResolvedValue({ id: 77 });
+
+        const creato = await submitNewIntervention({ ...shared, customer: "Mario Rossi - 333", customerId: null });
+
+        expect(creato).toEqual({ id: 77 });
+        expect(resolveCustomerId).toHaveBeenCalledWith(null, "Mario Rossi - 333");
+        expect(createIntervention).toHaveBeenCalledWith({ ...shared, customerId: 30 });
+    });
+
+    it("se il cliente non si risolve non crea niente e lascia l'errore al dialogo", async () => {
+        createIntervention.mockClear();
+        resolveCustomerId.mockRejectedValue(new Error("Seleziona un cliente esistente o creane uno nuovo."));
+
+        await expect(submitNewIntervention({ ...shared, customer: "Nessuno", customerId: null })).rejects.toThrow(
+            /cliente esistente/
+        );
+        expect(createIntervention).not.toHaveBeenCalled();
     });
 });

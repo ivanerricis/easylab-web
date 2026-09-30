@@ -384,13 +384,11 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
  * con testo a 18px e la voce aperta come blocco blu pieno la barra pesava più del contenuto.
  * La voce aperta è ora una tinta leggera del primario con testo e icona nel primario; il
  * passaggio del mouse resta una tinta neutra, così le due cose non si confondono.
- * Il blu del tema (#2a75b9) non regge da solo come testo: sulla tinta chiara arriva a circa
- * 4.2:1 (sotto il 4.5:1 richiesto a 14px), quindi in chiaro è scurito un poco verso il nero;
- * sul fondo scuro della barra è sotto 3:1, quindi in scuro è schiarito verso il bianco.
- * Quella correzione è ora il token `text-primary-text` (index.css), lo stesso dei link.
+ * Colori della voce aperta identici a quelli della barra delle Impostazioni (tinta `primary/10`,
+ * testo e barretta nel primario), così le due barre non differiscono.
  */
 const sidebarMenuButtonVariants = cva(
-    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:group-data-[collapsible=icon]:size-11! data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-primary-text data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-primary/15 data-active:hover:text-primary-text dark:data-active:bg-primary/20 dark:data-active:hover:bg-primary/25 [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:group-data-[collapsible=icon]:size-11! data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-primary data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-primary/10 data-active:hover:text-primary [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
     {
         variants: {
             variant: {

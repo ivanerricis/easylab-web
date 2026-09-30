@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Settembre 2026, dal 21 al 30
 
+- [2026-09-30 — Calendario: nel "+N altri" il conto per stato, e i completati nascosti per primi](changelog/2026-09-21-30.md#2026-09-30-calendario-nel-n-altri-il-conto-per-stato-e-i-completati-nascosti-per-primi)
 - [2026-09-30 — Voce aperta della sidebar principale con i colori delle Impostazioni](changelog/2026-09-21-30.md#2026-09-30-voce-aperta-della-sidebar-principale-con-i-colori-delle-impostazioni)
 - [2026-09-29 — Pulsanti da 44px su touch, preferenze d'aspetto in una mappa, test più solidi](changelog/2026-09-21-30.md#2026-09-29-pulsanti-da-44px-su-touch-preferenze-daspetto-in-una-mappa-test-piu-solidi)
 - [2026-09-29 — Menu delle Impostazioni a categorie, evidenziazione condivisa con la barra principale](changelog/2026-09-21-30.md#2026-09-29-menu-delle-impostazioni-a-categorie-evidenziazione-condivisa-con-la-barra-principale)

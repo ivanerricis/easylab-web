@@ -261,10 +261,34 @@ describe('InterventionsCalendar: popup "+N altri"', () => {
         vi.restoreAllMocks();
     });
 
+    it("il pulsante dice quanti interventi nascosti ci sono per stato", () => {
+        const withStatus = (id: number, status: "programmato" | "in_lavorazione" | "completato") => ({
+            ...event,
+            id,
+            title: `Cliente ${id}`,
+            // Un `Date` per evento: la priorità di ordinamento viaggia sull'istanza.
+            start: new Date(event.start),
+            end: new Date(event.end),
+            resource: { ...event.resource, id, status },
+        });
+        renderCalendar(vi.fn(), {
+            events: [
+                withStatus(31, "completato"),
+                withStatus(32, "completato"),
+                withStatus(33, "in_lavorazione"),
+                withStatus(34, "programmato"),
+            ],
+        });
+
+        // Il primo posto va al programmato; nascosti restano gli altri tre.
+        expect(screen.getByRole("button", { name: "+3 altri: 1 in lavorazione, 2 completati" })).toBeInTheDocument();
+        expect(screen.getByText("Cliente 34")).toBeInTheDocument();
+    });
+
     it('si chiude con Esc, e il focus torna al "+N altri"', async () => {
         renderCalendar(vi.fn(), { events: crowdedDay });
 
-        const showMore = screen.getByRole("button", { name: "+3 altri" });
+        const showMore = screen.getByRole("button", { name: /^\+3 altri/ });
         await userEvent.click(showMore);
         expect(document.querySelector(".rbc-overlay")).toBeInTheDocument();
 
@@ -277,7 +301,7 @@ describe('InterventionsCalendar: popup "+N altri"', () => {
     it("aperto da tastiera porta il focus sul primo intervento del popup", async () => {
         renderCalendar(vi.fn(), { events: crowdedDay });
 
-        screen.getByRole("button", { name: "+3 altri" }).focus();
+        screen.getByRole("button", { name: /^\+3 altri/ }).focus();
         await userEvent.keyboard("{Enter}");
 
         await waitFor(() => {

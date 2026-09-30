@@ -64,6 +64,57 @@ const localizer = dateFnsLocalizer({
 });
 
 /**
+ * Più urgente = numero più basso. Nella cella di un giorno affollato il "+N altri" nasconde le
+ * ultime righe: con questo ordine sono i completati, e i programmati e quelli in lavorazione
+ * restano sempre in vista.
+ */
+const statusPriority: Record<InterventionStatus, number> = {
+    programmato: 0,
+    in_lavorazione: 1,
+    completato: 2,
+};
+
+/**
+ * L'ordinamento della libreria (`localizer.sortEvents`) riceve solo date e "tutto il giorno",
+ * non l'intervento: la priorità viaggia quindi sull'oggetto `Date` di inizio, che la libreria
+ * restituisce tale e quale dall'evento. Si compila da `registerStatusPriorities`.
+ */
+const priorityByStart = new WeakMap<Date, number>();
+
+const registerStatusPriorities = (events: InterventionCalendarEvent[]) => {
+    for (const event of events) {
+        priorityByStart.set(event.start, statusPriority[event.resource.status]);
+    }
+};
+
+const startOfDayTime = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+type SortableEvent = { start: Date; end: Date; allDay?: boolean };
+
+/**
+ * Stesso ordine di serie della libreria (giorno di inizio, eventi su più giorni, senza orario,
+ * orario di inizio e di fine) con la priorità dello stato inserita dopo gli eventi su più giorni,
+ * che restano per primi perché è così che la griglia li dispone. I tipi della libreria
+ * dichiarano `sortEvents` con due eventi e un booleano, ma a runtime riceve `{ evtA, evtB }`.
+ */
+const sortEventsByStatus = ({ evtA, evtB }: { evtA: SortableEvent; evtB: SortableEvent }) => {
+    const daysA = startOfDayTime(evtA.end) - startOfDayTime(evtA.start);
+    const daysB = startOfDayTime(evtB.end) - startOfDayTime(evtB.start);
+
+    return (
+        startOfDayTime(evtA.start) - startOfDayTime(evtB.start) ||
+        daysB - daysA ||
+        (priorityByStart.get(evtA.start) ?? statusPriority.completato) -
+            (priorityByStart.get(evtB.start) ?? statusPriority.completato) ||
+        Number(!!evtB.allDay) - Number(!!evtA.allDay) ||
+        evtA.start.getTime() - evtB.start.getTime() ||
+        evtA.end.getTime() - evtB.end.getTime()
+    );
+};
+
+(localizer as unknown as { sortEvents: typeof sortEventsByStatus }).sortEvents = sortEventsByStatus;
+
+/**
  * Un intervallo di giorni come lo si scrive in italiano: "21 – 27 settembre 2026", "28 settembre –
  * 4 ottobre 2026"; l'anno compare anche sulla prima data solo se l'intervallo lo attraversa
  * ("28 dicembre 2026 – 3 gennaio 2027"). Il formato di serie della libreria
@@ -83,7 +134,48 @@ const formats: Formats = {
     agendaHeaderFormat: formatDayRange,
 };
 
-const messages: Messages = {
+const statusOrder: InterventionStatus[] = ["programmato", "in_lavorazione", "completato"];
+
+const statusCountLabel: Record<InterventionStatus, (count: number) => string> = {
+    programmato: (count) => `${count} ${count === 1 ? "programmato" : "programmati"}`,
+    in_lavorazione: (count) => `${count} in lavorazione`,
+    completato: (count) => `${count} ${count === 1 ? "completato" : "completati"}`,
+};
+
+/**
+ * Il "+N altri" con il conto per stato, ognuno col colore che ha l'intervento nella griglia:
+ * prima nascondeva tutto dietro un numero, e un programmato o in lavorazione non si distingueva
+ * da un completato. Il testo per gli screen reader dice gli stessi numeri a parole.
+ */
+const ShowMoreLabel = ({ total, remainingEvents }: { total: number; remainingEvents: InterventionCalendarEvent[] }) => {
+    const counts = statusOrder
+        .map((status) => ({
+            status,
+            count: remainingEvents.filter((event) => event.resource.status === status).length,
+        }))
+        .filter(({ count }) => count > 0);
+
+    return (
+        <>
+            <span className="sr-only">
+                {`+${total} altri: ${counts.map(({ status, count }) => statusCountLabel[status](count)).join(", ")}`}
+            </span>
+            <span aria-hidden="true" className="inline-flex flex-wrap items-center gap-x-2 font-semibold">
+                {counts.map(({ status, count }) => (
+                    <span key={status} className="inline-flex items-center gap-1">
+                        <span
+                            className="inline-block size-2.5 rounded-full"
+                            style={{ backgroundColor: statusEventStyle[status].backgroundColor }}
+                        />
+                        {count}
+                    </span>
+                ))}
+            </span>
+        </>
+    );
+};
+
+const messages: Messages<InterventionCalendarEvent> = {
     date: "Data",
     time: "Ora",
     event: "Intervento",
@@ -99,7 +191,7 @@ const messages: Messages = {
     today: "Oggi",
     agenda: "Agenda",
     noEventsInRange: "Nessun intervento programmato in questo intervallo.",
-    showMore: (total) => `+${total} altri`,
+    showMore: (total, remainingEvents) => <ShowMoreLabel total={total} remainingEvents={remainingEvents} />,
 };
 
 // Stili inline: il CSS di react-big-calendar definisce già .rbc-event con la stessa
@@ -280,6 +372,9 @@ const InterventionsCalendar = ({
         }),
         []
     );
+
+    // Prima del disegno: la libreria ordina gli eventi mentre renderizza, e legge le priorità da qui.
+    useMemo(() => registerStatusPriorities(events), [events]);
 
     const handleViewChange = (nextView: View) => {
         setView(nextView);

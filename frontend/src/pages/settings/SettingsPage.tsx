@@ -383,7 +383,7 @@ const SettingsPage = () => {
                                                 className={cn(
                                                     "relative flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
                                                     isActive &&
-                                                        "bg-primary/10 font-semibold text-primary before:absolute before:top-2 before:bottom-2 before:left-0 before:w-1 before:rounded-full before:bg-primary hover:bg-primary/10 hover:text-primary"
+                                                        "bg-foreground/10 font-semibold text-foreground before:absolute before:top-2 before:bottom-2 before:left-0 before:w-1 before:rounded-full before:bg-primary hover:bg-foreground/10 hover:text-foreground"
                                                 )}
                                             >
                                                 <Icon className="size-4 shrink-0" />

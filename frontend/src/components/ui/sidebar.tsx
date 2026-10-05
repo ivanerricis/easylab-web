@@ -382,13 +382,12 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 /**
  * Voce della barra laterale alla stessa scala del resto dell'app (testo 14px, icone 18px):
  * con testo a 18px e la voce aperta come blocco blu pieno la barra pesava più del contenuto.
- * La voce aperta è ora una tinta leggera del primario con testo e icona nel primario; il
- * passaggio del mouse resta una tinta neutra, così le due cose non si confondono.
- * Colori della voce aperta identici a quelli della barra delle Impostazioni (tinta `primary/10`,
- * testo e barretta nel primario), così le due barre non differiscono.
+ * La voce aperta ha testo e icona nel colore del testo (bianco in scuro) su una tinta neutra
+ * leggermente più marcata dell'hover, e la barretta a sinistra nel primario: come la voce
+ * aperta di GitHub, e identica a quella della barra delle Impostazioni (SettingsPage).
  */
 const sidebarMenuButtonVariants = cva(
-    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:group-data-[collapsible=icon]:size-11! data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-primary data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-primary/10 data-active:hover:text-primary [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+    "peer/menu-button group/menu-button relative flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:group-data-[collapsible=icon]:size-11! data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-foreground/10 data-active:font-medium data-active:text-foreground data-active:before:absolute data-active:before:top-2 data-active:before:bottom-2 data-active:before:left-0 data-active:before:w-1 data-active:before:rounded-full data-active:before:bg-primary data-active:hover:bg-foreground/10 data-active:hover:text-foreground [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
     {
         variants: {
             variant: {

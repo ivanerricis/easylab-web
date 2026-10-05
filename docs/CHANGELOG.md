@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-05 — Sidebar: la voce aperta con tinta neutra e barretta, come su GitHub](changelog/2026-10.md#2026-10-05-sidebar-la-voce-aperta-con-tinta-neutra-e-barretta-come-su-github)
 - [2026-10-05 — Report: la colonna "Stato" si può nascondere dal menu Colonne](changelog/2026-10.md#2026-10-05-report-la-colonna-stato-si-puo-nascondere-dal-menu-colonne)
 - [2026-10-02 — Dashboard: la card "Incassi mese" su touch non sborda più](changelog/2026-10.md#2026-10-02-dashboard-la-card-incassi-mese-su-touch-non-sborda-piu)
 - [2026-10-02 — Interventi: l'etichetta diventa "Materiali da consegnare/consegnati"](changelog/2026-10.md#2026-10-02-interventi-letichetta-diventa-materiali-da-consegnareconsegnati)

@@ -30,11 +30,8 @@ export const reportColumns: ReportColumn[] = [
         // (verde/rosso da reports-table.tsx), quindi l'informazione più importante della
         // pagina era invisibile a chi non distingue i due colori e spariva in stampa.
         // Stessa formulazione della scheda cliente, che questa colonna ce l'aveva già.
-        // Non si nasconde dal menu "Colonne": tolta lei, lo stato tornerebbe a dirlo solo il
-        // colore della riga, cioè il problema per cui la colonna è nata.
         key: "closed",
         header: "Stato",
-        hideable: false,
         cardSlot: "badge",
         render: (row) => formatReportStatus(row.closed),
     },

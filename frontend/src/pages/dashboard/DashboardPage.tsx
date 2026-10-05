@@ -261,9 +261,11 @@ const DashboardPage = () => {
                                 variant="outline"
                                 // `whitespace-normal` e `text-left` annullano quelli del pulsante: qui
                                 // l'etichetta deve poter andare a capo come nelle altre schede.
+                                // `pointer-coarse:h-auto`: il pulsante porta a 44px l'altezza sui
+                                // touch (`pointer-coarse:h-11`), e quella varrebbe più di `h-auto`.
                                 className={cn(
                                     dashboardCardLayoutClassName,
-                                    "h-auto justify-items-start border-primary/20 text-left whitespace-normal"
+                                    "h-auto justify-items-start border-primary/20 text-left whitespace-normal pointer-coarse:h-auto"
                                 )}
                             >
                                 <span className={cn(dashboardCardLabelClassName, "font-medium text-primary-text")}>

@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-02 — Dashboard: la card "Incassi mese" su touch non sborda più](changelog/2026-10.md#2026-10-02-dashboard-la-card-incassi-mese-su-touch-non-sborda-piu)
 - [2026-10-02 — Interventi: l'etichetta diventa "Materiali da consegnare/consegnati"](changelog/2026-10.md#2026-10-02-interventi-letichetta-diventa-materiali-da-consegnareconsegnati)
 
 ## Settembre 2026, dal 21 al 30

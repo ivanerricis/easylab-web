@@ -22,6 +22,10 @@ periodo. Un periodo nuovo vuol dire un file nuovo, una sezione nuova qui e una v
 `mkdocs.yml`. I rimandi "vedi CHANGELOG del AAAA-MM-GG" nelle altre pagine restano validi: la
 data porta alla voce da qui.
 
+## Ottobre 2026
+
+- [2026-10-02 — Interventi: l'etichetta diventa "Materiali da consegnare/consegnati"](changelog/2026-10.md#2026-10-02-interventi-letichetta-diventa-materiali-da-consegnareconsegnati)
+
 ## Settembre 2026, dal 21 al 30
 
 - [2026-09-30 — Calendario: nel "+N altri" il conto per stato, e i completati nascosti per primi](changelog/2026-09-21-30.md#2026-09-30-calendario-nel-n-altri-il-conto-per-stato-e-i-completati-nascosti-per-primi)

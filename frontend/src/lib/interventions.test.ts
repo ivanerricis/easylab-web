@@ -49,7 +49,7 @@ describe("etichette degli interventi", () => {
         expect(isAssistanceInterventionType("intervento_remoto")).toBe(true);
         expect(isAssistanceInterventionType("consegna_materiale")).toBe(false);
 
-        expect(interventionDescriptionLabel("consegna_materiale")).toBe("Materiali da consegnare");
+        expect(interventionDescriptionLabel("consegna_materiale")).toBe("Materiali da consegnare/consegnati");
         expect(interventionDescriptionLabel("intervento_sede")).toBe("Assistenza effettuata");
         expect(interventionDateLabel("consegna_materiale")).toBe("Data consegna");
         expect(interventionDateLabel("intervento_remoto")).toBe("Data intervento");

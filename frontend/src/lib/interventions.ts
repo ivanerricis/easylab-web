@@ -43,7 +43,7 @@ export const isAssistanceInterventionType = (value: InterventionType) =>
     value === "intervento_sede" || value === "intervento_remoto";
 
 export const interventionDescriptionLabel = (value: InterventionType) =>
-    value === "consegna_materiale" ? "Materiali da consegnare" : "Assistenza effettuata";
+    value === "consegna_materiale" ? "Materiali da consegnare/consegnati" : "Assistenza effettuata";
 
 /**
  * Orari e assistenza effettuata sono i dati del lavoro svolto: nascono mentre lo si fa e si

@@ -52,6 +52,7 @@ nav:
   - Sicurezza account e accesso: OPERATIONS.md
   - Changelog:
       - Indice: CHANGELOG.md
+      - Ottobre 2026: changelog/2026-10.md
       - "Settembre 2026, 21-30": changelog/2026-09-21-30.md
       - "Settembre 2026, 11-20": changelog/2026-09-11-20.md
       - "Settembre 2026, 1-10": changelog/2026-09-01-10.md

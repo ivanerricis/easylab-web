@@ -16,6 +16,7 @@ import {
     registerFailedLogin,
     registerSuccessfulLogin,
     rememberLoginSource,
+    reserveLoginAttempts,
     resetLoginRateLimit,
 } from "./loginRateLimit";
 
@@ -187,5 +188,83 @@ describe("loginRateLimit", () => {
         }
 
         expect(isLoginRateLimited(recentIp)).toBe(true);
+    });
+});
+
+describe("prenotazione dei tentativi in corso", () => {
+    beforeEach(() => {
+        resetLoginRateLimit();
+    });
+
+    it("i tentativi prenotati contano per il tetto prima ancora che ne sia registrato l'esito", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttempts; attempt += 1) {
+            expect(isLoginRateLimited("1.2.3.4")).toBe(false);
+            reserveLoginAttempts("1.2.3.4");
+        }
+
+        expect(isLoginRateLimited("1.2.3.4")).toBe(true);
+    });
+
+    it("rilasciata la prenotazione, senza errori registrati il tetto non scatta più", () => {
+        const releases = Array.from({ length: loginRateLimitMaxAttempts }, () => reserveLoginAttempts("1.2.3.4"));
+
+        for (const release of releases) {
+            release();
+        }
+
+        expect(isLoginRateLimited("1.2.3.4")).toBe(false);
+    });
+
+    it("l'errore registrato prima del rilascio tiene il conteggio, senza scendere fra i due", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttempts; attempt += 1) {
+            const release = reserveLoginAttempts("1.2.3.4");
+            registerFailedLogin("1.2.3.4");
+            release();
+        }
+
+        expect(isLoginRateLimited("1.2.3.4")).toBe(true);
+    });
+
+    it("rilasciare due volte la stessa prenotazione non toglie quella di un altro tentativo", () => {
+        const first = reserveLoginAttempts("1.2.3.4");
+        reserveLoginAttempts("1.2.3.4");
+
+        first();
+        first();
+
+        // Ne resta una: altre quattro esauriscono il tetto di cinque.
+        for (let attempt = 0; attempt < loginRateLimitMaxAttempts - 1; attempt += 1) {
+            reserveLoginAttempts("1.2.3.4");
+        }
+
+        expect(isLoginRateLimited("1.2.3.4")).toBe(true);
+    });
+
+    it("una prenotazione su più chiavi le conta tutte e le rilascia tutte", () => {
+        const release = reserveLoginAttempts("a", "b");
+
+        for (let attempt = 0; attempt < loginRateLimitMaxAttempts - 1; attempt += 1) {
+            reserveLoginAttempts("a");
+        }
+
+        expect(isLoginRateLimited("a")).toBe(true);
+        expect(isLoginRateLimited("b")).toBe(false);
+
+        release();
+        expect(isLoginRateLimited("a")).toBe(false);
+    });
+
+    it("vale anche per il tetto per IP e per quello per nome utente", () => {
+        for (let attempt = 0; attempt < loginRateLimitMaxAttemptsPerIp; attempt += 1) {
+            reserveLoginAttempts("5.6.7.8");
+        }
+
+        expect(isIpLoginRateLimited("5.6.7.8")).toBe(true);
+
+        for (let attempt = 0; attempt < loginRateLimitMaxAttemptsPerUsername; attempt += 1) {
+            reserveLoginAttempts("nome:mario");
+        }
+
+        expect(isUsernameLoginRateLimited("nome:mario")).toBe(true);
     });
 });

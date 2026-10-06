@@ -101,6 +101,9 @@ vi.mock("./loginRateLimit", async () => {
 
     return {
         rateLimitSubject: actual.rateLimitSubject,
+        // Vera anche questa: la prenotazione non decide nulla da sola, e il test sulle richieste in
+        // parallelo ha bisogno che il controllo e la prenotazione parlino fra loro.
+        reserveLoginAttempts: actual.reserveLoginAttempts,
         isLoginRateLimited: (key: string) => isLoginRateLimited(key) as boolean,
         isIpLoginRateLimited: (ip: string) => isIpLoginRateLimited(ip) as boolean,
         isUsernameLoginRateLimited: (key: string) => isUsernameLoginRateLimited(key) as boolean,
@@ -1691,5 +1694,112 @@ describe("assertOwnPassword", () => {
         queueRows("select", userTable, [buildUser()]);
 
         await expect(assertOwnPassword(7, "password-giusta")).rejects.toMatchObject({ statusCode: 429 });
+    });
+});
+
+/**
+ * Il fallimento si registra solo dopo la verifica, cioè dopo un `await`: prima che il limitatore
+ * tenesse conto dei tentativi già ammessi, tutte le richieste arrivate insieme prima del primo
+ * errore vedevano il conteggio vecchio e passavano il controllo, quindi una raffica valutava molte
+ * più password o codici del tetto. Qui il limitatore è quello vero (non i mock del resto del file)
+ * e la raffica è di trenta richieste: ne devono entrare al più cinque.
+ */
+describe("tentativi in parallelo", () => {
+    const burst = 30;
+
+    const useRealLimiter = async () => {
+        const actual = await vi.importActual<typeof import("./loginRateLimit")>("./loginRateLimit");
+
+        actual.resetLoginRateLimit();
+        isLoginRateLimited.mockImplementation((key) => actual.isLoginRateLimited(key));
+        isIpLoginRateLimited.mockImplementation((ip) => actual.isIpLoginRateLimited(ip));
+        isUsernameLoginRateLimited.mockImplementation((key) => actual.isUsernameLoginRateLimited(key));
+        registerFailedLogin.mockImplementation((key: string) => actual.registerFailedLogin(key));
+        registerSuccessfulLogin.mockImplementation((key: string) => actual.registerSuccessfulLogin(key));
+
+        return actual;
+    };
+
+    beforeEach(async () => {
+        await useRealLimiter();
+    });
+
+    afterEach(async () => {
+        const actual = await vi.importActual<typeof import("./loginRateLimit")>("./loginRateLimit");
+
+        actual.resetLoginRateLimit();
+    });
+
+    const statusesOf = (results: PromiseSettledResult<unknown>[]) =>
+        results.map((result) => (result.status === "rejected" ? (result.reason as AuthManagerError).statusCode : 200));
+
+    it("login: con trenta password sbagliate insieme ne valuta al più cinque, le altre ricevono 429", async () => {
+        for (let index = 0; index < burst; index += 1) {
+            queueRows("select", userTable, [buildUser()]);
+        }
+
+        const results = await Promise.allSettled(
+            Array.from({ length: burst }, () => login("mario", "password-sbagliata", "1.2.3.4"))
+        );
+        const statuses = statusesOf(results);
+
+        expect(statuses.filter((status) => status === 401)).toHaveLength(5);
+        expect(statuses.filter((status) => status === 429)).toHaveLength(burst - 5);
+        // Solo le richieste ammesse hanno raggiunto il database.
+        expect(dbCalls.filter((call) => call.op === "select")).toHaveLength(5);
+    });
+
+    it("login: dopo la raffica il blocco resta, anche per una richiesta sola con la password giusta", async () => {
+        for (let index = 0; index < 5; index += 1) {
+            queueRows("select", userTable, [buildUser()]);
+        }
+
+        await Promise.allSettled(Array.from({ length: 5 }, () => login("mario", "password-sbagliata", "1.2.3.4")));
+
+        await expect(login("mario", "password-giusta", "1.2.3.4")).rejects.toMatchObject({ statusCode: 429 });
+    });
+
+    it("login: le prenotazioni si rilasciano, sei login riusciti di fila non esauriscono il tetto", async () => {
+        for (let index = 0; index < 6; index += 1) {
+            queueRows("select", userTable, [buildUser()]);
+            queueAdminIdLookup(7);
+
+            await expect(login("mario", "password-giusta", "1.2.3.4")).resolves.toMatchObject({
+                status: "authenticated",
+            });
+        }
+    });
+
+    it("password richiesta di nuovo: trenta tentativi insieme ne valutano al più cinque", async () => {
+        for (let index = 0; index < burst; index += 1) {
+            queueRows("select", userTable, [buildUser()]);
+        }
+
+        const results = await Promise.allSettled(
+            Array.from({ length: burst }, () => assertOwnPassword(7, "password-sbagliata"))
+        );
+        const statuses = statusesOf(results);
+
+        expect(statuses.filter((status) => status === 400)).toHaveLength(5);
+        expect(statuses.filter((status) => status === 429)).toHaveLength(burst - 5);
+    });
+
+    it("secondo fattore: trenta codici sbagliati insieme ne valutano al più cinque", async () => {
+        decryptSecret.mockResolvedValue(totpSecret);
+        getTwoFactorChallengeUserId.mockReturnValue(7);
+
+        for (let index = 0; index < burst; index += 1) {
+            queueRows("select", userTable, [buildTwoFactorUser()]);
+        }
+
+        const results = await Promise.allSettled(
+            Array.from({ length: burst }, () => completeTwoFactorLogin("challenge-1", "000000", "1.2.3.4"))
+        );
+        const statuses = statusesOf(results);
+
+        // Un codice sbagliato è valutato (401, o 410 se il challenge si chiude); 429 è il rifiuto
+        // del limitatore, prima di valutare il codice.
+        expect(statuses.filter((status) => status === 401 || status === 410)).toHaveLength(5);
+        expect(statuses.filter((status) => status === 429)).toHaveLength(burst - 5);
     });
 });

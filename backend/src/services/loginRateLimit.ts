@@ -105,10 +105,53 @@ const attemptsByKey = new Map<string, Attempt>();
 const prune = (now: number): void =>
     pruneExpiring(attemptsByKey, loginRateLimitMaxEntries, now, (entry) => entry.resetAt);
 
+/**
+ * Tentativi già ammessi ma non ancora giudicati, per chiave. Il fallimento si registra solo dopo
+ * la verifica (lettura dal database, scrypt, codice TOTP), cioè dopo un `await`: senza questo
+ * contatore tutte le richieste arrivate in parallelo prima del primo errore vedevano ancora il
+ * conteggio vecchio e passavano il controllo, quindi una raffica valutava molti più tentativi
+ * del tetto. Il controllo e la prenotazione avvengono nello stesso tratto sincrono, perciò non
+ * ne entrano mai più del tetto, qualunque sia la concorrenza.
+ */
+const inflightByKey = new Map<string, number>();
+
 const hasReachedLimit = (key: string, maxAttempts: number, now: number): boolean => {
     const entry = attemptsByKey.get(key);
+    const failed = entry && entry.resetAt > now ? entry.count : 0;
 
-    return Boolean(entry && entry.resetAt > now && entry.count >= maxAttempts);
+    return failed + (inflightByKey.get(key) ?? 0) >= maxAttempts;
+};
+
+/**
+ * Prenota un tentativo su ciascuna chiave, da chiamare subito dopo il controllo e senza `await`
+ * in mezzo. Chi chiama registra l'esito (`registerFailedLogin` o `registerSuccessfulLogin`) e poi
+ * chiama la funzione restituita, in un `finally`: la prenotazione si rilascia dopo l'esito, così
+ * il conteggio non scende mai fra i due. Rilasciarla due volte non ha effetto.
+ */
+export const reserveLoginAttempts = (...keys: string[]): (() => void) => {
+    for (const key of keys) {
+        inflightByKey.set(key, (inflightByKey.get(key) ?? 0) + 1);
+    }
+
+    let released = false;
+
+    return () => {
+        if (released) {
+            return;
+        }
+
+        released = true;
+
+        for (const key of keys) {
+            const remaining = (inflightByKey.get(key) ?? 0) - 1;
+
+            if (remaining > 0) {
+                inflightByKey.set(key, remaining);
+            } else {
+                inflightByKey.delete(key);
+            }
+        }
+    };
 };
 
 /** true se la chiave ha esaurito i tentativi nella finestra corrente. */
@@ -171,6 +214,7 @@ export const registerSuccessfulLogin = (key: string): void => {
 /** Solo per i test: riporta il limitatore allo stato iniziale. */
 export const resetLoginRateLimit = (): void => {
     attemptsByKey.clear();
+    inflightByKey.clear();
     knownLoginSources.clear();
 };
 

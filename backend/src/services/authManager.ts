@@ -19,6 +19,7 @@ import {
     rateLimitSubject,
     registerFailedLogin,
     registerSuccessfulLogin,
+    reserveLoginAttempts,
     rememberLoginSource,
 } from "./loginRateLimit";
 import { describeUserAgent, sanitizeUserAgent } from "./deviceLabel";
@@ -281,13 +282,19 @@ const passwordCheckRateLimitKey = (userId: number) => `utente:${userId}:password
 const assertCurrentPassword = async (user: UserRow, password: string, errorMessage: string): Promise<void> => {
     const rateLimitKey = passwordCheckRateLimitKey(user.id);
     assertLoginRateLimit(rateLimitKey);
+    // Prenotato subito, nello stesso tratto sincrono del controllo: vedi `reserveLoginAttempts`.
+    const release = reserveLoginAttempts(rateLimitKey);
 
-    if (!(await verifyPassword(password, user.passwordHash))) {
-        registerFailedLogin(rateLimitKey);
-        throw new AuthManagerError(errorMessage, 400);
+    try {
+        if (!(await verifyPassword(password, user.passwordHash))) {
+            registerFailedLogin(rateLimitKey);
+            throw new AuthManagerError(errorMessage, 400);
+        }
+
+        registerSuccessfulLogin(rateLimitKey);
+    } finally {
+        release();
     }
-
-    registerSuccessfulLogin(rateLimitKey);
 };
 
 export type LoginResult =
@@ -415,20 +422,29 @@ export const login = async (
     assertIpLoginRateLimit(subject);
     assertLoginRateLimit(accountRateLimitKey);
     assertUsernameLoginRateLimit(username, subject);
+    // Prenotati subito, nello stesso tratto sincrono dei controlli: vedi `reserveLoginAttempts`.
+    // Si rilasciano appena l'esito della password è registrato, non a sessione creata.
+    const release = reserveLoginAttempts(subject, accountRateLimitKey, usernameRateLimitKey(username));
 
     const invalidCredentialsError = new AuthManagerError("Nome utente o password non validi", 401);
-    const rows = await db.select().from(userTable).where(eq(userTable.username, username)).limit(1);
-    const user = rows[0];
+    let user: UserRow | undefined;
 
-    // Verifica sempre una password (reale o esca) così il tempo di risposta non rivela
-    // se lo username esiste.
-    const isPasswordValid = await verifyPassword(password, user ? user.passwordHash : await getDummyPasswordHash());
+    try {
+        const rows = await db.select().from(userTable).where(eq(userTable.username, username)).limit(1);
+        user = rows[0];
 
-    if (!user || !isPasswordValid) {
-        registerFailedLogin(subject);
-        registerFailedLogin(accountRateLimitKey);
-        registerFailedLogin(usernameRateLimitKey(username));
-        throw invalidCredentialsError;
+        // Verifica sempre una password (reale o esca) così il tempo di risposta non rivela
+        // se lo username esiste.
+        const isPasswordValid = await verifyPassword(password, user ? user.passwordHash : await getDummyPasswordHash());
+
+        if (!user || !isPasswordValid) {
+            registerFailedLogin(subject);
+            registerFailedLogin(accountRateLimitKey);
+            registerFailedLogin(usernameRateLimitKey(username));
+            throw invalidCredentialsError;
+        }
+    } finally {
+        release();
     }
 
     // Il contatore si azzera solo quando nasce davvero una sessione, non a password
@@ -899,16 +915,24 @@ const checkSecondFactorCode = async (user: UserRow, code: string): Promise<Secon
 const verifySecondFactor = async (user: UserRow, code: string): Promise<SecondFactorResult> => {
     const rateLimitKey = secondFactorRateLimitKey(user.id);
     assertLoginRateLimit(rateLimitKey);
+    // Prenotato subito, nello stesso tratto sincrono del controllo: vedi `reserveLoginAttempts`.
+    // Il tetto di cinque su questa chiave vale anche per i tentativi in parallelo sullo stesso
+    // challenge, che ha lo stesso tetto e viene contato dopo.
+    const release = reserveLoginAttempts(rateLimitKey);
 
-    const result = await checkSecondFactorCode(user, code);
+    try {
+        const result = await checkSecondFactorCode(user, code);
 
-    if (result.valid) {
-        registerSuccessfulLogin(rateLimitKey);
-    } else {
-        registerFailedLogin(rateLimitKey);
+        if (result.valid) {
+            registerSuccessfulLogin(rateLimitKey);
+        } else {
+            registerFailedLogin(rateLimitKey);
+        }
+
+        return result;
+    } finally {
+        release();
     }
-
-    return result;
 };
 
 export const completeTwoFactorLogin = async (

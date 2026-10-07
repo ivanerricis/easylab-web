@@ -14,11 +14,11 @@ import type { InterventionType, InterventionStatus } from "../db/schema";
 export type { InterventionType, InterventionStatus } from "../db/schema";
 
 export const formatInterventionType = (value: InterventionType) => {
-    if (value === "consegna_materiale") {
+    if (value === "material_delivery") {
         return "Consegna materiale";
     }
 
-    if (value === "intervento_sede") {
+    if (value === "customer_site") {
         return "Intervento in sede";
     }
 
@@ -26,9 +26,9 @@ export const formatInterventionType = (value: InterventionType) => {
 };
 
 const interventionStatusLabels: Record<InterventionStatus, string> = {
-    programmato: "Programmato",
-    in_lavorazione: "In lavorazione",
-    completato: "Completato",
+    scheduled: "Programmato",
+    in_progress: "In lavorazione",
+    completed: "Completato",
 };
 
 export const formatInterventionStatus = (value: InterventionStatus) => interventionStatusLabels[value] ?? value;

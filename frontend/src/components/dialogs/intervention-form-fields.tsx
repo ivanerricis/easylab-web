@@ -74,7 +74,7 @@ export const InterventionDetailsSection = ({
 }: FieldsProps & { part?: InterventionDetailsPart }) => {
     const shows = (fieldPart: InterventionDetailsPart) => part == null || part === fieldPart;
     const isAssistance = isAssistanceInterventionType(values.type);
-    // Orari e lavoro svolto si chiedono solo a intervento completato: prima restano
+    // Orari e lavoro svolto si chiedono solo a intervento completed: prima restano
     // compilabili ma senza asterisco. L'asterisco rosso è l'unico segno dell'obbligo: le
     // scritte "(facoltativo)" accanto agli altri campi sono state tolte perché affollavano
     // il form, e dicevano la stessa cosa della sua assenza.
@@ -236,7 +236,7 @@ export const InterventionDetailsSection = ({
                                 className="resize-none"
                                 rows={4}
                                 placeholder={
-                                    values.type === "consegna_materiale"
+                                    values.type === "material_delivery"
                                         ? "Elenca i materiali da consegnare"
                                         : "Descrivi l'assistenza effettuata"
                                 }

@@ -35,8 +35,8 @@ export type InterventionFormState = {
 export type InterventionFieldErrors = Partial<Record<"collaboratorId" | "price" | InterventionField, string>>;
 
 export const emptyInterventionFormState = (interventionDate: string): InterventionFormState => ({
-    type: "consegna_materiale",
-    status: "programmato",
+    type: "material_delivery",
+    status: "scheduled",
     description: "",
     problem: "",
     note: "",

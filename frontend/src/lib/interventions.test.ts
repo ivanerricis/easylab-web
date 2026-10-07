@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     formatInterventionStatus,
+    fromLegacyInterventionValue,
     formatInterventionTime,
     formatInterventionType,
     getInterventionValidationError,
@@ -14,8 +15,8 @@ type Values = Parameters<typeof getInterventionValidationError>[0];
 
 /** Un intervento in sede completato e valido: ogni test ne rompe un campo solo. */
 const validOnSite: Values = {
-    type: "intervento_sede",
-    status: "completato",
+    type: "customer_site",
+    status: "completed",
     description: "Sostituito alimentatore",
     interventionDate: "2026-09-11",
     problem: "Il PC non si accende",
@@ -24,8 +25,8 @@ const validOnSite: Values = {
 };
 
 const validDelivery: Values = {
-    type: "consegna_materiale",
-    status: "completato",
+    type: "material_delivery",
+    status: "completed",
     description: "2 risme di carta",
     interventionDate: "2026-09-11",
     problem: "",
@@ -37,22 +38,41 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+describe("valori italiani dei vecchi link", () => {
+    it.each([
+        ["consegna_materiale", "material_delivery"],
+        ["intervento_sede", "customer_site"],
+        ["intervento_remoto", "remote"],
+        ["programmato", "scheduled"],
+        ["in_lavorazione", "in_progress"],
+        ["completato", "completed"],
+    ])("legge %s come %s", (legacy, current) => {
+        expect(fromLegacyInterventionValue(legacy)).toBe(current);
+    });
+
+    it("lascia passare valori nuovi, sconosciuti e assenti", () => {
+        expect(fromLegacyInterventionValue("scheduled")).toBe("scheduled");
+        expect(fromLegacyInterventionValue("toString")).toBe("toString");
+        expect(fromLegacyInterventionValue(null)).toBeNull();
+    });
+});
+
 describe("etichette degli interventi", () => {
     it("traduce tipo e stato, lasciando passare un valore sconosciuto", () => {
-        expect(formatInterventionType("intervento_remoto")).toBe("Intervento da remoto");
-        expect(formatInterventionStatus("in_lavorazione")).toBe("In lavorazione");
+        expect(formatInterventionType("remote")).toBe("Intervento da remoto");
+        expect(formatInterventionStatus("in_progress")).toBe("In lavorazione");
         expect(formatInterventionType("sconosciuto" as never)).toBe("sconosciuto");
     });
 
     it("distingue le consegne dagli interventi veri e propri", () => {
-        expect(isAssistanceInterventionType("intervento_sede")).toBe(true);
-        expect(isAssistanceInterventionType("intervento_remoto")).toBe(true);
-        expect(isAssistanceInterventionType("consegna_materiale")).toBe(false);
+        expect(isAssistanceInterventionType("customer_site")).toBe(true);
+        expect(isAssistanceInterventionType("remote")).toBe(true);
+        expect(isAssistanceInterventionType("material_delivery")).toBe(false);
 
-        expect(interventionDescriptionLabel("consegna_materiale")).toBe("Materiali da consegnare/consegnati");
-        expect(interventionDescriptionLabel("intervento_sede")).toBe("Assistenza effettuata");
-        expect(interventionDateLabel("consegna_materiale")).toBe("Data consegna");
-        expect(interventionDateLabel("intervento_remoto")).toBe("Data intervento");
+        expect(interventionDescriptionLabel("material_delivery")).toBe("Materiali da consegnare/consegnati");
+        expect(interventionDescriptionLabel("customer_site")).toBe("Assistenza effettuata");
+        expect(interventionDateLabel("material_delivery")).toBe("Data consegna");
+        expect(interventionDateLabel("remote")).toBe("Data intervento");
     });
 
     it("mostra l'orario senza secondi, o un trattino se manca", () => {
@@ -94,7 +114,7 @@ describe("getInterventionValidationError", () => {
         expect(
             getInterventionValidationError({
                 ...validOnSite,
-                status: "programmato",
+                status: "scheduled",
                 description: "",
                 startTime: "",
                 endTime: "",
@@ -104,16 +124,12 @@ describe("getInterventionValidationError", () => {
 
     // Il lavoro è ancora in corso: cosa è stato fatto, e fino a quando, si scrive alla fine.
     it("non chiede descrizione né orari a un intervento in lavorazione", () => {
-        expect(
-            getInterventionValidationError({ ...validOnSite, status: "in_lavorazione", description: "" })
-        ).toBeNull();
-        expect(
-            getInterventionValidationError({ ...validDelivery, status: "in_lavorazione", description: "" })
-        ).toBeNull();
+        expect(getInterventionValidationError({ ...validOnSite, status: "in_progress", description: "" })).toBeNull();
+        expect(getInterventionValidationError({ ...validDelivery, status: "in_progress", description: "" })).toBeNull();
         expect(
             getInterventionValidationError({
                 ...validOnSite,
-                status: "in_lavorazione",
+                status: "in_progress",
                 description: "",
                 startTime: "",
                 endTime: "",
@@ -122,7 +138,7 @@ describe("getInterventionValidationError", () => {
     });
 
     it("chiede comunque il problema anche a un intervento programmato", () => {
-        expect(getInterventionValidationError({ ...validOnSite, status: "programmato", problem: "" })).toEqual({
+        expect(getInterventionValidationError({ ...validOnSite, status: "scheduled", problem: "" })).toEqual({
             field: "problem",
             message: "Indica il problema riscontrato",
         });
@@ -156,7 +172,7 @@ describe("getInterventionValidationError", () => {
         expect(
             getInterventionValidationError({
                 ...validOnSite,
-                status: "programmato",
+                status: "scheduled",
                 startTime: "11:00",
                 endTime: "10:00",
             })

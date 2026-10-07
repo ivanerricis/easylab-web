@@ -348,8 +348,8 @@ export const notificationTable = pgTable(
  * e `routes/summaryPrint.ts`, con un cast `as` a ogni punto in cui la colonna (tipizzata
  * `string` senza `$type`) doveva tornare a essere l'unione letterale.
  */
-export const interventionTypes = ["consegna_materiale", "intervento_sede", "intervento_remoto"] as const;
-export const interventionStatuses = ["programmato", "in_lavorazione", "completato"] as const;
+export const interventionTypes = ["material_delivery", "customer_site", "remote"] as const;
+export const interventionStatuses = ["scheduled", "in_progress", "completed"] as const;
 export type InterventionType = (typeof interventionTypes)[number];
 export type InterventionStatus = (typeof interventionStatuses)[number];
 
@@ -384,7 +384,7 @@ export const interventionTable = pgTable(
          * stato incassato. La gran parte del lavoro non si fattura, quindi il default è `false`.
          */
         toInvoice: boolean("to_invoice").notNull().default(false),
-        status: varchar("status", { length: 20 }).$type<InterventionStatus>().notNull().default("programmato"),
+        status: varchar("status", { length: 20 }).$type<InterventionStatus>().notNull().default("scheduled"),
         // Obbligatoria a ogni scrittura da `validateInterventionRow` (routes/interventions.ts),
         // per ogni tipo e stato, senza eccezioni: dichiararlo qui rende impossibile che una
         // scrittura che aggira quella funzione (uno script, una rotta futura) lasci una riga
@@ -410,5 +410,10 @@ export const interventionTable = pgTable(
         index("intervention_status_idx").on(table.status),
         index("intervention_description_trgm_idx").using("gin", sql`${table.description} gin_trgm_ops`),
         index("intervention_created_at_idx").on(table.created_at),
+        // I valori ammessi di tipo e stato erano solo un tipo TypeScript: una scrittura diretta
+        // poteva salvarne uno qualunque. Il CHECK li fa rispettare dal database
+        // (0040_intervention_enum_english); `errorHandler.ts` traduce la violazione.
+        check("intervention_type_check", sql`${table.type} IN ('material_delivery', 'customer_site', 'remote')`),
+        check("intervention_status_check", sql`${table.status} IN ('scheduled', 'in_progress', 'completed')`),
     ]
 );

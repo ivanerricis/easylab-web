@@ -7,7 +7,7 @@ const baseData = (overrides: Partial<InterventionEmailData> = {}): InterventionE
     labEmail: "info@easylab.it",
     labAddress: "Via Roma 1",
     labPhone: "011 1234567",
-    type: "intervento_sede",
+    type: "customer_site",
     day: "2026-09-10",
     logoCid: null,
     ...overrides,
@@ -39,9 +39,9 @@ describe("buildInterventionEmail", () => {
     });
 
     it.each([
-        ["consegna_materiale", "Riepilogo consegna del", "della consegna di materiale", "di quanto consegnato"],
-        ["intervento_sede", "Riepilogo intervento del", "dell'intervento in sede", "del lavoro svolto"],
-        ["intervento_remoto", "Riepilogo intervento del", "dell'intervento da remoto", "del lavoro svolto"],
+        ["material_delivery", "Riepilogo consegna del", "della consegna di materiale", "di quanto consegnato"],
+        ["customer_site", "Riepilogo intervento del", "dell'intervento in sede", "del lavoro svolto"],
+        ["remote", "Riepilogo intervento del", "dell'intervento da remoto", "del lavoro svolto"],
     ] as const)("per il tipo %s nomina la pratica in oggetto, testo e html", (type, subjectStart, summary, detail) => {
         const { subject, text, html } = buildInterventionEmail(baseData({ type }));
 

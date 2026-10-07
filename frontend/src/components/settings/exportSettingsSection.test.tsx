@@ -90,8 +90,6 @@ describe("ExportSettingsSection", () => {
         await userEvent.type(card.getByLabelText("Data di inizio"), "2026-02-01");
         await userEvent.click(screen.getByRole("button", { name: "Esporta interventi" }));
 
-        expect(location.href).toBe(
-            'interventi:{"status":"completato","type":"intervento_sede","dateFrom":"2026-02-01"}'
-        );
+        expect(location.href).toBe('interventi:{"status":"completed","type":"customer_site","dateFrom":"2026-02-01"}');
     });
 });

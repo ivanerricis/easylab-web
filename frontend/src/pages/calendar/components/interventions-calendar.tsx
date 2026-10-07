@@ -69,9 +69,9 @@ const localizer = dateFnsLocalizer({
  * restano sempre in vista.
  */
 const statusPriority: Record<InterventionStatus, number> = {
-    programmato: 0,
-    in_lavorazione: 1,
-    completato: 2,
+    scheduled: 0,
+    in_progress: 1,
+    completed: 2,
 };
 
 /**
@@ -104,8 +104,8 @@ const sortEventsByStatus = ({ evtA, evtB }: { evtA: SortableEvent; evtB: Sortabl
     return (
         startOfDayTime(evtA.start) - startOfDayTime(evtB.start) ||
         daysB - daysA ||
-        (priorityByStart.get(evtA.start) ?? statusPriority.completato) -
-            (priorityByStart.get(evtB.start) ?? statusPriority.completato) ||
+        (priorityByStart.get(evtA.start) ?? statusPriority.completed) -
+            (priorityByStart.get(evtB.start) ?? statusPriority.completed) ||
         Number(!!evtB.allDay) - Number(!!evtA.allDay) ||
         evtA.start.getTime() - evtB.start.getTime() ||
         evtA.end.getTime() - evtB.end.getTime()
@@ -134,12 +134,12 @@ const formats: Formats = {
     agendaHeaderFormat: formatDayRange,
 };
 
-const statusOrder: InterventionStatus[] = ["programmato", "in_lavorazione", "completato"];
+const statusOrder: InterventionStatus[] = ["scheduled", "in_progress", "completed"];
 
 const statusCountLabel: Record<InterventionStatus, (count: number) => string> = {
-    programmato: (count) => `${count} ${count === 1 ? "programmato" : "programmati"}`,
-    in_lavorazione: (count) => `${count} in lavorazione`,
-    completato: (count) => `${count} ${count === 1 ? "completato" : "completati"}`,
+    scheduled: (count) => `${count} ${count === 1 ? "programmato" : "programmati"}`,
+    in_progress: (count) => `${count} in lavorazione`,
+    completed: (count) => `${count} ${count === 1 ? "completato" : "completati"}`,
 };
 
 /**
@@ -197,9 +197,9 @@ const messages: Messages<InterventionCalendarEvent> = {
 // Stili inline: il CSS di react-big-calendar definisce già .rbc-event con la stessa
 // specificità delle classi Tailwind e viene caricato dopo, quindi vincerebbe sempre lui.
 const statusEventStyle: Record<InterventionStatus, { backgroundColor: string; color: string }> = {
-    completato: { backgroundColor: "var(--color-green-500)", color: "#fff" },
-    in_lavorazione: { backgroundColor: "var(--color-yellow-400)", color: "#fff" },
-    programmato: { backgroundColor: "var(--color-red-500)", color: "#fff" },
+    completed: { backgroundColor: "var(--color-green-500)", color: "#fff" },
+    in_progress: { backgroundColor: "var(--color-yellow-400)", color: "#fff" },
+    scheduled: { backgroundColor: "var(--color-red-500)", color: "#fff" },
 };
 
 /**

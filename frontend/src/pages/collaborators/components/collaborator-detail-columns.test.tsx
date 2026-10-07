@@ -10,9 +10,9 @@ import { collaboratorInterventionColumns, collaboratorReportColumns } from "./co
  */
 const intervention: InterventionDto = {
     id: 12,
-    type: "intervento_sede",
+    type: "customer_site",
     description: "Sostituito l'alimentatore",
-    status: "in_lavorazione",
+    status: "in_progress",
     interventionDate: "2026-09-14",
     startTime: "13:00:00",
     endTime: "14:30:00",

@@ -22,6 +22,7 @@ import {
     type InterventionStatusFilter,
     type InterventionTypeFilter,
 } from "./components/types";
+import { fromLegacyInterventionValue } from "@/lib/interventions";
 import { useInterventionsRows } from "./hooks/useInterventionsRows";
 import {
     listUrlParams,
@@ -39,7 +40,7 @@ import { entityPaths } from "@/lib/entityPaths";
 import { useCreateInterventionFlow } from "@/hooks/useCreateEntityFlow";
 import { Mail } from "lucide-react";
 
-const statusFilters: InterventionStatusFilter[] = ["all", "programmato", "in_lavorazione", "completato"];
+const statusFilters: InterventionStatusFilter[] = ["all", "scheduled", "in_progress", "completed"];
 /**
  * I dialoghi di creazione e modifica si scaricano solo quando servono, non con la pagina (vedi
  * `lazyWithPrefetch`): quello di creazione già al passaggio del mouse o al focus su "Crea
@@ -56,7 +57,7 @@ const prefetchInterventionDialogs = () => {
     prefetchEditInterventionDialog();
 };
 
-const typeFilters: InterventionTypeFilter[] = ["all", "consegna_materiale", "intervento_sede", "intervento_remoto"];
+const typeFilters: InterventionTypeFilter[] = ["all", "material_delivery", "customer_site", "remote"];
 const sortOptionValues = interventionSortOptions.map((option) => option.value);
 
 const InterventionsPage = () => {
@@ -71,8 +72,8 @@ const InterventionsPage = () => {
     const hasOpenedEditDialog = useHasBeenOpen(interventionToEdit != null);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     // "status" è il nome che usa già la dashboard nei suoi collegamenti.
-    const statusFilter = readEnumParam(searchParams, "status", statusFilters, "all");
-    const typeFilter = readEnumParam(searchParams, "type", typeFilters, "all");
+    const statusFilter = readEnumParam(searchParams, "status", statusFilters, "all", fromLegacyInterventionValue);
+    const typeFilter = readEnumParam(searchParams, "type", typeFilters, "all", fromLegacyInterventionValue);
     const sortOption = readEnumParam(
         searchParams,
         listUrlParams.sort,

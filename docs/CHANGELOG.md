@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-07 — Interventi: tipi e stati salvati in inglese, e il ripristino aggiorna lo schema](changelog/2026-10.md#2026-10-07-interventi-tipi-e-stati-salvati-in-inglese-e-il-ripristino-aggiorna-lo-schema)
 - [2026-10-06 — Login: il limite di tentativi regge anche alle richieste in parallelo](changelog/2026-10.md#2026-10-06-login-il-limite-di-tentativi-regge-anche-alle-richieste-in-parallelo)
 - [2026-10-05 — Dipendenze: aggiornamenti di Dependabot di frontend e backend](changelog/2026-10.md#2026-10-05-dipendenze-aggiornamenti-di-dependabot-di-frontend-e-backend)
 - [2026-10-05 — Sidebar: la voce aperta con tinta neutra e barretta, come su GitHub](changelog/2026-10.md#2026-10-05-sidebar-la-voce-aperta-con-tinta-neutra-e-barretta-come-su-github)

@@ -223,8 +223,8 @@ describe("collaborators router", () => {
                     id: 7,
                     createdAt: new Date("2026-02-01"),
                     customer: "Anna Bianchi",
-                    type: "intervento_remoto",
-                    status: "programmato",
+                    type: "remote",
+                    status: "scheduled",
                     description: null,
                     interventionDate: null,
                     startTime: null,
@@ -249,9 +249,7 @@ describe("collaborators router", () => {
                     subjectLabel: "Collaboratore",
                     showCustomerColumn: true,
                     interventionCount: 1,
-                    interventions: [
-                        expect.objectContaining({ id: 7, customerName: "Anna Bianchi", type: "intervento_remoto" }),
-                    ],
+                    interventions: [expect.objectContaining({ id: 7, customerName: "Anna Bianchi", type: "remote" })],
                 })
             );
         });

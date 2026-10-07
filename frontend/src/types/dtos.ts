@@ -76,14 +76,14 @@ export type IssueDto = {
     updatedAt: string | null;
 };
 
-export type InterventionType = "consegna_materiale" | "intervento_sede" | "intervento_remoto";
+export type InterventionType = "material_delivery" | "customer_site" | "remote";
 
-export type InterventionStatus = "programmato" | "in_lavorazione" | "completato";
+export type InterventionStatus = "scheduled" | "in_progress" | "completed";
 
 export type InterventionDto = {
     id: number;
     type: InterventionType;
-    /** Assente finché l'intervento è solo programmato: il lavoro non è ancora stato svolto. */
+    /** Assente finché l'intervento è solo scheduled: il lavoro non è ancora stato svolto. */
     description: string | null;
     status: InterventionStatus;
     interventionDate: string | null;

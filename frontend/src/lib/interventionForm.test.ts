@@ -21,8 +21,8 @@ import {
 } from "./interventionForm";
 
 const shared = {
-    type: "intervento_sede" as const,
-    status: "completato" as const,
+    type: "customer_site" as const,
+    status: "completed" as const,
     description: "Sostituito cavo",
     problem: "Rete assente",
     note: "Richiamare lunedì",
@@ -59,8 +59,8 @@ describe("interventionForm", () => {
 describe("validateInterventionForm / toInterventionSubmitFields", () => {
     const filled = {
         ...emptyInterventionFormState("2026-09-10"),
-        type: "intervento_sede" as const,
-        status: "completato" as const,
+        type: "customer_site" as const,
+        status: "completed" as const,
         description: "  Sostituito cavo  ",
         problem: "Rete assente",
         collaboratorId: "40",
@@ -95,7 +95,7 @@ describe("validateInterventionForm / toInterventionSubmitFields", () => {
             collaboratorId: 40,
             startTime: "09:00",
         });
-        expect(toInterventionSubmitFields({ ...filled, type: "consegna_materiale", price: "" })).toMatchObject({
+        expect(toInterventionSubmitFields({ ...filled, type: "material_delivery", price: "" })).toMatchObject({
             problem: null,
             startTime: null,
             endTime: null,

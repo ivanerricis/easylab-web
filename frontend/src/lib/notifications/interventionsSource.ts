@@ -29,7 +29,7 @@ export const interventionsNotificationSource: NotificationSource = {
                 description: formatInterventionStatus(intervention.status),
                 meta: intervention.startTime ? formatInterventionTime(intervention.startTime) : undefined,
                 href: entityPaths.intervention(intervention.id),
-                resolved: intervention.status === "completato",
+                resolved: intervention.status === "completed",
             }));
     },
 };

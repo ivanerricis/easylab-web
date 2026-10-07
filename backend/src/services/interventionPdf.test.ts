@@ -51,8 +51,8 @@ const buildIntervention = (overrides: Partial<InterventionPrintData> = {}): Inte
     customerPhone: "333123456",
     customerEmail: "mario@bianchi.it",
     collaboratorName: "Luigi Verdi",
-    type: "intervento_sede",
-    status: "completato",
+    type: "customer_site",
+    status: "completed",
     description: "Sostituita la scheda madre",
     problem: "Il PC non si accende",
     note: null,
@@ -85,8 +85,8 @@ const buildInterventionSummary = (
 ): CustomerInterventionSummaryItem => ({
     id: 9,
     createdAtLabel: "01/01/2026",
-    type: "consegna_materiale",
-    status: "in_lavorazione",
+    type: "material_delivery",
+    status: "in_progress",
     description: "Consegnati due monitor",
     scheduleLabel: null,
     price: null,
@@ -142,11 +142,9 @@ describe("createInterventionPdfBuffer", () => {
     });
 
     it("mostra 'ORE TECNICI' solo per gli interventi in sede o da remoto, mai per la consegna materiale", async () => {
-        const consegna = JSON.stringify(
-            await captureInterventionDoc(buildIntervention({ type: "consegna_materiale" }))
-        );
-        const sede = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "intervento_sede" })));
-        const remoto = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "intervento_remoto" })));
+        const consegna = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "material_delivery" })));
+        const sede = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "customer_site" })));
+        const remoto = JSON.stringify(await captureInterventionDoc(buildIntervention({ type: "remote" })));
 
         expect(consegna).not.toContain("ORE TECNICI");
         expect(sede).toContain("ORE TECNICI");
@@ -219,7 +217,7 @@ describe("createInterventionPdfBuffer", () => {
     });
 
     it('non mostra "Stato" nella ricevuta: chi firma sta chiudendo l\'intervento in quel momento, lo stato è implicito', async () => {
-        const doc = await captureInterventionDoc(buildIntervention({ status: "completato" }));
+        const doc = await captureInterventionDoc(buildIntervention({ status: "completed" }));
         const activitySection = (doc.content as { table: { body: { text?: string }[][] } }[])[2];
         const rows = activitySection.table.body;
 
@@ -282,8 +280,8 @@ describe("createCustomerInterventionsPdfBuffer", () => {
                 buildCustomerInterventions({
                     interventions: [
                         buildInterventionSummary({
-                            type: "consegna_materiale",
-                            status: "in_lavorazione",
+                            type: "material_delivery",
+                            status: "in_progress",
                             description: "Consegnati due monitor",
                         }),
                     ],

@@ -3,16 +3,34 @@ import { formatDateISO, formatYesNo } from "@/lib/utils";
 import type { StatusColor } from "@/lib/statusColors";
 
 export const interventionTypeOptions: { value: InterventionType; label: string }[] = [
-    { value: "consegna_materiale", label: "Consegna materiale" },
-    { value: "intervento_sede", label: "Intervento in sede" },
-    { value: "intervento_remoto", label: "Intervento da remoto" },
+    { value: "material_delivery", label: "Consegna materiale" },
+    { value: "customer_site", label: "Intervento in sede" },
+    { value: "remote", label: "Intervento da remoto" },
 ];
 
 export const interventionStatusOptions: { value: InterventionStatus; label: string }[] = [
-    { value: "programmato", label: "Programmato" },
-    { value: "in_lavorazione", label: "In lavorazione" },
-    { value: "completato", label: "Completato" },
+    { value: "scheduled", label: "Programmato" },
+    { value: "in_progress", label: "In lavorazione" },
+    { value: "completed", label: "Completato" },
 ];
+
+/**
+ * Prima i valori di tipo e stato erano in italiano (`intervento_sede`, `in_lavorazione`...) e
+ * finivano anche nell'indirizzo della lista (`?status=programmato`). I link salvati o mandati
+ * ai colleghi prima del cambio devono continuare a funzionare: questi valori vecchi vengono
+ * letti come i corrispondenti nuovi. Qualsiasi altro valore passa invariato.
+ */
+const legacyInterventionValues: Record<string, string> = {
+    consegna_materiale: "material_delivery",
+    intervento_sede: "customer_site",
+    intervento_remoto: "remote",
+    programmato: "scheduled",
+    in_lavorazione: "in_progress",
+    completato: "completed",
+};
+
+export const fromLegacyInterventionValue = (value: string | null) =>
+    value != null && Object.hasOwn(legacyInterventionValues, value) ? legacyInterventionValues[value] : value;
 
 /**
  * Colore di stato della riga: lo legge `index.css` da `data-status-color`, insieme
@@ -23,9 +41,9 @@ export const interventionStatusOptions: { value: InterventionStatus; label: stri
  * ricopiata in ognuna: tre occasioni perché un colore cambi in un posto solo.
  */
 export const interventionStatusColor: Record<InterventionStatus, StatusColor> = {
-    programmato: "red",
-    in_lavorazione: "yellow",
-    completato: "green",
+    scheduled: "red",
+    in_progress: "yellow",
+    completed: "green",
 };
 
 export const formatInterventionType = (value: InterventionType) =>
@@ -40,22 +58,22 @@ export const formatInterventionStatus = (value: InterventionStatus) =>
  * ma valeva anche per gli interventi da remoto e il nome faceva pensare a un errore.
  */
 export const isAssistanceInterventionType = (value: InterventionType) =>
-    value === "intervento_sede" || value === "intervento_remoto";
+    value === "customer_site" || value === "remote";
 
 export const interventionDescriptionLabel = (value: InterventionType) =>
-    value === "consegna_materiale" ? "Materiali da consegnare/consegnati" : "Assistenza effettuata";
+    value === "material_delivery" ? "Materiali da consegnare/consegnati" : "Assistenza effettuata";
 
 /**
  * Orari e assistenza effettuata sono i dati del lavoro svolto: nascono mentre lo si fa e si
- * completano alla fine, quindi sono obbligatori solo a intervento "completato". Prima lo
+ * completano alla fine, quindi sono obbligatori solo a intervento "completed". Prima lo
  * diventavano già a "in lavorazione", e chi apriva il lavoro doveva inventarsi un orario di
- * fine e una descrizione di ciò che non aveva ancora fatto. A "completato" restano
+ * fine e una descrizione di ciò che non aveva ancora fatto. A "completed" restano
  * obbligatori: un intervento chiuso deve dire cosa è stato fatto e quando.
  *
  * Il problema riscontrato non segue questa regola: è noto fin dalla chiamata del cliente ed è
  * il motivo per cui l'intervento viene programmato.
  */
-export const isCompletedInterventionStatus = (value: InterventionStatus) => value === "completato";
+export const isCompletedInterventionStatus = (value: InterventionStatus) => value === "completed";
 
 type InterventionFormValues = {
     type: InterventionType;
@@ -96,7 +114,7 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
         return {
             field: "description",
             message:
-                values.type === "consegna_materiale"
+                values.type === "material_delivery"
                     ? "Indica i materiali da consegnare"
                     : "Indica il tipo di assistenza effettuata",
         };
@@ -134,7 +152,7 @@ export const getInterventionValidationError = (values: InterventionFormValues): 
 };
 
 export const interventionDateLabel = (value: InterventionType) =>
-    value === "consegna_materiale" ? "Data consegna" : "Data intervento";
+    value === "material_delivery" ? "Data consegna" : "Data intervento";
 
 export const formatInterventionTime = (value: string | null) => (value ? value.slice(0, 5) : "-");
 

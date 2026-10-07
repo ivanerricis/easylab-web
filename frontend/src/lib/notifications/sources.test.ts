@@ -14,7 +14,7 @@ import { notificationSources } from "./index";
 import { interventionsNotificationSource } from "./interventionsSource";
 import { serverNotificationSource } from "./serverSource";
 
-const buildIntervention = (id: number, startTime: string | null, status = "programmato") => ({
+const buildIntervention = (id: number, startTime: string | null, status = "scheduled") => ({
     id,
     customer: `Cliente ${id}`,
     startTime,
@@ -74,7 +74,7 @@ describe("interventionsNotificationSource", () => {
      */
     it("include la data nell'id e segna come risolti i completati", async () => {
         listInterventions.mockResolvedValue({
-            items: [buildIntervention(5, "10:00:00", "completato"), buildIntervention(6, "11:00:00", "in_lavorazione")],
+            items: [buildIntervention(5, "10:00:00", "completed"), buildIntervention(6, "11:00:00", "in_progress")],
         });
 
         const [completed, inProgress] = await interventionsNotificationSource.load();

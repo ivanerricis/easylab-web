@@ -28,9 +28,10 @@ export const readEnumParam = <T extends string>(
     searchParams: URLSearchParams,
     key: string,
     allowed: readonly T[],
-    fallback: T
+    fallback: T,
+    normalize: (value: string | null) => string | null = (value) => value
 ): T => {
-    const value = searchParams.get(key);
+    const value = normalize(searchParams.get(key));
 
     return allowed.includes(value as T) ? (value as T) : fallback;
 };

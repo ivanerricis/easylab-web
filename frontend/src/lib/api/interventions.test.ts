@@ -32,8 +32,8 @@ describe("api interventi", () => {
             page: 1,
             pageSize: 100,
             search: "   ",
-            status: "programmato",
-            type: "intervento_sede",
+            status: "scheduled",
+            type: "customer_site",
             scheduledDate: "2026-09-11",
             scheduledFrom: "2026-09-01",
             scheduledTo: "2026-09-30",
@@ -50,8 +50,8 @@ describe("api interventi", () => {
                 page: 1,
                 pageSize: 100,
                 search: undefined,
-                status: "programmato",
-                type: "intervento_sede",
+                status: "scheduled",
+                type: "customer_site",
                 dateFrom: undefined,
                 dateTo: undefined,
                 scheduledDate: "2026-09-11",
@@ -73,8 +73,8 @@ describe("api interventi", () => {
         const del = vi.spyOn(api, "delete").mockResolvedValue({ data: {} });
 
         await getIntervention(9);
-        await createIntervention({ type: "consegna_materiale", customerId: 1, collaboratorId: 2 });
-        await updateIntervention(9, { status: "completato" });
+        await createIntervention({ type: "material_delivery", customerId: 1, collaboratorId: 2 });
+        await updateIntervention(9, { status: "completed" });
         await deleteIntervention(9);
         await expect(sendInterventionEmail(9)).resolves.toEqual({ message: "Inviata" });
         await getInterventionStats();
@@ -82,12 +82,12 @@ describe("api interventi", () => {
         expect(get).toHaveBeenCalledWith("/interventions/9");
         expect(get).toHaveBeenCalledWith("/interventions/stats");
         expect(post).toHaveBeenCalledWith("/interventions", {
-            type: "consegna_materiale",
+            type: "material_delivery",
             customerId: 1,
             collaboratorId: 2,
         });
         expect(post).toHaveBeenCalledWith("/interventions/9/send-email");
-        expect(put).toHaveBeenCalledWith("/interventions/9", { status: "completato" });
+        expect(put).toHaveBeenCalledWith("/interventions/9", { status: "completed" });
         expect(del).toHaveBeenCalledWith("/interventions/9");
         expect(getInterventionPrintUrl(9)).toContain("/interventions/9/print");
     });

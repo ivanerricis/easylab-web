@@ -14,13 +14,20 @@ const routerAt =
 
 describe("readEnumParam / readDateParam", () => {
     it("accettano solo i valori previsti", () => {
-        const params = new URLSearchParams("status=completato&type=boh&from=2026-09-01&to=ieri");
+        const params = new URLSearchParams("status=completed&type=boh&from=2026-09-01&to=ieri");
 
-        expect(readEnumParam(params, "status", ["all", "completato"], "all")).toBe("completato");
+        expect(readEnumParam(params, "status", ["all", "completed"], "all")).toBe("completed");
         expect(readEnumParam(params, "type", ["all", "sede"], "all")).toBe("all");
         expect(readEnumParam(params, "manca", ["all"], "all")).toBe("all");
         expect(readDateParam(params, "from")).toBe("2026-09-01");
         expect(readDateParam(params, "to")).toBeUndefined();
+    });
+
+    it("applicano la normalizzazione prima di controllare i valori ammessi", () => {
+        const params = new URLSearchParams("status=vecchio");
+        const normalize = (value: string | null) => (value === "vecchio" ? "nuovo" : value);
+
+        expect(readEnumParam(params, "status", ["all", "nuovo"], "all", normalize)).toBe("nuovo");
     });
 });
 

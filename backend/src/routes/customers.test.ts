@@ -342,8 +342,8 @@ describe("customers router", () => {
                 {
                     id: 7,
                     createdAt: new Date("2026-02-01"),
-                    type: "intervento_sede",
-                    status: "completato",
+                    type: "customer_site",
+                    status: "completed",
                     description: "Sostituzione batteria",
                     interventionDate: "2026-02-05",
                     startTime: "09:00:00",
@@ -371,8 +371,8 @@ describe("customers router", () => {
                     interventions: [
                         expect.objectContaining({
                             id: 7,
-                            type: "intervento_sede",
-                            status: "completato",
+                            type: "customer_site",
+                            status: "completed",
                             description: "Sostituzione batteria",
                             scheduleLabel: expect.stringContaining("09:00-10:00"),
                         }),

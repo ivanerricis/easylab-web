@@ -22,9 +22,9 @@ import type { InterventionDto } from "@/types/dtos";
 
 const buildIntervention = (overrides: Partial<InterventionDto>): InterventionDto => ({
     id: 1,
-    type: "intervento_sede",
+    type: "customer_site",
     description: null,
-    status: "programmato",
+    status: "scheduled",
     interventionDate: "2026-09-11",
     startTime: "09:00:00",
     endTime: "10:30:00",
@@ -101,7 +101,7 @@ describe("useCalendarInterventions", () => {
     it("mette a giornata intera le consegne senza orario e i record senza data", async () => {
         listInterventions.mockResolvedValue(
             page([
-                buildIntervention({ id: 1, type: "consegna_materiale", startTime: null, endTime: null }),
+                buildIntervention({ id: 1, type: "material_delivery", startTime: null, endTime: null }),
                 buildIntervention({ id: 2, interventionDate: null, startTime: null, endTime: null }),
             ])
         );

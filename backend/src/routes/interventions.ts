@@ -31,7 +31,7 @@ const logoContentId = "logo-laboratorio";
 // Le due liste (valori ammessi di `type` e `status`) vivono una sola volta in `db/schema.ts`,
 // insieme al tipo della colonna: prima erano riscritte identiche qui, in
 // `services/interventionLabels.ts`, `db/queries/intervention.ts` e `routes/summaryPrint.ts`.
-const onSiteInterventionTypes = new Set<InterventionType>(["intervento_sede", "intervento_remoto"]);
+const onSiteInterventionTypes = new Set<InterventionType>(["customer_site", "remote"]);
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -86,14 +86,14 @@ const interventionBodySchema = z
 
 /**
  * Orari e assistenza effettuata sono i dati del lavoro svolto: nascono mentre lo si fa e si
- * completano alla fine, quindi sono obbligatori solo a intervento "completato" — né da
- * "programmato" né da "in lavorazione". A "completato" restano obbligatori, altrimenti un
+ * completano alla fine, quindi sono obbligatori solo a intervento "completed" — né da
+ * "scheduled" né da "in lavorazione". A "completed" restano obbligatori, altrimenti un
  * intervento potrebbe risultare chiuso senza che risulti cosa è stato fatto e quando.
  *
  * Il problema riscontrato non segue questa regola: si conosce già al momento della chiamata
  * del cliente, ed è il motivo per cui l'intervento viene programmato.
  */
-const isCompletedStatus = (status?: InterventionStatus) => status === "completato";
+const isCompletedStatus = (status?: InterventionStatus) => status === "completed";
 
 /** La riga su cui `validateInterventionRow` applica le regole: vedi lì. */
 type InterventionValidationRow = {
@@ -396,7 +396,7 @@ interventionsRouter.post("/", validate({ body: interventionBodySchema }), async 
         price: req.body.price ?? null,
         paid: req.body.paid ?? false,
         toInvoice: req.body.toInvoice ?? false,
-        status: req.body.status ?? "programmato",
+        status: req.body.status ?? "scheduled",
         customerId: req.body.customerId,
         collaboratorId: req.body.collaboratorId,
         interventionDate: req.body.interventionDate ?? null,

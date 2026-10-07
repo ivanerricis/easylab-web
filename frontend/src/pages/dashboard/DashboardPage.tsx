@@ -149,7 +149,7 @@ const DashboardPage = () => {
         navigate(`/reports?visibility=${visibilityFilter}`);
     };
 
-    const goToInterventionsPage = (statusFilter: "programmato" | "in_lavorazione" | "completato") => {
+    const goToInterventionsPage = (statusFilter: "scheduled" | "in_progress" | "completed") => {
         navigate(`/interventions?status=${statusFilter}`);
     };
 
@@ -233,25 +233,25 @@ const DashboardPage = () => {
                         text="Interventi programmati"
                         mobileText="Programmati"
                         icon={CalendarClock}
-                        number={formatCount(interventionStats?.programmatoCount)}
+                        number={formatCount(interventionStats?.scheduledCount)}
                         iconColor="text-destructive"
-                        onClick={() => goToInterventionsPage("programmato")}
+                        onClick={() => goToInterventionsPage("scheduled")}
                     />
                     <CardDashboard
                         text="Interventi in lavorazione"
                         mobileText="In lavorazione"
                         icon={Loader}
-                        number={formatCount(interventionStats?.inLavorazioneCount)}
+                        number={formatCount(interventionStats?.inProgressCount)}
                         iconColor="text-action-print"
-                        onClick={() => goToInterventionsPage("in_lavorazione")}
+                        onClick={() => goToInterventionsPage("in_progress")}
                     />
                     <CardDashboard
                         text="Interventi completati"
                         mobileText="Completati"
                         icon={CircleCheck}
-                        number={formatCount(interventionStats?.completatoCount)}
+                        number={formatCount(interventionStats?.completedCount)}
                         iconColor="text-status-green-foreground"
-                        onClick={() => goToInterventionsPage("completato")}
+                        onClick={() => goToInterventionsPage("completed")}
                     />
 
                     <Dialog>

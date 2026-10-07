@@ -7,9 +7,9 @@ import { getEventAccessibleLabel } from "../eventAccessibleLabel";
 
 const intervention: InterventionCalendarEvent["resource"] = {
     id: 12,
-    type: "intervento_remoto",
+    type: "remote",
     description: "Configurata la stampante di rete",
-    status: "completato",
+    status: "completed",
     interventionDate: "2026-09-14",
     startTime: "09:00:00",
     endTime: "10:30:00",
@@ -143,7 +143,7 @@ describe("CalendarEventWrapper", () => {
     });
 
     it("senza descrizione non lascia una riga vuota", async () => {
-        renderWrapper({ ...intervention, description: null, status: "programmato" });
+        renderWrapper({ ...intervention, description: null, status: "scheduled" });
 
         fireEvent.mouseEnter(anchor());
 

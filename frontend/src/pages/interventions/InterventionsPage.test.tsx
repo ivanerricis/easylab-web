@@ -93,9 +93,9 @@ import { renderWithProviders } from "@/test/render";
 
 const intervention = {
     id: 9,
-    type: "intervento_sede",
+    type: "customer_site",
     description: "Sostituito cavo",
-    status: "programmato",
+    status: "scheduled",
     interventionDate: "2026-09-10",
     startTime: "09:00:00",
     endTime: null,
@@ -109,8 +109,8 @@ const intervention = {
 };
 
 const formValues = {
-    type: "intervento_sede",
-    status: "programmato",
+    type: "customer_site",
+    status: "scheduled",
     description: null,
     problem: "Rete assente",
     note: "Citofonare al secondo piano",
@@ -136,9 +136,17 @@ beforeEach(() => {
 
 describe("InterventionsPage", () => {
     it("mostra tutti gli stati di default e legge il filtro dall'indirizzo", async () => {
-        await renderPage("/interventions?status=in_lavorazione");
+        await renderPage("/interventions?status=in_progress");
 
-        expect(listInterventions).toHaveBeenCalledWith(expect.objectContaining({ status: "in_lavorazione" }));
+        expect(listInterventions).toHaveBeenCalledWith(expect.objectContaining({ status: "in_progress" }));
+    });
+
+    it("un link salvato con i vecchi valori italiani filtra come prima", async () => {
+        await renderPage("/interventions?status=in_lavorazione&type=intervento_sede");
+
+        expect(listInterventions).toHaveBeenCalledWith(
+            expect.objectContaining({ status: "in_progress", type: "customer_site" })
+        );
     });
 
     it("senza filtro nell'indirizzo chiede tutti gli stati", async () => {

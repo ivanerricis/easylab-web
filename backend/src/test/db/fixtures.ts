@@ -118,7 +118,7 @@ export const insertIntervention = async (values: Partial<NewIntervention> = {}) 
     const [row] = await db
         .insert(interventionTable)
         .values({
-            type: "intervento_sede",
+            type: "customer_site",
             interventionDate: "2026-01-01",
             customerId: values.customerId ?? (await insertCustomer()).id,
             collaboratorId: values.collaboratorId ?? (await insertCollaborator()).id,

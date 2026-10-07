@@ -236,7 +236,7 @@ const run = async () => {
 
         ["Interventi, pagina 1 x10", "Interventi", "/interventions?page=1&pageSize=10"],
         ["Interventi, ricerca testuale", "Interventi", "/interventions?page=1&pageSize=10&search=stampante"],
-        ["Interventi, filtro stato+tipo", "Interventi", "/interventions?page=1&pageSize=10&status=completato&type=intervento_sede"],
+        ["Interventi, filtro stato+tipo", "Interventi", "/interventions?page=1&pageSize=10&status=completed&type=customer_site"],
         ["Interventi, ordina per data", "Interventi", "/interventions?page=1&pageSize=10&sortBy=interventionDate&sortOrder=desc"],
         [`Interventi, lista SENZA paginazione (${counts.interventions} righe, calendario)`, "Interventi", "/interventions"],
         ["Interventi, statistiche dashboard", "Interventi", "/interventions/stats"],

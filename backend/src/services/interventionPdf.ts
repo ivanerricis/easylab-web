@@ -77,7 +77,7 @@ export type CustomerInterventionsPrintData = {
 const formatTime = (value: string | null) => (value ? value.slice(0, 5) : "-");
 
 const descriptionLabel = (type: InterventionType) =>
-    type === "consegna_materiale" ? "Materiali consegnati" : "Assistenza effettuata";
+    type === "material_delivery" ? "Materiali consegnati" : "Assistenza effettuata";
 
 const parseTimeToMinutes = (value: string | null) => {
     if (!value) {
@@ -205,7 +205,7 @@ const buildActivitySection = (intervention: InterventionPrintData) => ({
 });
 
 const buildTechnicianHoursSection = (intervention: InterventionPrintData) => {
-    if (intervention.type === "consegna_materiale") {
+    if (intervention.type === "material_delivery") {
         return null;
     }
 

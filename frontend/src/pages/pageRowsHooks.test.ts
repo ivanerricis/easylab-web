@@ -50,13 +50,13 @@ describe("hook delle righe delle pagine", () => {
     });
 
     it("useInterventionsRows passa stato, tipo e intervallo di date", async () => {
-        listInterventions.mockResolvedValue(page([{ id: 1, status: "programmato" }]));
+        listInterventions.mockResolvedValue(page([{ id: 1, status: "scheduled" }]));
 
         const { result } = renderHook(() =>
             useInterventionsRows({
                 searchText: "",
-                statusFilter: "programmato",
-                typeFilter: "consegna_materiale",
+                statusFilter: "scheduled",
+                typeFilter: "material_delivery",
                 sortOption: "interventionDate:desc",
                 dateFrom: "2026-09-01",
                 dateTo: "2026-09-30",
@@ -72,8 +72,8 @@ describe("hook delle righe delle pagine", () => {
             page: 1,
             pageSize: 10,
             search: "",
-            status: "programmato",
-            type: "consegna_materiale",
+            status: "scheduled",
+            type: "material_delivery",
             sortBy: "interventionDate",
             sortOrder: "desc",
             dateFrom: "2026-09-01",
@@ -206,7 +206,7 @@ describe("hook delle righe delle pagine", () => {
         listReports.mockResolvedValue(page([]));
 
         const interventions = renderHook(
-            ({ typeFilter }: { typeFilter: "all" | "intervento_sede" }) =>
+            ({ typeFilter }: { typeFilter: "all" | "customer_site" }) =>
                 useInterventionsRows({
                     searchText: "",
                     statusFilter: "all",
@@ -235,14 +235,14 @@ describe("hook delle righe delle pagine", () => {
             expect(listReports).toHaveBeenCalledTimes(1);
         });
 
-        interventions.rerender({ typeFilter: "intervento_sede" });
+        interventions.rerender({ typeFilter: "customer_site" });
         reports.rerender({ dateTo: "2026-09-30" });
 
         await waitFor(() => {
             expect(listInterventions).toHaveBeenCalledTimes(2);
             expect(listReports).toHaveBeenCalledTimes(2);
         });
-        expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ type: "intervento_sede" }));
+        expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ type: "customer_site" }));
         expect(listReports).toHaveBeenLastCalledWith(expect.objectContaining({ dateTo: "2026-09-30" }));
     });
 

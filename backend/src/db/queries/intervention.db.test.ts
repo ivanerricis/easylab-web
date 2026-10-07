@@ -61,13 +61,13 @@ describe("listInterventions: ricerca libera", () => {
         await insertIntervention({
             problem: "zefiro",
             note: "zefiro",
-            type: "consegna_materiale",
-            status: "completato",
+            type: "material_delivery",
+            status: "completed",
         });
 
         expect(await search("zefiro")).toEqual([]);
         expect(await search("consegna")).toEqual([]);
-        expect(await search("completato")).toEqual([]);
+        expect(await search("completed")).toEqual([]);
     });
 
     it("non distingue maiuscole e minuscole", async () => {
@@ -118,24 +118,24 @@ describe("listInterventions: ricerca libera", () => {
 
     it("si combina con gli altri filtri", async () => {
         const customer = await insertCustomer({ firstName: "Zefiro" });
-        const done = await insertIntervention({ customerId: customer.id, status: "completato" });
-        await insertIntervention({ customerId: customer.id, status: "programmato" });
-        await insertIntervention({ status: "completato" });
+        const done = await insertIntervention({ customerId: customer.id, status: "completed" });
+        await insertIntervention({ customerId: customer.id, status: "scheduled" });
+        await insertIntervention({ status: "completed" });
 
-        expect(await findIds({ search: "zefiro", status: "completato" })).toEqual([done.id]);
+        expect(await findIds({ search: "zefiro", status: "completed" })).toEqual([done.id]);
     });
 });
 
 describe("listInterventions: filtri", () => {
     it("filtra per stato e per tipo", async () => {
-        const scheduledOnSite = await insertIntervention({ status: "programmato", type: "intervento_sede" });
-        const doneRemote = await insertIntervention({ status: "completato", type: "intervento_remoto" });
-        const doneDelivery = await insertIntervention({ status: "completato", type: "consegna_materiale" });
+        const scheduledOnSite = await insertIntervention({ status: "scheduled", type: "customer_site" });
+        const doneRemote = await insertIntervention({ status: "completed", type: "remote" });
+        const doneDelivery = await insertIntervention({ status: "completed", type: "material_delivery" });
 
-        expect(await findIds({ status: "programmato" })).toEqual([scheduledOnSite.id]);
-        expect(await findIds({ status: "completato" })).toEqual([doneRemote.id, doneDelivery.id]);
-        expect(await findIds({ type: "consegna_materiale" })).toEqual([doneDelivery.id]);
-        expect(await findIds({ status: "completato", type: "intervento_remoto" })).toEqual([doneRemote.id]);
+        expect(await findIds({ status: "scheduled" })).toEqual([scheduledOnSite.id]);
+        expect(await findIds({ status: "completed" })).toEqual([doneRemote.id, doneDelivery.id]);
+        expect(await findIds({ type: "material_delivery" })).toEqual([doneDelivery.id]);
+        expect(await findIds({ status: "completed", type: "remote" })).toEqual([doneRemote.id]);
         expect(await findIds({ status: "all", type: "all" })).toHaveLength(3);
     });
 
@@ -222,19 +222,19 @@ describe("listInterventions: ordinamento e paginazione", () => {
     it("ordina per cliente e per stato", async () => {
         const bruno = await insertIntervention({
             customerId: (await insertCustomer({ firstName: "Bruno" })).id,
-            status: "completato",
+            status: "completed",
         });
         const anna = await insertIntervention({
             customerId: (await insertCustomer({ firstName: "Anna" })).id,
-            status: "programmato",
+            status: "scheduled",
         });
         const carla = await insertIntervention({
             customerId: (await insertCustomer({ firstName: "Carla" })).id,
-            status: "in_lavorazione",
+            status: "in_progress",
         });
 
         expect(await orderedIds({ sortBy: "customer", sortOrder: "asc" })).toEqual([anna.id, bruno.id, carla.id]);
-        // Alfabetico sul valore salvato: completato, in_lavorazione, programmato.
+        // Alfabetico sul valore salvato: completed, in_progress, scheduled.
         expect(await orderedIds({ sortBy: "status", sortOrder: "asc" })).toEqual([bruno.id, carla.id, anna.id]);
     });
 
@@ -275,8 +275,8 @@ describe("listInterventions: righe e join", () => {
         const target = await insertIntervention({
             customerId: customer.id,
             collaboratorId: collaborator.id,
-            type: "intervento_remoto",
-            status: "completato",
+            type: "remote",
+            status: "completed",
             description: "Configurata la stampante",
             price: 40,
             paid: true,
@@ -291,8 +291,8 @@ describe("listInterventions: righe e join", () => {
             items: [
                 {
                     id: target.id,
-                    type: "intervento_remoto",
-                    status: "completato",
+                    type: "remote",
+                    status: "completed",
                     problem: null,
                     description: "Configurata la stampante",
                     note: null,
@@ -336,14 +336,29 @@ describe("listInterventions: righe e join", () => {
 
 describe("getInterventionStats", () => {
     it("conta gli interventi per stato, zero per gli stati senza righe", async () => {
-        await insertIntervention({ status: "programmato" });
-        await insertIntervention({ status: "programmato" });
-        await insertIntervention({ status: "in_lavorazione" });
+        await insertIntervention({ status: "scheduled" });
+        await insertIntervention({ status: "scheduled" });
+        await insertIntervention({ status: "in_progress" });
 
         expect(await getInterventionStats()).toEqual({
-            programmatoCount: 2,
-            inLavorazioneCount: 1,
-            completatoCount: 0,
+            scheduledCount: 2,
+            inProgressCount: 1,
+            completedCount: 0,
+        });
+    });
+});
+
+describe("vincoli CHECK su tipo e stato", () => {
+    // I vecchi valori italiani (prima della migrazione 0040) non devono più poter entrare.
+    it("rifiuta un tipo nel vecchio valore italiano", async () => {
+        await expect(insertIntervention({ type: "intervento_sede" as never })).rejects.toMatchObject({
+            cause: { code: "23514", constraint: "intervention_type_check" },
+        });
+    });
+
+    it("rifiuta uno stato nel vecchio valore italiano", async () => {
+        await expect(insertIntervention({ status: "completato" as never })).rejects.toMatchObject({
+            cause: { code: "23514", constraint: "intervention_status_check" },
         });
     });
 });

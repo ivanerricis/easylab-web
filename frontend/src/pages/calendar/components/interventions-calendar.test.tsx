@@ -25,9 +25,9 @@ const event: InterventionCalendarEvent = {
     end: new Date(2026, 8, 11, 10, 30),
     resource: {
         id: 9,
-        type: "intervento_sede",
+        type: "customer_site",
         description: null,
-        status: "programmato",
+        status: "scheduled",
         interventionDate: "2026-09-11",
         startTime: "09:00:00",
         endTime: "10:30:00",
@@ -262,7 +262,7 @@ describe('InterventionsCalendar: popup "+N altri"', () => {
     });
 
     it("il pulsante dice quanti interventi nascosti ci sono per stato", () => {
-        const withStatus = (id: number, status: "programmato" | "in_lavorazione" | "completato") => ({
+        const withStatus = (id: number, status: "scheduled" | "in_progress" | "completed") => ({
             ...event,
             id,
             title: `Cliente ${id}`,
@@ -273,10 +273,10 @@ describe('InterventionsCalendar: popup "+N altri"', () => {
         });
         renderCalendar(vi.fn(), {
             events: [
-                withStatus(31, "completato"),
-                withStatus(32, "completato"),
-                withStatus(33, "in_lavorazione"),
-                withStatus(34, "programmato"),
+                withStatus(31, "completed"),
+                withStatus(32, "completed"),
+                withStatus(33, "in_progress"),
+                withStatus(34, "scheduled"),
             ],
         });
 

@@ -25,7 +25,7 @@ export type EditInterventionSubmitValues = {
     interventionId: number;
     type: InterventionType;
     status: InterventionStatus;
-    /** `null` quando l'intervento è solo programmato: il lavoro non è ancora stato svolto. */
+    /** `null` quando l'intervento è solo scheduled: il lavoro non è ancora stato svolto. */
     description: string | null;
     problem: string | null;
     note: string | null;

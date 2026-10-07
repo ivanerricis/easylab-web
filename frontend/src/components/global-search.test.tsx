@@ -48,8 +48,8 @@ const report = {
 const intervention = {
     id: 9,
     customer: "Mario Rossi",
-    type: "intervento_sede",
-    status: "programmato",
+    type: "customer_site",
+    status: "scheduled",
     interventionDate: "2026-09-20",
 };
 

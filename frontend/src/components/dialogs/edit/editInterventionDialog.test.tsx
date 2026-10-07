@@ -24,8 +24,8 @@ import EditInterventionDialog from "./editInterventionDialog";
 import { renderWithProviders } from "@/test/render";
 
 const baseIntervention = {
-    type: "intervento_sede" as const,
-    status: "programmato" as const,
+    type: "customer_site" as const,
+    status: "scheduled" as const,
     description: null,
     problem: "Non si accende",
     price: null,

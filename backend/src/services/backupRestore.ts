@@ -22,6 +22,16 @@ import { findNonPlainEntry, findUnsafeTarEntry } from "./archiveSafety";
 import { writeRestrictedSql } from "./restoreSql";
 import { getCompanySettings } from "./companyManager";
 import { invalidateJsonSettingsCaches } from "./jsonSettingsStore";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { db } from "../db";
+
+// Il dump riportato può essere di una versione più vecchia dello schema (e dei valori salvati,
+// come i tipi e gli stati degli interventi): senza questo passo resterebbe così fino al
+// prossimo riavvio del backend, e il codice attuale non ne riconoscerebbe i dati. Il tracking
+// delle migrazioni sta nello schema `drizzle`, che il dump riporta insieme al resto, quindi il
+// migrator applica esattamente quelle mancanti. La cartella è relativa alla cwd del processo
+// (`/app` in produzione, `backend/` in sviluppo), come in `migrate.js`.
+export const runPendingMigrations = () => migrate(db, { migrationsFolder: path.resolve("drizzle") });
 
 // Estrae l'archivio e restituisce dove trovare dump e impostazioni. Per il formato
 // storico (.sql puro) non c'è nulla da estrarre e non ci sono impostazioni.
@@ -161,6 +171,8 @@ const performRestore = async (
         }
 
         await runPsql(["-f", restrictedSqlPath]);
+        // Un errore qui è un ripristino fallito, come uno di psql: il catch sotto lo registra.
+        await runPendingMigrations();
 
         if (source.dataDir) {
             await restoreDataEntries(source.dataDir);

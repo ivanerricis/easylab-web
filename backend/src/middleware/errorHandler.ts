@@ -97,6 +97,8 @@ const GENERIC_NOT_NULL_MESSAGE = "Campo obbligatorio mancante";
 const CHECK_MESSAGES: Record<string, string> = {
     report_paid_price_check: "Se il pagamento è in contanti o con carta, il prezzo deve essere maggiore di 0",
     report_closed_collaborator_check: "Per chiudere un report è necessario indicare un collaboratore",
+    intervention_type_check: "Tipo di intervento non valido",
+    intervention_status_check: "Stato dell'intervento non valido",
 };
 
 const GENERIC_CHECK_MESSAGE = "I dati inseriti non sono validi.";

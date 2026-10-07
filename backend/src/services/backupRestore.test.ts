@@ -82,6 +82,12 @@ vi.mock("./jsonSettingsStore", () => jsonSettingsStoreMock);
 const authManagerMock = vi.hoisted(() => ({ clearUnreadableTwoFactorSecrets: vi.fn() }));
 vi.mock("./authManager", () => authManagerMock);
 
+const migratorMock = vi.hoisted(() => ({ migrate: vi.fn() }));
+vi.mock("drizzle-orm/node-postgres/migrator", () => migratorMock);
+
+const dbMock = vi.hoisted(() => ({ db: { fake: "db" } }));
+vi.mock("../db", () => dbMock);
+
 import { BackupManagerError } from "./backupError";
 import { restoreBackupFromExisting, restoreBackupFromUpload } from "./backupRestore";
 
@@ -303,6 +309,36 @@ describe("restoreBackupFromExisting", () => {
         await expect(restoreBackupFromExisting("db-dump-20260101-000000.sql", false)).rejects.toThrow("psql");
 
         expect(authManagerMock.clearUnreadableTwoFactorSecrets).not.toHaveBeenCalled();
+    });
+
+    it("applica le migrazioni pendenti subito dopo psql, sulla cartella drizzle", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-dump-20260701-020000.sql");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(false);
+        backupProcessMock.runPsql.mockResolvedValueOnce(undefined);
+        migratorMock.migrate.mockResolvedValueOnce(undefined);
+
+        await restoreBackupFromExisting("db-dump-20260701-020000.sql", true);
+
+        expect(migratorMock.migrate).toHaveBeenCalledWith(dbMock.db, { migrationsFolder: path.resolve("drizzle") });
+        expect(backupProcessMock.runPsql.mock.invocationCallOrder[0]).toBeLessThan(
+            migratorMock.migrate.mock.invocationCallOrder[0]
+        );
+    });
+
+    it("segna il ripristino come fallito se le migrazioni falliscono", async () => {
+        backupFilesMock.getBackupDumpPath.mockResolvedValueOnce("/backups/db-dump-20260701-020000.sql");
+        backupFilesMock.isArchiveFileName.mockReturnValueOnce(false);
+        backupProcessMock.runPsql.mockResolvedValueOnce(undefined);
+        migratorMock.migrate.mockRejectedValueOnce(new Error("migrazione rotta"));
+
+        await expect(restoreBackupFromExisting("db-dump-20260701-020000.sql", true)).rejects.toThrow(
+            "migrazione rotta"
+        );
+
+        expect(backupStateMock.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({ lastRestoreStatus: "failed", lastRestoreError: "migrazione rotta" })
+        );
+        expect(backupLockMock.endRestore).toHaveBeenCalledTimes(1);
     });
 
     // `prepareRestoreSource` viene chiamato *dentro* il blocco try/finally di performRestore

@@ -47,17 +47,17 @@ const textColor = "#1f2733";
  * non più in un riquadro "Data / Tipo" a parte, che ripeteva una data già detta due volte.
  */
 const wordingByType: Record<InterventionType, { subject: string; summary: string; detail: string }> = {
-    consegna_materiale: {
+    material_delivery: {
         subject: "consegna",
         summary: "della consegna di materiale",
         detail: "di quanto consegnato",
     },
-    intervento_sede: {
+    customer_site: {
         subject: "intervento",
         summary: "dell'intervento in sede",
         detail: "del lavoro svolto",
     },
-    intervento_remoto: {
+    remote: {
         subject: "intervento",
         summary: "dell'intervento da remoto",
         detail: "del lavoro svolto",

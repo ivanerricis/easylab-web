@@ -95,8 +95,8 @@ beforeEach(() => {
         page([
             {
                 id: 9,
-                type: "consegna_materiale",
-                status: "completato",
+                type: "material_delivery",
+                status: "completed",
                 customer: "Mario Rossi",
                 collaborator: "Luca",
                 interventionDate: "2026-09-02",

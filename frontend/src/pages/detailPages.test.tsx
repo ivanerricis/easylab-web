@@ -340,11 +340,11 @@ describe("ReportPage", () => {
 describe("InterventionPage", () => {
     const intervention = {
         id: 9,
-        type: "intervento_remoto",
+        type: "remote",
         description: null,
         problem: "VPN non si collega",
         note: "Chiamare dopo le 15",
-        status: "in_lavorazione",
+        status: "in_progress",
         interventionDate: "2026-09-10",
         startTime: "09:00:00",
         endTime: null,
@@ -385,7 +385,7 @@ describe("InterventionPage", () => {
     });
 
     it("non mostra il problema per una consegna", async () => {
-        api.getIntervention.mockResolvedValue({ ...intervention, type: "consegna_materiale", problem: null });
+        api.getIntervention.mockResolvedValue({ ...intervention, type: "material_delivery", problem: null });
         await renderPage();
 
         expect(screen.queryByText("Problema")).not.toBeInTheDocument();
@@ -394,8 +394,8 @@ describe("InterventionPage", () => {
     it("salva la modifica con la nota e ricarica", async () => {
         editValues = {
             interventionId: 9,
-            type: "intervento_remoto",
-            status: "completato",
+            type: "remote",
+            status: "completed",
             description: "Riconfigurato il client",
             problem: "VPN non si collega",
             note: "Tutto a posto",
@@ -412,7 +412,7 @@ describe("InterventionPage", () => {
         await waitFor(() => {
             expect(api.updateIntervention).toHaveBeenCalledWith(
                 9,
-                expect.objectContaining({ note: "Tutto a posto", status: "completato" })
+                expect.objectContaining({ note: "Tutto a posto", status: "completed" })
             );
         });
         await waitFor(() => {

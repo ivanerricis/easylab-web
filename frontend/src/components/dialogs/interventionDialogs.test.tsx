@@ -134,8 +134,8 @@ describe("CreateInterventionDialog", () => {
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith({
-                type: "consegna_materiale",
-                status: "programmato",
+                type: "material_delivery",
+                status: "scheduled",
                 description: null,
                 problem: null,
                 note: null,
@@ -238,8 +238,8 @@ describe("CreateInterventionDialog", () => {
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    type: "intervento_sede",
-                    status: "completato",
+                    type: "customer_site",
+                    status: "completed",
                     problem: "Stampante bloccata",
                     description: "Sbloccato il rullo",
                     startTime: "11:00",
@@ -284,7 +284,7 @@ describe("CreateInterventionDialog", () => {
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(
-                expect.objectContaining({ type: "consegna_materiale", problem: null, startTime: null, endTime: null })
+                expect.objectContaining({ type: "material_delivery", problem: null, startTime: null, endTime: null })
             );
         });
     });
@@ -360,14 +360,14 @@ describe("CreateInterventionDialog", () => {
 describe("EditInterventionDialog", () => {
     const intervention = {
         id: 9,
-        type: "intervento_sede",
+        type: "customer_site",
         description: "Sostituito cavo",
         problem: "Rete assente",
         note: null,
         price: null,
         paid: true,
         toInvoice: true,
-        status: "completato",
+        status: "completed",
         interventionDate: "2026-09-10",
         startTime: "09:00:00",
         endTime: "10:15:00",
@@ -415,8 +415,8 @@ describe("EditInterventionDialog", () => {
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith({
                 interventionId: 9,
-                type: "intervento_sede",
-                status: "completato",
+                type: "customer_site",
+                status: "completed",
                 description: "Sostituito cavo",
                 problem: "Rete assente",
                 note: "Richiamare lunedì",
@@ -447,7 +447,7 @@ describe("EditInterventionDialog", () => {
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(
-                expect.objectContaining({ status: "in_lavorazione", description: null })
+                expect.objectContaining({ status: "in_progress", description: null })
             );
         });
     });

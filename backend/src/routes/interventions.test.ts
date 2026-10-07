@@ -77,12 +77,12 @@ const { timeZone: _timeZone, ...labHeader } = labConfig;
 // Riga così come la restituisce `getInterventionDetailById`, che servono anche stampa ed email.
 const printRow = {
     id: 1,
-    type: "intervento_sede",
+    type: "customer_site",
     description: "Sostituito alimentatore",
     problem: "Non si accende",
     note: "Cliente da richiamare",
     toInvoice: true,
-    status: "completato",
+    status: "completed",
     interventionDate: "2026-01-10",
     startTime: "09:00:00",
     endTime: "10:00:00",
@@ -98,13 +98,13 @@ const printRow = {
 // grezze della tabella, non quelle rinominate della query di stampa.
 const storedIntervention = {
     id: 1,
-    type: "consegna_materiale",
+    type: "material_delivery",
     description: "Consegnato alimentatore",
     problem: null,
     note: null,
     paid: false,
     toInvoice: false,
-    status: "programmato",
+    status: "scheduled",
     interventionDate: "2026-01-10",
     startTime: null,
     endTime: null,
@@ -133,15 +133,15 @@ describe("interventions router", () => {
             vi.mocked(listInterventions).mockResolvedValue({ items: [], totalItems: 0 } as never);
 
             const response = await request(buildApp()).get(
-                "/api/interventions?page=1&pageSize=10&status=completato&type=intervento_sede" +
+                "/api/interventions?page=1&pageSize=10&status=completed&type=customer_site" +
                     "&dateFrom=2026-01-01&dateTo=2026-01-31&scheduledDate=2026-01-15" +
                     "&scheduledFrom=2026-01-01&scheduledTo=2026-01-31&sortBy=customer&sortOrder=asc&search=rossi"
             );
 
             expect(response.status).toBe(200);
             expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({
-                status: "completato",
-                type: "intervento_sede",
+                status: "completed",
+                type: "customer_site",
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
                 scheduledDate: "2026-01-15",
@@ -183,8 +183,8 @@ describe("interventions router", () => {
             customer: "Mario Rossi",
             customerPhone: "02 1234567",
             collaborator: "Luigi Verdi",
-            type: "intervento_sede",
-            status: "completato",
+            type: "customer_site",
+            status: "completed",
             interventionDate: "2026-01-15",
             startTime: "09:00",
             endTime: "10:30",
@@ -201,15 +201,15 @@ describe("interventions router", () => {
             vi.mocked(listInterventions).mockResolvedValue([exportInterventionRow] as never);
 
             const response = await request(buildApp()).get(
-                "/api/interventions/export.csv?status=completato&type=intervento_sede&dateFrom=2026-01-01&dateTo=2026-01-31"
+                "/api/interventions/export.csv?status=completed&type=customer_site&dateFrom=2026-01-01&dateTo=2026-01-31"
             );
 
             expect(response.status).toBe(200);
             expect(response.headers["content-type"]).toContain("text/csv");
             expect(response.headers["content-disposition"]).toContain("interventi.csv");
             expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({
-                status: "completato",
-                type: "intervento_sede",
+                status: "completed",
+                type: "customer_site",
                 dateFrom: "2026-01-01",
                 dateTo: "2026-01-31",
                 unpaginatedLimit: exportRowLimit,
@@ -254,15 +254,15 @@ describe("interventions router", () => {
     describe("GET /stats", () => {
         it("restituisce il conteggio per stato", async () => {
             vi.mocked(getInterventionStats).mockResolvedValue({
-                programmatoCount: 2,
-                inLavorazioneCount: 1,
-                completatoCount: 5,
+                scheduledCount: 2,
+                inProgressCount: 1,
+                completedCount: 5,
             } as never);
 
             const response = await request(buildApp()).get("/api/interventions/stats");
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({ programmatoCount: 2, inLavorazioneCount: 1, completatoCount: 5 });
+            expect(response.body).toEqual({ scheduledCount: 2, inProgressCount: 1, completedCount: 5 });
         });
     });
 
@@ -442,7 +442,7 @@ describe("interventions router", () => {
 
     describe("POST /", () => {
         const minimalBody = {
-            type: "consegna_materiale",
+            type: "material_delivery",
             customerId: 1,
             collaboratorId: 1,
             interventionDate: "2026-01-10",
@@ -456,7 +456,7 @@ describe("interventions router", () => {
             expect(response.status).toBe(201);
             expect(createIntervention).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    status: "programmato",
+                    status: "scheduled",
                     description: null,
                     problem: null,
                     startTime: null,
@@ -469,8 +469,8 @@ describe("interventions router", () => {
             vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
 
             const response = await request(buildApp()).post("/api/interventions").send({
-                type: "intervento_sede",
-                status: "completato",
+                type: "customer_site",
+                status: "completed",
                 customerId: 1,
                 collaboratorId: 1,
                 interventionDate: "2026-01-10",
@@ -560,7 +560,7 @@ describe("interventions router", () => {
         it("rifiuta la creazione senza data dell'intervento", async () => {
             const response = await request(buildApp())
                 .post("/api/interventions")
-                .send({ type: "consegna_materiale", customerId: 1, collaboratorId: 1 });
+                .send({ type: "material_delivery", customerId: 1, collaboratorId: 1 });
 
             expect(response.status).toBe(400);
             expect(createIntervention).not.toHaveBeenCalled();
@@ -571,7 +571,7 @@ describe("interventions router", () => {
 
             const response = await request(buildApp())
                 .post("/api/interventions")
-                .send({ ...minimalBody, status: "in_lavorazione" });
+                .send({ ...minimalBody, status: "in_progress" });
 
             expect(response.status).not.toBe(400);
             expect(createIntervention).toHaveBeenCalled();
@@ -580,7 +580,7 @@ describe("interventions router", () => {
         it("richiede la descrizione quando l'intervento è completato", async () => {
             const response = await request(buildApp())
                 .post("/api/interventions")
-                .send({ ...minimalBody, status: "completato" });
+                .send({ ...minimalBody, status: "completed" });
 
             expect(response.status).toBe(400);
             expect(createIntervention).not.toHaveBeenCalled();
@@ -589,7 +589,7 @@ describe("interventions router", () => {
         it("richiede il problema riscontrato per un intervento in sede anche se solo programmato", async () => {
             const response = await request(buildApp())
                 .post("/api/interventions")
-                .send({ ...minimalBody, type: "intervento_sede" });
+                .send({ ...minimalBody, type: "customer_site" });
 
             expect(response.status).toBe(400);
             expect(createIntervention).not.toHaveBeenCalled();
@@ -602,8 +602,8 @@ describe("interventions router", () => {
                 .post("/api/interventions")
                 .send({
                     ...minimalBody,
-                    type: "intervento_remoto",
-                    status: "in_lavorazione",
+                    type: "remote",
+                    status: "in_progress",
                     problem: "Non si accende",
                 });
 
@@ -616,8 +616,8 @@ describe("interventions router", () => {
                 .post("/api/interventions")
                 .send({
                     ...minimalBody,
-                    type: "intervento_remoto",
-                    status: "completato",
+                    type: "remote",
+                    status: "completed",
                     problem: "Non si accende",
                     description: "Fatto",
                 });
@@ -631,8 +631,8 @@ describe("interventions router", () => {
                 .post("/api/interventions")
                 .send({
                     ...minimalBody,
-                    type: "intervento_remoto",
-                    status: "in_lavorazione",
+                    type: "remote",
+                    status: "in_progress",
                     problem: "Non si accende",
                     description: "In corso",
                     startTime: "10:00",
@@ -710,10 +710,10 @@ describe("interventions router", () => {
             expect(updateInterventionById).not.toHaveBeenCalled();
         });
 
-        it("richiede la descrizione quando lo stato passa a 'completato' e la riga esistente non ce l'ha", async () => {
+        it("richiede la descrizione quando lo stato passa a 'completed' e la riga esistente non ce l'ha", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([{ ...storedIntervention, description: null }] as never);
 
-            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "completato" });
+            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "completed" });
 
             expect(response.status).toBe(400);
             expect(updateInterventionById).not.toHaveBeenCalled();
@@ -723,7 +723,7 @@ describe("interventions router", () => {
             vi.mocked(getInterventionById).mockResolvedValue([
                 {
                     ...storedIntervention,
-                    type: "intervento_sede",
+                    type: "customer_site",
                     problem: "Non si accende",
                     description: null,
                     startTime: null,
@@ -732,7 +732,7 @@ describe("interventions router", () => {
             ] as never);
             vi.mocked(updateInterventionById).mockResolvedValue([storedIntervention] as never);
 
-            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "in_lavorazione" });
+            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "in_progress" });
 
             expect(response.status).not.toBe(400);
             expect(updateInterventionById).toHaveBeenCalled();
@@ -741,7 +741,7 @@ describe("interventions router", () => {
         it("richiede il problema riscontrato quando il tipo passa a un intervento in sede", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([storedIntervention] as never);
 
-            const response = await request(buildApp()).put("/api/interventions/1").send({ type: "intervento_sede" });
+            const response = await request(buildApp()).put("/api/interventions/1").send({ type: "customer_site" });
 
             expect(response.status).toBe(400);
             expect(updateInterventionById).not.toHaveBeenCalled();
@@ -749,10 +749,10 @@ describe("interventions router", () => {
 
         it("richiede ora inizio e fine quando un intervento in sede diventa completato", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([
-                { ...storedIntervention, type: "intervento_sede", problem: "Non si accende" },
+                { ...storedIntervention, type: "customer_site", problem: "Non si accende" },
             ] as never);
 
-            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "completato" });
+            const response = await request(buildApp()).put("/api/interventions/1").send({ status: "completed" });
 
             expect(response.status).toBe(400);
             expect(updateInterventionById).not.toHaveBeenCalled();
@@ -760,7 +760,7 @@ describe("interventions router", () => {
 
         it("rifiuta un'ora di fine non successiva a quella di inizio", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([
-                { ...storedIntervention, type: "intervento_sede", problem: "Non si accende" },
+                { ...storedIntervention, type: "customer_site", problem: "Non si accende" },
             ] as never);
 
             const response = await request(buildApp())
@@ -794,8 +794,8 @@ describe("interventions router", () => {
         // rompere, così la PUT isola la violazione senza dover ricalcolare il resto a mano.
         const completeOnSiteExisting = {
             ...storedIntervention,
-            type: "intervento_sede",
-            status: "completato",
+            type: "customer_site",
+            status: "completed",
             problem: "Non si accende",
             description: "Fatto",
             startTime: "09:00",
@@ -803,12 +803,12 @@ describe("interventions router", () => {
         };
 
         const onSiteBase = {
-            type: "intervento_sede",
+            type: "customer_site",
             customerId: 1,
             collaboratorId: 1,
             interventionDate: "2026-01-10",
             problem: "Non si accende",
-            status: "completato",
+            status: "completed",
             description: "Fatto",
             startTime: "09:00",
             endTime: "10:00",

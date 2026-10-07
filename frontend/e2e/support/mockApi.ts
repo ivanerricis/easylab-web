@@ -52,7 +52,7 @@ const defaultHandlers = (loggedIn: boolean): Record<string, ApiHandler> => ({
         monthlyNetRevenue: 0,
         series: [],
     }),
-    "GET /api/interventions/stats": () => ({ programmatoCount: 0, inLavorazioneCount: 0, completatoCount: 0 }),
+    "GET /api/interventions/stats": () => ({ scheduledCount: 0, inProgressCount: 0, completedCount: 0 }),
     "GET /api/interventions": ({ url }) => listOrPage(url, []),
     "GET /api/reports": ({ url }) => listOrPage(url, []),
     "GET /api/customers": ({ url }) => listOrPage(url, []),

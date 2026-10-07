@@ -233,9 +233,9 @@ export const getInterventionStats = async () => {
     const countByStatus = new Map(statusCountRows.map((row) => [row.status, Number(row.count)]));
 
     return {
-        programmatoCount: countByStatus.get("programmato") ?? 0,
-        inLavorazioneCount: countByStatus.get("in_lavorazione") ?? 0,
-        completatoCount: countByStatus.get("completato") ?? 0,
+        scheduledCount: countByStatus.get("scheduled") ?? 0,
+        inProgressCount: countByStatus.get("in_progress") ?? 0,
+        completedCount: countByStatus.get("completed") ?? 0,
     };
 };
 

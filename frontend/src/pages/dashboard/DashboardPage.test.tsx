@@ -144,7 +144,7 @@ beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 8, 11, 10, 0));
     api.getReportStats.mockResolvedValue(reportStats);
-    api.getInterventionStats.mockResolvedValue({ programmatoCount: 4, inLavorazioneCount: 2, completatoCount: 7 });
+    api.getInterventionStats.mockResolvedValue({ scheduledCount: 4, inProgressCount: 2, completedCount: 7 });
     api.listInterventions.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 1000, totalPages: 0 });
 });
 
@@ -185,7 +185,7 @@ describe("DashboardPage", () => {
         await userEvent.click(screen.getByRole("button", { name: /Interventi in lavorazione/ }));
 
         expect(navigate).toHaveBeenCalledWith("/reports?visibility=closed");
-        expect(navigate).toHaveBeenCalledWith("/interventions?status=in_lavorazione");
+        expect(navigate).toHaveBeenCalledWith("/interventions?status=in_progress");
     });
 
     it("i contatori si attivano anche da tastiera", async () => {
@@ -259,8 +259,8 @@ describe("DashboardPage", () => {
         resolveCustomerId.mockResolvedValue(30);
         api.createIntervention.mockResolvedValue({ id: 77 });
         interventionValues = {
-            type: "consegna_materiale",
-            status: "programmato",
+            type: "material_delivery",
+            status: "scheduled",
             description: null,
             problem: null,
             note: "Lasciare in portineria",

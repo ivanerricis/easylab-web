@@ -199,7 +199,7 @@ SELECT
            'Migrazione posta elettronica','Controllo periodico backup',
            'Ripristino condivisione cartelle','Aggiornamento antivirus su tutte le postazioni',
            'Consegna notebook sostitutivo'])[1 + (g % 10)],
-    CASE WHEN tipo <> 'consegna_materiale' THEN
+    CASE WHEN tipo <> 'material_delivery' THEN
         (ARRAY['La stampante di rete non risponde dalle postazioni del primo piano',
                'Il gestionale si blocca all''apertura degli ordini',
                'La posta non scarica dal client su due postazioni',
@@ -208,30 +208,30 @@ SELECT
     END,
     stato,
     data_intervento,
-    CASE WHEN tipo <> 'consegna_materiale' THEN (time '08:00' + ((g % 9) * interval '1 hour')) END,
-    CASE WHEN tipo <> 'consegna_materiale' THEN (time '08:00' + ((g % 9) * interval '1 hour') + interval '90 minutes') END,
+    CASE WHEN tipo <> 'material_delivery' THEN (time '08:00' + ((g % 9) * interval '1 hour')) END,
+    CASE WHEN tipo <> 'material_delivery' THEN (time '08:00' + ((g % 9) * interval '1 hour') + interval '90 minutes') END,
     creato,
-    CASE WHEN stato = 'completato' THEN creato + (random() * interval '10 days') END,
+    CASE WHEN stato = 'completed' THEN creato + (random() * interval '10 days') END,
     1 + (random() * (:n_customers - 1))::int,
     1 + (random() * (:n_collaborators - 1))::int
 FROM generate_series(1, :n_interventions) AS g
 CROSS JOIN LATERAL (
     SELECT
-        (ARRAY['consegna_materiale','intervento_sede','intervento_remoto'])[1 + (g % 3)] AS tipo,
+        (ARRAY['material_delivery','customer_site','remote'])[1 + (g % 3)] AS tipo,
         now() - (power(random(), 2) * interval '730 days') AS creato
 ) AS base
 CROSS JOIN LATERAL (
     SELECT
-        -- Il 4% degli interventi cade nel futuro (agenda), e quelli restano "programmato".
+        -- Il 4% degli interventi cade nel futuro (agenda), e quelli restano "scheduled".
         (creato + CASE WHEN g % 25 = 0 THEN (random() * interval '30 days') + interval '1 day'
                        ELSE (random() * interval '5 days') END)::date AS data_intervento
 ) AS pianificazione
 CROSS JOIN LATERAL (
     SELECT CASE
-        WHEN data_intervento > current_date THEN 'programmato'
-        WHEN g % 9 = 0 THEN 'in_lavorazione'
-        WHEN g % 11 = 0 THEN 'programmato'
-        ELSE 'completato'
+        WHEN data_intervento > current_date THEN 'scheduled'
+        WHEN g % 9 = 0 THEN 'in_progress'
+        WHEN g % 11 = 0 THEN 'scheduled'
+        ELSE 'completed'
     END AS stato
 ) AS avanzamento;
 

@@ -293,7 +293,7 @@ const CustomDialog = ({
                     {/* `mb-4`: il form non è una griglia, quindi il `gap` di DialogContent non
                         arriva fra intestazione e contenuto, e la prima etichetta stava attaccata
                         al titolo (0px). Alcuni contenuti aggiungono un loro `py-*`, che si somma. */}
-                    <DialogHeader className="mb-4">
+                    <DialogHeader className="mb-4 pr-8">
                         {title ? <DialogTitle className="text-lg font-semibold">{title}</DialogTitle> : null}
                         {description ? <DialogDescription>{description}</DialogDescription> : null}
                     </DialogHeader>

@@ -53,10 +53,10 @@ describe("RequireAuth", () => {
         expect(screen.queryByText("Pagina report")).not.toBeInTheDocument();
     });
 
-    it("manda al login chi non è autenticato, ricordando da dove veniva", () => {
+    it("manda al login chi non è autenticato, senza ricordare da dove veniva", () => {
         renderAt("/reports", { user: null, isLoading: false });
 
-        expect(screen.getByText("Login, provenienza: /reports")).toBeInTheDocument();
+        expect(screen.getByText("Login, provenienza:")).toBeInTheDocument();
     });
 
     /** Una password generata non deve dare accesso all'app, nemmeno a una pagina. */

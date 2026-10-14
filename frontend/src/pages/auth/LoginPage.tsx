@@ -1,6 +1,6 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { type ReactNode, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,6 @@ const LoginPage = () => {
     useDocumentTitle("Accesso");
     const { login, completeTwoFactorLogin } = useAuth();
     const navigate = useNavigate();
-    const location = useLocation();
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -71,17 +70,10 @@ const LoginPage = () => {
     const [passwordError, setPasswordError] = useState<string>();
     const [codeError, setCodeError] = useState<string>();
 
-    // Si torna all'indirizzo intero da cui `RequireAuth` ha mandato qui, filtri compresi: prima
-    // si teneva solo il percorso, e un link a una lista filtrata (`/reports?status=…`) aperto a
-    // sessione scaduta portava alla lista senza filtri.
+    // Sempre alla dashboard: con la sessione scaduta o dopo un logout il prossimo accesso può
+    // essere di un altro utente, e riaprire la pagina di prima non ha senso.
     const goToApp = () => {
-        const from = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
-        navigate(
-            from?.pathname
-                ? { pathname: from.pathname, search: from.search ?? "", hash: from.hash ?? "" }
-                : "/dashboard",
-            { replace: true }
-        );
+        navigate("/dashboard", { replace: true });
     };
 
     const backToCredentials = (reason?: string) => {

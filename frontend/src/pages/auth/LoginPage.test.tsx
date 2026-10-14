@@ -187,23 +187,15 @@ describe("LoginPage", () => {
         expect(input).not.toHaveAttribute("autocapitalize");
     });
 
-    /** Un link a una lista filtrata aperto a sessione scaduta deve tornare alla lista filtrata. */
-    it("dopo l'accesso torna all'indirizzo di partenza con filtri e ancora", async () => {
+    /** Anche con un `from` nello stato (vecchi link, sessione scaduta) si atterra sulla dashboard. */
+    it("dopo l'accesso va sempre alla dashboard", async () => {
         login.mockResolvedValue({ status: "authenticated", user: { ...user, twoFactorEnabled: false } });
 
-        renderLoginPage([
-            {
-                pathname: "/login",
-                state: { from: { pathname: "/reports", search: "?status=open&page=2", hash: "#fondo" } },
-            },
-        ]);
+        renderLoginPage([{ pathname: "/login", state: { from: { pathname: "/reports" } } }]);
         await submitCredentials();
 
         await waitFor(() => {
-            expect(navigate).toHaveBeenCalledWith(
-                { pathname: "/reports", search: "?status=open&page=2", hash: "#fondo" },
-                { replace: true }
-            );
+            expect(navigate).toHaveBeenCalledWith("/dashboard", { replace: true });
         });
     });
 

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import LoadingPage from "@/components/loadingPage";
 import { useAuth } from "@/components/use-auth";
 
@@ -11,14 +11,15 @@ const ForceTwoFactorSetupPage = lazy(() => import("@/pages/auth/ForceTwoFactorSe
 
 const RequireAuth = () => {
     const { user, isLoading } = useAuth();
-    const location = useLocation();
 
     if (isLoading) {
         return <LoadingPage className="h-svh" />;
     }
 
     if (!user) {
-        return <Navigate to="/login" replace state={{ from: location }} />;
+        // Niente `state.from`: dopo il login si atterra sempre sulla dashboard, che la sessione
+        // sia scaduta o la si sia chiusa a mano (magari per entrare con un altro account).
+        return <Navigate to="/login" replace />;
     }
 
     if (user.mustChangePassword) {

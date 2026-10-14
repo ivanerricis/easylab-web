@@ -157,6 +157,7 @@ const CustomerPage = () => {
                     backTo: "/clients",
                     backLabel: "Vai ai clienti",
                 }}
+                variant="person"
             />
         );
     }

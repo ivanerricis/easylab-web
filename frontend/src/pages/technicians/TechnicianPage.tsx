@@ -136,6 +136,7 @@ const TechnicianPage = () => {
                     backTo: "/technicians",
                     backLabel: "Vai ai tecnici esterni",
                 }}
+                variant="person"
             />
         );
     }

@@ -3,7 +3,6 @@ import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "rea
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, Database, FileDown, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -21,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { SettingsLoadingBox } from "@/components/settings/settingsUi";
+import { SettingsSectionSkeleton } from "./settings-skeleton";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/use-auth";
 
@@ -176,15 +175,6 @@ const getInternalLinkTarget = (event: MouseEvent) => {
 
     return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : null;
 };
-
-/** Stesso aspetto delle card delle sezioni mentre arrivano i dati, finché arriva il codice. */
-const SectionFallback = () => (
-    <Card size="sm" className="border-primary/15 shadow-sm">
-        <CardContent>
-            <SettingsLoadingBox label="Caricamento sezione..." />
-        </CardContent>
-    </Card>
-);
 
 const SettingsPage = () => {
     useDocumentTitle("Impostazioni");
@@ -402,7 +392,7 @@ const SettingsPage = () => {
                 direttamente sulla pagina, come le DetailSection delle schede. Prima erano una
                 scatola (sezione) nella scatola (card) nella scatola (riquadro). */}
             <section className="@container min-w-0 flex-1 overflow-y-auto">
-                <Suspense fallback={<SectionFallback />}>{sectionContent[activeSection]}</Suspense>
+                <Suspense fallback={<SettingsSectionSkeleton />}>{sectionContent[activeSection]}</Suspense>
             </section>
 
             {/* Stesse parole e stessa disposizione della domanda dei dialoghi (vedi

@@ -67,6 +67,7 @@ const ReportPage = () => {
                     backLabel: "Vai ai report",
                 }}
                 unavailableLabel="Report non disponibile."
+                variant="report"
             />
         );
     }

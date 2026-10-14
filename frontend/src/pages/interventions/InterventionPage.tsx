@@ -94,6 +94,7 @@ const InterventionPage = () => {
                     backLabel: "Vai agli interventi",
                 }}
                 unavailableLabel="Intervento non disponibile."
+                variant="intervention"
             />
         );
     }

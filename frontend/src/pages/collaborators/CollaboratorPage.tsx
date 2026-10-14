@@ -133,6 +133,7 @@ const CollaboratorPage = () => {
                     backTo: "/collaborators",
                     backLabel: "Vai ai collaboratori",
                 }}
+                variant="person"
             />
         );
     }

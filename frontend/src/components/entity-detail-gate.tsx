@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import DetailPageSkeleton from "@/components/detail-page-skeleton";
+import DetailPageSkeleton, { type DetailSkeletonVariant } from "@/components/detail-page-skeleton";
 import NotFoundState from "@/components/not-found-state";
 
 type EntityDetailGateProps = {
@@ -14,6 +14,8 @@ type EntityDetailGateProps = {
      * primo caricamento.
      */
     unavailableLabel?: string;
+    /** La forma dello scheletro, quella della scheda che sta per arrivare. */
+    variant?: DetailSkeletonVariant;
 };
 
 /**
@@ -27,13 +29,19 @@ type EntityDetailGateProps = {
  * pagina a non chiamare il gate quando li ha): su un ricaricamento la scheda resta, attenuata,
  * invece di lampeggiare o smontare un dialogo aperto (vedi `ReportPage`).
  */
-const EntityDetailGate = ({ isNotFound, isLoading, notFound, unavailableLabel }: EntityDetailGateProps) => {
+const EntityDetailGate = ({
+    isNotFound,
+    isLoading,
+    notFound,
+    unavailableLabel,
+    variant = "person",
+}: EntityDetailGateProps) => {
     if (isNotFound) {
         return <NotFoundState {...notFound} />;
     }
 
     if (isLoading || unavailableLabel == null) {
-        return <DetailPageSkeleton />;
+        return <DetailPageSkeleton variant={variant} />;
     }
 
     return <div className="flex h-full items-center justify-center text-muted-foreground">{unavailableLabel}</div>;

@@ -40,10 +40,6 @@ const readPageTitle = () => {
  * dell'indirizzo, e lì il focus deve restare dov'è. E non al primo caricamento, dove il
  * browser annuncia già la pagina da sé.
  */
-/** `/reports/12`, `/clients/3/interventions`: una scheda di dettaglio, non una lista. */
-const isDetailPath = (pathname: string) =>
-    /^\/(reports|interventions|clients|collaborators|technicians)\/[^/]+/.test(pathname);
-
 const useRouteChangeFocus = (pathname: string) => {
     const mainRef = useRef<HTMLElement>(null);
     const announcerRef = useRef<HTMLDivElement>(null);
@@ -180,9 +176,7 @@ export const MainLayout = () => {
                             sull'errore della pagina di prima. Quello in App.tsx resta per i crash del
                             layout stesso. */}
                         <AppErrorBoundary key={pathname}>
-                            <Suspense
-                                fallback={<PageLoadingSkeleton variant={isDetailPath(pathname) ? "detail" : "list"} />}
-                            >
+                            <Suspense fallback={<PageLoadingSkeleton pathname={pathname} />}>
                                 <Outlet />
                             </Suspense>
                         </AppErrorBoundary>

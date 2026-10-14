@@ -24,8 +24,9 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Elenco report: la colonna Stato è nascosta di default](changelog/2026-10.md#2026-10-14-elenco-report-la-colonna-stato-e-nascosta-di-default)
 - [2026-10-14 — Tabelle: stesso ordine delle colonne ovunque](changelog/2026-10.md#2026-10-14-tabelle-stesso-ordine-delle-colonne-ovunque)
-- [2026-10-14 — Logout: il login successivo riparte dalla dashboard](changelog/2026-10.md#2026-10-14-logout-il-login-successivo-riparte-dalla-dashboard)
+- [2026-10-14 — Login: si atterra sempre sulla dashboard](changelog/2026-10.md#2026-10-14-login-si-atterra-sempre-sulla-dashboard)
 - [2026-10-14 — Aggiornamento: le fasi si vedono anche sulle altre postazioni](changelog/2026-10.md#2026-10-14-aggiornamento-le-fasi-si-vedono-anche-sulle-altre-postazioni)
 - [2026-10-14 — Incassi mese: etichetta e confronto cambiano insieme alla cifra](changelog/2026-10.md#2026-10-14-incassi-mese-etichetta-e-confronto-cambiano-insieme-alla-cifra)
 - [2026-10-14 — Class diagram del database: generato da uno script e tenuto allineato allo schema](changelog/2026-10.md#2026-10-14-class-diagram-del-database-generato-da-uno-script-e-tenuto-allineato-allo-schema)

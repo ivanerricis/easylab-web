@@ -1,4 +1,4 @@
-import { type ComponentType, lazy, useEffect, useState } from "react";
+import { type ComponentType, createElement, lazy, useEffect, useState } from "react";
 
 /**
  * Un componente caricato pigramente (`lazy`) insieme alla funzione che lo scarica in anticipo.
@@ -13,17 +13,32 @@ import { type ComponentType, lazy, useEffect, useState } from "react";
  * corso invece di aprirne un'altra. Se la richiesta fallisce, la si dimentica, così l'apertura
  * successiva riprova invece di restare sull'errore. L'errore del solo `prefetch` non conta:
  * se il file non arriva, lo richiede `lazy` all'apertura.
+ *
+ * `Component` non è il `lazy` nudo: quando il file è già arrivato disegna direttamente il
+ * componente. Un `lazy` sospende anche se il file è già in memoria (la promessa risolta va
+ * comunque letta al giro dopo), e React, dopo aver mostrato un fallback, aspetta fino a 300 ms
+ * prima di rivelare il contenuto, per evitare lo sfarfallio. Risultato: alla prima apertura il
+ * dialogo, già scaricato, compariva con 300 ms di ritardo senza che il browser facesse niente
+ * (dalla seconda apertura, 85 ms). Senza il file si ricade sul `lazy`, che sospende come prima.
  */
 export const lazyWithPrefetch = <Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>) => {
     let pending: Promise<{ default: ComponentType<Props> }> | undefined;
+    let loaded: ComponentType<Props> | undefined;
     const loadOnce = () =>
-        (pending ??= load().catch((error: unknown) => {
-            pending = undefined;
-            throw error;
-        }));
+        (pending ??= load().then(
+            (module) => {
+                loaded = module.default;
+                return module;
+            },
+            (error: unknown) => {
+                pending = undefined;
+                throw error;
+            }
+        ));
+    const Lazy = lazy(loadOnce);
 
     return {
-        Component: lazy(loadOnce),
+        Component: (props: Props) => createElement(loaded ?? Lazy, props),
         prefetch: () => {
             loadOnce().catch(() => undefined);
         },

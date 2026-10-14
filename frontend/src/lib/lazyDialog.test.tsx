@@ -23,6 +23,27 @@ describe("lazyWithPrefetch", () => {
         expect(load).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * Con il file già arrivato il dialogo si disegna subito, senza passare dal fallback: un `lazy`
+     * sospende comunque, e React tiene il contenuto nascosto fino a 300 ms dopo un fallback.
+     */
+    it("con il file già scaricato non sospende", async () => {
+        const load = vi.fn().mockResolvedValue({ default: Dialog });
+        const { Component, prefetch } = lazyWithPrefetch(load);
+
+        prefetch();
+        await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+        await Promise.resolve();
+        render(
+            <Suspense fallback={<p>Caricamento</p>}>
+                <Component />
+            </Suspense>
+        );
+
+        expect(screen.getByText("Dialogo")).toBeInTheDocument();
+        expect(screen.queryByText("Caricamento")).not.toBeInTheDocument();
+    });
+
     /** Una richiesta fallita (rete assente) non resta in memoria: la successiva riprova. */
     it("dopo un errore la richiesta successiva riprova", async () => {
         const load = vi.fn().mockRejectedValueOnce(new Error("rete")).mockResolvedValue({ default: Dialog });

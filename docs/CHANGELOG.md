@@ -24,6 +24,10 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Tabelle: stesso ordine delle colonne ovunque](changelog/2026-10.md#2026-10-14-tabelle-stesso-ordine-delle-colonne-ovunque)
+- [2026-10-14 — Logout: il login successivo riparte dalla dashboard](changelog/2026-10.md#2026-10-14-logout-il-login-successivo-riparte-dalla-dashboard)
+- [2026-10-14 — Aggiornamento: le fasi si vedono anche sulle altre postazioni](changelog/2026-10.md#2026-10-14-aggiornamento-le-fasi-si-vedono-anche-sulle-altre-postazioni)
+- [2026-10-14 — Incassi mese: etichetta e confronto cambiano insieme alla cifra](changelog/2026-10.md#2026-10-14-incassi-mese-etichetta-e-confronto-cambiano-insieme-alla-cifra)
 - [2026-10-14 — Class diagram del database: generato da uno script e tenuto allineato allo schema](changelog/2026-10.md#2026-10-14-class-diagram-del-database-generato-da-uno-script-e-tenuto-allineato-allo-schema)
 - [2026-10-14 — Ricerca globale: "#" per il numero esatto di un report o di un intervento](changelog/2026-10.md#2026-10-14-ricerca-globale-per-il-numero-esatto-di-un-report-o-di-un-intervento)
 - [2026-10-14 — Ricerca clienti: nome e cognome scritti insieme](changelog/2026-10.md#2026-10-14-ricerca-clienti-nome-e-cognome-scritti-insieme)

@@ -236,10 +236,7 @@ const GlobalSearch = () => {
     const showSeeAll = !parsedQuery.exact;
     const hasAnyResult =
         currentResults != null &&
-        currentResults.customers.length +
-            currentResults.reports.length +
-            currentResults.interventions.length >
-            0;
+        currentResults.customers.length + currentResults.reports.length + currentResults.interventions.length > 0;
 
     return (
         <>

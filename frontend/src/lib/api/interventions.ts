@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, signalArgs } from "./client";
 import type { PaginatedResponse } from "./client";
 import type { InterventionDto, InterventionStatus, InterventionType } from "@/types/dtos";
 
@@ -108,8 +108,8 @@ export type InterventionDetailDto = InterventionEntityDto & {
     collaboratorName: string | null;
 };
 
-export const getIntervention = async (id: number) =>
-    (await api.get<InterventionDetailDto>(`/interventions/${id}`)).data;
+export const getIntervention = async (id: number, signal?: AbortSignal) =>
+    (await api.get<InterventionDetailDto>(`/interventions/${id}`, ...signalArgs(signal))).data;
 
 export const createIntervention = async (payload: InterventionCreateInput) =>
     (await api.post<InterventionEntityDto>("/interventions", payload)).data;

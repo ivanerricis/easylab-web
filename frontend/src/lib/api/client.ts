@@ -2,6 +2,12 @@ import axios from "axios";
 
 const apiBaseURL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
+/**
+ * Gli argomenti di configurazione di un GET che si può annullare: nessuno senza `signal`, così le
+ * chiamate che non annullano restano identiche a prima.
+ */
+export const signalArgs = (signal?: AbortSignal) => (signal ? ([{ signal }] as const) : ([] as const));
+
 export const api = axios.create({
     baseURL: apiBaseURL,
     withCredentials: true,
@@ -157,7 +163,9 @@ export const createEntityApi = <
         list,
         /** Solo la forma paginata: per le anagrafiche troppo grandi da scaricare intere (i clienti). */
         listPage,
-        get: async (id: number) => toDto((await api.get<RawDto>(`${path}/${id}`)).data),
+        /** `signal` serve a chi cerca per numero (ricerca globale): scrivendo, la richiesta vecchia si annulla. */
+        get: async (id: number, signal?: AbortSignal) =>
+            toDto((await api.get<RawDto>(`${path}/${id}`, ...signalArgs(signal))).data),
         create: async (payload: CreateInput) => toDto((await api.post<RawDto>(path, payload)).data),
         update: async (id: number, payload: UpdateInput) =>
             toDto((await api.put<RawDto>(`${path}/${id}`, payload)).data),

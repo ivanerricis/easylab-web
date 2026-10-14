@@ -1,3 +1,7 @@
+// Il class diagram dello schema è `docs/diagrams/class-diagram.drawio`, generato da
+// `scripts/dev/generate-class-diagram.py`: a ogni modifica di questo file (tabelle, colonne,
+// vincoli, valori degli enum) si aggiorna il generatore e si rigenera il diagramma, nello stesso
+// commit della migration.
 import {
     integer,
     pgTable,

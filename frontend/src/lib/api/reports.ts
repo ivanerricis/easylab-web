@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, signalArgs } from "./client";
 import type { PaymentMethod } from "@/types/dtos";
 import type { PaginatedResponse } from "./client";
 import type { ReportDto } from "@/types/dtos";
@@ -142,7 +142,8 @@ export type ReportDetailDto = ReportEntityDto & {
     totalPrice: number;
 };
 
-export const getReport = async (id: number) => (await api.get<ReportDetailDto>(`/reports/${id}`)).data;
+export const getReport = async (id: number, signal?: AbortSignal) =>
+    (await api.get<ReportDetailDto>(`/reports/${id}`, ...signalArgs(signal))).data;
 
 export const createReport = async (payload: ReportCreateInput) =>
     (await api.post<ReportEntityDto>("/reports", payload)).data;

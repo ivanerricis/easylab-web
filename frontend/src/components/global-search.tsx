@@ -13,7 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { getApiErrorMessage, listCustomers, listInterventions, listReports } from "@/lib/api";
+import {
+    getApiErrorMessage,
+    getApiErrorStatus,
+    getIntervention,
+    getReport,
+    listCustomers,
+    listInterventions,
+    listReports,
+} from "@/lib/api";
+import { isSearchable, parseGlobalQuery } from "@/lib/globalSearchQuery";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
 import { formatDate, isMacLike, modifierKey } from "@/lib/utils";
@@ -47,9 +56,13 @@ type SearchResults = {
     /** La ricerca a cui questi risultati rispondono: vedi `isSearching` più sotto. */
     query: string;
     customers: CustomerDto[];
-    reports: ReportDto[];
-    interventions: InterventionDto[];
+    reports: ReportRow[];
+    interventions: InterventionRow[];
 };
+
+/** Quello che serve alle righe: la lista e il dettaglio lo danno con nomi diversi, qui si uniscono. */
+type ReportRow = Pick<ReportDto, "id" | "customer" | "device" | "issue" | "closed">;
+type InterventionRow = Pick<InterventionDto, "id" | "customer" | "type" | "status" | "interventionDate">;
 
 const pages: { label: string; path: string; icon: LucideIcon }[] = [
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -69,12 +82,6 @@ const normalize = (value: string) =>
         .replace(/\p{Diacritic}/gu, "")
         .toLowerCase();
 
-/**
- * Da quando vale la pena chiedere al server: due lettere, oppure un numero di qualunque
- * lunghezza (il numero di un report o di un intervento, che la ricerca confronta esatto).
- */
-const isSearchable = (query: string) => query.length >= 2 || /^#?\d+$/.test(query);
-
 const shortcutLabel = `${modifierKey} K`;
 
 const customerName = (customer: CustomerDto) => formatPersonName(customer);
@@ -88,7 +95,7 @@ const customerName = (customer: CustomerDto) => formatPersonName(customer);
  * una ricevuta non si poteva digitare da nessuna parte senza prima scegliere la pagina.
  *
  * I risultati arrivano dalle stesse ricerche delle tre liste (le stesse regole, compreso il
- * numero esatto), tre richieste in parallelo con pochi risultati ciascuna. "Vedi tutti"
+ * numero esatto), quattro richieste in parallelo con pochi risultati ciascuna. "Vedi tutti"
  * porta alla lista con la ricerca già scritta, grazie a `?q=` (vedi `useListUrlState`).
  */
 const GlobalSearch = () => {
@@ -111,7 +118,8 @@ const GlobalSearch = () => {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    const shouldSearch = open && isSearchable(trimmedQuery);
+    const parsedQuery = parseGlobalQuery(trimmedQuery);
+    const shouldSearch = open && isSearchable(parsedQuery);
 
     useEffect(() => {
         if (!shouldSearch) {
@@ -121,33 +129,73 @@ const GlobalSearch = () => {
         // Scrivendo, la ricerca precedente è superata: annullarla ferma anche la query sul
         // server, come fanno le liste (vedi `usePaginatedRows`).
         const controller = new AbortController();
-        const search = trimmedQuery.replace(/^#/, "");
+        const { scope, text: search, exact, exactId } = parseGlobalQuery(trimmedQuery);
         const common = { page: 1, pageSize: resultsPerGroup, search, signal: controller.signal };
 
-        void Promise.allSettled([
-            listCustomers(common),
-            listReports({ ...common, visibility: "all" }),
-            listInterventions({ ...common, status: "all" }),
-        ]).then(([customers, reports, interventions]) => {
+        // `#123`: il record con quel numero, preso per id. Un 404 è "non esiste", cioè un gruppo
+        // vuoto; ogni altro errore è un gruppo che non risponde, come per la ricerca di testo.
+        const findById = async <T, R>(get: (id: number, signal: AbortSignal) => Promise<T>, toRow: (item: T) => R) => {
+            if (exactId == null) {
+                return [];
+            }
+
+            try {
+                return [toRow(await get(exactId, controller.signal))];
+            } catch (error) {
+                if (getApiErrorStatus(error) === 404) {
+                    return [];
+                }
+
+                throw error;
+            }
+        };
+
+        const customersRequest = scope === "all" ? listCustomers(common).then((page) => page.items) : null;
+        const numberedRequests: Promise<unknown[]>[] = exact
+            ? [
+                  findById(getReport, (report) => ({
+                      id: report.id,
+                      customer: report.customerName ?? "",
+                      device: report.deviceName,
+                      issue: report.issueName,
+                      closed: report.closed,
+                  })),
+                  findById(getIntervention, (intervention) => ({
+                      id: intervention.id,
+                      customer: intervention.customerName ?? "",
+                      type: intervention.type,
+                      status: intervention.status,
+                      interventionDate: intervention.interventionDate,
+                  })),
+              ]
+            : [
+                  listReports({ ...common, visibility: "all" }).then((page) => page.items),
+                  listInterventions({ ...common, status: "all" }).then((page) => page.items),
+              ];
+
+        void Promise.allSettled([customersRequest ?? Promise.resolve([]), ...numberedRequests]).then((settled) => {
             if (controller.signal.aborted) {
                 return;
             }
 
             // Un gruppo che non risponde non deve svuotare gli altri: si mostra quello che c'è,
-            // e si avvisa solo se non è arrivato niente.
-            if (
-                customers.status === "rejected" &&
-                reports.status === "rejected" &&
-                interventions.status === "rejected"
-            ) {
-                toast.error(getApiErrorMessage(customers.reason, "Impossibile completare la ricerca"));
+            // e si avvisa solo se non è arrivato niente. I clienti, fuori da `#`, non contano.
+            const asked = customersRequest ? settled : settled.slice(1);
+            const failed = asked.filter((result) => result.status === "rejected");
+
+            if (failed.length === asked.length) {
+                toast.error(getApiErrorMessage(failed[0].reason, "Impossibile completare la ricerca"));
             }
+
+            const [customers, reports, interventions] = settled.map((result) =>
+                result.status === "fulfilled" ? result.value : []
+            );
 
             setResults({
                 query: trimmedQuery,
-                customers: customers.status === "fulfilled" ? customers.value.items : [],
-                reports: reports.status === "fulfilled" ? reports.value.items : [],
-                interventions: interventions.status === "fulfilled" ? interventions.value.items : [],
+                customers: customers as CustomerDto[],
+                reports: reports as ReportRow[],
+                interventions: interventions as InterventionRow[],
             });
         });
 
@@ -161,8 +209,13 @@ const GlobalSearch = () => {
     const isSearching = shouldSearch && currentResults == null;
 
     const normalizedQuery = normalize(query.trim());
+    // Con "#" le pagine non c'entrano (nessun nome di pagina è un numero): fuori, non per caso.
     const matchingPages =
-        normalizedQuery === "" ? pages : pages.filter((page) => normalize(page.label).includes(normalizedQuery));
+        parsedQuery.scope === "numbered"
+            ? []
+            : normalizedQuery === ""
+              ? pages
+              : pages.filter((page) => normalize(page.label).includes(normalizedQuery));
 
     const handleOpenChange = (nextOpen: boolean) => {
         setOpen(nextOpen);
@@ -177,10 +230,16 @@ const GlobalSearch = () => {
         navigate(path);
     };
 
-    const searchParam = encodeURIComponent(trimmedQuery.replace(/^#/, ""));
+    const searchParam = encodeURIComponent(parsedQuery.text);
+    // "Vedi tutti" apre la lista con `?q=`, che cerca anche nel testo: con il numero esatto
+    // mostrerebbe proprio le corrispondenze che "#123" voleva evitare.
+    const showSeeAll = !parsedQuery.exact;
     const hasAnyResult =
         currentResults != null &&
-        currentResults.customers.length + currentResults.reports.length + currentResults.interventions.length > 0;
+        currentResults.customers.length +
+            currentResults.reports.length +
+            currentResults.interventions.length >
+            0;
 
     return (
         <>
@@ -234,9 +293,11 @@ const GlobalSearch = () => {
 
                         {!isSearching && matchingPages.length === 0 && !hasAnyResult ? (
                             <CommandEmpty>
-                                {isSearchable(trimmedQuery)
+                                {isSearchable(parsedQuery)
                                     ? `Nessun risultato per "${trimmedQuery}".`
-                                    : "Scrivi almeno due lettere, o un numero."}
+                                    : parsedQuery.scope === "numbered"
+                                      ? "Dopo il # scrivi un numero, o almeno due lettere."
+                                      : "Scrivi almeno due lettere, o un numero."}
                             </CommandEmpty>
                         ) : null}
 
@@ -255,14 +316,16 @@ const GlobalSearch = () => {
                                         </span>
                                     </CommandItem>
                                 ))}
-                                <CommandItem
-                                    value="customers-all"
-                                    onSelect={() => go(`/clients?q=${searchParam}`)}
-                                    className="text-primary"
-                                >
-                                    <Search className="text-primary" />
-                                    Vedi tutti i clienti trovati
-                                </CommandItem>
+                                {showSeeAll ? (
+                                    <CommandItem
+                                        value="customers-all"
+                                        onSelect={() => go(`/clients?q=${searchParam}`)}
+                                        className="text-primary"
+                                    >
+                                        <Search className="text-primary" />
+                                        Vedi tutti i clienti trovati
+                                    </CommandItem>
+                                ) : null}
                             </CommandGroup>
                         ) : null}
 
@@ -289,14 +352,16 @@ const GlobalSearch = () => {
                                         </CommandShortcut>
                                     </CommandItem>
                                 ))}
-                                <CommandItem
-                                    value="reports-all"
-                                    onSelect={() => go(`/reports?visibility=all&q=${searchParam}`)}
-                                    className="text-primary"
-                                >
-                                    <Search className="text-primary" />
-                                    Vedi tutti i report trovati
-                                </CommandItem>
+                                {showSeeAll ? (
+                                    <CommandItem
+                                        value="reports-all"
+                                        onSelect={() => go(`/reports?visibility=all&q=${searchParam}`)}
+                                        className="text-primary"
+                                    >
+                                        <Search className="text-primary" />
+                                        Vedi tutti i report trovati
+                                    </CommandItem>
+                                ) : null}
                             </CommandGroup>
                         ) : null}
 
@@ -326,15 +391,23 @@ const GlobalSearch = () => {
                                         </CommandShortcut>
                                     </CommandItem>
                                 ))}
-                                <CommandItem
-                                    value="interventions-all"
-                                    onSelect={() => go(`/interventions?q=${searchParam}`)}
-                                    className="text-primary"
-                                >
-                                    <Search className="text-primary" />
-                                    Vedi tutti gli interventi trovati
-                                </CommandItem>
+                                {showSeeAll ? (
+                                    <CommandItem
+                                        value="interventions-all"
+                                        onSelect={() => go(`/interventions?q=${searchParam}`)}
+                                        className="text-primary"
+                                    >
+                                        <Search className="text-primary" />
+                                        Vedi tutti gli interventi trovati
+                                    </CommandItem>
+                                ) : null}
                             </CommandGroup>
+                        ) : null}
+
+                        {query.trim() === "" ? (
+                            <p className="px-2 pt-3 pb-1 text-xs text-muted-foreground">
+                                Digita # e un numero per trovare un report o un intervento.
+                            </p>
                         ) : null}
 
                         {matchingPages.length > 0 ? (

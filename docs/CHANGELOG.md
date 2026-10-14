@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Sì/No del nuovo report: due coppie distinte](changelog/2026-10.md#2026-10-14-sino-del-nuovo-report-due-coppie-distinte)
 - [2026-10-14 — Impostazioni: codici di recupero, attivazione 2FA e cambio password](changelog/2026-10.md#2026-10-14-impostazioni-codici-di-recupero-attivazione-2fa-e-cambio-password)
 - [2026-10-14 — Interventi: due colonne con stato e pagamento sempre in vista](changelog/2026-10.md#2026-10-14-interventi-due-colonne-con-stato-e-pagamento-sempre-in-vista)
 - [2026-10-14 — Nuovo report: modulo fitto, con Alimentatore e Backup come Sì/No](changelog/2026-10.md#2026-10-14-nuovo-report-modulo-fitto-con-alimentatore-e-backup-come-si-no)

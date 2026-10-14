@@ -96,7 +96,7 @@ const OptionSelector = <TValue extends string | number | boolean>({
             aria-describedby={describedBy}
             tabIndex={id ? -1 : undefined}
             onFocus={id ? handleGroupFocus : undefined}
-            className={cn("grid gap-2 outline-none", columnsClassName, className)}
+            className={cn("grid gap-2 outline-none", isSegmented && "gap-0", columnsClassName, className)}
         >
             {options.map((option, index) => {
                 const isSelected = value === option.value;
@@ -116,6 +116,14 @@ const OptionSelector = <TValue extends string | number | boolean>({
                         className={cn(
                             "flex cursor-pointer border-2 focus-outline transition outline-none",
                             isSegmented ? "h-10 items-center justify-center rounded-lg px-3 text-base" : "rounded-xl",
+                            // Le voci di `segmented` sono due metà di un solo controllo: bordi che si
+                            // toccano (quello condiviso è sovrapposto di 2 px) e angoli tondi solo
+                            // all'esterno. Con lo spazio fra i bottoni, due gruppi affiancati (il Sì/No
+                            // dell'alimentatore e quello del backup) sembravano quattro bottoni di un
+                            // gruppo solo.
+                            isSegmented && index > 0 && "-ml-0.5 rounded-l-none",
+                            isSegmented && index < options.length - 1 && "rounded-r-none",
+                            isSegmented && isSelected && "relative z-10",
                             isStacked && "flex-col items-center justify-center gap-1 px-1 py-2 text-center",
                             !isStacked && !isSegmented && "items-center justify-start gap-3 px-4 py-3 text-left",
                             isSelected

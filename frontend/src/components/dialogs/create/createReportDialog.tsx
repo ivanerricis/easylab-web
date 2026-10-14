@@ -609,7 +609,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
                         {!isStepped || step === 2 ? (
                             <FormSection title="Stato" ruled>
-                                <div className="grid items-start gap-3 sm:grid-cols-2">
+                                <div className="grid items-start gap-3 sm:grid-cols-2 sm:gap-x-8">
                                     <FormField
                                         id="charger"
                                         labelSize="sm"

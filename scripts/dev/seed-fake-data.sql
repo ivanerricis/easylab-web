@@ -125,7 +125,7 @@ FROM generate_series(1, :n_customers) AS g;
 
 INSERT INTO report (
     id, note, password, issue_description, service_description,
-    data_backup, charger, alerted, closed, payment_method, price,
+    data_backup, charger, alerted, picked_up, closed, payment_method, price,
     created_at, updated_at, device_id, issue_id, collaborator_id, customer_id
 )
 SELECT
@@ -151,6 +151,7 @@ SELECT
     (g % 3 = 0),
     (g % 2 = 0),
     closed_flag AND (g % 5 <> 0),
+    closed_flag AND (g % 4 <> 0),
     closed_flag,
     CASE
         WHEN NOT closed_flag THEN 'non_paid'

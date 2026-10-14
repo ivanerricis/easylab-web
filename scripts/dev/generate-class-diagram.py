@@ -173,6 +173,7 @@ cls("report", "Report", C1, 40, [
     "+ data_backup: boolean [1]",
     "+ charger: boolean [1]",
     "+ alerted: boolean [1]",
+    "+ picked_up: boolean [1]",
     "+ closed: boolean [1]",
     "+ payment_method: PaymentMethod [1]",
     "+ price: int [1]",

@@ -57,6 +57,7 @@ export const reportTable = pgTable(
         dataBackup: boolean("data_backup").notNull().default(false),
         charger: boolean("charger").notNull().default(false),
         alerted: boolean("alerted").notNull().default(false),
+        pickedUp: boolean("picked_up").notNull().default(false),
         closed: boolean("closed").notNull().default(false),
         paymentMethod: varchar("payment_method", { length: 20 })
             .$type<ReportPaymentMethod>()

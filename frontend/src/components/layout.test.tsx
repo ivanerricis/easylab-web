@@ -76,6 +76,8 @@ describe("MainSidebar", () => {
         renderSidebar("/dashboard");
 
         expect(screen.getByRole("link", { name: "Tecnici esterni" })).toHaveAttribute("href", "/technicians");
+        expect(screen.getByRole("link", { name: "Contratti" })).toHaveAttribute("href", "/contracts");
+        expect(screen.getByRole("link", { name: "Fornitori" })).toHaveAttribute("href", "/providers");
         expect(screen.getByRole("link", { name: "Impostazioni" })).toHaveAttribute("href", "/settings");
 
         await userEvent.click(screen.getByRole("link", { name: "Impostazioni" }));

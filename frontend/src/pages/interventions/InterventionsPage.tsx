@@ -57,7 +57,7 @@ const prefetchInterventionDialogs = () => {
     prefetchEditInterventionDialog();
 };
 
-const typeFilters: InterventionTypeFilter[] = ["all", "material_delivery", "customer_site", "remote"];
+const typeFilters: InterventionTypeFilter[] = ["all", "material_delivery", "customer_site", "remote", "lab"];
 const sortOptionValues = interventionSortOptions.map((option) => option.value);
 
 const InterventionsPage = () => {

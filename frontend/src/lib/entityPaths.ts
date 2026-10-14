@@ -8,4 +8,6 @@ export const entityPaths = {
     customer: (id: number) => `/clients/${id}`,
     collaborator: (id: number) => `/collaborators/${id}`,
     technician: (id: number) => `/technicians/${id}`,
+    provider: (id: number) => `/providers/${id}`,
+    contract: (id: number) => `/contracts/${id}`,
 };

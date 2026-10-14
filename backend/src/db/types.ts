@@ -1,10 +1,13 @@
 import type { InferInsertModel } from "drizzle-orm";
 import {
+    assistanceTable,
     collaboratorTable,
+    contractTable,
     customerTable,
     deviceTable,
     interventionTable,
     IssueTable,
+    providerTable,
     reportTable,
     sessionTable,
     technicianTable,
@@ -31,6 +34,14 @@ export type UpdateIssue = Partial<Omit<NewIssue, "id">>;
 
 export type NewIntervention = InferInsertModel<typeof interventionTable>;
 export type UpdateIntervention = Partial<Omit<NewIntervention, "id">>;
+
+export type NewProvider = InferInsertModel<typeof providerTable>;
+export type UpdateProvider = Partial<Omit<NewProvider, "id">>;
+
+export type NewContract = InferInsertModel<typeof contractTable>;
+export type UpdateContract = Partial<Omit<NewContract, "id">>;
+
+export type NewAssistance = InferInsertModel<typeof assistanceTable>;
 
 export type NewUser = InferInsertModel<typeof userTable>;
 export type NewSession = InferInsertModel<typeof sessionTable>;

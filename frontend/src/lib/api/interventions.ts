@@ -22,6 +22,8 @@ export type InterventionEntityDto = {
     endTime: string | null;
     customerId: number;
     collaboratorId: number;
+    /** Il contratto di assistenza a cui sono imputate le ore, se c'è. */
+    contractId: number | null;
     created_at: string;
     updated_at: string | null;
 };
@@ -37,6 +39,8 @@ export type InterventionCreateInput = {
     status?: InterventionStatus;
     customerId: number;
     collaboratorId: number;
+    /** `null` scollega l'intervento dal contratto; assente lo lascia com'è. */
+    contractId?: number | null;
     interventionDate?: string | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -60,6 +64,8 @@ export type ListInterventionsParams = {
     collaboratorId?: number;
     /** Solo gli interventi di quel cliente: lo usa la sua pagina degli interventi. */
     customerId?: number;
+    /** Solo gli interventi imputati a quel contratto: lo usa la scheda del contratto. */
+    contractId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
     /**
@@ -92,6 +98,7 @@ export async function listInterventions(params?: ListInterventionsParams) {
             scheduledTo: params.scheduledTo,
             collaboratorId: params.collaboratorId,
             customerId: params.customerId,
+            contractId: params.contractId,
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
         },

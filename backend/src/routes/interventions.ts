@@ -10,6 +10,8 @@ import {
     listInterventions,
     updateInterventionById,
 } from "../db/queries/intervention";
+import { getContractById } from "../db/queries/contract";
+import { consumingInterventionTypes, recheckAssistanceHours } from "../services/assistanceHours";
 import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
 import { buildInterventionEmail } from "../services/interventionEmail";
@@ -22,7 +24,13 @@ import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter"
 import { validate } from "./validation";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
-import { interventionStatuses, interventionTypes, type InterventionStatus, type InterventionType } from "../db/schema";
+import {
+    interventionStatuses,
+    interventionTypes,
+    type AssistanceType,
+    type InterventionStatus,
+    type InterventionType,
+} from "../db/schema";
 
 const interventionsRouter = Router();
 
@@ -32,7 +40,7 @@ const logoContentId = "logo-laboratorio";
 // Le due liste (valori ammessi di `type` e `status`) vivono una sola volta in `db/schema.ts`,
 // insieme al tipo della colonna: prima erano riscritte identiche qui, in
 // `services/interventionLabels.ts`, `db/queries/intervention.ts` e `routes/summaryPrint.ts`.
-const onSiteInterventionTypes = new Set<InterventionType>(["customer_site", "remote"]);
+const onSiteInterventionTypes = new Set<InterventionType>(["customer_site", "remote", "lab"]);
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -57,6 +65,8 @@ const interventionListQuerySchema = listQuerySchema.extend({
     collaboratorId: z.coerce.number().int().positive().optional(),
     // E per cliente, per la sua pagina degli interventi: stesso problema dei report.
     customerId: z.coerce.number().int().positive().optional(),
+    // E per contratto, per l'elenco degli interventi collegati nella pagina del contratto.
+    contractId: z.coerce.number().int().positive().optional(),
     sortBy: z.enum(interventionSortFields).optional(),
 });
 
@@ -79,6 +89,9 @@ const interventionBodySchema = z
         status: z.enum(interventionStatuses).optional(),
         customerId: z.coerce.number().int().positive(),
         collaboratorId: z.coerce.number().int().positive(),
+        // Il contratto di assistenza a cui imputare le ore: facoltativo. Le regole sul
+        // collegamento (tipo, stato, periodo, cliente) stanno in `validateContractLink`.
+        contractId: z.coerce.number().int().positive().nullable().optional(),
         interventionDate: z.string().regex(dateRegex).nullable().optional(),
         startTime: z.string().regex(timeRegex).nullable().optional(),
         endTime: z.string().regex(timeRegex).nullable().optional(),
@@ -108,7 +121,7 @@ type InterventionValidationRow = {
 };
 
 type InterventionValidationFailure = {
-    field: "interventionDate" | "description" | "problem" | "startTime" | "endTime";
+    field: "interventionDate" | "description" | "problem" | "startTime" | "endTime" | "contractId";
     message: string;
 };
 
@@ -164,6 +177,64 @@ const validateInterventionRow = (row: InterventionValidationRow): InterventionVa
 
     return null;
 };
+
+/** Il contratto com'è letto da `getContractById`, ridotto a ciò che il collegamento controlla. */
+type LinkableContract = {
+    type: string;
+    customerId: number;
+    effectiveStatus: string;
+    startDate: string;
+    endDate: string;
+    assistanceType: string | null;
+};
+
+/**
+ * Le regole per collegare un intervento a un contratto, sulla riga risultante. Il cliente è già
+ * imposto dalla chiave esterna composta `intervention_customer_contract_fk`, ma lì l'errore
+ * sarebbe una violazione generica: qui si risponde con un 400 che dice cosa correggere.
+ * `contract` è `undefined` se l'id non esiste.
+ */
+const validateContractLink = (
+    row: { type: InterventionType; customerId: number; interventionDate?: string | null },
+    contract: LinkableContract | undefined
+): InterventionValidationFailure | null => {
+    const fail = (message: string): InterventionValidationFailure => ({ field: "contractId", message });
+
+    if (!contract) {
+        return fail("Il contratto selezionato non esiste");
+    }
+
+    if (contract.type !== "assistance" || !contract.assistanceType) {
+        return fail("Si può collegare solo un contratto di assistenza");
+    }
+
+    if (contract.customerId !== row.customerId) {
+        return fail("Il contratto selezionato appartiene a un altro cliente");
+    }
+
+    // Lo stato effettivo, non quello salvato: un contratto attivo ma scaduto non vale più.
+    if (contract.effectiveStatus !== "active") {
+        return fail("Il contratto selezionato non è attivo");
+    }
+
+    // Fine esclusa: `endDate` è il giorno in cui il contratto risulta già scaduto.
+    if (
+        !row.interventionDate ||
+        row.interventionDate < contract.startDate ||
+        row.interventionDate >= contract.endDate
+    ) {
+        return fail("La data dell'intervento non rientra nel periodo del contratto");
+    }
+
+    if (!consumingInterventionTypes(contract.assistanceType as AssistanceType).includes(row.type)) {
+        return fail("Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato");
+    }
+
+    return null;
+};
+
+/** Il mese (`YYYY-MM`) di un giorno `YYYY-MM-DD`, la chiave su cui si contano le ore. */
+const monthOf = (day: string | null | undefined) => day?.slice(0, 7) ?? null;
 
 const interventionUpdateBodySchema = interventionBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
     message: "È necessario specificare almeno un campo",
@@ -404,6 +475,7 @@ interventionsRouter.post(
             status: req.body.status ?? "scheduled",
             customerId: req.body.customerId,
             collaboratorId: req.body.collaboratorId,
+            contractId: req.body.contractId ?? null,
             interventionDate: req.body.interventionDate ?? null,
             startTime: isOnSite ? (req.body.startTime ?? null) : null,
             endTime: isOnSite ? (req.body.endTime ?? null) : null,
@@ -416,7 +488,21 @@ interventionsRouter.post(
             return;
         }
 
+        if (normalizedIntervention.contractId !== null) {
+            const [contract] = await getContractById(normalizedIntervention.contractId, await getAppTimeZone());
+            const linkFailure = validateContractLink(normalizedIntervention, contract);
+
+            if (linkFailure) {
+                res.status(400).json({ message: linkFailure.message, field: linkFailure.field });
+                return;
+            }
+        }
+
         const createdIntervention = await createIntervention(normalizedIntervention);
+
+        await recheckAssistanceHours([
+            { contractId: createdIntervention[0].contractId, month: monthOf(createdIntervention[0].interventionDate) },
+        ]);
 
         setAuditSubject(res, describeSubject(createdIntervention[0].id));
         res.status(201).json(createdIntervention[0]);
@@ -447,6 +533,8 @@ interventionsRouter.put(
         const nextStatus: InterventionStatus = req.body.status ?? existing.status;
         const nextDescription = "description" in req.body ? req.body.description || null : existing.description;
         const nextNote = "note" in req.body ? req.body.note || null : existing.note;
+        const nextContractId = "contractId" in req.body ? (req.body.contractId ?? null) : existing.contractId;
+        const nextCustomerId = req.body.customerId ?? existing.customerId;
 
         // La combinazione da validare nasce dall'unione del corpo parziale con la riga
         // esistente, appena calcolata qui sopra: `validateInterventionRow` applica le stesse
@@ -466,6 +554,28 @@ interventionsRouter.put(
             return;
         }
 
+        // Il collegamento si ricontrolla solo se è cambiato qualcosa che lo riguarda: altrimenti
+        // correggere una nota su un vecchio intervento fallirebbe perché nel frattempo il
+        // contratto è scaduto o è stato annullato.
+        const linkChanged =
+            nextContractId !== existing.contractId ||
+            nextCustomerId !== existing.customerId ||
+            nextInterventionDate !== existing.interventionDate ||
+            nextType !== existing.type;
+
+        if (nextContractId != null && linkChanged) {
+            const [contract] = await getContractById(nextContractId, await getAppTimeZone());
+            const linkFailure = validateContractLink(
+                { type: nextType, customerId: nextCustomerId, interventionDate: nextInterventionDate },
+                contract
+            );
+
+            if (linkFailure) {
+                res.status(400).json({ message: linkFailure.message, field: linkFailure.field });
+                return;
+            }
+        }
+
         const updatedIntervention = await updateInterventionById(id, {
             ...req.body,
             interventionDate: nextInterventionDate,
@@ -480,6 +590,13 @@ interventionsRouter.put(
             res.status(404).json({ message: "Intervento non trovato" });
             return;
         }
+
+        // Un cambio di contratto, di data o di stato sposta ore fra mesi e contratti: si
+        // ricalcolano sia il posto di partenza sia quello di arrivo.
+        await recheckAssistanceHours([
+            { contractId: existing.contractId, month: monthOf(existing.interventionDate) },
+            { contractId: updatedIntervention[0].contractId, month: monthOf(updatedIntervention[0].interventionDate) },
+        ]);
 
         setAuditSubject(res, describeSubject(updatedIntervention[0].id));
         res.json(updatedIntervention[0]);
@@ -498,6 +615,11 @@ interventionsRouter.delete(
             res.status(404).json({ message: "Intervento non trovato" });
             return;
         }
+
+        // Le ore dell'intervento tolto non contano più: gli avvisi del suo mese si riallineano.
+        await recheckAssistanceHours([
+            { contractId: deletedIntervention[0].contractId, month: monthOf(deletedIntervention[0].interventionDate) },
+        ]);
 
         setAuditSubject(res, describeSubject(deletedIntervention[0].id));
         res.json(deletedIntervention[0]);

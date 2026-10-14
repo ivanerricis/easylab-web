@@ -25,6 +25,7 @@ import {
     type InterventionFormState,
 } from "@/lib/interventionForm";
 import { getTodayDateString } from "@/lib/interventions";
+import { useLinkableContracts } from "@/hooks/useLinkableContracts";
 import type { CollaboratorDto, CustomerDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
@@ -46,6 +47,8 @@ export type CreateInterventionSubmitValues = {
     customer: string;
     customerId: number | null;
     collaboratorId: number;
+    /** Il contratto di assistenza a cui imputare le ore; `null` se nessuno. */
+    contractId: number | null;
     interventionDate: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -117,6 +120,29 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
     // un passo precedente, "Salva" torna lì, e il campo esiste solo dopo il render.
     const pendingFocusRef = useRef<FieldKey | null>(null);
     const isLastStep = !isStepped || step === lastStep;
+
+    // I contratti collegabili dipendono da cliente, tipo e data: il cliente conta solo se è già stato scelto
+    // dai suggerimenti (altrimenti il suo id si risolve solo al salvataggio, e non c'è niente da offrire).
+    const selectedCustomerId = customerIdByOption[formValues.customer] ?? null;
+    const linkableContracts = useLinkableContracts({
+        customerId: selectedCustomerId,
+        type: formValues.type,
+        date: formValues.interventionDate,
+    });
+    const { contractId: selectedContractId } = formValues;
+    const { isReady: areContractsReady, options: contractOptions } = linkableContracts;
+    const isSelectedContractValid =
+        selectedContractId === "" ||
+        (selectedCustomerId != null &&
+            (!areContractsReady || contractOptions.some((contract) => String(contract.id) === selectedContractId)));
+
+    // Un contratto scelto che non è più valido (altro cliente, altro tipo, altra data) si toglie da solo:
+    // lasciarlo lì farebbe rifiutare il salvataggio dal server, con un messaggio che non dice perché.
+    useEffect(() => {
+        if (!isSelectedContractValid) {
+            startTransition(() => setFormValues((prev) => ({ ...prev, contractId: "" })));
+        }
+    }, [isSelectedContractValid]);
 
     const initialCustomerId = initialCustomer?.id ?? null;
     const initialCustomerOption = initialCustomer
@@ -391,6 +417,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         values={formValues}
                                         errors={errors}
                                         onChange={handleChange}
+                                        contractOptions={contractOptions}
                                     />
                                 ) : null}
                             </>
@@ -406,6 +433,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         errors={errors}
                                         onChange={handleChange}
                                         withoutProgress
+                                        contractOptions={contractOptions}
                                     />
                                 </div>
                                 <InterventionProgressSection

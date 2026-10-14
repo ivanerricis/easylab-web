@@ -19,6 +19,8 @@ const api = vi.hoisted(() => ({
     listIssues: vi.fn(),
     listCollaborators: vi.fn(),
     listCustomers: vi.fn(),
+    listContracts: vi.fn(),
+    createContract: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -34,6 +36,8 @@ vi.mock("@/lib/api", async () => {
         listIssues: (...args: unknown[]) => api.listIssues(...args),
         listCollaborators: (...args: unknown[]) => api.listCollaborators(...args),
         listCustomers: (...args: unknown[]) => api.listCustomers(...args),
+        listContracts: (...args: unknown[]) => api.listContracts(...args),
+        createContract: (...args: unknown[]) => api.createContract(...args),
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
         getCustomerInterventionsPrintUrl: (id: number) => `interventions:${id}`,
     };
@@ -67,6 +71,28 @@ beforeEach(() => {
     api.listIssues.mockResolvedValue([]);
     api.listCollaborators.mockResolvedValue([]);
     api.listCustomers.mockResolvedValue(page([]));
+    api.listContracts.mockResolvedValue(
+        page([
+            {
+                id: 21,
+                type: "assistance",
+                status: "active",
+                effectiveStatus: "active",
+                term: "months_12",
+                device: "Server NAS",
+                note: null,
+                startDate: "2026-06-01",
+                endDate: "2027-06-01",
+                customerId: 3,
+                customerName: "Mario Rossi",
+                providerId: 8,
+                providerName: "Rossi Informatica",
+                assistance: { assistanceType: "remote", includedHours: 10 },
+                createdAt: "2026-06-01T10:00:00.000Z",
+                updatedAt: null,
+            },
+        ])
+    );
     api.getCustomer.mockResolvedValue({
         id: 3,
         firstName: "Mario",
@@ -116,7 +142,9 @@ describe("CustomerPage", () => {
         expect(screen.getByText("mario@example.com")).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "Report" })).toHaveAttribute("aria-selected", "true");
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, visibility: "all" }));
-        expect(await within(screen.getByRole("table")).findByText("Notebook")).toBeInTheDocument();
+        expect(
+            await within(within(screen.getByRole("tabpanel")).getByRole("table")).findByText("Notebook")
+        ).toBeInTheDocument();
     });
 
     /** L'indirizzo dice il tab: i collegamenti salvati e il ricaricamento non lo perdono. */
@@ -176,7 +204,7 @@ describe("CustomerPage", () => {
     ])('"%s" apre il dialogo con il cliente già compilato', async (item, dialogTitle) => {
         await renderPage("/clients/3", "/clients/:id");
 
-        await userEvent.click(screen.getByRole("button", { name: "Nuovo report o intervento" }));
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
         await userEvent.click(await screen.findByRole("menuitem", { name: item }));
 
         const dialog = await screen.findByRole("dialog", { name: dialogTitle });
@@ -216,10 +244,41 @@ describe("CustomerPage", () => {
         });
     });
 
+    it("elenca i contratti del cliente nella terza tab, con filtro per stato", async () => {
+        await renderPage("/clients/3/contracts", "/clients/:id/contracts");
+
+        expect(screen.getByRole("tab", { name: "Contratti" })).toHaveAttribute("aria-selected", "true");
+        expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, status: "all" }));
+        // Tabella e schede mobili mostrano la stessa riga: basta che ci sia.
+        expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("link", { name: "Apri contratto 21" })[0]).toHaveAttribute("href", "/contracts/21");
+        // La colonna del cliente non c'è: nella sua scheda sarebbe sempre lo stesso nome.
+        expect(screen.queryByRole("columnheader", { name: "Cliente" })).not.toBeInTheDocument();
+        // Per i contratti non c'è un resoconto da stampare.
+        expect(screen.queryByRole("button", { name: /^Stampa resoconto/ })).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Filtra i contratti per stato" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Scaduto" }));
+
+        await waitFor(() => {
+            expect(api.listContracts).toHaveBeenLastCalledWith(expect.objectContaining({ status: "expired" }));
+        });
+    });
+
+    it("crea un contratto dal menu Nuovo, partendo dal cliente della scheda", async () => {
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Nuovo contratto" }));
+
+        expect(await screen.findByRole("dialog", { name: "Nuovo contratto" })).toBeInTheDocument();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+    });
+
     it("apre il report dalla riga", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
-        const table = screen.getByRole("table");
+        const table = within(screen.getByRole("tabpanel")).getByRole("table");
         await within(table).findByText("5");
         expect(within(table).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
         fireEvent.keyDown(within(table).getAllByRole("row")[1], { key: "Enter" });

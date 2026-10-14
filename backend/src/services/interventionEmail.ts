@@ -62,6 +62,11 @@ const wordingByType: Record<InterventionType, { subject: string; summary: string
         summary: "dell'intervento da remoto",
         detail: "del lavoro svolto",
     },
+    lab: {
+        subject: "intervento",
+        summary: "dell'intervento in laboratorio",
+        detail: "del lavoro svolto",
+    },
 };
 
 // Per esteso ("22 settembre 2026"), perché sta dentro una frase. Il giorno non ha fuso: letto

@@ -32,6 +32,7 @@ import {
     interventionDescriptionLabel,
     isAssistanceInterventionType,
 } from "@/lib/interventions";
+import InterventionContractItem from "./components/intervention-contract-item";
 import { Mail, Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
@@ -196,6 +197,9 @@ const InterventionPage = () => {
                                 label="Collaboratore"
                                 value={intervention.collaboratorName ?? "Collaboratore sconosciuto"}
                             />
+                            {intervention.contractId != null ? (
+                                <InterventionContractItem contractId={intervention.contractId} />
+                            ) : null}
                         </DetailGrid>
                     </DetailSection>
 

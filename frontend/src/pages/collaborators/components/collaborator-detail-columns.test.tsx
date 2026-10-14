@@ -18,6 +18,7 @@ const intervention: InterventionDto = {
     endTime: "14:30:00",
     customerId: 3,
     collaboratorId: 5,
+    contractId: null,
     customer: "Mario Rossi",
     customerPhone: null,
     collaborator: "Anna",

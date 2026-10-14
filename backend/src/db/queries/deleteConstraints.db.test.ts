@@ -1,18 +1,25 @@
 import type { NextFunction, Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 import { errorHandler } from "../../middleware/errorHandler";
+import { db, pool } from "../index";
+import { assistanceHoursAlertTable } from "../schema";
 import {
+    insertAssistanceContract,
     insertCollaborator,
+    insertContract,
     insertCustomer,
     insertDevice,
     insertIntervention,
     insertIssue,
+    insertProvider,
     insertReport,
 } from "../../test/db/fixtures";
 import { deleteCollaboratorById } from "./collaborator";
+import { deleteContractById } from "./contract";
 import { deleteCustomerById } from "./customer";
 import { deleteDeviceById } from "./device";
 import { deleteIssueById } from "./issue";
+import { deleteProviderById } from "./provider";
 
 /**
  * Cosa succede a eliminare un cliente, un collaboratore, un dispositivo o un guasto ancora
@@ -121,6 +128,58 @@ describe("eliminare un'anagrafica ancora referenziata da un intervento", () => {
         expect(res.body.message).toBe(
             "Impossibile eliminare il collaboratore: è ancora associato a uno o più interventi."
         );
+    });
+});
+
+describe("eliminare cliente, fornitore o contratto ancora referenziati da un contratto", () => {
+    it("il cliente con un contratto: 400 con il messaggio sul contratto", async () => {
+        const contract = await insertContract();
+
+        const res = await deleteAndTranslate(() => deleteCustomerById(contract.customerId));
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Impossibile eliminare il cliente: è ancora associato a uno o più contratti.");
+    });
+
+    it("il fornitore con un contratto: 400 con il messaggio sul contratto", async () => {
+        const contract = await insertContract();
+
+        const res = await deleteAndTranslate(() => deleteProviderById(contract.providerId));
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Impossibile eliminare il fornitore: è ancora associato a uno o più contratti.");
+    });
+
+    it("il contratto con un intervento collegato: 400 con il messaggio sull'intervento", async () => {
+        const contract = await insertContract();
+        await insertIntervention({ customerId: contract.customerId, contractId: contract.id });
+
+        const res = await deleteAndTranslate(() => deleteContractById(contract.id));
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toBe("Impossibile eliminare il contratto: è ancora collegato a uno o più interventi.");
+    });
+
+    it("il contratto senza interventi si elimina e porta con sé assistenza e avvisi", async () => {
+        const contract = await insertAssistanceContract();
+        await db
+            .insert(assistanceHoursAlertTable)
+            .values({ contractId: contract.id, month: "2026-10-01", kind: "warning" });
+
+        await expect(deleteContractById(contract.id)).resolves.toHaveLength(1);
+
+        const { rows } = await pool.query(
+            "select (select count(*) from assistance)::int as assistance, (select count(*) from assistance_hours_alert)::int as alerts"
+        );
+        expect(rows[0]).toEqual({ assistance: 0, alerts: 0 });
+    });
+
+    it("cliente e fornitore senza contratti si eliminano normalmente", async () => {
+        const customer = await insertCustomer();
+        const provider = await insertProvider();
+
+        await expect(deleteCustomerById(customer.id)).resolves.toHaveLength(1);
+        await expect(deleteProviderById(provider.id)).resolves.toHaveLength(1);
     });
 });
 

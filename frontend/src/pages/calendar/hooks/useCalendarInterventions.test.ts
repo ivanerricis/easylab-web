@@ -30,6 +30,7 @@ const buildIntervention = (overrides: Partial<InterventionDto>): InterventionDto
     endTime: "10:30:00",
     customerId: 1,
     collaboratorId: 1,
+    contractId: null,
     customer: "Mario Rossi",
     customerPhone: null,
     collaborator: "Luca",

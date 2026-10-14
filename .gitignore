@@ -14,6 +14,9 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# Certificati di prova di Mailpit (scripts/dev/mailpit-cert.sh)
+scripts/dev/certs/
+
 # Build outputs
 dist/
 build/

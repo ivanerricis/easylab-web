@@ -27,6 +27,8 @@ export type InterventionFormState = {
     paid: boolean;
     toInvoice: boolean;
     collaboratorId: string;
+    /** Il contratto di assistenza scelto (id come testo, come `collaboratorId`); vuoto = nessuno. */
+    contractId: string;
     interventionDate: string;
     startTime: string;
     endTime: string;
@@ -44,6 +46,7 @@ export const emptyInterventionFormState = (interventionDate: string): Interventi
     paid: false,
     toInvoice: false,
     collaboratorId: "",
+    contractId: "",
     interventionDate,
     startTime: "",
     endTime: "",
@@ -111,6 +114,8 @@ export const toInterventionSubmitFields = (values: InterventionFormState) => {
         paid: values.paid,
         toInvoice: values.toInvoice,
         collaboratorId: Number(values.collaboratorId),
+        // La consegna di materiale non consuma mai ore: il contratto non le si applica.
+        contractId: isAssistance && values.contractId !== "" ? Number(values.contractId) : null,
         interventionDate: values.interventionDate,
         startTime: isAssistance ? values.startTime || null : null,
         endTime: isAssistance ? values.endTime || null : null,
@@ -140,6 +145,7 @@ export const toInterventionCreatePayload = (
     toInvoice: values.toInvoice,
     customerId,
     collaboratorId: values.collaboratorId,
+    contractId: values.contractId,
     interventionDate: values.interventionDate,
     startTime: values.startTime,
     endTime: values.endTime,
@@ -173,6 +179,9 @@ export const toInterventionUpdatePayload = (
     paid: values.paid,
     toInvoice: values.toInvoice,
     collaboratorId: values.collaboratorId,
+    // Assente = invariato: un vecchio intervento il cui contratto è nel frattempo scaduto non deve
+    // essere ricontrollato dal server a ogni modifica di altro.
+    ...(values.contractId === undefined ? {} : { contractId: values.contractId }),
     interventionDate: values.interventionDate,
     startTime: values.startTime,
     endTime: values.endTime,

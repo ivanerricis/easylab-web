@@ -39,7 +39,11 @@ services:
       # `secure` (il default, vedi middleware/requireAuth.ts), e non tutti i browser lo
       # accettano da http, nemmeno su localhost.
       NODE_ENV: development
+      # La CA di prova che firma il certificato di Mailpit (vedi il servizio mailpit qui sotto):
+      # si aggiunge alle CA di sistema, non le sostituisce.
+      NODE_EXTRA_CA_CERTS: /certs/mailpit-ca.crt
     volumes:
+      - ./scripts/dev/certs/mailpit-ca.crt:/certs/mailpit-ca.crt:ro
       - ./backend:/app
       - ${BACKUP_HOST_DIR}:/app/backups
       - backend_node_modules:/app/node_modules
@@ -69,6 +73,30 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  # Solo in sviluppo: cattura le email dell'app (gli avvisi delle ore di assistenza, i riepiloghi
+  # degli interventi) senza spedirle davvero. L'interfaccia per leggerle è su
+  # http://localhost:8025. In Impostazioni > Email: host mailpit, porta 1025, SSL/TLS spento
+  # (cioè STARTTLS), qualsiasi utente e password. Solo da questa macchina, come il database.
+  #
+  # Il TLS non è facoltativo: `emailManager.buildTransporter` lo pretende, con il certificato
+  # verificato. Il certificato lo crea `scripts/dev/mailpit-cert.sh` (una volta, prima di avviare),
+  # firmato da una CA di prova che conosce solo il backend di sviluppo (`NODE_EXTRA_CA_CERTS`).
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit_dev
+    restart: always
+    environment:
+      MP_SMTP_TLS_CERT: /certs/mailpit.crt
+      MP_SMTP_TLS_KEY: /certs/mailpit.key
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    volumes:
+      - ./scripts/dev/certs/mailpit.crt:/certs/mailpit.crt:ro
+      - ./scripts/dev/certs/mailpit.key:/certs/mailpit.key:ro
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
 
 volumes:
   postgres_data_dev:

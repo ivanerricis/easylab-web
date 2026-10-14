@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const listCollaborators = vi.fn();
 const listCustomers = vi.fn();
 const getIntervention = vi.fn();
+const listContracts = vi.fn();
+const getContract = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -16,6 +18,8 @@ vi.mock("@/lib/api", async () => {
         listCollaborators: (...args: unknown[]) => listCollaborators(...args),
         listCustomers: (...args: unknown[]) => listCustomers(...args),
         getIntervention: (...args: unknown[]) => getIntervention(...args),
+        listContracts: (...args: unknown[]) => listContracts(...args),
+        getContract: (...args: unknown[]) => getContract(...args),
         createCustomer: vi.fn(),
     };
 });
@@ -36,7 +40,7 @@ vi.setConfig({ testTimeout: 20000 });
 
 const timestamps = { createdAt: "2026-01-01T00:00:00.000Z", updatedAt: null };
 
-const chooseOption = async (label: string | RegExp, option: string) => {
+const chooseOption = async (label: string | RegExp, option: string | RegExp) => {
     await userEvent.click(screen.getByRole("combobox", { name: label }));
     await userEvent.click(await screen.findByRole("option", { name: option }));
 };
@@ -59,6 +63,7 @@ const save = () => userEvent.click(screen.getByRole("button", { name: "Salva" })
 
 beforeEach(() => {
     vi.clearAllMocks();
+    listContracts.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 200, totalPages: 1 });
     listCollaborators.mockResolvedValue([
         { id: 40, firstName: "Luca", lastName: "Bianchi", phoneNumber: null, ...timestamps },
     ]);
@@ -168,6 +173,7 @@ describe("CreateInterventionDialog", () => {
                 customer: "Mario Rossi - 333",
                 customerId: 30,
                 collaboratorId: 40,
+                contractId: null,
                 interventionDate: "2026-10-05",
                 startTime: null,
                 endTime: null,
@@ -504,5 +510,140 @@ describe("EditInterventionDialog", () => {
             expect(onOpenChange).toHaveBeenCalledWith(false);
         });
         expect(toastError).toHaveBeenCalledWith("Intervento non trovato");
+    });
+});
+
+/** Il menu "Contratto di assistenza": offre solo i contratti validi per cliente, data e tipo. */
+describe("contratto di assistenza negli interventi", () => {
+    const contract = (id: number, assistanceType: string, overrides: Record<string, unknown> = {}) => ({
+        id,
+        type: "assistance",
+        status: "active",
+        effectiveStatus: "active",
+        term: "months_12",
+        device: `Dispositivo ${id}`,
+        note: null,
+        startDate: "2026-09-01",
+        endDate: "2027-09-01",
+        customerId: 30,
+        customerName: "Mario Rossi",
+        providerId: 8,
+        providerName: "Rossi Informatica",
+        assistance: { assistanceType, includedHours: assistanceType === "full_time" ? null : 10 },
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: null,
+        ...overrides,
+    });
+
+    const pageOf = (items: unknown[]) => ({ items, totalItems: items.length, page: 1, pageSize: 200, totalPages: 1 });
+
+    beforeEach(() => {
+        listContracts.mockResolvedValue(
+            pageOf([contract(1, "remote"), contract(2, "on_site"), contract(3, "remote", { startDate: "2026-11-01" })])
+        );
+    });
+
+    const renderCreate = async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(
+            <CreateInterventionDialog open onOpenChange={() => {}} onSubmit={onSubmit} initialDate="2026-10-05" />
+        );
+        await userEvent.type(screen.getByLabelText(/^Cliente/), "mario");
+        await userEvent.click(await screen.findByRole("option", { name: "Mario Rossi - 333" }, { timeout: 10_000 }));
+        await chooseOption(/^Collaboratore/, "Luca Bianchi");
+        return onSubmit;
+    };
+
+    it("chiede al server i contratti attivi di assistenza del cliente e filtra per tipo e data", async () => {
+        await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+
+        await waitFor(() => {
+            expect(listContracts).toHaveBeenCalledWith(
+                expect.objectContaining({ customerId: 30, type: "assistance", status: "active" })
+            );
+        });
+        await userEvent.click(await screen.findByRole("combobox", { name: "Contratto di assistenza" }));
+        // Il #2 è "in sede o in laboratorio": non consuma ore da remoto. Il #3 inizia dopo la data.
+        expect(screen.getByRole("option", { name: /#1 Remota/ })).toBeInTheDocument();
+        expect(screen.queryByRole("option", { name: /#2/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole("option", { name: /#3/ })).not.toBeInTheDocument();
+    });
+
+    it("un intervento in laboratorio vede il pacchetto in sede e lo invia come contractId", async () => {
+        const onSubmit = await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento in laboratorio");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
+        await chooseOption("Contratto di assistenza", /#2 In sede/);
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "lab", contractId: 2 }));
+        });
+    });
+
+    it("toglie il contratto scelto quando il tipo non lo consuma più", async () => {
+        const onSubmit = await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento in laboratorio");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
+        await chooseOption("Contratto di assistenza", /#2 In sede/);
+
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "remote", contractId: null }));
+        });
+    });
+
+    it("in modifica tiene il contratto già collegato anche se scaduto e non lo rimanda se non cambia", async () => {
+        getContract.mockResolvedValue(contract(5, "remote", { effectiveStatus: "expired", endDate: "2026-12-01" }));
+        listContracts.mockResolvedValue(pageOf([]));
+        getIntervention.mockResolvedValue({
+            id: 9,
+            type: "remote",
+            description: "Fatto",
+            problem: "Rete",
+            note: null,
+            price: null,
+            paid: false,
+            toInvoice: false,
+            status: "completed",
+            interventionDate: "2026-10-05",
+            startTime: "09:00:00",
+            endTime: "10:00:00",
+            customerId: 30,
+            collaboratorId: 40,
+            contractId: 5,
+            created_at: "2026-10-05T00:00:00.000Z",
+            updated_at: null,
+        });
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        renderWithProviders(
+            <EditInterventionDialog
+                open
+                interventionId={9}
+                customerName="Mario Rossi"
+                onOpenChange={() => {}}
+                onSubmit={onSubmit}
+            />
+        );
+        await screen.findByLabelText(/^Problema/);
+
+        await waitFor(() => {
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#5 Remota");
+        });
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        expect(onSubmit.mock.calls[0][0].contractId).toBeUndefined();
+    });
+
+    it("una consegna di materiale non ha il menu del contratto", async () => {
+        await renderCreate();
+
+        expect(screen.queryByRole("combobox", { name: "Contratto di assistenza" })).not.toBeInTheDocument();
     });
 });

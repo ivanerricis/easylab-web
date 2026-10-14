@@ -7,8 +7,9 @@ import { interventionStatusColor, interventionStatusOptions } from "@/lib/interv
 import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
 import { ListFilter } from "lucide-react";
+import type { ReactNode } from "react";
 
-export type ReportsInterventionsTab = "reports" | "interventions";
+export type ReportsInterventionsTab = "reports" | "interventions" | "contracts";
 
 type ReportsInterventionsTabsProps = {
     activeTab: ReportsInterventionsTab;
@@ -22,10 +23,15 @@ type ReportsInterventionsTabsProps = {
     ownerNoun: string;
     onOpenReport: (id: number) => void;
     onOpenIntervention: (id: number) => void;
+    /**
+     * La terza tab, solo nella scheda del cliente: il filtro (sulla riga delle tab, come gli altri
+     * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
+     */
+    contractsTab?: { filter: ReactNode; content: ReactNode };
 };
 
 /**
- * Le due tab delle schede di cliente e collaboratore, con il filtro sulla stessa riga e la tabella
+ * Le tab delle schede di cliente e collaboratore (più i contratti, solo per il cliente), con il filtro sulla stessa riga e la tabella
  * con la sua impaginazione sotto. Erano circa 120 righe identiche nelle due pagine.
  */
 const ReportsInterventionsTabs = ({
@@ -38,6 +44,7 @@ const ReportsInterventionsTabs = ({
     ownerNoun,
     onOpenReport,
     onOpenIntervention,
+    contractsTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
 
@@ -58,8 +65,15 @@ const ReportsInterventionsTabs = ({
                     <TabsTrigger value="interventions" className="px-2 sm:px-3">
                         Interventi
                     </TabsTrigger>
+                    {contractsTab ? (
+                        <TabsTrigger value="contracts" className="px-2 sm:px-3">
+                            Contratti
+                        </TabsTrigger>
+                    ) : null}
                 </TabsList>
-                {activeTab === "interventions" ? (
+                {activeTab === "contracts" && contractsTab ? (
+                    contractsTab.filter
+                ) : activeTab === "interventions" ? (
                     <FilterSelect
                         variant="inline"
                         value={interventions.filter}
@@ -141,6 +155,12 @@ const ReportsInterventionsTabs = ({
                     onPageSizeChange={interventions.setPageSize}
                 />
             </TabsContent>
+
+            {contractsTab ? (
+                <TabsContent value="contracts" aria-label={`Contratti del ${ownerNoun}`} className="min-h-0 flex-1">
+                    {contractsTab.content}
+                </TabsContent>
+            ) : null}
         </Tabs>
     );
 };

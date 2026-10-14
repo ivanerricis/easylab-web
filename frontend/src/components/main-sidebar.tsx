@@ -14,7 +14,9 @@ import {
     BookOpen,
     BookUser,
     Bug,
+    Building2,
     ClipboardList,
+    FileSignature,
     HardHat,
     Laptop,
     LayoutDashboard,
@@ -41,6 +43,8 @@ const sidebarItems: SidebarItem[] = [
     { label: "Clienti", path: "/clients", icon: Users },
     { label: "Collaboratori", path: "/collaborators", icon: BookUser },
     { label: "Tecnici esterni", path: "/technicians", icon: Wrench },
+    { label: "Contratti", path: "/contracts", icon: FileSignature },
+    { label: "Fornitori", path: "/providers", icon: Building2 },
     { label: "Dispositivi", path: "/devices", icon: Laptop },
     { label: "Difetti", path: "/issues", icon: Bug },
 ];

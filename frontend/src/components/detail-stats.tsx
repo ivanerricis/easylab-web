@@ -67,7 +67,7 @@ const DetailStats = ({
  * grande (24px) la sovrastava; da `xl` resta un po' più grande dei valori, ma non quanto prima.
  * La misura `lg` tiene fuori il pallino, che nella card stretta spingeva la parola oltre il bordo.
  */
-const DetailStatBadge = ({ color, children }: { color: StatusColor; children: ReactNode }) => (
+const DetailStatBadge = ({ color, children }: { color?: StatusColor; children: ReactNode }) => (
     <StatusBadge size="lg" color={color} className="px-2.5 py-0.5 text-sm xl:px-3 xl:py-1 xl:text-lg">
         {children}
     </StatusBadge>

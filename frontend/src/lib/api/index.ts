@@ -7,6 +7,8 @@ export * from "./reports";
 export * from "./interventions";
 export * from "./notifications";
 export * from "./technicians";
+export * from "./providers";
+export * from "./contracts";
 export * from "./settings";
 export * from "./system";
 export * from "./auth";

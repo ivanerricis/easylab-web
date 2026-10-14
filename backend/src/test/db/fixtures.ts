@@ -1,10 +1,13 @@
 import { db } from "../../db";
 import {
+    assistanceTable,
     collaboratorTable,
+    contractTable,
     customerTable,
     deviceTable,
     interventionTable,
     IssueTable,
+    providerTable,
     reportTable,
     reportTechnicianTable,
     sessionTable,
@@ -12,9 +15,12 @@ import {
     userTable,
 } from "../../db/schema";
 import type {
+    NewAssistance,
     NewCollaborator,
+    NewContract,
     NewCustomer,
     NewIntervention,
+    NewProvider,
     NewReport,
     NewSession,
     NewTechnician,
@@ -126,4 +132,49 @@ export const insertIntervention = async (values: Partial<NewIntervention> = {}) 
         })
         .returning();
     return row;
+};
+
+/** Un fornitore: nome, email e telefono sono unici, quindi hanno un suffisso in lettere. */
+export const insertProvider = async (values: Partial<NewProvider> = {}) => {
+    const suffix = next();
+    const [row] = await db
+        .insert(providerTable)
+        .values({
+            providerName: `Fornitore${suffix}`,
+            email: `fornitore${suffix.toLowerCase()}@example.test`,
+            phoneNumber: `Tel${suffix}`,
+            ...values,
+        })
+        .returning();
+    return row;
+};
+
+/** Un contratto di noleggio (nessuna riga figlia): cliente e fornitore nuovi se il test non li passa. */
+export const insertContract = async (values: Partial<NewContract> = {}) => {
+    const [row] = await db
+        .insert(contractTable)
+        .values({
+            type: "rental",
+            term: "months_12",
+            device: `Dispositivo contratto ${next()}`,
+            startDate: "2026-01-01",
+            customerId: values.customerId ?? (await insertCustomer()).id,
+            providerId: values.providerId ?? (await insertProvider()).id,
+            ...values,
+        })
+        .returning();
+    return row;
+};
+
+/** Un contratto di assistenza con la sua riga, come li crea la rotta: predefinito 10 ore da remoto. */
+export const insertAssistanceContract = async (
+    values: Partial<NewContract> = {},
+    assistance: Partial<Pick<NewAssistance, "assistanceType" | "includedHours">> = {}
+) => {
+    const contract = await insertContract({ ...values, type: "assistance" });
+    const [assistanceRow] = await db
+        .insert(assistanceTable)
+        .values({ assistanceType: "remote", includedHours: 10, ...assistance, contractId: contract.id })
+        .returning();
+    return { ...contract, assistance: assistanceRow };
 };

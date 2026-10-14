@@ -18,9 +18,10 @@ import {
     isAssistanceInterventionType,
     isCompletedInterventionStatus,
 } from "@/lib/interventions";
+import { formatContractOption } from "@/lib/contracts";
 import { formatPersonName } from "@/lib/people";
 import { cn } from "@/lib/utils";
-import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import type { CollaboratorDto, ContractDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import type { ReactNode } from "react";
 
 /**
@@ -68,6 +69,9 @@ export const InterventionCollaboratorField = ({
         </Select>
     </FormField>
 );
+
+/** Il valore del menu per "nessun contratto": Radix non ammette una voce con valore vuoto. */
+const noContractValue = "none";
 
 /** Il tipo: decide quali altri campi compaiono (orari e problema solo per l'assistenza) e come si chiamano. */
 const InterventionTypeField = ({ values, onChange }: Pick<FieldsProps, "values" | "onChange">) => (
@@ -297,7 +301,15 @@ export const InterventionDetailsSection = ({
     errors,
     onChange,
     withoutProgress = false,
-}: FieldsProps & { withoutProgress?: boolean }) => {
+    contractOptions,
+}: FieldsProps & {
+    withoutProgress?: boolean;
+    /**
+     * I contratti di assistenza collegabili (vedi `useLinkableContracts`). Senza, o se è vuoto, il
+     * campo non c'è; c'è solo per i tipi che consumano ore, cioè non per la consegna di materiale.
+     */
+    contractOptions?: ContractDto[];
+}) => {
     const common = { values, errors, onChange };
     const isAssistance = isAssistanceInterventionType(values.type);
 
@@ -312,6 +324,40 @@ export const InterventionDetailsSection = ({
                 <InterventionTypeField {...common} />
                 {withoutProgress ? null : <InterventionStatusField {...common} />}
                 <InterventionDateField {...common} />
+
+                {/* Solo se c'è qualcosa da scegliere: un menu spento "Nessun contratto disponibile"
+                    su ogni intervento di un cliente senza contratti era solo rumore. */}
+                {contractOptions && contractOptions.length > 0 && isAssistance ? (
+                    <FormField
+                        labelSize="sm"
+                        id="contractId"
+                        label="Contratto di assistenza"
+                        className="gap-1 lg:col-span-2"
+                    >
+                        <Select
+                            value={values.contractId || noContractValue}
+                            // Un valore vuoto non è una scelta: Radix lo emette quando valore e voci cambiano insieme
+                            // (le voci arrivano dopo il contratto già collegato) e cancellerebbe il contratto.
+                            onValueChange={(contractId) => {
+                                if (contractId !== "") {
+                                    onChange({ contractId: contractId === noContractValue ? "" : contractId });
+                                }
+                            }}
+                        >
+                            <SelectTrigger id="contractId" className="w-full">
+                                <SelectValue placeholder="Nessun contratto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={noContractValue}>Nessun contratto</SelectItem>
+                                {contractOptions.map((contract) => (
+                                    <SelectItem key={contract.id} value={String(contract.id)}>
+                                        {formatContractOption(contract)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </FormField>
+                ) : null}
 
                 {!withoutProgress ? (
                     <>

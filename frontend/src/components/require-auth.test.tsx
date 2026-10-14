@@ -31,7 +31,7 @@ const LoginProbe = () => {
     return <p>Login, provenienza: {from}</p>;
 };
 
-const renderAt = (path: string, state: { user: UserDto | null; isLoading: boolean }) =>
+const renderAt = (path: string, state: { user: UserDto | null; isLoading: boolean; loggedOutExplicitly?: boolean }) =>
     render(
         <AuthProviderContext.Provider value={{ ...initialAuthProviderState, ...state }}>
             <MemoryRouter initialEntries={[path]}>
@@ -57,6 +57,13 @@ describe("RequireAuth", () => {
         renderAt("/reports", { user: null, isLoading: false });
 
         expect(screen.getByText("Login, provenienza: /reports")).toBeInTheDocument();
+    });
+
+    /** Dopo "Esci" il prossimo login (magari di un altro account) deve partire dalla dashboard. */
+    it("dopo un logout esplicito non ricorda la pagina da cui si usciva", () => {
+        renderAt("/reports", { user: null, isLoading: false, loggedOutExplicitly: true });
+
+        expect(screen.getByText("Login, provenienza:")).toBeInTheDocument();
     });
 
     /** Una password generata non deve dare accesso all'app, nemmeno a una pagina. */

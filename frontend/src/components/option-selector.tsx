@@ -14,7 +14,12 @@ type Props<TValue> = {
     /** Etichetta letta dagli screen reader al posto del gruppo di radio. */
     ariaLabel: string;
     className?: string;
-    orientation?: "horizontal" | "vertical";
+    /**
+     * `vertical`: una voce per riga. `stacked`: tutte in una riga, con l'icona sopra la scritta e
+     * senza il pallino a destra (la scelta si vede dal bordo e dal colore): per le colonne
+     * strette, dove tre voci per intero in riga non ci stanno e una per riga costa troppa altezza.
+     */
+    orientation?: "horizontal" | "vertical" | "stacked";
 };
 
 /**
@@ -42,8 +47,12 @@ const OptionSelector = <TValue extends string | number | boolean>({
 }: Props<TValue>) => {
     // Una griglia vera, non `flex flex-wrap`: con il flex le classi `grid-cols-*` non facevano
     // nulla, e le voci andavano a capo come capitava, larghe ciascuna quanto la propria scritta.
-    const columnsClassName =
-        orientation === "vertical" ? "grid-cols-1" : (horizontalColumnsClassName[options.length] ?? "grid-cols-1");
+    const isStacked = orientation === "stacked";
+    const columnsClassName = isStacked
+        ? "grid-cols-3"
+        : orientation === "vertical"
+          ? "grid-cols-1"
+          : (horizontalColumnsClassName[options.length] ?? "grid-cols-1");
 
     return (
         <div role="radiogroup" aria-label={ariaLabel} className={cn("grid gap-2", columnsClassName, className)}>
@@ -60,7 +69,10 @@ const OptionSelector = <TValue extends string | number | boolean>({
                         data-state={isSelected ? "checked" : "unchecked"}
                         onClick={() => onValueChange(option.value)}
                         className={cn(
-                            "flex cursor-pointer items-center justify-start gap-3 rounded-xl border-2 px-4 py-3 text-left focus-outline transition outline-none",
+                            "flex cursor-pointer rounded-xl border-2 focus-outline transition outline-none",
+                            isStacked
+                                ? "flex-col items-center justify-center gap-1 px-1 py-2 text-center"
+                                : "items-center justify-start gap-3 px-4 py-3 text-left",
                             isSelected
                                 ? "border-primary bg-primary/10 shadow-sm"
                                 : "border-border bg-card hover:border-primary/40 hover:bg-muted/60"
@@ -71,22 +83,31 @@ const OptionSelector = <TValue extends string | number | boolean>({
                         />
 
                         <span className="flex flex-col gap-0.5">
-                            <span className="text-base font-medium text-foreground">{option.label}</span>
-                        </span>
-
-                        <span
-                            className={cn(
-                                "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full border",
-                                isSelected ? "border-primary" : "border-input"
-                            )}
-                        >
                             <span
                                 className={cn(
-                                    "size-2.5 rounded-full bg-primary transition-opacity",
-                                    isSelected ? "opacity-100" : "opacity-0"
+                                    "text-base font-medium text-foreground",
+                                    isStacked && isSelected && "font-semibold"
                                 )}
-                            />
+                            >
+                                {option.label}
+                            </span>
                         </span>
+
+                        {isStacked ? null : (
+                            <span
+                                className={cn(
+                                    "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full border",
+                                    isSelected ? "border-primary" : "border-input"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "size-2.5 rounded-full bg-primary transition-opacity",
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                            </span>
+                        )}
                     </button>
                 );
             })}

@@ -7,7 +7,7 @@ type Props = {
     value: PaymentMethod;
     onValueChange: (value: PaymentMethod) => void;
     className?: string;
-    orientation?: "horizontal" | "vertical";
+    orientation?: "horizontal" | "vertical" | "stacked";
 };
 
 const paymentMethodOptions: SelectorOption<PaymentMethod>[] = [

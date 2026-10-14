@@ -78,6 +78,15 @@ const fieldOrder = [
     "internalPrice",
 ] as const;
 
+/**
+ * Stato e pagamento, la colonna a destra, hanno uno sfondo del colore principale invece di quello
+ * neutro degli altri riquadri: sono la parte che segue l'avanzamento della pratica e si tocca a
+ * ogni consegna, e a colpo d'occhio si distinguono dai dati del lavoro. Il colore del tema e non
+ * uno fisso (verde, giallo e rosso sono già i colori di stato delle righe): segue il colore scelto
+ * in Impostazioni e il tema scuro. Su telefono il riquadro resta senza sfondo (vedi `FormSection`).
+ */
+const progressSectionClassName = "border-primary/25 bg-primary/[0.04] [&_h3]:text-primary-text";
+
 const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit }: EditReportDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<FieldErrors>({});
@@ -328,315 +337,361 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                         // modulo sta tutto senza barra di scorrimento. Su mobile i pulsanti
                         // vanno uno sotto l'altro, quindi resta un po' più di margine.
                         <div className="grid max-h-[calc(100dvh-15rem)] gap-4 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
-                            <FormSection flatOnMobile title="Anagrafica">
-                                {/*
+                            {/*
+                                Da lg in su due colonne: a sinistra i dati del lavoro (anagrafica,
+                                intervento, tecnico esterno), a destra l'avanzamento della pratica
+                                (stato e pagamento). Prima i cinque riquadri stavano uno sotto
+                                l'altro e a 1280×720 stato e pagamento, le parti che si toccano a
+                                ogni consegna, restavano sotto la piega, dietro uno scroll. Sotto lg
+                                le colonne si impilano come prima.
+                            */}
+                            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                                <div className="grid gap-4">
+                                    <FormSection flatOnMobile title="Anagrafica">
+                                        {/*
                                     `items-start` in tutte le griglie di campi: quando un campo
                                     mostra l'errore sotto di sé la riga si allunga, e senza le celle
                                     vicine si stiravano con lei spingendo in giù le etichette.
                                 */}
-                                <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    <FormField id="customerId" label="Cliente" className="gap-1">
-                                        <Select disabled value={formValues.customerId}>
-                                            <SelectTrigger id="customerId" className="w-full">
-                                                <SelectValue placeholder={customerName} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={formValues.customerId}>{customerName}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
+                                        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+                                            <FormField labelSize="sm" id="customerId" label="Cliente" className="gap-1">
+                                                <Select disabled value={formValues.customerId}>
+                                                    <SelectTrigger id="customerId" className="w-full">
+                                                        <SelectValue placeholder={customerName} />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value={formValues.customerId}>
+                                                            {customerName}
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormField>
 
-                                    <FormField
-                                        id="deviceId"
-                                        label="Dispositivo"
-                                        className="gap-1"
-                                        required
-                                        error={errors.deviceId}
-                                    >
-                                        <Select
-                                            value={formValues.deviceId}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, deviceId: value }));
-                                                setErrors((prev) => ({ ...prev, deviceId: undefined }));
-                                            }}
-                                        >
-                                            <SelectTrigger
+                                            <FormField
+                                                labelSize="sm"
                                                 id="deviceId"
-                                                {...fieldErrorAria("deviceId", errors.deviceId)}
-                                                className="w-full"
+                                                label="Dispositivo"
+                                                className="gap-1"
+                                                required
+                                                error={errors.deviceId}
                                             >
-                                                <SelectValue placeholder="Seleziona dispositivo" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {devices.map((device) => (
-                                                    <SelectItem key={device.id} value={String(device.id)}>
-                                                        {device.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
+                                                <Select
+                                                    value={formValues.deviceId}
+                                                    onValueChange={(value) => {
+                                                        setFormValues((prev) => ({ ...prev, deviceId: value }));
+                                                        setErrors((prev) => ({ ...prev, deviceId: undefined }));
+                                                    }}
+                                                >
+                                                    <SelectTrigger
+                                                        id="deviceId"
+                                                        {...fieldErrorAria("deviceId", errors.deviceId)}
+                                                        className="w-full"
+                                                    >
+                                                        <SelectValue placeholder="Seleziona dispositivo" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {devices.map((device) => (
+                                                            <SelectItem key={device.id} value={String(device.id)}>
+                                                                {device.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormField>
 
-                                    <FormField
-                                        id="collaboratorId"
-                                        label="Collaboratore"
-                                        className="gap-1 sm:col-span-2 lg:col-span-1"
-                                        required={formValues.closed}
-                                        error={errors.collaboratorId}
-                                    >
-                                        <Select
-                                            value={formValues.collaboratorId}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, collaboratorId: value }));
-                                                setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
-                                            }}
-                                        >
-                                            <SelectTrigger
+                                            <FormField
+                                                labelSize="sm"
                                                 id="collaboratorId"
-                                                {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
-                                                className="w-full"
+                                                label="Collaboratore"
+                                                className="gap-1 sm:col-span-2 xl:col-span-1"
+                                                required={formValues.closed}
+                                                error={errors.collaboratorId}
                                             >
-                                                <SelectValue placeholder="Nessun collaboratore" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">Nessuno</SelectItem>
-                                                {collaborators.map((collaborator) => (
-                                                    <SelectItem key={collaborator.id} value={String(collaborator.id)}>
-                                                        {formatPersonName(collaborator)}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
-                                </div>
-                            </FormSection>
+                                                <Select
+                                                    value={formValues.collaboratorId}
+                                                    onValueChange={(value) => {
+                                                        setFormValues((prev) => ({ ...prev, collaboratorId: value }));
+                                                        setErrors((prev) => ({ ...prev, collaboratorId: undefined }));
+                                                    }}
+                                                >
+                                                    <SelectTrigger
+                                                        id="collaboratorId"
+                                                        {...fieldErrorAria("collaboratorId", errors.collaboratorId)}
+                                                        className="w-full"
+                                                    >
+                                                        <SelectValue placeholder="Nessun collaboratore" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">Nessuno</SelectItem>
+                                                        {collaborators.map((collaborator) => (
+                                                            <SelectItem
+                                                                key={collaborator.id}
+                                                                value={String(collaborator.id)}
+                                                            >
+                                                                {formatPersonName(collaborator)}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormField>
+                                        </div>
+                                    </FormSection>
 
-                            <FormSection flatOnMobile title="Intervento">
-                                <div className="grid items-start gap-4 sm:grid-cols-2">
-                                    {/*
+                                    <FormSection flatOnMobile title="Intervento">
+                                        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                                            {/*
                                         Il difetto ha almeno mezza riga e non un quarto: è la voce
                                         con il testo più lungo del modulo, e in un quarto di riga le
                                         descrizioni del catalogo arrivavano troncate. Sotto lg anche
                                         mezza riga non basta, quindi lì la prende tutta (e la
                                         password con lui, per non lasciare mezza riga vuota).
                                     */}
-                                    <FormField
-                                        id="issueId"
-                                        label="Difetto catalogo"
-                                        className="gap-1 sm:col-span-2 lg:col-span-1"
-                                        required
-                                        error={errors.issueId}
-                                    >
-                                        <Select
-                                            value={formValues.issueId}
-                                            onValueChange={(value) => {
-                                                setFormValues((prev) => ({ ...prev, issueId: value }));
-                                                setErrors((prev) => ({ ...prev, issueId: undefined }));
-                                            }}
-                                        >
-                                            <SelectTrigger
+                                            <FormField
+                                                labelSize="sm"
                                                 id="issueId"
-                                                {...fieldErrorAria("issueId", errors.issueId)}
-                                                className="w-full"
+                                                label="Difetto catalogo"
+                                                className="gap-1 sm:col-span-2 lg:col-span-4"
+                                                required
+                                                error={errors.issueId}
                                             >
-                                                <SelectValue placeholder="Seleziona difetto" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {issues.map((issue) => (
-                                                    <SelectItem key={issue.id} value={String(issue.id)}>
-                                                        {issue.description}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
+                                                <Select
+                                                    value={formValues.issueId}
+                                                    onValueChange={(value) => {
+                                                        setFormValues((prev) => ({ ...prev, issueId: value }));
+                                                        setErrors((prev) => ({ ...prev, issueId: undefined }));
+                                                    }}
+                                                >
+                                                    <SelectTrigger
+                                                        id="issueId"
+                                                        {...fieldErrorAria("issueId", errors.issueId)}
+                                                        className="w-full"
+                                                    >
+                                                        <SelectValue placeholder="Seleziona difetto" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {issues.map((issue) => (
+                                                            <SelectItem key={issue.id} value={String(issue.id)}>
+                                                                {issue.description}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormField>
 
-                                    <FormField
-                                        id="password"
-                                        label="Password sblocco"
-                                        className="gap-1 sm:col-span-2 lg:col-span-1"
-                                    >
-                                        <Input
-                                            id="password"
-                                            placeholder="Password dispositivo"
-                                            value={formValues.password}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({ ...prev, password: event.target.value }))
-                                            }
-                                        />
-                                    </FormField>
+                                            <FormField
+                                                labelSize="sm"
+                                                id="password"
+                                                label="Password sblocco"
+                                                className="gap-1 sm:col-span-2 lg:col-span-2"
+                                            >
+                                                <Input
+                                                    id="password"
+                                                    placeholder="Password dispositivo"
+                                                    value={formValues.password}
+                                                    onChange={(event) =>
+                                                        setFormValues((prev) => ({
+                                                            ...prev,
+                                                            password: event.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </FormField>
 
-                                    {needsProblemText ? (
-                                        <FormField
-                                            id="issueDescription"
-                                            label="Problema riscontrato"
-                                            className="gap-1 sm:col-span-2"
-                                            required
-                                            error={errors.issueDescription}
-                                        >
-                                            <Textarea
-                                                {...fieldProps("issueDescription", {
-                                                    error: errors.issueDescription,
-                                                })}
-                                                placeholder="Quello che il cliente legge sulla ricevuta"
-                                                maxLength={255}
-                                                value={formValues.issueDescription}
-                                                onChange={(event) => {
-                                                    setFormValues((prev) => ({
-                                                        ...prev,
-                                                        issueDescription: event.target.value,
-                                                    }));
-                                                    setErrors((prev) => ({ ...prev, issueDescription: undefined }));
-                                                }}
-                                            />
-                                        </FormField>
-                                    ) : null}
+                                            {needsProblemText ? (
+                                                <FormField
+                                                    labelSize="sm"
+                                                    id="issueDescription"
+                                                    label="Problema riscontrato"
+                                                    className="gap-1 sm:col-span-2 lg:col-span-6"
+                                                    required
+                                                    error={errors.issueDescription}
+                                                >
+                                                    <Textarea
+                                                        {...fieldProps("issueDescription", {
+                                                            error: errors.issueDescription,
+                                                        })}
+                                                        placeholder="Quello che il cliente legge sulla ricevuta"
+                                                        maxLength={255}
+                                                        value={formValues.issueDescription}
+                                                        onChange={(event) => {
+                                                            setFormValues((prev) => ({
+                                                                ...prev,
+                                                                issueDescription: event.target.value,
+                                                            }));
+                                                            setErrors((prev) => ({
+                                                                ...prev,
+                                                                issueDescription: undefined,
+                                                            }));
+                                                        }}
+                                                    />
+                                                </FormField>
+                                            ) : null}
 
-                                    <FormField id="serviceDescription" label="Descrizione intervento" className="gap-1">
-                                        <Textarea
-                                            id="serviceDescription"
-                                            className="min-h-24 resize-none"
-                                            placeholder="Descrivi l'intervento"
-                                            value={formValues.serviceDescription}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({
-                                                    ...prev,
-                                                    serviceDescription: event.target.value,
-                                                }))
-                                            }
-                                        />
-                                    </FormField>
+                                            <FormField
+                                                labelSize="sm"
+                                                id="serviceDescription"
+                                                label="Descrizione intervento"
+                                                className="gap-1 lg:col-span-3"
+                                            >
+                                                <Textarea
+                                                    id="serviceDescription"
+                                                    className="min-h-24 resize-none"
+                                                    placeholder="Descrivi l'intervento"
+                                                    value={formValues.serviceDescription}
+                                                    onChange={(event) =>
+                                                        setFormValues((prev) => ({
+                                                            ...prev,
+                                                            serviceDescription: event.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </FormField>
 
-                                    <FormField id="note" label="Note" className="gap-1">
-                                        <Textarea
-                                            id="note"
-                                            className="min-h-24 resize-none"
-                                            placeholder="Note"
-                                            value={formValues.note}
-                                            onChange={(event) =>
-                                                setFormValues((prev) => ({ ...prev, note: event.target.value }))
-                                            }
-                                        />
-                                    </FormField>
+                                            <FormField
+                                                labelSize="sm"
+                                                id="note"
+                                                label="Note"
+                                                className="gap-1 lg:col-span-3"
+                                            >
+                                                <Textarea
+                                                    id="note"
+                                                    className="min-h-24 resize-none"
+                                                    placeholder="Note"
+                                                    value={formValues.note}
+                                                    onChange={(event) =>
+                                                        setFormValues((prev) => ({ ...prev, note: event.target.value }))
+                                                    }
+                                                />
+                                            </FormField>
+                                        </div>
+                                    </FormSection>
+
+                                    <FormSection flatOnMobile title="Tecnico esterno">
+                                        <div className="grid items-start gap-4 sm:grid-cols-2">
+                                            <FormField
+                                                labelSize="sm"
+                                                id="technicianId"
+                                                label="Tecnico"
+                                                className="gap-1"
+                                            >
+                                                <Select
+                                                    value={formValues.technicianId}
+                                                    onValueChange={(value) =>
+                                                        setFormValues((prev) => ({ ...prev, technicianId: value }))
+                                                    }
+                                                >
+                                                    <SelectTrigger id="technicianId" className="w-full">
+                                                        <SelectValue placeholder="Nessun tecnico" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">Nessuno</SelectItem>
+                                                        {technicians.map((technician) => (
+                                                            <SelectItem
+                                                                key={technician.id}
+                                                                value={String(technician.id)}
+                                                            >
+                                                                {formatPersonName(technician)}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormField>
+
+                                            <FormField
+                                                labelSize="sm"
+                                                id="technicianPrice"
+                                                label="Prezzo lavoro tecnico"
+                                                className="gap-1"
+                                                error={errors.technicianPrice}
+                                            >
+                                                <EuroInput
+                                                    {...fieldProps("technicianPrice", {
+                                                        error: errors.technicianPrice,
+                                                    })}
+                                                    value={formValues.technicianPrice}
+                                                    onChange={(event) => {
+                                                        setFormValues((prev) => ({
+                                                            ...prev,
+                                                            technicianPrice: event.target.value,
+                                                        }));
+                                                        setErrors((prev) => ({ ...prev, technicianPrice: undefined }));
+                                                    }}
+                                                />
+                                            </FormField>
+                                        </div>
+                                    </FormSection>
                                 </div>
-                            </FormSection>
 
-                            {/*
-                                Tre riquadri affiancati da lg in su, alti uguali: dentro, i campi
-                                tornano uno sotto l'altro perché la colonna è stretta. Sotto lg i
-                                riquadri si impilano e i campi si rimettono in riga.
-                            */}
-                            <div className="grid gap-4 lg:grid-cols-3">
-                                <FormSection flatOnMobile title="Tecnico esterno">
-                                    <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                                        <FormField id="technicianId" label="Tecnico" className="gap-1">
-                                            <Select
-                                                value={formValues.technicianId}
-                                                onValueChange={(value) =>
-                                                    setFormValues((prev) => ({ ...prev, technicianId: value }))
-                                                }
-                                            >
-                                                <SelectTrigger id="technicianId" className="w-full">
-                                                    <SelectValue placeholder="Nessun tecnico" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">Nessuno</SelectItem>
-                                                    {technicians.map((technician) => (
-                                                        <SelectItem key={technician.id} value={String(technician.id)}>
-                                                            {formatPersonName(technician)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </FormField>
+                                <div className="grid gap-4">
+                                    <FormSection flatOnMobile title="Stato" className={progressSectionClassName}>
+                                        <div className="grid gap-2">
+                                            {statusOptions.map((option) => (
+                                                // Tutto il riquadro è l'etichetta, quindi tutto il
+                                                // riquadro è cliccabile: prima lo era solo la scritta,
+                                                // e un clic sul bordo interno andava a vuoto.
+                                                <Label
+                                                    key={option.id}
+                                                    htmlFor={option.id}
+                                                    className="w-full cursor-pointer gap-3 rounded-md border border-primary/15 bg-background px-3 py-2 text-base transition-colors hover:bg-muted/60 has-[[aria-checked=true]]:border-primary/50 has-[[aria-checked=true]]:bg-primary/5"
+                                                >
+                                                    <Checkbox
+                                                        id={option.id}
+                                                        className="size-5"
+                                                        checked={formValues[option.id]}
+                                                        onCheckedChange={(checked) =>
+                                                            setFormValues((prev) => ({
+                                                                ...prev,
+                                                                [option.id]: checked === true,
+                                                            }))
+                                                        }
+                                                    />
+                                                    {option.label}
+                                                </Label>
+                                            ))}
+                                        </div>
+                                    </FormSection>
 
-                                        <FormField
-                                            id="technicianPrice"
-                                            label="Prezzo lavoro tecnico"
-                                            className="gap-1"
-                                            error={errors.technicianPrice}
-                                        >
-                                            <EuroInput
-                                                {...fieldProps("technicianPrice", { error: errors.technicianPrice })}
-                                                value={formValues.technicianPrice}
-                                                onChange={(event) => {
-                                                    setFormValues((prev) => ({
-                                                        ...prev,
-                                                        technicianPrice: event.target.value,
-                                                    }));
-                                                    setErrors((prev) => ({ ...prev, technicianPrice: undefined }));
-                                                }}
-                                            />
-                                        </FormField>
-                                    </div>
-                                </FormSection>
-
-                                {/*
+                                    {/*
                                     Prezzo e metodo stanno nello stesso riquadro perché dipendono
                                     l'uno dall'altro: "Non pagato" riporta il prezzo a zero, e con
                                     contanti o carta il prezzo non può restare a zero.
                                 */}
-                                <FormSection flatOnMobile title="Pagamento">
-                                    <FormField
-                                        id="internalPrice"
-                                        label="Prezzo interno"
-                                        className="gap-1"
-                                        error={errors.internalPrice}
-                                    >
-                                        <EuroInput
-                                            {...fieldProps("internalPrice", { error: errors.internalPrice })}
-                                            value={formValues.internalPrice}
-                                            onChange={(event) => {
+                                    <FormSection flatOnMobile title="Pagamento" className={progressSectionClassName}>
+                                        <FormField
+                                            labelSize="sm"
+                                            id="internalPrice"
+                                            label="Prezzo interno"
+                                            className="gap-1"
+                                            error={errors.internalPrice}
+                                        >
+                                            <EuroInput
+                                                {...fieldProps("internalPrice", { error: errors.internalPrice })}
+                                                value={formValues.internalPrice}
+                                                onChange={(event) => {
+                                                    setFormValues((prev) => ({
+                                                        ...prev,
+                                                        internalPrice: event.target.value,
+                                                    }));
+                                                    setErrors((prev) => ({ ...prev, internalPrice: undefined }));
+                                                }}
+                                            />
+                                        </FormField>
+
+                                        <PaymentMethodSelector
+                                            value={formValues.paymentMethod}
+                                            onValueChange={(paymentMethod) => {
                                                 setFormValues((prev) => ({
                                                     ...prev,
-                                                    internalPrice: event.target.value,
+                                                    paymentMethod,
+                                                    internalPrice:
+                                                        paymentMethod === "non_paid" ? "0" : prev.internalPrice,
                                                 }));
                                                 setErrors((prev) => ({ ...prev, internalPrice: undefined }));
                                             }}
+                                            orientation="stacked"
                                         />
-                                    </FormField>
-
-                                    <PaymentMethodSelector
-                                        value={formValues.paymentMethod}
-                                        onValueChange={(paymentMethod) => {
-                                            setFormValues((prev) => ({
-                                                ...prev,
-                                                paymentMethod,
-                                                internalPrice: paymentMethod === "non_paid" ? "0" : prev.internalPrice,
-                                            }));
-                                            setErrors((prev) => ({ ...prev, internalPrice: undefined }));
-                                        }}
-                                        className="lg:grid-cols-1"
-                                    />
-                                </FormSection>
-
-                                <FormSection flatOnMobile title="Stato">
-                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                                        {statusOptions.map((option) => (
-                                            // Tutto il riquadro è l'etichetta, quindi tutto il
-                                            // riquadro è cliccabile: prima lo era solo la scritta,
-                                            // e un clic sul bordo interno andava a vuoto.
-                                            <Label
-                                                key={option.id}
-                                                htmlFor={option.id}
-                                                className="w-full cursor-pointer gap-3 rounded-md border border-primary/15 bg-background px-3 py-2.5 text-lg transition-colors hover:bg-muted/60 has-[[aria-checked=true]]:border-primary/50 has-[[aria-checked=true]]:bg-primary/5"
-                                            >
-                                                <Checkbox
-                                                    id={option.id}
-                                                    className="size-5"
-                                                    checked={formValues[option.id]}
-                                                    onCheckedChange={(checked) =>
-                                                        setFormValues((prev) => ({
-                                                            ...prev,
-                                                            [option.id]: checked === true,
-                                                        }))
-                                                    }
-                                                />
-                                                {option.label}
-                                            </Label>
-                                        ))}
-                                    </div>
-                                </FormSection>
+                                    </FormSection>
+                                </div>
                             </div>
                         </div>
                     )}

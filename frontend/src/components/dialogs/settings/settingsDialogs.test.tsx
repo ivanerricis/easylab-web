@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,7 @@ const enableTwoFactor = vi.fn();
 const createUser = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+const downloadTextFile = vi.fn();
 
 vi.mock("@/lib/api", async () => {
     const errors = await vi.importActual<typeof import("@/lib/api/errors")>("@/lib/api/errors");
@@ -26,6 +27,10 @@ vi.mock("sonner", () => ({
         error: (...args: unknown[]) => toastError(...args),
         success: (...args: unknown[]) => toastSuccess(...args),
     },
+}));
+
+vi.mock("@/lib/downloadTextFile", () => ({
+    downloadTextFile: (...args: unknown[]) => downloadTextFile(...args),
 }));
 
 import ChangePasswordDialog from "./changePasswordDialog";
@@ -60,29 +65,60 @@ beforeEach(() => {
 describe("ChangePasswordDialog", () => {
     const requirementItems = () => screen.getAllByRole("listitem");
 
+    const requirementStates = () => requirementItems().map((item) => item.getAttribute("data-state"));
+
     /** Appena aperto non si è ancora sbagliato niente: i requisiti non devono essere già rossi. */
-    it("mostra i requisiti in grigio finché non si scrive la nuova password", async () => {
+    it("mostra i requisiti neutri finché non si scrive la nuova password", async () => {
         renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
 
-        expect(requirementItems().every((item) => item.className.includes("text-muted-foreground"))).toBe(true);
+        expect(requirementStates()).toEqual(["idle", "idle", "idle"]);
+        expect(requirementItems()[0]).toHaveTextContent("non ancora verificato");
 
         await userEvent.type(screen.getByLabelText(/^Nuova password/), "a");
 
-        expect(requirementItems().some((item) => item.className.includes("text-status-red-foreground"))).toBe(true);
+        expect(requirementStates()).toContain("unmet");
+        expect(requirementStates()).not.toContain("idle");
     });
 
     /** La checklist accende i requisiti man mano che si scrive, prima di premere Salva. */
-    it("spunta i requisiti mentre si digita", async () => {
+    it("spunta i requisiti mentre si digita, anche a parole per chi non vede i colori", async () => {
         renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
-
-        expect(requirementItems().filter((item) => item.className.includes("line-through"))).toHaveLength(0);
 
         await userEvent.type(screen.getByLabelText(/^Nuova password/), "abcdefgh1");
 
-        const satisfied = requirementItems()
-            .filter((item) => item.className.includes("line-through"))
-            .map((item) => item.textContent);
-        expect(satisfied).toEqual(["Almeno 8 caratteri", "Almeno un numero"]);
+        expect(requirementStates()).toEqual(["met", "met", "unmet"]);
+        const met = requirementItems().filter((item) => item.getAttribute("data-state") === "met");
+        expect(met.map((item) => item.textContent)).toEqual([
+            "Almeno 8 caratterisoddisfatto",
+            "Almeno un numerosoddisfatto",
+        ]);
+        expect(requirementItems()[2]).toHaveTextContent("Almeno un carattere specialenon soddisfatto");
+        expect(requirementItems().some((item) => item.className.includes("line-through"))).toBe(false);
+    });
+
+    it("ha un occhio per ciascuno dei tre campi, con stato indipendente", async () => {
+        renderWithProviders(<ChangePasswordDialog open onOpenChange={() => {}} />);
+        const current = screen.getByLabelText(/^Password attuale/);
+        const next = screen.getByLabelText(/^Nuova password/);
+        const confirm = screen.getByLabelText(/^Conferma nuova password/);
+
+        await userEvent.click(screen.getByRole("button", { name: "Mostra nuova password" }));
+
+        expect(next).toHaveAttribute("type", "text");
+        expect(current).toHaveAttribute("type", "password");
+        expect(confirm).toHaveAttribute("type", "password");
+        expect(screen.getByRole("button", { name: "Nascondi nuova password" })).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Mostra conferma password" }));
+        await userEvent.click(screen.getByRole("button", { name: "Mostra password attuale" }));
+
+        expect(current).toHaveAttribute("type", "text");
+        expect(confirm).toHaveAttribute("type", "text");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nascondi nuova password" }));
+
+        expect(next).toHaveAttribute("type", "password");
+        expect(current).toHaveAttribute("type", "text");
     });
 
     it("salva, avvisa e chiude svuotando il form", async () => {
@@ -111,7 +147,7 @@ describe("ChangePasswordDialog", () => {
         const currentPassword = screen.getByLabelText(/^Password attuale/);
         expect(currentPassword).toHaveAccessibleDescription("Inserisci la password attuale");
         expect(screen.getByLabelText(/^Nuova password/)).toHaveAccessibleDescription(
-            "La password non rispetta tutti i requisiti qui sopra"
+            "La password non rispetta tutti i requisiti"
         );
         expect(screen.getByLabelText(/^Conferma nuova password/)).toHaveAccessibleDescription(
             "Ripeti la nuova password"
@@ -123,7 +159,7 @@ describe("ChangePasswordDialog", () => {
         await userEvent.type(currentPassword, "v");
         expect(currentPassword).not.toHaveAccessibleDescription();
         expect(screen.getByLabelText(/^Nuova password/)).toHaveAccessibleDescription(
-            "La password non rispetta tutti i requisiti qui sopra"
+            "La password non rispetta tutti i requisiti"
         );
         expect(changeOwnPassword).not.toHaveBeenCalled();
     });
@@ -209,6 +245,17 @@ describe("TwoFactorSetupDialog", () => {
         });
         expect(enableTwoFactor).toHaveBeenCalledWith("123456");
         expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it("al passo del QR mette subito il focus sul campo del codice", async () => {
+        startTwoFactorSetup.mockResolvedValue({ secretBase32: "S", otpauthUri: "", qrDataUrl: "data:," });
+        renderWithProviders(<TwoFactorSetupDialog open onOpenChange={() => {}} onEnabled={() => {}} />);
+
+        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+
+        const codeInput = await screen.findByLabelText(/^Codice di verifica/);
+        await waitFor(() => expect(codeInput).toHaveFocus());
     });
 
     it("con un codice sbagliato resta sul QR, svuota il campo e dice perché sotto il campo", async () => {
@@ -387,6 +434,45 @@ describe("RecoveryCodesDialog", () => {
 
         expect(writeText).toHaveBeenCalledWith("aaaa-1111\nbbbb-2222");
         expect(toastSuccess).toHaveBeenCalledWith("Codici copiati negli appunti");
+    });
+
+    it("numera i codici con il numero separato dal codice", () => {
+        renderWithProviders(<RecoveryCodesDialog open onOpenChange={() => {}} codes={["aaaa-1111", "bbbb-2222"]} />);
+
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
+        expect(screen.getByText("aaaa-1111")).toBeInTheDocument();
+        expect(screen.getByText("bbbb-2222").previousElementSibling).toHaveTextContent("2");
+    });
+
+    it("scarica i codici come file di testo numerato, senza spuntare la conferma", async () => {
+        renderWithProviders(<RecoveryCodesDialog open onOpenChange={() => {}} codes={["aaaa-1111", "bbbb-2222"]} />);
+
+        await userEvent.click(screen.getByRole("button", { name: "Scarica .txt" }));
+
+        expect(downloadTextFile).toHaveBeenCalledTimes(1);
+        const [fileName, content] = downloadTextFile.mock.calls[0] as [string, string];
+        expect(fileName).toBe("codici-di-recupero.txt");
+        expect(content).toContain("1. aaaa-1111\n2. bbbb-2222");
+        expect(screen.getByRole("checkbox")).not.toBeChecked();
+        expect(screen.getByRole("button", { name: "Ho salvato i codici, chiudi" })).toBeDisabled();
+    });
+
+    it("rimette il pulsante di copia com'era dopo un attimo", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            renderWithProviders(<RecoveryCodesDialog open onOpenChange={() => {}} codes={["aaaa-1111"]} />);
+            const copy = screen.getByRole("button", { name: "Copia tutti i codici" });
+
+            await userEvent.click(copy);
+            expect(copy.querySelector("svg")).toHaveClass("lucide-check");
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(2100);
+            });
+            expect(copy.querySelector("svg")).toHaveClass("lucide-copy");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 

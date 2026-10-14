@@ -103,6 +103,7 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
     if (!setup) {
         return (
             <CustomDialog
+                key="password"
                 open={open}
                 onOpenChange={handleOpenChange}
                 title="Attiva la verifica in due passaggi"
@@ -133,6 +134,9 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
 
     return (
         <CustomDialog
+            // `key`: i due passi sono lo stesso componente nello stesso punto, e senza un'identità
+            // diversa Radix riuserebbe il dialogo già aperto senza rifare il focus iniziale.
+            key="qr"
             open={open}
             onOpenChange={handleOpenChange}
             title="Inquadra il codice QR"
@@ -144,50 +148,88 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleCodeStep()}
             preventOutsideClose
+            contentClassName="sm:max-w-[44rem]"
+            // Il primo elemento focalizzabile sarebbe il pulsante di copia del segreto, ma il campo
+            // che serve subito dopo la scansione è il codice. L'`InputOTP` ha un input vero (nascosto)
+            // con questo id. Non sui touch: lì il focus apre la tastiera, che copre il QR prima
+            // ancora di averlo inquadrato.
+            onOpenAutoFocus={(event) => {
+                if (window.matchMedia?.("(pointer: coarse)").matches) {
+                    return;
+                }
+                event.preventDefault();
+                document.getElementById("twoFactorConfirmCode")?.focus();
+            }}
             content={
-                <div className="grid gap-3 pb-2">
-                    <div className="flex justify-center rounded-md border border-primary/15 bg-white p-3">
-                        {/* Il QR arriva già come PNG in un data URL: il segreto non passa mai
-                            per un URL, dove finirebbe nei log e nella cronologia. */}
-                        <img src={setup.qrDataUrl} alt="Codice QR per l'app di autenticazione" className="size-44" />
+                <div className="grid gap-6 pb-2 sm:grid-cols-[auto_1fr]">
+                    <div className="grid content-start gap-3">
+                        <div className="flex justify-center rounded-md border border-primary/15 bg-white p-3">
+                            {/* Il QR arriva già come PNG in un data URL: il segreto non passa mai
+                                per un URL, dove finirebbe nei log e nella cronologia. Lo sfondo
+                                resta bianco anche in tema scuro: la fotocamera ha bisogno del contrasto. */}
+                            <img
+                                src={setup.qrDataUrl}
+                                alt="Codice QR per l'app di autenticazione"
+                                className="size-44"
+                            />
+                        </div>
+
+                        {/* Non tutti possono inquadrare: chi usa l'app sullo stesso dispositivo,
+                            o una che non apre la fotocamera, inserisce il segreto a mano. */}
+                        <CopyableValue
+                            id="twoFactorSecret"
+                            label="Oppure inserisci questo codice a mano"
+                            value={setup.secretBase32}
+                            copiedMessage="Codice copiato negli appunti"
+                            errorMessage="Impossibile copiare il codice"
+                        />
                     </div>
 
-                    {/* Non tutti possono inquadrare: chi usa l'app sullo stesso dispositivo,
-                        o una che non apre la fotocamera, inserisce il segreto a mano. */}
-                    <CopyableValue
-                        id="twoFactorSecret"
-                        label="Oppure inserisci questo codice a mano"
-                        value={setup.secretBase32}
-                        copiedMessage="Codice copiato negli appunti"
-                        errorMessage="Impossibile copiare il codice"
-                    />
+                    <div className="grid content-start gap-5">
+                        <ol className="grid gap-3 text-base">
+                            {[
+                                "Apri l'app di autenticazione e aggiungi l'account: inquadra il codice QR o inserisci il codice a mano.",
+                                "Leggi il codice a 6 cifre che l'app mostra.",
+                                "Scrivilo qui sotto e premi Attiva.",
+                            ].map((text, index) => (
+                                <li key={text} className="flex gap-3">
+                                    <span
+                                        aria-hidden="true"
+                                        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-text"
+                                    >
+                                        {index + 1}
+                                    </span>
+                                    <span>{text}</span>
+                                </li>
+                            ))}
+                        </ol>
 
-                    <FormField id="twoFactorConfirmCode" label="Codice di verifica" required error={codeError}>
-                        <InputOTP
-                            {...fieldProps("twoFactorConfirmCode", { error: codeError, required: true })}
-                            autoComplete="one-time-code"
-                            maxLength={6}
-                            pattern={REGEXP_ONLY_DIGITS}
-                            containerClassName="justify-center"
-                            value={code}
-                            onChange={(value) => {
-                                setCode(value);
-                                setCodeError(undefined);
-                            }}
-                        >
-                            <InputOTPGroup>
-                                {/* Le caselle sono `div` disegnati sopra l'input vero, che è
+                        <FormField id="twoFactorConfirmCode" label="Codice di verifica" required error={codeError}>
+                            <InputOTP
+                                {...fieldProps("twoFactorConfirmCode", { error: codeError, required: true })}
+                                autoComplete="one-time-code"
+                                maxLength={6}
+                                pattern={REGEXP_ONLY_DIGITS}
+                                value={code}
+                                onChange={(value) => {
+                                    setCode(value);
+                                    setCodeError(undefined);
+                                }}
+                            >
+                                <InputOTPGroup>
+                                    {/* Le caselle sono `div` disegnati sopra l'input vero, che è
                                     invisibile: il bordo rosso va chiesto a loro. */}
-                                {[0, 1, 2, 3, 4, 5].map((index) => (
-                                    <InputOTPSlot
-                                        key={index}
-                                        index={index}
-                                        aria-invalid={codeError ? true : undefined}
-                                    />
-                                ))}
-                            </InputOTPGroup>
-                        </InputOTP>
-                    </FormField>
+                                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                                        <InputOTPSlot
+                                            key={index}
+                                            index={index}
+                                            aria-invalid={codeError ? true : undefined}
+                                        />
+                                    ))}
+                                </InputOTPGroup>
+                            </InputOTP>
+                        </FormField>
+                    </div>
                 </div>
             }
         />

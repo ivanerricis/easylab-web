@@ -335,22 +335,40 @@ describe("TwoFactorConfirmDialog", () => {
             />
         );
 
-    it("pretende password e codice insieme", async () => {
+    it("tiene spento il pulsante finché password e codice non hanno la forma giusta", async () => {
         const onConfirm = vi.fn();
         renderConfirm(onConfirm);
+        const confirm = screen.getByRole("button", { name: "Disattiva" });
+        const codeInput = screen.getByLabelText(/^Codice di verifica o di recupero/);
+
+        expect(confirm).toBeDisabled();
 
         await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
-        await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
+        expect(confirm).toBeDisabled();
 
-        const codeInput = screen.getByLabelText(/^Codice di verifica o di recupero/);
-        expect(codeInput).toHaveAccessibleDescription("Inserisci un codice dell'app o di recupero");
-        expect(codeInput).toHaveFocus();
-        expect(screen.getByLabelText(/^Password/)).not.toHaveAccessibleDescription();
-        expect(toastError).not.toHaveBeenCalled();
+        // Sei cifre dell'app, ma ne mancano.
+        await userEvent.type(codeInput, "12345");
+        expect(confirm).toBeDisabled();
+        await userEvent.type(codeInput, "6");
+        expect(confirm).toBeEnabled();
+
+        // Un codice di recupero: otto caratteri, con trattino o minuscole non cambia.
+        await userEvent.clear(codeInput);
+        await userEvent.type(codeInput, "abcd-23");
+        expect(confirm).toBeDisabled();
+        await userEvent.type(codeInput, "45");
+        expect(confirm).toBeEnabled();
+
+        // Caratteri che l'alfabeto dei codici non usa (O, I, 0, 1).
+        await userEvent.clear(codeInput);
+        await userEvent.type(codeInput, "ABCD-OI01");
+        expect(confirm).toBeDisabled();
+
+        await userEvent.clear(screen.getByLabelText(/^Password/));
+        await userEvent.clear(codeInput);
+        await userEvent.type(codeInput, "123456");
+        expect(confirm).toBeDisabled();
         expect(onConfirm).not.toHaveBeenCalled();
-
-        await userEvent.type(codeInput, "1");
-        expect(codeInput).not.toHaveAccessibleDescription();
     });
 
     it.each([

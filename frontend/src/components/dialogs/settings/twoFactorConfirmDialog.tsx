@@ -13,6 +13,19 @@ import { getApiErrorMessage, isFieldRejection } from "@/lib/api";
  * stessa domanda davanti — chiederne uno solo renderebbe l'intera 2FA aggirabile da chi ha
  * ottenuto quell'uno — quindi il dialogo è uno e cambia solo nei testi.
  */
+/**
+ * Un codice plausibile, prima ancora di mandarlo al server: sei cifre dell'app, oppure un codice
+ * di recupero, otto caratteri dell'alfabeto del server (senza O, I, 0, 1) con o senza trattino
+ * e spazi in mezzo (vedi `normalizeRecoveryCode` nel backend). Il pulsante resta spento finché
+ * il codice non ha una di queste due forme: un codice a metà non può essere giusto, e provarlo
+ * conterebbe comunque fra i tentativi concessi.
+ */
+const isPlausibleSecondFactorCode = (code: string) => {
+    const normalized = code.replace(/[\s-]/g, "").toUpperCase();
+
+    return /^\d{6}$/.test(normalized) || /^[A-HJ-NP-Z2-9]{8}$/.test(normalized);
+};
+
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -55,7 +68,11 @@ const TwoFactorConfirmDialog = ({
 
     const handleConfirm = async () => {
         const nextPasswordError = password ? undefined : "Inserisci la password";
-        const nextCodeError = code.trim() ? undefined : "Inserisci un codice dell'app o di recupero";
+        const nextCodeError = !code.trim()
+            ? "Inserisci un codice dell'app o di recupero"
+            : isPlausibleSecondFactorCode(code)
+              ? undefined
+              : "Il codice dell'app ha 6 cifre, quello di recupero 8 caratteri";
         setPasswordError(nextPasswordError);
         setCodeError(nextCodeError);
 
@@ -105,7 +122,7 @@ const TwoFactorConfirmDialog = ({
             destructive={destructive}
             confirmLabel={isSubmitting ? submittingLabel : confirmLabel}
             confirmIcon={confirmIcon}
-            confirmDisabled={isSubmitting}
+            confirmDisabled={isSubmitting || password === "" || !isPlausibleSecondFactorCode(code)}
             cancelDisabled={isSubmitting}
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleConfirm()}

@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Report: la voce "Ritirato"](changelog/2026-10.md#2026-10-14-report-la-voce-ritirato)
 - [2026-10-14 — Sessioni: scadenza a rinnovo, con tetto di trenta giorni](changelog/2026-10.md#2026-10-14-sessioni-scadenza-a-rinnovo-con-tetto-di-trenta-giorni)
 - [2026-10-14 — Colonna Stato nascosta di default in tutte le tabelle con il colore di riga](changelog/2026-10.md#2026-10-14-colonna-stato-nascosta-di-default-in-tutte-le-tabelle-con-il-colore-di-riga)
 - [2026-10-14 — Elenco report: la colonna Stato è nascosta di default](changelog/2026-10.md#2026-10-14-elenco-report-la-colonna-stato-e-nascosta-di-default)

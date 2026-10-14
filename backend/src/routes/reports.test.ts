@@ -79,6 +79,7 @@ const printReportRow = {
     dataBackup: true,
     charger: false,
     alerted: true,
+    pickedUp: false,
     price: 50,
     created_at: new Date("2026-01-01T10:00:00Z"),
     customerName: "Mario Rossi",
@@ -102,6 +103,7 @@ const storedReport = {
     dataBackup: false,
     charger: false,
     alerted: false,
+    pickedUp: false,
     closed: false,
     paymentMethod: "non_paid",
     price: 0,
@@ -434,6 +436,26 @@ describe("reports router", () => {
     describe("POST /", () => {
         const minimalBody = { deviceId: 1, issueId: 1, customerId: 1 };
 
+        it("inoltra il flag pickedUp alla creazione", async () => {
+            vi.mocked(createReport).mockResolvedValue([{ ...storedReport, pickedUp: true }] as never);
+
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, pickedUp: true });
+
+            expect(response.status).toBe(201);
+            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ pickedUp: true }), undefined);
+        });
+
+        it("rifiuta un pickedUp che non è un booleano", async () => {
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, pickedUp: "sì" });
+
+            expect(response.status).toBe(400);
+            expect(createReport).not.toHaveBeenCalled();
+        });
+
         it("crea un report non pagato con i default", async () => {
             vi.mocked(createReport).mockResolvedValue([storedReport] as never);
 
@@ -584,6 +606,16 @@ describe("reports router", () => {
             const response = await request(buildApp()).put("/api/reports/999").send({ note: "Nuova nota" });
 
             expect(response.status).toBe(404);
+        });
+
+        it("inoltra il flag pickedUp all'aggiornamento", async () => {
+            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+            vi.mocked(updateReportById).mockResolvedValue([{ ...storedReport, pickedUp: true }] as never);
+
+            const response = await request(buildApp()).put("/api/reports/1").send({ pickedUp: true });
+
+            expect(response.status).toBe(200);
+            expect(updateReportById).toHaveBeenCalledWith(1, { pickedUp: true }, undefined);
         });
 
         it("aggiorna un campo mantenendo il resto della riga esistente", async () => {

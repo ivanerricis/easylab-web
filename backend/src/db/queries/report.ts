@@ -181,6 +181,7 @@ export const listReports = async ({
             dataBackup: reportTable.dataBackup,
             charger: reportTable.charger,
             alerted: reportTable.alerted,
+            pickedUp: reportTable.pickedUp,
             paymentMethod: reportTable.paymentMethod,
             price: reportTable.price,
             customer: customerSortExpr,

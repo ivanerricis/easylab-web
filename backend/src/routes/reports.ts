@@ -59,6 +59,7 @@ const reportBodySchema = z
         dataBackup: z.boolean().optional(),
         charger: z.boolean().optional(),
         alerted: z.boolean().optional(),
+        pickedUp: z.boolean().optional(),
         closed: z.boolean().optional(),
         paymentMethod: z.enum(reportPaymentMethods).optional(),
         price: z.coerce.number().int().min(0).optional(),

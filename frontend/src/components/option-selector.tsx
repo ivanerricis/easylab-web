@@ -96,7 +96,7 @@ const OptionSelector = <TValue extends string | number | boolean>({
             aria-describedby={describedBy}
             tabIndex={id ? -1 : undefined}
             onFocus={id ? handleGroupFocus : undefined}
-            className={cn("grid gap-2 outline-none", isSegmented && "gap-0", columnsClassName, className)}
+            className={cn("grid gap-2 outline-none", isSegmented && "isolate gap-0", columnsClassName, className)}
         >
             {options.map((option, index) => {
                 const isSelected = value === option.value;
@@ -123,6 +123,10 @@ const OptionSelector = <TValue extends string | number | boolean>({
                             // gruppo solo.
                             isSegmented && index > 0 && "-ml-0.5 rounded-l-none",
                             isSegmented && index < options.length - 1 && "rounded-r-none",
+                            // `relative z-10` porta la voce scelta sopra il bordo condiviso; `isolate` sul gruppo
+                            // tiene quello z-index dentro il gruppo. Senza, la voce scelta superava la lista
+                            // dei suggerimenti di un campo vicino (anche lei `z-10`, ma prima nel DOM) e
+                            // restava disegnata sopra.
                             isSegmented && isSelected && "relative z-10",
                             isStacked && "flex-col items-center justify-center gap-1 px-1 py-2 text-center",
                             !isStacked && !isSegmented && "items-center justify-start gap-3 px-4 py-3 text-left",

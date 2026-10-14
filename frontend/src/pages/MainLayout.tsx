@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import AppErrorBoundary from "@/components/app-error-boundary";
-import LoadingPage from "@/components/loadingPage";
+import PageLoadingSkeleton from "@/components/page-loading-skeleton";
 // import { ModeToggle } from "@/components/mode-toggle"
 import GlobalSearch from "@/components/global-search";
 import ShortcutsLegend from "@/components/shortcuts-legend";
@@ -40,6 +40,10 @@ const readPageTitle = () => {
  * dell'indirizzo, e lì il focus deve restare dov'è. E non al primo caricamento, dove il
  * browser annuncia già la pagina da sé.
  */
+/** `/reports/12`, `/clients/3/interventions`: una scheda di dettaglio, non una lista. */
+const isDetailPath = (pathname: string) =>
+    /^\/(reports|interventions|clients|collaborators|technicians)\/[^/]+/.test(pathname);
+
 const useRouteChangeFocus = (pathname: string) => {
     const mainRef = useRef<HTMLElement>(null);
     const announcerRef = useRef<HTMLDivElement>(null);
@@ -177,9 +181,7 @@ export const MainLayout = () => {
                             layout stesso. */}
                         <AppErrorBoundary key={pathname}>
                             <Suspense
-                                fallback={
-                                    <LoadingPage className="absolute inset-3 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-                                }
+                                fallback={<PageLoadingSkeleton variant={isDetailPath(pathname) ? "detail" : "list"} />}
                             >
                                 <Outlet />
                             </Suspense>

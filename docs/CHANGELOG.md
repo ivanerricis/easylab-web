@@ -26,6 +26,7 @@ data porta alla voce da qui.
 
 - [2026-10-14 — Disattiva e Rigenera: pulsante spento finché password e codice non sono validi](changelog/2026-10.md#2026-10-14-disattiva-e-rigenera-pulsante-spento-finche-password-e-codice-non-sono-validi)
 - [2026-10-14 — Menu a tendina: si aprono sempre sotto il campo](changelog/2026-10.md#2026-10-14-menu-a-tendina-si-aprono-sempre-sotto-il-campo)
+- [2026-10-14 — Scheletri al posto delle rotelline: dashboard, schede di dettaglio e cambio pagina](changelog/2026-10.md#2026-10-14-scheletri-al-posto-delle-rotelline-dashboard-schede-di-dettaglio-e-cambio-pagina)
 - [2026-10-14 — Dialoghi: il titolo lungo non passa più sotto la X](changelog/2026-10.md#2026-10-14-dialoghi-il-titolo-lungo-non-passa-piu-sotto-la-x)
 - [2026-10-14 — Dialoghi: sfumatura di scorrimento, due passi su telefono, pulsanti uniformi](changelog/2026-10.md#2026-10-14-dialoghi-sfumatura-di-scorrimento-due-passi-su-telefono-pulsanti-uniformi)
 - [2026-10-14 — Interventi: caselle di testo affiancate alla stessa altezza](changelog/2026-10.md#2026-10-14-interventi-caselle-di-testo-affiancate-alla-stessa-altezza)

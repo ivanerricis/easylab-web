@@ -15,7 +15,8 @@ import CardDashboard, {
     dashboardCardLayoutClassName,
     dashboardCardValueClassName,
 } from "./components/cardDashboard";
-import LoadingPage from "@/components/loadingPage";
+import CalendarSkeleton from "@/pages/calendar/components/calendar-skeleton";
+import { Card } from "@/components/ui/card";
 import PageHeader from "@/components/page-header";
 import RefreshButton from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,10 @@ const DashboardPage = () => {
         reloadInterventionStats,
     } = useDashboardStats();
 
+    // Finché non sono arrivati i primi contatori le schede mostrano un segnaposto al posto del
+    // numero; dai ricaricamenti in poi restano i valori di prima, attenuati (vedi sotto).
+    const isFirstLoad = isLoading && !hasLoadedMetricsOnce;
+
     const selectedRevenueLabel = useMemo(() => getMonthLabel(displayedRevenueMonth), [displayedRevenueMonth]);
 
     const maxMonthlyRevenue = useMemo(
@@ -219,6 +224,7 @@ const DashboardPage = () => {
                         icon={CircleDashed}
                         number={formatCount(reportStats?.openCount)}
                         iconColor="text-destructive"
+                        isLoading={isFirstLoad}
                         onClick={() => goToReportsPage("open")}
                     />
                     <CardDashboard
@@ -227,6 +233,7 @@ const DashboardPage = () => {
                         icon={CircleCheck}
                         number={formatCount(reportStats?.closedCount)}
                         iconColor="text-status-green-foreground"
+                        isLoading={isFirstLoad}
                         onClick={() => goToReportsPage("closed")}
                     />
 
@@ -236,6 +243,7 @@ const DashboardPage = () => {
                         icon={CalendarClock}
                         number={formatCount(interventionStats?.scheduledCount)}
                         iconColor="text-destructive"
+                        isLoading={isFirstLoad}
                         onClick={() => goToInterventionsPage("scheduled")}
                     />
                     <CardDashboard
@@ -244,6 +252,7 @@ const DashboardPage = () => {
                         icon={Loader}
                         number={formatCount(interventionStats?.inProgressCount)}
                         iconColor="text-action-print"
+                        isLoading={isFirstLoad}
                         onClick={() => goToInterventionsPage("in_progress")}
                     />
                     <CardDashboard
@@ -252,6 +261,7 @@ const DashboardPage = () => {
                         icon={CircleCheck}
                         number={formatCount(interventionStats?.completedCount)}
                         iconColor="text-status-green-foreground"
+                        isLoading={isFirstLoad}
                         onClick={() => goToInterventionsPage("completed")}
                     />
 
@@ -458,7 +468,13 @@ const DashboardPage = () => {
                 che non teneva conto delle schede: quando queste andavano su due o tre righe (a
                 finestra non intera) la pagina scorreva, e rimpicciolirle non avrebbe dato al
                 calendario un pixel in più. */}
-            <Suspense fallback={<LoadingPage className="min-h-[24rem] flex-1 sm:min-h-[28rem]" />}>
+            <Suspense
+                fallback={
+                    <Card className="min-h-[24rem] flex-1 sm:min-h-[28rem]">
+                        <CalendarSkeleton />
+                    </Card>
+                }
+            >
                 <InterventionsCalendar
                     className="min-h-[24rem] flex-1 sm:min-h-[28rem]"
                     events={calendarEvents}
@@ -468,10 +484,6 @@ const DashboardPage = () => {
                     onRangeChange={handleCalendarRangeChange}
                 />
             </Suspense>
-
-            {isLoading && !hasLoadedMetricsOnce ? (
-                <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-            ) : null}
 
             {hasOpenedCreateReport ? (
                 <Suspense fallback={null}>

@@ -1,4 +1,4 @@
-import LoadingPage from "@/components/loadingPage";
+import CalendarSkeleton from "./calendar-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
@@ -490,9 +490,7 @@ const InterventionsCalendar = ({
                 </Suspense>
             ) : null}
 
-            {isInitialLoading ? (
-                <LoadingPage className="absolute inset-0 z-10 rounded-2xl bg-background/70 backdrop-blur-sm" />
-            ) : null}
+            {isInitialLoading ? <CalendarSkeleton className="absolute inset-0 z-10 rounded-2xl bg-card" /> : null}
         </Card>
     );
 };

@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import LoadingPage from "@/components/loadingPage";
+import DetailPageSkeleton from "@/components/detail-page-skeleton";
 import NotFoundState from "@/components/not-found-state";
 
 type EntityDetailGateProps = {
@@ -18,12 +18,12 @@ type EntityDetailGateProps = {
 
 /**
  * Quello che una scheda di dettaglio mostra al posto di sé quando non può ancora mostrarsi: "non
- * trovato", il caricamento a tutta pagina o "non disponibile", in quest'ordine.
+ * trovato", lo scheletro della scheda o "non disponibile", in quest'ordine.
  *
  * Le cinque schede (report, intervento, cliente, collaboratore, tecnico) avevano ognuna la sua
  * copia di questi tre rami, una quindicina di righe identiche a parte i testi. La pagina decide
  * *se* cedere il posto — con un `return` anticipato, dopo tutti gli hook — e il gate *cosa*
- * mostrare: l'ordine resta uno solo. Il caricamento a tutta pagina vale solo senza dati (è la
+ * mostrare: l'ordine resta uno solo. Lo scheletro vale solo senza dati (è la
  * pagina a non chiamare il gate quando li ha): su un ricaricamento la scheda resta, attenuata,
  * invece di lampeggiare o smontare un dialogo aperto (vedi `ReportPage`).
  */
@@ -33,7 +33,7 @@ const EntityDetailGate = ({ isNotFound, isLoading, notFound, unavailableLabel }:
     }
 
     if (isLoading || unavailableLabel == null) {
-        return <LoadingPage />;
+        return <DetailPageSkeleton />;
     }
 
     return <div className="flex h-full items-center justify-center text-muted-foreground">{unavailableLabel}</div>;

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { LucideIcon } from "lucide-react";
 
 type Props = Readonly<{
@@ -7,6 +8,8 @@ type Props = Readonly<{
     icon: LucideIcon;
     number: string;
     iconColor?: string;
+    /** Il numero non è ancora arrivato: al suo posto un segnaposto, della stessa altezza. */
+    isLoading?: boolean;
     onClick?: () => void;
 }>;
 
@@ -35,7 +38,7 @@ export const dashboardCardIconClassName =
     "col-start-2 row-start-2 size-4 shrink-0 sm:row-start-1 sm:size-5 sm:@max-[80rem]:size-4";
 export const dashboardCardValueClassName = "row-start-2 text-lg font-bold sm:text-2xl sm:@max-[80rem]:text-xl";
 
-const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClick }: Props) => {
+const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, isLoading = false, onClick }: Props) => {
     const isInteractive = onClick != null;
 
     return (
@@ -72,7 +75,14 @@ const CardDashboard = ({ text, mobileText, icon: Icon, number, iconColor, onClic
                 )}
             </span>
             <Icon className={cn(dashboardCardIconClassName, "text-muted-foreground", iconColor)} />
-            <span className={dashboardCardValueClassName}>{number}</span>
+            {isLoading ? (
+                <span className={dashboardCardValueClassName}>
+                    <span className="sr-only">Caricamento in corso</span>
+                    <Skeleton aria-hidden="true" className="h-[1lh] w-10" />
+                </span>
+            ) : (
+                <span className={dashboardCardValueClassName}>{number}</span>
+            )}
         </div>
     );
 };

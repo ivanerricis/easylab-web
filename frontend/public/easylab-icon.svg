@@ -1,44 +1,18 @@
-<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="copper" x1="20%" y1="0%" x2="80%" y2="100%">
-      <stop offset="0%" stop-color="#EFC08D"/>
-      <stop offset="55%" stop-color="#D08B4E"/>
-      <stop offset="100%" stop-color="#A9632F"/>
-    </linearGradient>
-    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#E8E6DA"/>
-      <stop offset="100%" stop-color="#A9B3AE"/>
-    </linearGradient>
+    <clipPath id="inside">
+      <path d="M114 96 V128 L84 188 Q80 196 90 196 H166 Q176 196 172 188 L142 128 V96 Z"/>
+    </clipPath>
   </defs>
-
-  <g transform="translate(256 256) scale(1.46) translate(-256 -256)">
-
-    <!-- open-end wrench -->
-    <g transform="rotate(-40 256 256)" fill="url(#copper)">
-      <!-- head with open jaw notched into the top edge -->
-      <path d="M 228 100
-               L 240 100 L 240 132 Q 240 141 249 141
-               L 263 141 Q 272 141 272 132 L 272 100
-               L 284 100 Q 302 100 302 118
-               L 302 156 Q 302 174 284 174
-               L 228 174 Q 210 174 210 156
-               L 210 118 Q 210 100 228 100 Z"/>
-      <!-- handle -->
-      <rect x="236" y="164" width="40" height="240" rx="20"/>
-      <!-- hanging-hole end -->
-      <path fill-rule="evenodd"
-            d="M 230 404 A 26 26 0 1 0 282 404 A 26 26 0 1 0 230 404 Z
-               M 246 404 A 10 10 0 1 0 266 404 A 10 10 0 1 0 246 404 Z"/>
+  <g transform="translate(128 128) scale(1.16) translate(-128 -128)">
+    <path fill="#1A2B40" d="M72 28 H150 L200 78 V212 a16 16 0 0 1 -16 16 H72 a16 16 0 0 1 -16 -16 V44 a16 16 0 0 1 16 -16 Z"/>
+    <path fill="#46597A" d="M150 28 V62 a16 16 0 0 0 16 16 H200 Z"/>
+    <g transform="translate(128 140) scale(1.3) translate(-128 -146)">
+      <rect x="80" y="156" width="96" height="44" fill="#5AB0F0" clip-path="url(#inside)"/>
+      <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M114 96 V128 L84 188 Q80 196 90 196 H166 Q176 196 172 188 L142 128 V96"/>
+        <path d="M106 96 H150"/>
+      </g>
     </g>
-
-    <!-- flathead screwdriver -->
-    <g transform="rotate(40 256 256)">
-      <rect x="234" y="84" width="44" height="34" rx="6" fill="url(#steel)"/>
-      <rect x="242" y="112" width="28" height="146" rx="8" fill="url(#steel)"/>
-      <rect x="230" y="248" width="52" height="24" rx="9" fill="#6FB5A1"/>
-      <rect x="224" y="266" width="64" height="154" rx="30" fill="#8FE3CC"/>
-      <rect x="248" y="294" width="8" height="102" rx="4" fill="#57A08C" opacity="0.5"/>
-    </g>
-
   </g>
 </svg>

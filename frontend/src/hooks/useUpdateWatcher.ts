@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useBusyGuard } from "@/components/use-busy-guard";
 import { getUpdateState } from "@/lib/api";
+import { updatePhaseSteps } from "@/lib/updatePhases";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -20,9 +21,10 @@ export const useUpdateWatcher = () => {
 
         const poll = async () => {
             let state;
+            let phase;
 
             try {
-                ({ state } = await getUpdateState());
+                ({ state, phase } = await getUpdateState());
             } catch {
                 // Mentre i container si ricostruiscono il backend non risponde: un errore di
                 // rete non è la fine dell'aggiornamento, quindi il blocco resta dov'è.
@@ -37,16 +39,17 @@ export const useUpdateWatcher = () => {
                 wasUpdatingRef.current = true;
                 // Riasserito a ogni giro di proposito: se qualcun altro toglie il blocco
                 // (il pannello Impostazioni lo fa quando rinuncia ad aspettare) torna su.
-                // Aggiornamento funzionale per non cancellare steps/activeStepKey: sulla scheda
-                // che ha lanciato l'aggiornamento è updateSettingsPanel a tenerli aggiornati con
-                // la fase reale, e questo poller (che gira su ogni scheda) non li conosce.
-                // Sovrascriverli qui li farebbe sparire e ricomparire a ogni giro.
+                // Le fasi arrivano dallo stato del server, così anche le schede che non hanno
+                // lanciato l'aggiornamento mostrano a che punto è. Se il server non ne
+                // dichiara una (ancora o già) si tiene quella che c'è: sulla scheda che ha
+                // lanciato l'aggiornamento è il pannello a tenerla, e a fine corsa a metterla
+                // "oltre l'ultima".
                 setBusy((prev) => ({
                     title: "Aggiornamento in corso...",
                     description:
                         "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
-                    steps: prev?.steps,
-                    activeStepKey: prev?.activeStepKey,
+                    steps: updatePhaseSteps,
+                    activeStepKey: phase ?? prev?.activeStepKey ?? updatePhaseSteps[0].key,
                 }));
                 return;
             }

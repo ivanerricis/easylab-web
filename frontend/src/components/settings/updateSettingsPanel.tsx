@@ -24,20 +24,12 @@ import {
     type UpdateStatusDto,
 } from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
+import { updatePhaseSteps } from "@/lib/updatePhases";
 import { Download, RefreshCw } from "lucide-react";
 
 const POLL_INTERVAL_MS = 3000;
 const CHECK_MAX_ATTEMPTS = 20; // ~1 minute
 const UPDATE_MAX_ATTEMPTS = 120; // ~6 minutes
-
-// Stesso ordine delle fasi scritte da scripts/update-server.sh: vedi UpdatePhase in
-// backend/src/services/updateManager.ts.
-const updatePhaseSteps = [
-    { key: "verify", label: "Verifica della firma del commit" },
-    { key: "code", label: "Aggiornamento del codice" },
-    { key: "build", label: "Ricostruzione dei container" },
-    { key: "cleanup", label: "Pulizia delle immagini vecchie" },
-];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -80,6 +80,16 @@ describe("useUpdateWatcher", () => {
      * Mentre i container si ricostruiscono il backend non risponde: se un errore di rete
      * togliesse il blocco, l'utente tornerebbe a scrivere proprio mentre girano le migrazioni.
      */
+    /** Le altre postazioni non lanciano l'aggiornamento: le fasi le leggono dallo stato del server. */
+    it("mostra le fasi anche sulle schede che non hanno lanciato l'aggiornamento", async () => {
+        getUpdateState.mockResolvedValue({ state: "running", phase: "build" });
+
+        await renderWatcher();
+
+        expect(screen.getByText("Ricostruzione dei container")).toBeInTheDocument();
+        expect(screen.getByText("Verifica della firma del commit")).toBeInTheDocument();
+    });
+
     it("tiene il blocco quando il backend non risponde", async () => {
         getUpdateState.mockResolvedValue({ state: "running" });
         await renderWatcher();

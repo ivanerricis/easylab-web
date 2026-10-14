@@ -14,7 +14,7 @@ export type UpdateStatusDto = {
 };
 
 /** Lo stato nudo, leggibile da qualunque utente autenticato: vedi hooks/useUpdateWatcher.ts. */
-export type UpdateStateDto = { state: UpdateStatusDto["state"] };
+export type UpdateStateDto = { state: UpdateStatusDto["state"]; phase: UpdateStatusDto["phase"] };
 
 export const getUpdateStatus = async () => (await api.get<UpdateStatusDto>("/settings/update")).data;
 

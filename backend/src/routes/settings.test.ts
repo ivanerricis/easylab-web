@@ -46,6 +46,7 @@ vi.mock("../services/authManager", () => ({
 vi.mock("../services/updateManager", () => ({
     getUpdateStatus: vi.fn().mockResolvedValue({
         state: "idle",
+        phase: null,
         currentCommit: "a1b2c3d",
         lastError: "Aggiornamento fallito (exit 1)",
         log: "=== git fetch ===",
@@ -155,7 +156,7 @@ describe("settings router: permessi", () => {
     it("espone solo lo stato dell'aggiornamento, non commit, log ed errori", async () => {
         const response = await request(buildApp(false)).get("/api/settings/update-state");
 
-        expect(response.body).toEqual({ state: "idle" });
+        expect(response.body).toEqual({ state: "idle", phase: null });
     });
 
     it("lascia passare l'amministratore sulle rotte protette", async () => {

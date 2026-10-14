@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Colonna Stato nascosta di default in tutte le tabelle con il colore di riga](changelog/2026-10.md#2026-10-14-colonna-stato-nascosta-di-default-in-tutte-le-tabelle-con-il-colore-di-riga)
 - [2026-10-14 — Elenco report: la colonna Stato è nascosta di default](changelog/2026-10.md#2026-10-14-elenco-report-la-colonna-stato-e-nascosta-di-default)
 - [2026-10-14 — Tabelle: stesso ordine delle colonne ovunque](changelog/2026-10.md#2026-10-14-tabelle-stesso-ordine-delle-colonne-ovunque)
 - [2026-10-14 — Login: si atterra sempre sulla dashboard](changelog/2026-10.md#2026-10-14-login-si-atterra-sempre-sulla-dashboard)

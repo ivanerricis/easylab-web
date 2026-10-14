@@ -296,7 +296,13 @@ const EntityTable = <TRow,>({
         // Una colonna non nascondibile si disegna anche se le preferenze salvate la dicono
         // nascosta (l'utente l'aveva tolta prima che diventasse bloccata): vedi
         // `withoutLockedColumns`.
-        const effectiveHiddenKeys = hiddenColumnKeys?.length ? withoutLockedColumns(hiddenColumnKeys, allColumns) : [];
+        // Senza menu "Colonne" (`hiddenColumnKeys` assente: le tabelle delle schede) valgono i
+        // predefiniti della colonna.
+        const requestedHiddenKeys =
+            hiddenColumnKeys ?? allColumns.filter((column) => column.hiddenByDefault).map((column) => column.key);
+        const effectiveHiddenKeys = requestedHiddenKeys.length
+            ? withoutLockedColumns(requestedHiddenKeys, allColumns)
+            : [];
 
         return effectiveHiddenKeys.length
             ? allColumns.filter((column) => !effectiveHiddenKeys.includes(column.key))

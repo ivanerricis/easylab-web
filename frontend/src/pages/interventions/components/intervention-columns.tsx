@@ -57,6 +57,7 @@ export const interventionColumns: InterventionColumn[] = [
     {
         key: "status",
         header: "Stato",
+        hiddenByDefault: true,
         sortKey: "status",
         defaultSortDirection: "desc",
         cardSlot: "badge",

@@ -22,6 +22,7 @@ export type CollaboratorReportColumn = {
     className?: string;
     render: (row: ReportDto) => ReactNode;
     cardSlot?: EntityCardSlot;
+    hiddenByDefault?: boolean;
 };
 
 export type CollaboratorInterventionColumn = {
@@ -30,6 +31,7 @@ export type CollaboratorInterventionColumn = {
     className?: string;
     render: (row: InterventionDto) => ReactNode;
     cardSlot?: EntityCardSlot;
+    hiddenByDefault?: boolean;
 };
 
 export const collaboratorReportColumns: CollaboratorReportColumn[] = [
@@ -65,6 +67,7 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
         // report, per chi non distingue verde e rosso.
         key: "closed",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatReportStatus(row.closed),
     },
@@ -117,6 +120,7 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
     {
         key: "status",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatInterventionStatus(row.status),
     },

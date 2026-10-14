@@ -48,6 +48,7 @@ export const technicianReportColumns: EntityColumn<ReportDto>[] = [
     {
         key: "closed",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatReportStatus(row.closed),
     },

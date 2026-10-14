@@ -43,6 +43,7 @@ export const customerReportColumns: EntityColumn<ReportDto>[] = [
     {
         key: "closed",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatReportStatus(row.closed),
     },
@@ -90,6 +91,7 @@ export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
     {
         key: "status",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatInterventionStatus(row.status),
     },

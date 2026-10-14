@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { ApiResponse, mockApi, user } from "./support/mockApi";
 
 test.describe("accesso", () => {
-    test("senza sessione porta al login, e dopo l'accesso torna alla pagina chiesta", async ({ page }) => {
+    test("senza sessione porta al login, e dopo l'accesso va alla dashboard", async ({ page }) => {
         let loggedIn = false;
         const api = await mockApi(page, {
             handlers: {
@@ -22,7 +22,9 @@ test.describe("accesso", () => {
         await page.locator("#loginPassword").fill("segreta1!");
         await page.getByRole("button", { name: "Accedi" }).click();
 
-        await expect(page).toHaveURL(/\/reports$/);
+        // Sempre alla dashboard, anche se si era chiesta un'altra pagina: il prossimo accesso può
+        // essere di un altro utente.
+        await expect(page).toHaveURL(/\/dashboard$/);
         expect(api.calls("POST /api/auth/login")).toEqual([{ username: "mario", password: "segreta1!" }]);
         expect(api.unhandled).toEqual([]);
     });

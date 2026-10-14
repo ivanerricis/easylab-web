@@ -165,14 +165,15 @@ const ReportPage = () => {
 
                     {/*
                     Stato (aperto/chiuso) e metodo di pagamento non si ripetono qui: stanno già
-                    nei numeri in alto. C'è invece "Avvisato", che si imposta dal dialogo di
-                    modifica ma in questa pagina non compariva da nessuna parte.
+                    nei numeri in alto. Ci sono invece "Avvisato" e "Ritirato", che si impostano
+                    dal dialogo di modifica ma in questa pagina non comparivano da nessuna parte.
                 */}
                     <DetailSection title="Stato e gestione">
                         <DetailGrid layout="rows">
                             <DetailItem label="Alimentatore" value={formatYesNo(report.charger)} />
                             <DetailItem label="Backup dati" value={formatYesNo(report.dataBackup)} />
                             <DetailItem label="Avvisato" value={formatYesNo(report.alerted)} />
+                            <DetailItem label="Ritirato" value={formatYesNo(report.pickedUp)} />
                             <DetailItem label="Creato il" value={formatDateTime(report.created_at)} />
                             <DetailItem
                                 label="Ultimo aggiornamento"

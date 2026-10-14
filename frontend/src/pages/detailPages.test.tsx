@@ -130,6 +130,7 @@ const report = {
     dataBackup: true,
     charger: false,
     alerted: true,
+    pickedUp: true,
     closed: false,
     price: 80,
     // Calcolato dal server con la stessa espressione di `listReports` (Q2): la pagina non
@@ -190,6 +191,7 @@ describe("ReportPage", () => {
         expect(detailValue("Collaboratore")).toBe("Luca Bianchi");
         expect(detailValue("Problema riscontrato")).toBe("Non carica");
         expect(detailValue("Avvisato")).toBe("Sì");
+        expect(detailValue("Ritirato")).toBe("Sì");
         expect(detailValue("Alimentatore")).toBe("No");
         expect(screen.getByText("Carta")).toBeInTheDocument();
         expect(screen.getByText("Paolo")).toBeInTheDocument();

@@ -25,6 +25,7 @@ export type ReportEntityDto = {
     dataBackup: boolean;
     charger: boolean;
     alerted: boolean;
+    pickedUp: boolean;
     closed: boolean;
     price: number;
     paymentMethod: PaymentMethod;
@@ -48,6 +49,7 @@ export type ReportCreateInput = {
     dataBackup?: boolean;
     charger?: boolean;
     alerted?: boolean;
+    pickedUp?: boolean;
     closed?: boolean;
     paymentMethod?: PaymentMethod;
     price?: number;

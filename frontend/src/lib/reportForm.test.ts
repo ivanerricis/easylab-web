@@ -150,6 +150,7 @@ describe("toReportUpdatePayload", () => {
             dataBackup: true,
             charger: false,
             alerted: true,
+            pickedUp: true,
             closed: true,
             internalPrice: 50,
         };
@@ -167,6 +168,7 @@ describe("toReportUpdatePayload", () => {
             dataBackup: true,
             charger: false,
             alerted: true,
+            pickedUp: true,
             closed: true,
             price: 50,
             technicianId: null,

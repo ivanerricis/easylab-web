@@ -20,12 +20,13 @@ import { formatPersonName } from "@/lib/people";
 
 /**
  * Le spunte di stato, nell'ordine in cui contano: le due dell'accettazione (le stesse del dialogo
- * di creazione), poi le due della riconsegna.
+ * di creazione), poi le tre della riconsegna (avvisato, ritirato, chiuso).
  */
 const statusOptions = [
     { id: "charger", label: "Alimentatore presente" },
     { id: "dataBackup", label: "Backup dati" },
     { id: "alerted", label: "Avvisato" },
+    { id: "pickedUp", label: "Ritirato" },
     { id: "closed", label: "Report chiuso" },
 ] as const;
 
@@ -58,6 +59,7 @@ export type EditReportSubmitValues = {
     dataBackup: boolean;
     charger: boolean;
     alerted: boolean;
+    pickedUp: boolean;
     closed: boolean;
     internalPrice: number;
 };
@@ -102,6 +104,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         dataBackup: false,
         charger: false,
         alerted: false,
+        pickedUp: false,
         closed: false,
     });
 
@@ -168,6 +171,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                     dataBackup: report.dataBackup,
                     charger: report.charger,
                     alerted: report.alerted,
+                    pickedUp: report.pickedUp,
                     closed: report.closed,
                 };
                 setFormValues(loadedFormValues);
@@ -282,6 +286,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 dataBackup: formValues.dataBackup,
                 charger: formValues.charger,
                 alerted: formValues.alerted,
+                pickedUp: formValues.pickedUp,
                 closed: formValues.closed,
                 internalPrice,
             });

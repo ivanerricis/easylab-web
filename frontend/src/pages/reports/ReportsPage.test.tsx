@@ -144,6 +144,7 @@ const buildReport = (id: number, overrides: Record<string, unknown> = {}) => ({
     dataBackup: false,
     charger: false,
     alerted: false,
+    pickedUp: false,
     paymentMethod: "non_paid",
     price: 0,
     customer: `Cliente ${id}`,
@@ -178,6 +179,7 @@ const baseEdit = {
     dataBackup: false,
     charger: false,
     alerted: false,
+    pickedUp: false,
     closed: false,
     internalPrice: 50,
 };

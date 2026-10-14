@@ -109,6 +109,7 @@ export const toReportUpdatePayload = (values: EditReportSubmitValues) => ({
     dataBackup: values.dataBackup,
     charger: values.charger,
     alerted: values.alerted,
+    pickedUp: values.pickedUp,
     closed: values.closed,
     paymentMethod: values.paymentMethod,
     price: values.internalPrice,

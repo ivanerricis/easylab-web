@@ -42,6 +42,7 @@ const baseReport = {
     dataBackup: false,
     charger: false,
     alerted: false,
+    pickedUp: false,
     closed: false,
 };
 

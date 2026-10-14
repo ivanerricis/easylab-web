@@ -435,6 +435,7 @@ describe("EditReportDialog", () => {
         dataBackup: false,
         charger: true,
         alerted: false,
+        pickedUp: false,
         closed: false,
         price: 80,
         paymentMethod: "cash",
@@ -511,9 +512,31 @@ describe("EditReportDialog", () => {
             dataBackup: false,
             charger: true,
             alerted: false,
+            pickedUp: false,
             closed: false,
             internalPrice: 80,
         });
+    });
+
+    it("consegna pickedUp a true quando si spunta Ritirato", async () => {
+        const onSubmit = await renderDialog();
+
+        await userEvent.click(screen.getByRole("checkbox", { name: "Ritirato" }));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        expect(onSubmit.mock.calls[0][0]).toMatchObject({ pickedUp: true, alerted: false, closed: false });
+    });
+
+    it("mostra Ritirato fra Avvisato e Report chiuso", async () => {
+        await renderDialog();
+
+        const labels = ["Avvisato", "Ritirato", "Report chiuso"];
+        const checkboxes = labels.map((name) => screen.getByRole("checkbox", { name }));
+        expect(checkboxes[0].compareDocumentPosition(checkboxes[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(checkboxes[1].compareDocumentPosition(checkboxes[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     /** Un report chiuso senza collaboratore non direbbe chi l'ha lavorato. */

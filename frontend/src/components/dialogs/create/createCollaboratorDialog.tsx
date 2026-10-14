@@ -101,7 +101,7 @@ const CreateCollaboratorDialog = ({ open, onOpenChange, onSubmit, mode = "create
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid gap-6">
+                <div className="grid gap-4 pb-2">
                     <FormField id="firstName" label="Nome" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}

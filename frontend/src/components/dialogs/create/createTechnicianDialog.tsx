@@ -102,7 +102,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
             open={open}
             onOpenChange={onOpenChange}
             isDirty={isDirty}
-            title={mode === "edit" ? "Modifica tecnico" : "Nuovo tecnico"}
+            title={mode === "edit" ? "Modifica tecnico esterno" : "Nuovo tecnico esterno"}
             description={
                 mode === "edit"
                     ? "Aggiorna i dati del tecnico e conferma per salvare."
@@ -116,7 +116,7 @@ const CreateTechnicianDialog = ({ open, onOpenChange, onSubmit, mode = "create",
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid gap-6">
+                <div className="grid gap-4 pb-2">
                     <FormField id="firstName" label="Nome" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}

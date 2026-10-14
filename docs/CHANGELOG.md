@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Nuovo cliente, tecnico e collaboratore: spaziatura e testi](changelog/2026-10.md#2026-10-14-nuovo-cliente-tecnico-e-collaboratore-spaziatura-e-testi)
 - [2026-10-14 — Icona dell'app: foglio più largo e bordo chiaro](changelog/2026-10.md#2026-10-14-icona-dellapp-foglio-piu-largo-e-bordo-chiaro)
 - [2026-10-14 — Nuova icona dell'app: foglio con provetta](changelog/2026-10.md#2026-10-14-nuova-icona-dellapp-foglio-con-provetta)
 - [2026-10-14 — Sì/No del nuovo report: due coppie distinte](changelog/2026-10.md#2026-10-14-sino-del-nuovo-report-due-coppie-distinte)

@@ -240,7 +240,7 @@ test("crea un report con un cliente nuovo, scegliendo dispositivo e difetto dai 
     // Il cliente non esiste: lo si crea dal "+" accanto al campo, senza uscire dal report.
     await dialog.getByRole("button", { name: "Crea nuovo cliente" }).click();
     const customerDialog = page.getByRole("dialog", { name: "Nuovo cliente" });
-    await customerDialog.getByLabel("Nome (Nome azienda)").fill("Giulia");
+    await customerDialog.getByLabel("Nome o azienda").fill("Giulia");
     await customerDialog.getByLabel("Cognome").fill("Verdi");
     await customerDialog.getByLabel("Telefono 1").fill("333 1234567");
     await customerDialog.getByRole("button", { name: "Salva" }).click();

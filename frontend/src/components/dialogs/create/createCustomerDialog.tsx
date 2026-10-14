@@ -127,8 +127,8 @@ const CreateCustomerDialog = ({ open, onOpenChange, onSubmit, mode = "create", i
             cancelDisabled={isSubmitting}
             confirmDisabled={isSubmitting}
             content={
-                <div className="grid gap-6">
-                    <FormField id="firstName" label="Nome (Nome azienda)" required error={errors.firstName}>
+                <div className="grid gap-4 pb-2">
+                    <FormField id="firstName" label="Nome o azienda" required error={errors.firstName}>
                         <Input
                             {...fieldProps("firstName", { error: errors.firstName, required: true })}
                             autoComplete="off"

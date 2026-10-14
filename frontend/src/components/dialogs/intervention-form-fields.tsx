@@ -164,8 +164,25 @@ const InterventionTimeFields = ({ values, errors, onChange }: FieldsProps) => (
     </div>
 );
 
+/**
+ * I campi di testo affiancati (problema e assistenza effettuata; materiali e note) hanno la stessa
+ * altezza, quella del più alto. Un `Textarea` si dimensiona sul contenuto (`field-sizing-content`),
+ * placeholder compreso: quello delle note è lungo e andava a capo, e il campo accanto restava
+ * più basso. Il campo si stende sull'altezza della riga (`self-stretch`) e la sua riga di
+ * controllo prende lo spazio che resta (`grid-rows-[auto_1fr]`), dove il `Textarea` si allarga
+ * da solo perché non ha un'altezza sua.
+ */
+const stretchedTextFieldClassName = "gap-1 self-stretch grid-rows-[auto_1fr]";
+
 const InterventionProblemField = ({ values, errors, onChange }: FieldsProps) => (
-    <FormField labelSize="sm" id="problem" label="Problema" className="gap-1" required error={errors.problem}>
+    <FormField
+        labelSize="sm"
+        id="problem"
+        label="Problema"
+        className={stretchedTextFieldClassName}
+        required
+        error={errors.problem}
+    >
         <Textarea
             {...fieldProps("problem", { error: errors.problem })}
             className="resize-none"
@@ -182,7 +199,7 @@ const InterventionDescriptionField = ({ values, errors, onChange }: FieldsProps)
         labelSize="sm"
         id="description"
         label={interventionDescriptionLabel(values.type)}
-        className="gap-1"
+        className={stretchedTextFieldClassName}
         required={isCompletedInterventionStatus(values.status)}
         error={errors.description}
     >
@@ -206,7 +223,7 @@ const InterventionNoteField = ({
     onChange,
     className,
 }: Pick<FieldsProps, "values" | "onChange"> & { className?: string }) => (
-    <FormField labelSize="sm" id="note" label="Note" className={cn("gap-1", className)}>
+    <FormField labelSize="sm" id="note" label="Note" className={cn(stretchedTextFieldClassName, className)}>
         <Textarea
             id="note"
             className="resize-none"
@@ -325,7 +342,10 @@ export const InterventionDetailsSection = ({
                 {shows("work") ? (
                     <>
                         <InterventionDescriptionField {...common} />
-                        <InterventionNoteField {...common} className={isAssistance ? "lg:col-span-2" : undefined} />
+                        <InterventionNoteField
+                            {...common}
+                            className={isAssistance ? "self-auto lg:col-span-2" : undefined}
+                        />
                     </>
                 ) : null}
             </div>

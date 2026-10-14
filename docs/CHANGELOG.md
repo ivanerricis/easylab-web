@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Interventi: caselle di testo affiancate alla stessa altezza](changelog/2026-10.md#2026-10-14-interventi-caselle-di-testo-affiancate-alla-stessa-altezza)
 - [2026-10-14 — Nuovo report: la lista dei difetti non passa più sotto il Sì/No](changelog/2026-10.md#2026-10-14-nuovo-report-la-lista-dei-difetti-non-passa-piu-sotto-il-si-no)
 - [2026-10-14 — Nuovo report: l'anello di focus non è più tagliato a sinistra](changelog/2026-10.md#2026-10-14-nuovo-report-lanello-di-focus-non-e-piu-tagliato-a-sinistra)
 - [2026-10-14 — Nuovo cliente, tecnico e collaboratore: spaziatura e testi](changelog/2026-10.md#2026-10-14-nuovo-cliente-tecnico-e-collaboratore-spaziatura-e-testi)

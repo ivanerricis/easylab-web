@@ -265,10 +265,8 @@ test("crea un report con un cliente nuovo, scegliendo dispositivo e difetto dai 
     await issueField.press("Enter");
     await expect(issueField).toHaveValue("Schermo rotto");
 
-    await dialog.locator("#charger").click();
-    await page.getByRole("option", { name: "Sì" }).click();
-    await dialog.locator("#dataBackup").click();
-    await page.getByRole("option", { name: "No" }).click();
+    await dialog.locator("#charger").getByRole("radio", { name: "Sì" }).click();
+    await dialog.locator("#dataBackup").getByRole("radio", { name: "No" }).click();
 
     await dialog.getByRole("button", { name: "Salva" }).click();
 

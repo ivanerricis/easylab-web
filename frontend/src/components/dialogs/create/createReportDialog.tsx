@@ -1,7 +1,7 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
 import FormSection from "@/components/dialogs/form-section";
-import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
+import { fieldErrorAria, fieldErrorId, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { findCustomerByText } from "@/lib/customerLookup";
 import { isCatchAllIssue } from "@/lib/issues";
@@ -24,9 +24,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import StepProgress from "@/components/dialogs/step-progress";
 import { toast } from "sonner";
 import InputWithAdd from "@/components/inputWithAdd";
+import OptionSelector from "@/components/option-selector";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Save } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { CustomerDto } from "@/types/dtos";
@@ -92,17 +92,36 @@ const reportSteps: { title: string; fields: readonly FieldKey[] }[] = [
 const lastStep = reportSteps.length - 1;
 const stepOfField = (field: FieldKey) => reportSteps.findIndex((step) => step.fields.includes(field));
 
-/** Il modulo come si presenta all'apertura: da qui si riparte, e con questo si confronta. */
-const emptyFormValues = {
+/**
+ * Il modulo come si presenta all'apertura: da qui si riparte, e con questo si confronta.
+ * Alimentatore e backup partono a `null`: nessuna risposta preselezionata, perché un "No" già
+ * messo passerebbe per una scelta fatta e il campo obbligatorio non si accorgerebbe di niente.
+ */
+const emptyFormValues: {
+    customer: string;
+    deviceType: string;
+    issue: string;
+    issueDescription: string;
+    password: string;
+    charger: boolean | null;
+    dataBackup: boolean | null;
+    notes: string;
+} = {
     customer: "",
     deviceType: "",
     issue: "",
     issueDescription: "",
     password: "",
-    charger: "unset",
-    dataBackup: "unset",
+    charger: null,
+    dataBackup: null,
     notes: "",
 };
+
+/** Le due risposte dei campi Sì/No (alimentatore, backup): senza voce preselezionata, il valore parte a `null`. */
+const yesNoOptions = [
+    { value: true, label: "Sì" },
+    { value: false, label: "No" },
+];
 
 const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = null }: Props) => {
     const [formValues, setFormValues] = useState(emptyFormValues);
@@ -282,11 +301,11 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
             nextFieldErrors.issueDescription = 'Con il difetto "Altro" va descritto il problema';
         }
 
-        if (formValues.charger === "unset") {
+        if (formValues.charger === null) {
             nextFieldErrors.charger = "Seleziona se l'alimentatore è presente";
         }
 
-        if (formValues.dataBackup === "unset") {
+        if (formValues.dataBackup === null) {
             nextFieldErrors.dataBackup = "Seleziona se deve essere effettuato il backup dati";
         }
 
@@ -317,6 +336,11 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
             return;
         }
 
+        // Il controllo sopra ha già bloccato i `null`, ma TypeScript non lo sa: va ripetuto qui.
+        if (formValues.charger === null || formValues.dataBackup === null) {
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             await onSubmit({
@@ -326,8 +350,8 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 issueId,
                 // Fuori da "Altro" il problema non si scrive: l'etichetta del catalogo basta.
                 issueDescription: needsProblemText ? formValues.issueDescription.trim() : null,
-                charger: formValues.charger === "yes",
-                dataBackup: formValues.dataBackup === "yes",
+                charger: formValues.charger,
+                dataBackup: formValues.dataBackup,
             });
             // Niente avviso di successo qui: lo dà chi ha creato, che conosce il numero
             // assegnato e offre di aprire o stampare (vedi `showCreatedToast`).
@@ -378,17 +402,18 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                         ) : null}
 
                         {!isStepped || step === 0 ? (
-                            <FormSection title="Anagrafica">
+                            <FormSection title="Anagrafica" ruled>
                                 {/*
                                 `items-start` in tutte le griglie di campi: quando un campo mostra
                                 l'errore sotto di sé la riga si allunga, e senza le celle vicine si
                                 stiravano con lei spingendo in giù etichetta e campo.
                             */}
-                                <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                                <div className="grid items-start gap-3 sm:grid-cols-2">
                                     <FormField
                                         id="client"
+                                        labelSize="sm"
                                         label="Cliente"
-                                        className="gap-1 lg:col-span-1"
+                                        className="gap-1"
                                         required
                                         error={fieldErrors.client}
                                     >
@@ -427,8 +452,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
                                     <FormField
                                         id="deviceType"
+                                        labelSize="sm"
                                         label="Tipologia dispositivo"
-                                        className="gap-1 lg:col-span-2 xl:col-span-1"
+                                        className="gap-1"
                                         required
                                         error={fieldErrors.deviceType}
                                     >
@@ -472,12 +498,13 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                         ) : null}
 
                         {!isStepped || step === 1 ? (
-                            <FormSection title="Intervento">
-                                <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-2">
+                            <FormSection title="Intervento" ruled>
+                                <div className="grid items-start gap-3 sm:grid-cols-2">
                                     <FormField
                                         id="issue"
+                                        labelSize="sm"
                                         label="Difetto"
-                                        className="gap-1 lg:col-span-2 xl:col-span-1"
+                                        className="gap-1"
                                         required
                                         error={fieldErrors.issue}
                                     >
@@ -518,6 +545,17 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         </div>
                                     </FormField>
 
+                                    <FormField id="password" label="Password sblocco" labelSize="sm" className="gap-1">
+                                        <Input
+                                            id="password"
+                                            placeholder="Password dispositivo"
+                                            value={formValues.password}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setFormValues((prev) => ({ ...prev, password: event.target.value }))
+                                            }
+                                        />
+                                    </FormField>
+
                                     {/*
                                     Solo con "Altro": è il caso in cui l'etichetta del catalogo non
                                     dice niente al cliente, e quello che si scrive qui è ciò che
@@ -527,8 +565,9 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                     {isCatchAllIssue(formValues.issue) ? (
                                         <FormField
                                             id="issueDescription"
+                                            labelSize="sm"
                                             label="Problema riscontrato"
-                                            className="gap-1 lg:col-span-2 xl:col-span-2"
+                                            className="gap-1 sm:col-span-2"
                                             required
                                             error={fieldErrors.issueDescription}
                                         >
@@ -553,18 +592,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         </FormField>
                                     ) : null}
 
-                                    <FormField id="password" label="Password sblocco" className="gap-1">
-                                        <Input
-                                            id="password"
-                                            placeholder="Password dispositivo"
-                                            value={formValues.password}
-                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                                                setFormValues((prev) => ({ ...prev, password: event.target.value }))
-                                            }
-                                        />
-                                    </FormField>
-
-                                    <FormField id="notes" label="Note" className="gap-1 lg:col-span-2 xl:col-span-2">
+                                    <FormField id="notes" label="Note" labelSize="sm" className="gap-1 sm:col-span-2">
                                         <Textarea
                                             id="notes"
                                             placeholder="Note"
@@ -580,68 +608,54 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                         ) : null}
 
                         {!isStepped || step === 2 ? (
-                            <FormSection title="Stato">
-                                <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-2">
+                            <FormSection title="Stato" ruled>
+                                <div className="grid items-start gap-3 sm:grid-cols-2">
                                     <FormField
                                         id="charger"
+                                        labelSize="sm"
                                         label="Alimentatore presente"
                                         className="gap-1"
                                         required
                                         error={fieldErrors.charger}
                                     >
-                                        <Select
+                                        <OptionSelector
+                                            id="charger"
+                                            ariaLabel="Alimentatore presente"
+                                            orientation="segmented"
                                             value={formValues.charger}
+                                            options={yesNoOptions}
+                                            invalid={Boolean(fieldErrors.charger)}
+                                            describedBy={fieldErrors.charger ? fieldErrorId("charger") : undefined}
                                             onValueChange={(value) => {
                                                 setFormValues((prev) => ({ ...prev, charger: value }));
-                                                if (value !== "unset") {
-                                                    setFieldErrors((prev) => ({ ...prev, charger: undefined }));
-                                                }
+                                                setFieldErrors((prev) => ({ ...prev, charger: undefined }));
                                             }}
-                                        >
-                                            <SelectTrigger
-                                                id="charger"
-                                                {...fieldErrorAria("charger", fieldErrors.charger)}
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Seleziona" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="unset">Seleziona</SelectItem>
-                                                <SelectItem value="yes">Sì</SelectItem>
-                                                <SelectItem value="no">No</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        />
                                     </FormField>
 
                                     <FormField
                                         id="dataBackup"
+                                        labelSize="sm"
                                         label="Backup dati"
                                         className="gap-1"
                                         required
                                         error={fieldErrors.dataBackup}
                                     >
-                                        <Select
+                                        <OptionSelector
+                                            id="dataBackup"
+                                            ariaLabel="Backup dati"
+                                            orientation="segmented"
                                             value={formValues.dataBackup}
+                                            options={yesNoOptions}
+                                            invalid={Boolean(fieldErrors.dataBackup)}
+                                            describedBy={
+                                                fieldErrors.dataBackup ? fieldErrorId("dataBackup") : undefined
+                                            }
                                             onValueChange={(value) => {
                                                 setFormValues((prev) => ({ ...prev, dataBackup: value }));
-                                                if (value !== "unset") {
-                                                    setFieldErrors((prev) => ({ ...prev, dataBackup: undefined }));
-                                                }
+                                                setFieldErrors((prev) => ({ ...prev, dataBackup: undefined }));
                                             }}
-                                        >
-                                            <SelectTrigger
-                                                id="dataBackup"
-                                                {...fieldErrorAria("dataBackup", fieldErrors.dataBackup)}
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Seleziona" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="unset">Seleziona</SelectItem>
-                                                <SelectItem value="yes">Sì</SelectItem>
-                                                <SelectItem value="no">No</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        />
                                     </FormField>
                                 </div>
                             </FormSection>

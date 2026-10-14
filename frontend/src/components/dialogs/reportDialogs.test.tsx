@@ -78,6 +78,12 @@ const chooseOption = async (label: string | RegExp, option: string) => {
     await userEvent.click(await screen.findByRole("option", { name: option }));
 };
 
+/** Risponde a un campo Sì/No (alimentatore, backup): un gruppo di radio col nome del campo. */
+const chooseYesNo = async (label: string | RegExp, answer: "Sì" | "No") => {
+    const group = screen.getByRole("radiogroup", { name: label });
+    await userEvent.click(within(group).getByRole("radio", { name: answer }));
+};
+
 /**
  * Scrive in un campo con suggerimenti e clicca quello indicato.
  *
@@ -130,6 +136,66 @@ describe("CreateReportDialog", () => {
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
+    it("alimentatore e backup partono senza nessuna risposta scelta", () => {
+        renderDialog();
+
+        for (const name of ["Alimentatore presente", "Backup dati"]) {
+            const radios = within(screen.getByRole("radiogroup", { name })).getAllByRole("radio");
+
+            expect(radios.map((radio) => radio.textContent)).toEqual(["Sì", "No"]);
+            for (const radio of radios) {
+                expect(radio).toHaveAttribute("aria-checked", "false");
+            }
+        }
+    });
+
+    it("rispondere a alimentatore o backup toglie solo l'errore di quel campo", async () => {
+        renderDialog();
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+        expect(screen.getByText("Seleziona se l'alimentatore è presente")).toBeInTheDocument();
+        expect(screen.getByRole("radiogroup", { name: "Alimentatore presente" })).toHaveAttribute(
+            "aria-describedby",
+            "charger-error"
+        );
+
+        await chooseYesNo("Alimentatore presente", "No");
+
+        expect(screen.queryByText("Seleziona se l'alimentatore è presente")).not.toBeInTheDocument();
+        expect(screen.getByText("Seleziona se deve essere effettuato il backup dati")).toBeInTheDocument();
+        expect(
+            within(screen.getByRole("radiogroup", { name: "Alimentatore presente" })).getByRole("radio", { name: "No" })
+        ).toHaveAttribute("aria-checked", "true");
+
+        await chooseYesNo("Backup dati", "Sì");
+
+        expect(screen.queryByText("Seleziona se deve essere effettuato il backup dati")).not.toBeInTheDocument();
+    });
+
+    it("con tutto il resto compilato, il focus va sull'alimentatore e poi sul backup", async () => {
+        renderDialog();
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
+        await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(
+            within(screen.getByRole("radiogroup", { name: "Alimentatore presente" })).getAllByRole("radio")[0]
+        ).toHaveFocus();
+
+        await chooseYesNo("Alimentatore presente", "Sì");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(within(screen.getByRole("radiogroup", { name: "Backup dati" })).getAllByRole("radio")[0]).toHaveFocus();
+    });
+
     /** La casella del difetto serve a cercare nel catalogo, non a inventare voci nuove. */
     it("rifiuta un difetto che non è nel catalogo", async () => {
         renderDialog();
@@ -154,8 +220,8 @@ describe("CreateReportDialog", () => {
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
         expect(screen.queryByLabelText(/^Problema riscontrato/)).not.toBeInTheDocument();
         await userEvent.type(screen.getByLabelText("Password sblocco"), "1234");
-        await chooseOption(/^Alimentatore presente/, "Sì");
-        await chooseOption(/^Backup dati/, "No");
+        await chooseYesNo(/^Alimentatore presente/, "Sì");
+        await chooseYesNo(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -209,8 +275,8 @@ describe("CreateReportDialog", () => {
 
         await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
-        await chooseOption(/^Alimentatore presente/, "No");
-        await chooseOption(/^Backup dati/, "No");
+        await chooseYesNo(/^Alimentatore presente/, "No");
+        await chooseYesNo(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -268,8 +334,8 @@ describe("CreateReportDialog", () => {
         await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
         await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "smart", "Smartphone");
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "alt", "Altro");
-        await chooseOption(/^Alimentatore presente/, "No");
-        await chooseOption(/^Backup dati/, "Sì");
+        await chooseYesNo(/^Alimentatore presente/, "No");
+        await chooseYesNo(/^Backup dati/, "Sì");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         expect(screen.getByRole("alert")).toHaveTextContent('Con il difetto "Altro" va descritto il problema');
@@ -293,8 +359,8 @@ describe("CreateReportDialog", () => {
         await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
         await userEvent.type(screen.getByLabelText(/^Tipologia dispositivo/), "Tablet");
         await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
-        await chooseOption(/^Alimentatore presente/, "No");
-        await chooseOption(/^Backup dati/, "No");
+        await chooseYesNo(/^Alimentatore presente/, "No");
+        await chooseYesNo(/^Backup dati/, "No");
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
         await waitFor(() => {
@@ -360,8 +426,8 @@ describe("CreateReportDialog", () => {
             expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Schermo rotto");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
-            await chooseOption(/^Alimentatore presente/, "Sì");
-            await chooseOption(/^Backup dati/, "No");
+            await chooseYesNo(/^Alimentatore presente/, "Sì");
+            await chooseYesNo(/^Backup dati/, "No");
             await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
             await waitFor(() => {

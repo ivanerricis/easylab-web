@@ -10,7 +10,7 @@ const ForcePasswordChangePage = lazy(() => import("@/pages/auth/ForcePasswordCha
 const ForceTwoFactorSetupPage = lazy(() => import("@/pages/auth/ForceTwoFactorSetupPage"));
 
 const RequireAuth = () => {
-    const { user, isLoading, loggedOutExplicitly } = useAuth();
+    const { user, isLoading } = useAuth();
     const location = useLocation();
 
     if (isLoading) {
@@ -18,8 +18,7 @@ const RequireAuth = () => {
     }
 
     if (!user) {
-        // Dopo un logout esplicito niente `from`: il prossimo login parte dalla dashboard.
-        return <Navigate to="/login" replace state={loggedOutExplicitly ? undefined : { from: location }} />;
+        return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
     if (user.mustChangePassword) {

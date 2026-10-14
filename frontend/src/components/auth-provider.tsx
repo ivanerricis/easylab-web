@@ -47,7 +47,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Il messaggio dell'ultima verifica della sessione fallita per un motivo diverso da 401.
     const [sessionCheckError, setSessionCheckError] = useState<string | null>(null);
     const [isRetrying, setIsRetrying] = useState(false);
-    const [loggedOutExplicitly, setLoggedOutExplicitly] = useState(false);
 
     /**
      * Solo un 401 vuol dire "non autenticato". Prima qualunque errore di `/auth/me` azzerava
@@ -111,7 +110,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // secondo fattore.
         if (result.status === "authenticated") {
             setUser(result.user);
-            setLoggedOutExplicitly(false);
         }
 
         return result;
@@ -120,7 +118,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const completeTwoFactorLogin = useCallback(async (challengeId: string, code: string) => {
         const loggedInUser = await verifyTwoFactorLogin(challengeId, code);
         setUser(loggedInUser);
-        setLoggedOutExplicitly(false);
         return loggedInUser;
     }, []);
 
@@ -129,11 +126,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await apiLogout();
         } finally {
             setUser(null);
-            setLoggedOutExplicitly(true);
         }
     }, []);
 
-    const value = { user, isLoading, loggedOutExplicitly, login, completeTwoFactorLogin, logout, refresh };
+    const value = { user, isLoading, login, completeTwoFactorLogin, logout, refresh };
 
     // Con un utente già in mano (un `refresh()` successivo fallito per la rete) si resta dove si
     // è: la prossima richiesta con la sessione davvero scaduta risponde 401 e l'handler sopra

@@ -395,8 +395,12 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting || isCheckingCustomer}
                 confirmDisabled={isSubmitting || isCheckingCustomer}
+                // `px-1`: questo contenitore scorre, quindi taglia anche in orizzontale. Con i riquadri
+                // i campi stavano lontani dal bordo; con i titoletti senza riquadro sono a filo, e
+                // l'anello di focus e quello rosso dei campi sbagliati (3 px) venivano tagliati sul
+                // lato sinistro. 4 px per lato bastano per entrambi.
                 content={
-                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto py-1 pr-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
+                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto px-1 py-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
                         {isStepped ? (
                             <StepProgress steps={reportSteps.map((reportStep) => reportStep.title)} current={step} />
                         ) : null}

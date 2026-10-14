@@ -1,4 +1,4 @@
-import { sql, type SQLWrapper } from "drizzle-orm";
+import { and, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 /**
  * "La colonna contiene il testo", senza distinguere le maiuscole: la forma che gli indici trigram
@@ -21,6 +21,35 @@ export const containsText = (column: SQLWrapper, pattern: string) => sql`${colum
  */
 export const containsTextAccentInsensitive = (column: SQLWrapper, pattern: string) =>
     sql`immutable_unaccent(${column}::text) ILIKE immutable_unaccent(${pattern})`;
+
+/**
+ * Ricerca di più parole sparse su più colonne: "Anna Romano" trova nome "Anna" + cognome "Romano"
+ * (e anche "Romano Anna": l'ordine non conta). Ogni parola deve comparire in almeno una delle
+ * colonne: AND sulle parole, OR sulle colonne, con `containsTextAccentInsensitive` come il resto
+ * della ricerca clienti.
+ *
+ * Perché non un `concat_ws(' ', nome, cognome) ILIKE '%Anna Romano%'`: sarebbe un'espressione
+ * calcolata, coperta da nessun indice, e basta un solo ramo del genere perché Postgres rinunci
+ * a combinare i bitmap degli indici trigram degli altri rami (vedi `parseIdSearch`). Qui ogni
+ * confronto resta sulla singola colonna, quindi gli indici GIN restano utilizzabili.
+ *
+ * Restituisce `undefined` con meno di due parole: il chiamante la aggiunge come ramo in più
+ * del proprio OR, accanto a quelli che confrontano l'intera frase (un telefono scritto con lo
+ * spazio, una città come "La Spezia"), e la ricerca a parola singola resta identica a prima.
+ * Le parole si separano su qualsiasi sequenza di spazi; `%` e `_` non vengono protetti, come
+ * nel pattern dell'intera frase.
+ */
+export const matchesAllWords = (columns: SQLWrapper[], search: string): SQL | undefined => {
+    const words = search.split(/\s+/).filter((word) => word !== "");
+
+    if (words.length < 2 || columns.length === 0) {
+        return undefined;
+    }
+
+    return and(
+        ...words.map((word) => or(...columns.map((column) => containsTextAccentInsensitive(column, `%${word}%`))))
+    );
+};
 
 /**
  * Ricerca per numero nella casella di testo libero.

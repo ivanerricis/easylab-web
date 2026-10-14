@@ -3,7 +3,7 @@ import { db } from "../index";
 import { customerTable } from "../schema";
 import type { NewCustomer, UpdateCustomer } from "../types";
 import { takeUnpaginated, type UnpaginatedLimit } from "./pagination";
-import { containsText, containsTextAccentInsensitive, parseIdSearch } from "./search";
+import { containsText, containsTextAccentInsensitive, matchesAllWords, parseIdSearch } from "./search";
 
 type ListCustomersParams = {
     page?: number;
@@ -26,6 +26,9 @@ export const listCustomers = async ({
     const trimmedSearch = search?.trim();
     const searchPattern = `%${trimmedSearch ?? ""}%`;
     const idSearch = trimmedSearch ? parseIdSearch(trimmedSearch) : null;
+    const wordsCondition = trimmedSearch
+        ? matchesAllWords([customerTable.firstName, customerTable.lastName], trimmedSearch)
+        : undefined;
     const searchConditions = trimmedSearch
         ? [
               ...(idSearch != null ? [eq(customerTable.id, idSearch)] : []),
@@ -35,6 +38,8 @@ export const listCustomers = async ({
               containsText(customerTable.phoneNumberSecondary, searchPattern),
               containsText(customerTable.email, searchPattern),
               containsTextAccentInsensitive(customerTable.city, searchPattern),
+              // "Anna Romano": nome e cognome stanno in colonne diverse, nessun ramo sopra li vede insieme.
+              ...(wordsCondition ? [wordsCondition] : []),
           ]
         : [];
     const whereClause = searchConditions.length > 0 ? or(...searchConditions) : undefined;

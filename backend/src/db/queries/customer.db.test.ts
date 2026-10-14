@@ -65,6 +65,68 @@ describe("listCustomers: ricerca libera", () => {
         });
     });
 
+    describe("più parole (nome e cognome insieme)", () => {
+        it("trova per nome e cognome, in qualsiasi ordine", async () => {
+            const target = await insertCustomer({ firstName: "Anna", lastName: "Romano" });
+            await insertCustomer({ firstName: "Anna", lastName: "Bianchi" });
+            await insertCustomer({ firstName: "Luca", lastName: "Romano" });
+
+            expect(await search("Anna Romano")).toEqual([target.id]);
+            expect(await search("Romano Anna")).toEqual([target.id]);
+            expect(await search("  anna   ROMANO ")).toEqual([target.id]);
+        });
+
+        it("ignora gli accenti su entrambe le parole", async () => {
+            const target = await insertCustomer({ firstName: "Nicolò", lastName: "Verdì" });
+
+            expect(await search("Nicolo Verdi")).toEqual([target.id]);
+        });
+
+        it("accetta parole parziali", async () => {
+            const target = await insertCustomer({ firstName: "Anna", lastName: "Romano" });
+            await insertCustomer({ firstName: "Luca", lastName: "Verdi" });
+
+            expect(await search("Ann Rom")).toEqual([target.id]);
+        });
+
+        it("serve che ogni parola corrisponda: una sola non basta", async () => {
+            await insertCustomer({ firstName: "Anna", lastName: "Romano" });
+
+            expect(await search("Anna Zzzz")).toEqual([]);
+            expect(await search("Zzzz Romano")).toEqual([]);
+        });
+
+        it("una frase senza corrispondenze non trova niente", async () => {
+            await insertCustomer({ firstName: "Anna", lastName: "Romano" });
+
+            const result = await listCustomers({ page: 1, pageSize: 10, search: "Qqqq Zzzz" });
+
+            expect(result).toEqual({ items: [], totalItems: 0 });
+        });
+
+        it("un telefono scritto con lo spazio si trova ancora", async () => {
+            const target = await insertCustomer({ firstName: "Mario", phoneNumber: "+39 3000628318" });
+            await insertCustomer();
+
+            expect(await search("+39 3000628318")).toEqual([target.id]);
+        });
+
+        it("una città di due parole si trova ancora", async () => {
+            const target = await insertCustomer({ firstName: "Mario", city: "La Spezia" });
+            await insertCustomer();
+
+            expect(await search("La Spezia")).toEqual([target.id]);
+        });
+
+        it("con una parola sola la ricerca resta quella di prima, id compreso", async () => {
+            const target = await insertCustomer({ firstName: "Anna", lastName: "Romano" });
+            await insertCustomer({ firstName: "Luca", lastName: "Verdi" });
+
+            expect(await search("Romano")).toEqual([target.id]);
+            expect(await search(String(target.id))).toEqual([target.id]);
+        });
+    });
+
     it("un numero trova il cliente con quell'id, non quelli che lo contengono", async () => {
         const customers = [];
         for (let index = 0; index < 12; index += 1) {

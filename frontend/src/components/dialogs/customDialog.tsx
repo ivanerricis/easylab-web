@@ -43,6 +43,12 @@ type Props = Readonly<{
     destructive?: boolean;
     preventOutsideClose?: boolean;
     /**
+     * Dove va il focus all'apertura. Radix lo dà al primo elemento focalizzabile; un dialogo il
+     * cui campo principale non è il primo (la 2FA ha il QR e la chiave prima del codice) lo
+     * sposta qui, con `event.preventDefault()` e poi `.focus()` sul campo.
+     */
+    onOpenAutoFocus?: (event: Event) => void;
+    /**
      * Il modulo ha modifiche non salvate. In quel caso Esc, la X e il clic fuori non chiudono
      * subito: prima chiedono se buttare via quello che si è scritto.
      *
@@ -71,6 +77,7 @@ const CustomDialog = ({
     showConfirmButton = true,
     destructive = false,
     preventOutsideClose = false,
+    onOpenAutoFocus,
     isDirty = false,
     contentClassName,
     footerClassName,
@@ -172,6 +179,7 @@ const CustomDialog = ({
                     destructive ? "border! border-destructive!" : "border! border-primary!",
                     contentClassName
                 )}
+                onOpenAutoFocus={onOpenAutoFocus}
                 // Copre anche il clic fuori: Radix chiama `onInteractOutside` pure per quello,
                 // subito dopo `onPointerDownOutside`, sullo stesso evento (vedi
                 // `usePointerDownOutside` in `@radix-ui/react-dismissable-layer`), quindi un

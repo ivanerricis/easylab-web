@@ -1,6 +1,6 @@
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
-import FormSection from "@/components/dialogs/form-section";
+import FormSection, { tintedSectionClassName } from "@/components/dialogs/form-section";
 import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -77,15 +77,6 @@ const fieldOrder = [
     "technicianPrice",
     "internalPrice",
 ] as const;
-
-/**
- * Stato e pagamento, la colonna a destra, hanno uno sfondo del colore principale invece di quello
- * neutro degli altri riquadri: sono la parte che segue l'avanzamento della pratica e si tocca a
- * ogni consegna, e a colpo d'occhio si distinguono dai dati del lavoro. Il colore del tema e non
- * uno fisso (verde, giallo e rosso sono già i colori di stato delle righe): segue il colore scelto
- * in Impostazioni e il tema scuro. Su telefono il riquadro resta senza sfondo (vedi `FormSection`).
- */
-const progressSectionClassName = "border-primary/25 bg-primary/[0.04] [&_h3]:text-primary-text";
 
 const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit }: EditReportDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -623,7 +614,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                 </div>
 
                                 <div className="grid gap-4">
-                                    <FormSection flatOnMobile title="Stato" className={progressSectionClassName}>
+                                    <FormSection flatOnMobile title="Stato" className={tintedSectionClassName}>
                                         <div className="grid gap-2">
                                             {statusOptions.map((option) => (
                                                 // Tutto il riquadro è l'etichetta, quindi tutto il
@@ -656,7 +647,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     l'uno dall'altro: "Non pagato" riporta il prezzo a zero, e con
                                     contanti o carta il prezzo non può restare a zero.
                                 */}
-                                    <FormSection flatOnMobile title="Pagamento" className={progressSectionClassName}>
+                                    <FormSection flatOnMobile title="Pagamento" className={tintedSectionClassName}>
                                         <FormField
                                             labelSize="sm"
                                             id="internalPrice"

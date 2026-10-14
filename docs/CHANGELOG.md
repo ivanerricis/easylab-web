@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Dialoghi: componenti condivisi per i nuovi layout](changelog/2026-10.md#2026-10-14-dialoghi-componenti-condivisi-per-i-nuovi-layout)
 - [2026-10-14 — Modifica report: due colonne, con stato e pagamento sempre in vista](changelog/2026-10.md#2026-10-14-modifica-report-due-colonne-con-stato-e-pagamento-sempre-in-vista)
 - [2026-10-14 — Dialoghi: la prima apertura non aspetta più 300 ms](changelog/2026-10.md#2026-10-14-dialoghi-la-prima-apertura-non-aspetta-piu-300-ms)
 - [2026-10-14 — Report: la voce "Ritirato"](changelog/2026-10.md#2026-10-14-report-la-voce-ritirato)

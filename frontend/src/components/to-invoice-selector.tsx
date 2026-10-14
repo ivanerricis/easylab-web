@@ -5,7 +5,7 @@ type Props = {
     value: boolean;
     onValueChange: (value: boolean) => void;
     className?: string;
-    orientation?: "horizontal" | "vertical";
+    orientation?: "horizontal" | "vertical" | "stacked";
 };
 
 /**

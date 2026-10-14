@@ -325,7 +325,7 @@ describe("CreateInterventionDialog", () => {
         it("mostra una parte alla volta e salva all'ultimo passo", async () => {
             const onSubmit = await renderDialog({ initialDate: "2026-10-05" });
 
-            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
             expect(screen.queryByRole("combobox", { name: "Tipo intervento" })).not.toBeInTheDocument();
 
             // "Avanti" controlla solo cliente e collaboratore, i campi del primo passo.
@@ -340,18 +340,11 @@ describe("CreateInterventionDialog", () => {
             // Il cliente è stato scelto dai suggerimenti, quindi l'id c'è già e "Avanti" non lo
             // verifica sul server (quel percorso ha i suoi test, sotto).
             expect(await screen.findByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
-            expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
-            // Su telefono lo stato resta nella pianificazione e il riquadro di destra non c'è.
-            expect(screen.getByRole("combobox", { name: "Stato" })).toBeInTheDocument();
-            expect(screen.queryByRole("heading", { name: "Stato e pagamento" })).not.toBeInTheDocument();
-
-            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             expect(screen.getByLabelText(/^Note/)).toBeInTheDocument();
-            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
-
+            expect(screen.getByRole("combobox", { name: "Stato" })).toBeInTheDocument();
             expect(screen.getByRole("radiogroup", { name: "Pagamento" })).toBeInTheDocument();
             expect(screen.getByRole("radiogroup", { name: "Fatturazione" })).toBeInTheDocument();
-            expect(screen.queryByRole("combobox", { name: "Stato" })).not.toBeInTheDocument();
+            // Su telefono stato e pagamento stanno nella sezione, non nel riquadro di destra.
             expect(screen.queryByRole("heading", { name: "Stato e pagamento" })).not.toBeInTheDocument();
 
             await userEvent.type(screen.getByLabelText(/^Prezzo/), "45");
@@ -380,7 +373,7 @@ describe("CreateInterventionDialog", () => {
             expect(await screen.findByRole("alert")).toHaveTextContent(
                 "Seleziona un cliente esistente o creane uno nuovo."
             );
-            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
             expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
         });
     });

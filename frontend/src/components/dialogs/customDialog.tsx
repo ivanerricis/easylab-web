@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -8,7 +8,7 @@ import { useDialogHistoryEntry } from "@/hooks/useDialogHistoryEntry";
 type Props = Readonly<{
     content?: ReactNode;
     contentClassName?: string;
-    /** Classi in più per la riga dei pulsanti (es. affiancati anche su mobile, nei moduli a passi). */
+    /** Classi in più per la riga dei pulsanti. */
     footerClassName?: string;
 
     open?: boolean;
@@ -60,6 +60,20 @@ type Props = Readonly<{
     isDirty?: boolean;
 }>;
 
+/** La sfumatura che dice che il corpo del dialogo scorre da questa parte (vedi sopra). */
+const ScrollFade = ({ edge, visible }: { edge: "top" | "bottom"; visible: boolean }) => (
+    <div
+        aria-hidden="true"
+        className={cn(
+            "pointer-events-none absolute inset-x-0 h-4 transition-opacity",
+            edge === "top"
+                ? "top-0 bg-linear-to-b from-black/10 to-transparent dark:from-black/40"
+                : "bottom-0 bg-linear-to-t from-black/10 to-transparent dark:from-black/40",
+            visible ? "opacity-100" : "opacity-0"
+        )}
+    />
+);
+
 const CustomDialog = ({
     content,
     open,
@@ -84,6 +98,48 @@ const CustomDialog = ({
 }: Props) => {
     const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
     const keepEditingButtonRef = useRef<HTMLButtonElement>(null);
+    const [bodyElement, setBodyElement] = useState<HTMLDivElement | null>(null);
+    const [scrollEdges, setScrollEdges] = useState({ top: false, bottom: false });
+
+    const updateScrollEdges = useCallback(() => {
+        if (!bodyElement) {
+            return;
+        }
+
+        const top = bodyElement.scrollTop > 1;
+        const bottom = bodyElement.scrollHeight - bodyElement.scrollTop - bodyElement.clientHeight > 1;
+        setScrollEdges((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
+    }, [bodyElement]);
+
+    // Il corpo scorre solo quando il dialogo tocca il limite dello schermo, e senza un segnale
+    // non si vede che sotto (o sopra) c'è altro: nella modifica del report a 1280×720 un riquadro
+    // intero stava sotto i pulsanti. Una sfumatura ai bordi dice da che parte si può scorrere.
+    // Si ricalcola quando cambia la misura del corpo o di un suo figlio (un passo nuovo, un errore
+    // sotto un campo, un'area di testo che cresce), non solo quando si scorre: l'osservatore scatta
+    // anche alla prima osservazione, quindi lo stato iniziale arriva da lì.
+    useEffect(() => {
+        if (!bodyElement) {
+            return;
+        }
+
+        const resizeObserver = new ResizeObserver(updateScrollEdges);
+        const observeChildren = () => {
+            resizeObserver.disconnect();
+            resizeObserver.observe(bodyElement);
+
+            for (const child of Array.from(bodyElement.children)) {
+                resizeObserver.observe(child);
+            }
+        };
+        const mutationObserver = new MutationObserver(observeChildren);
+
+        observeChildren();
+        mutationObserver.observe(bodyElement, { childList: true });
+        return () => {
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+        };
+    }, [bodyElement, updateScrollEdges]);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen && isDirty) {
@@ -254,10 +310,20 @@ const CustomDialog = ({
                         allungavano lo scroll del dialogo stesso: da telefono, un dialogo con più di uno
                         schermo di campi e due menu a tendina in fondo scorreva per 365px di vuoto,
                         con due scroll uno dentro l'altro. */}
-                    <div className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1">{content}</div>
+                    <div className="relative flex min-h-0 flex-1 flex-col">
+                        <div
+                            ref={setBodyElement}
+                            onScroll={updateScrollEdges}
+                            className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1"
+                        >
+                            {content}
+                        </div>
+                        <ScrollFade edge="top" visible={scrollEdges.top} />
+                        <ScrollFade edge="bottom" visible={scrollEdges.bottom} />
+                    </div>
 
                     {(showCancelButton || showConfirmButton) && (
-                        <DialogFooter className={cn("mt-2", footerClassName)}>
+                        <DialogFooter className={cn("mt-2 flex-row *:flex-1 sm:*:flex-none", footerClassName)}>
                             {showCancelButton && (
                                 <Button
                                     type="button"

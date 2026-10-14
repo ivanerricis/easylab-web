@@ -46,7 +46,7 @@ test.describe("su telefono", () => {
         await page.goto("/reports");
         await page.getByRole("button", { name: "Crea nuovo report" }).click();
         const dialog = page.getByRole("dialog", { name: "Nuovo report" });
-        await expect(dialog.getByText("Passo 1 di 3:")).toBeVisible();
+        await expect(dialog.getByText("Passo 1 di 2:")).toBeVisible();
 
         // Si scrive solo un pezzo del nome: la lista compare dopo la pausa di battitura.
         const customerField = dialog.getByRole("combobox", { name: /Cliente/ });
@@ -58,10 +58,14 @@ test.describe("su telefono", () => {
         await deviceField.fill("iph");
         await dialog.getByRole("option", { name: "iPhone 13" }).click();
 
+        const issueField = dialog.getByRole("combobox", { name: /Difetto/ });
+        await issueField.fill("bat");
+        await dialog.getByRole("option", { name: "Batteria" }).click();
+
         await dialog.getByRole("button", { name: "Avanti" }).click();
 
-        await expect(dialog.getByText("Passo 2 di 3:")).toBeVisible();
-        await expect(dialog.getByRole("combobox", { name: /Difetto/ })).toBeVisible();
+        await expect(dialog.getByText("Passo 2 di 2:")).toBeVisible();
+        await expect(dialog.getByRole("radiogroup", { name: /Alimentatore presente/ })).toBeVisible();
         // Il cliente veniva da un suggerimento, quindi "Avanti" non lo ha cercato di nuovo
         // (la verifica chiede fino a 1000 candidati, la ricerca dei suggerimenti 8): l'unica
         // richiesta è quella dei suggerimenti.
@@ -82,7 +86,7 @@ test.describe("su telefono", () => {
         await page.goto("/interventions");
         await page.getByRole("button", { name: "Crea nuovo intervento" }).click();
         const dialog = page.getByRole("dialog", { name: "Nuovo intervento" });
-        await expect(dialog.getByText("Passo 1 di 4:")).toBeVisible();
+        await expect(dialog.getByText("Passo 1 di 2:")).toBeVisible();
 
         const customerField = dialog.getByRole("combobox", { name: /Cliente/ });
         await customerField.fill("bianc");
@@ -94,7 +98,7 @@ test.describe("su telefono", () => {
 
         await dialog.getByRole("button", { name: "Avanti" }).click();
 
-        await expect(dialog.getByText("Passo 2 di 4:")).toBeVisible();
+        await expect(dialog.getByText("Passo 2 di 2:")).toBeVisible();
         await expect(dialog.getByRole("combobox", { name: "Tipo intervento" })).toBeVisible();
         expect(api.calls("GET /api/customers")).toHaveLength(1);
         expect(api.unhandled).toEqual([]);

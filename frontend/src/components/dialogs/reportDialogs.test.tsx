@@ -401,28 +401,29 @@ describe("CreateReportDialog", () => {
                 expect(listIssues).toHaveBeenCalled();
             });
 
-            expect(screen.getByText("Passo 1 di 3:")).toBeInTheDocument();
-            expect(screen.queryByLabelText(/^Difetto/)).not.toBeInTheDocument();
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
+            expect(screen.queryByLabelText(/^Alimentatore presente/)).not.toBeInTheDocument();
             expect(screen.queryByRole("button", { name: "Salva" })).not.toBeInTheDocument();
 
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
-            // Solo i due campi del primo passo: alimentatore e backup non si sono ancora visti.
+            // Solo i campi del primo passo: alimentatore e backup non si sono ancora visti.
             expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
                 "Seleziona un cliente",
                 "Seleziona un dispositivo",
+                "Seleziona un difetto",
             ]);
 
             await pickSuggestion(screen.getByLabelText(/^Cliente/), "mario", "Mario Rossi - 333");
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
             // Il cliente è stato scelto dai suggerimenti, quindi l'id c'è già e "Avanti" non lo
             // verifica sul server (quel percorso ha i suoi test, sotto).
-            await pickSuggestion(await screen.findByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+            expect(await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ })).toBeInTheDocument();
             // "Indietro" torna al passo prima senza perdere quanto scritto.
             await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
             expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
-            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Schermo rotto");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
@@ -450,12 +451,13 @@ describe("CreateReportDialog", () => {
 
             await userEvent.type(screen.getByLabelText(/^Cliente/), "Cliente Inventato");
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
             expect(await screen.findByRole("alert")).toHaveTextContent(
                 "Seleziona un cliente esistente o creane uno nuovo."
             );
-            expect(screen.getByText("Passo 1 di 3:")).toBeInTheDocument();
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
             expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
         });
 
@@ -467,6 +469,7 @@ describe("CreateReportDialog", () => {
 
             await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
 
             let answer: (value: unknown) => void = () => {};
             listCustomers.mockImplementation(
@@ -480,7 +483,7 @@ describe("CreateReportDialog", () => {
             expect(await screen.findByRole("button", { name: "Verifica..." })).toBeDisabled();
 
             answer({ items: customers, totalItems: 1, page: 1, pageSize: 1000, totalPages: 1 });
-            expect(await screen.findByLabelText(/^Difetto/)).toBeInTheDocument();
+            expect(await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ })).toBeInTheDocument();
         });
     });
 });

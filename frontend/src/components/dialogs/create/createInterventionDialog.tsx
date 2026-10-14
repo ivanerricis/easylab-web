@@ -18,8 +18,6 @@ import InputWithAdd from "@/components/inputWithAdd";
 import { createCustomer, getApiErrorMessage, listCollaborators, listCustomers } from "@/lib/api";
 import {
     emptyInterventionFormState,
-    interventionDetailsPartTitles,
-    type InterventionDetailsPart,
     interventionFieldOrder,
     toInterventionSubmitFields,
     validateInterventionForm,
@@ -80,15 +78,12 @@ type FieldKey = (typeof fieldOrder)[number];
  * nuovo report (vedi `reportSteps` in `createReportDialog.tsx`): una parte alla volta, "Avanti"
  * controlla solo i campi di quella, "Salva" all'ultimo. Da `sm` in su resta tutto in una pagina.
  */
-const interventionSteps: { title: string; part?: InterventionDetailsPart; fields: readonly FieldKey[] }[] = [
+const interventionSteps: { title: string; fields: readonly FieldKey[] }[] = [
     { title: "Anagrafica", fields: ["customer", "collaboratorId"] },
     {
-        title: interventionDetailsPartTitles.schedule,
-        part: "schedule",
-        fields: ["interventionDate", "startTime", "endTime"],
+        title: "Intervento",
+        fields: ["interventionDate", "startTime", "endTime", "problem", "description", "price"],
     },
-    { title: interventionDetailsPartTitles.work, part: "work", fields: ["problem", "description"] },
-    { title: interventionDetailsPartTitles.payment, part: "payment", fields: ["price"] },
 ];
 const lastStep = interventionSteps.length - 1;
 const stepOfField = (field: FieldKey) => interventionSteps.findIndex((step) => step.fields.includes(field));
@@ -379,12 +374,11 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 confirmIcon={isLastStep ? Save : undefined}
                 cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
                 onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
-                footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting || isCheckingCustomer}
                 confirmDisabled={isSubmitting || isCheckingCustomer}
                 content={
-                    <div className="grid content-start gap-4 max-sm:min-h-0 max-sm:flex-1 max-sm:overflow-y-auto max-sm:py-1 max-sm:pr-1">
+                    <div className="grid content-start gap-4 max-sm:min-h-0 max-sm:flex-1">
                         {isStepped ? (
                             <StepProgress steps={interventionSteps.map((item) => item.title)} current={step} />
                         ) : null}
@@ -397,7 +391,6 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         values={formValues}
                                         errors={errors}
                                         onChange={handleChange}
-                                        part={interventionSteps[step].part}
                                     />
                                 ) : null}
                             </>

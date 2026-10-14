@@ -85,8 +85,7 @@ const fieldOrder = ["client", "deviceType", "issue", "issueDescription", "charge
  * dialogo resta quello di sempre, tutto in una pagina.
  */
 const reportSteps: { title: string; fields: readonly FieldKey[] }[] = [
-    { title: "Anagrafica", fields: ["client", "deviceType"] },
-    { title: "Intervento", fields: ["issue", "issueDescription"] },
+    { title: "Anagrafica e intervento", fields: ["client", "deviceType", "issue", "issueDescription"] },
     { title: "Stato", fields: ["charger", "dataBackup"] },
 ];
 const lastStep = reportSteps.length - 1;
@@ -391,16 +390,11 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                 onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
                 // Sotto `sm` il footer impila i pulsanti; in un percorso a passi "Indietro" e
                 // "Avanti" stanno meglio affiancati, ciascuno dal suo lato.
-                footerClassName={isStepped ? "flex-row *:flex-1" : undefined}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting || isCheckingCustomer}
                 confirmDisabled={isSubmitting || isCheckingCustomer}
-                // `px-1`: questo contenitore scorre, quindi taglia anche in orizzontale. Con i riquadri
-                // i campi stavano lontani dal bordo; con i titoletti senza riquadro sono a filo, e
-                // l'anello di focus e quello rosso dei campi sbagliati (3 px) venivano tagliati sul
-                // lato sinistro. 4 px per lato bastano per entrambi.
                 content={
-                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto px-1 py-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
+                    <div className="grid content-start gap-4 max-sm:min-h-0 max-sm:flex-1">
                         {isStepped ? (
                             <StepProgress steps={reportSteps.map((reportStep) => reportStep.title)} current={step} />
                         ) : null}
@@ -501,7 +495,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                             </FormSection>
                         ) : null}
 
-                        {!isStepped || step === 1 ? (
+                        {!isStepped || step === 0 ? (
                             <FormSection title="Intervento" ruled>
                                 <div className="grid items-start gap-3 sm:grid-cols-2">
                                     <FormField
@@ -611,7 +605,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                             </FormSection>
                         ) : null}
 
-                        {!isStepped || step === 2 ? (
+                        {!isStepped || step === 1 ? (
                             <FormSection title="Stato" ruled>
                                 <div className="grid items-start gap-3 sm:grid-cols-2 sm:gap-x-8">
                                     <FormField

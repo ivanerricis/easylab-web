@@ -9,12 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { fieldErrorAria, fieldProps } from "@/lib/formField";
-import {
-    interventionDetailsPartTitles,
-    type InterventionDetailsPart,
-    type InterventionFieldErrors,
-    type InterventionFormState,
-} from "@/lib/interventionForm";
+import { type InterventionFieldErrors, type InterventionFormState } from "@/lib/interventionForm";
 import {
     interventionDateLabel,
     interventionDescriptionLabel,
@@ -291,39 +286,32 @@ export const InterventionProgressSection = (props: FieldsProps) => (
 );
 
 /**
- * La sezione "Intervento". Con `part` ne mostra una parte sola, per i passi del dialogo di
- * creazione su telefono (lì Stato sta in "Pianificazione", prezzo e pagamento in "Pagamento").
- * Con `withoutProgress` toglie stato, prezzo, pagamento e fatturazione, che da `lg` stanno nel
- * riquadro `InterventionProgressSection` accanto. Senza nessuno dei due è la sezione intera.
+ * La sezione "Intervento". Con `withoutProgress` toglie stato, prezzo, pagamento e fatturazione,
+ * che da `lg` stanno nel riquadro `InterventionProgressSection` accanto. Senza è la sezione
+ * intera, come nella modifica e nel secondo passo della creazione su telefono.
  */
 export const InterventionDetailsSection = ({
     values,
     errors,
     onChange,
-    part,
     withoutProgress = false,
-}: FieldsProps & { part?: InterventionDetailsPart; withoutProgress?: boolean }) => {
-    const shows = (fieldPart: InterventionDetailsPart) => part == null || part === fieldPart;
+}: FieldsProps & { withoutProgress?: boolean }) => {
     const common = { values, errors, onChange };
     const isAssistance = isAssistanceInterventionType(values.type);
 
     return (
-        <FormSection title={part ? interventionDetailsPartTitles[part] : "Intervento"}>
+        <FormSection title="Intervento">
             {/*
                 `items-start` in tutte le griglie di campi: quando un campo mostra l'errore sotto di
                 sé la riga si allunga, e senza le celle vicine si stiravano con lei spingendo in giù
                 etichetta e campo.
             */}
             <div className="grid items-start gap-4 lg:grid-cols-2">
-                {shows("schedule") ? (
-                    <>
-                        <InterventionTypeField {...common} />
-                        {withoutProgress ? null : <InterventionStatusField {...common} />}
-                        <InterventionDateField {...common} />
-                    </>
-                ) : null}
+                <InterventionTypeField {...common} />
+                {withoutProgress ? null : <InterventionStatusField {...common} />}
+                <InterventionDateField {...common} />
 
-                {!withoutProgress && shows("payment") ? (
+                {!withoutProgress ? (
                     <>
                         <InterventionPriceField {...common} />
                         <InterventionPaidField {...common} />
@@ -331,23 +319,16 @@ export const InterventionDetailsSection = ({
                     </>
                 ) : null}
 
-                {isAssistance && shows("schedule") ? <InterventionTimeFields {...common} /> : null}
+                {isAssistance ? <InterventionTimeFields {...common} /> : null}
 
                 {/*
                     Problema e assistenza effettuata affiancati, le note sotto a tutta larghezza;
                     senza problema (consegna materiale) le note stanno accanto al lavoro svolto.
                 */}
-                {isAssistance && shows("work") ? <InterventionProblemField {...common} /> : null}
+                {isAssistance ? <InterventionProblemField {...common} /> : null}
 
-                {shows("work") ? (
-                    <>
-                        <InterventionDescriptionField {...common} />
-                        <InterventionNoteField
-                            {...common}
-                            className={isAssistance ? "self-auto lg:col-span-2" : undefined}
-                        />
-                    </>
-                ) : null}
+                <InterventionDescriptionField {...common} />
+                <InterventionNoteField {...common} className={isAssistance ? "self-auto lg:col-span-2" : undefined} />
             </div>
         </FormSection>
     );

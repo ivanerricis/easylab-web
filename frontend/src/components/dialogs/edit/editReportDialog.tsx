@@ -323,11 +323,9 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                             Caricamento dati del report...
                         </div>
                     ) : (
-                        // L'altezza segue lo schermo invece di un 70vh fisso: intestazione e
-                        // pulsanti occupano sempre gli stessi pixel, e su un monitor alto il
-                        // modulo sta tutto senza barra di scorrimento. Su mobile i pulsanti
-                        // vanno uno sotto l'altro, quindi resta un po' più di margine.
-                        <div className="grid max-h-[calc(100dvh-15rem)] gap-4 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
+                        // Non scorre da sé: scorre il corpo del dialogo (vedi `CustomDialog`), che
+                        // è alto al massimo quanto lo schermo e mostra la sfumatura di scorrimento.
+                        <div className="grid gap-4">
                             {/*
                                 Da lg in su due colonne: a sinistra i dati del lavoro (anagrafica,
                                 intervento, tecnico esterno), a destra l'avanzamento della pratica

@@ -43,7 +43,17 @@ const initialAdminPasswordFilePath = path.join(dataDir, "initial-admin-password.
 
 const scryptKeyLength = 64;
 const sessionTokenBytes = 32;
-const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
+/**
+ * La sessione scade dopo sette giorni senza richieste: ogni richiesta autenticata (al più una
+ * volta ogni `sessionTouchIntervalMs`) sposta `expiresAt` in avanti di altri sette giorni. Prima
+ * la scadenza era fissa dal login, e chi lavorava ogni giorno veniva buttato fuori a metà settimana.
+ */
+const sessionIdleDurationMs = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Il tetto del rinnovo: una sessione non vive più di trenta giorni dal login, per quanto la si
+ * usi. Senza, un cookie rubato e usato di tanto in tanto varrebbe per sempre.
+ */
+const sessionAbsoluteDurationMs = 30 * 24 * 60 * 60 * 1000;
 const sessionCleanupIntervalMs = 60 * 60 * 1000;
 /**
  * Ogni quanto si riscrive `lastSeenAt` di una sessione in uso. Aggiornarlo a ogni richiesta
@@ -392,7 +402,7 @@ const createSessionForUser = async (
     deviceId?: string | null
 ): Promise<LoginResult> => {
     const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + sessionDurationMs);
+    const expiresAt = new Date(Date.now() + sessionIdleDurationMs);
     const sanitizedUserAgent = sanitizeUserAgent(userAgent);
     // Il dispositivo si registra solo qui, all'apertura: l'header può cambiare sotto la stessa
     // sessione (un aggiornamento del browser) e riscriverlo a ogni richiesta significherebbe
@@ -476,12 +486,17 @@ export const login = async (
  * l'admin (il primo account mai creato) lo dice qui una sottoquery, con la stessa regola di
  * `getAdminUserId`.
  */
-export const getSessionUser = async (token: string): Promise<PublicUser | null> => {
+export const getSessionUser = async (
+    token: string,
+    /** Chiamata quando la scadenza è stata spostata in avanti: chi ha il cookie lo deve riscrivere. */
+    onRenew?: (expiresAt: Date) => void
+): Promise<PublicUser | null> => {
     const tokenHash = hashSessionToken(token);
     const rows = await db
         .select({
             expiresAt: sessionTable.expiresAt,
             lastSeenAt: sessionTable.lastSeenAt,
+            sessionCreatedAt: sessionTable.createdAt,
             id: userTable.id,
             username: userTable.username,
             created_at: userTable.created_at,
@@ -511,10 +526,15 @@ export const getSessionUser = async (token: string): Promise<PublicUser | null> 
     // passa ogni richiesta autenticata. Si scrive solo se l'ultimo segno di vita è vecchio
     // (vedi `sessionTouchIntervalMs`), altrimenti ogni pagina aperta costerebbe una UPDATE.
     if (now - row.lastSeenAt.getTime() >= sessionTouchIntervalMs) {
+        // Lo stesso UPDATE rinnova la scadenza, entro il tetto assoluto dal login.
+        const renewedExpiresAt = new Date(
+            Math.min(now + sessionIdleDurationMs, row.sessionCreatedAt.getTime() + sessionAbsoluteDurationMs)
+        );
         await db
             .update(sessionTable)
-            .set({ lastSeenAt: new Date(now) })
+            .set({ lastSeenAt: new Date(now), expiresAt: renewedExpiresAt })
             .where(eq(sessionTable.tokenHash, tokenHash));
+        onRenew?.(renewedExpiresAt);
     }
 
     return toPublicUser(row, row.isAdmin === true);

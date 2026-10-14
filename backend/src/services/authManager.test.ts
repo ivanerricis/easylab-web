@@ -654,6 +654,7 @@ describe("getSessionUser", () => {
     const sessionRow = (overrides: Record<string, unknown> = {}) => ({
         expiresAt: new Date(Date.now() + 60_000),
         lastSeenAt: new Date(),
+        sessionCreatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
         id: 7,
         username: "mario",
         created_at: new Date("2026-01-01T00:00:00Z"),
@@ -733,12 +734,38 @@ describe("getSessionUser", () => {
         expect(update?.values?.lastSeenAt).toBeInstanceOf(Date);
     });
 
-    it("non riscrive l'ultimo utilizzo a ogni richiesta", async () => {
-        queueRows("select", sessionTable, [sessionRow({ lastSeenAt: new Date(Date.now() - 60 * 1000) })]);
+    it("rinnova la scadenza di sette giorni insieme all'ultimo utilizzo, e lo dice a chi chiama", async () => {
+        queueRows("select", sessionTable, [sessionRow({ lastSeenAt: new Date(Date.now() - 10 * 60 * 1000) })]);
+        const onRenew = vi.fn();
+
+        await getSessionUser("token-in-chiaro", onRenew);
+
+        const update = dbCalls.find((call) => call.op === "update" && call.table === sessionTable);
+        const expiresAt = update?.values?.expiresAt as Date;
+        expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(7 * 24 * 60 * 60 * 1000 - 5000);
+        expect(onRenew).toHaveBeenCalledWith(expiresAt);
+    });
+
+    it("non rinnova oltre i trenta giorni dal login", async () => {
+        const createdAt = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+        queueRows("select", sessionTable, [
+            sessionRow({ sessionCreatedAt: createdAt, lastSeenAt: new Date(Date.now() - 10 * 60 * 1000) }),
+        ]);
 
         await getSessionUser("token-in-chiaro");
 
+        const update = dbCalls.find((call) => call.op === "update" && call.table === sessionTable);
+        expect((update?.values?.expiresAt as Date).getTime()).toBe(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    });
+
+    it("non riscrive l'ultimo utilizzo a ogni richiesta", async () => {
+        queueRows("select", sessionTable, [sessionRow({ lastSeenAt: new Date(Date.now() - 60 * 1000) })]);
+
+        const onRenew = vi.fn();
+        await getSessionUser("token-in-chiaro", onRenew);
+
         expect(dbCalls.some((call) => call.op === "update")).toBe(false);
+        expect(onRenew).not.toHaveBeenCalled();
     });
 
     it("token sconosciuto: nessun utente e niente da cancellare", async () => {

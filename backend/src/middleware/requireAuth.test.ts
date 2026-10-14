@@ -31,12 +31,18 @@ const createResponse = () => {
             this.cleared = name;
             return this;
         },
+        cookie(name: string, value: string, options: { expires?: Date }) {
+            this.cookies.push({ name, value, expires: options.expires });
+            return this;
+        },
+        cookies: [] as { name: string; value: string; expires?: Date }[],
     };
 
     return res as unknown as Response & {
         statusCode: number;
         body: { message: string };
         cleared: string | undefined;
+        cookies: { name: string; value: string; expires?: Date }[];
     };
 };
 
@@ -82,6 +88,35 @@ describe("requireAuth", () => {
         expect(req.user).toEqual(user);
         expect(next).toHaveBeenCalledOnce();
         expect(res.statusCode).toBe(0);
+    });
+});
+
+describe("requireAuth: rinnovo della sessione", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    /** Il cookie scade con la sessione: spostata la scadenza, il browser deve riceverla. */
+    it("riscrive il cookie con la nuova scadenza quando la sessione viene rinnovata", async () => {
+        const renewedAt = new Date("2026-10-21T10:00:00Z");
+        vi.mocked(getSessionUser).mockImplementation(async (_token, onRenew) => {
+            onRenew?.(renewedAt);
+            return { id: 1, username: "mario" } as never;
+        });
+        const res = createResponse();
+
+        await requireAuth(createRequest("token-valido"), res, vi.fn() as unknown as NextFunction);
+
+        expect(res.cookies).toEqual([{ name: sessionCookieName, value: "token-valido", expires: renewedAt }]);
+    });
+
+    it("non tocca il cookie quando la sessione non viene rinnovata", async () => {
+        vi.mocked(getSessionUser).mockResolvedValue({ id: 1, username: "mario" } as never);
+        const res = createResponse();
+
+        await requireAuth(createRequest("token-valido"), res, vi.fn() as unknown as NextFunction);
+
+        expect(res.cookies).toEqual([]);
     });
 });
 

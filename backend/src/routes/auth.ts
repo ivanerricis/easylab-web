@@ -32,6 +32,7 @@ const authRouter = Router();
 
 // Il cookie scade quando scade la sessione (`expiresAt` di `login`), invece di avere una durata
 // sua scritta qui: il passaggio da 30 a 7 giorni aveva dovuto toccare due costanti in due file.
+// Con il rinnovo lo riscrive `requireAuth` a ogni spostamento della scadenza.
 
 /**
  * L'identità del dispositivo che sta facendo l'accesso: quella già nel cookie, o una nuova. Il

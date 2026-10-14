@@ -66,7 +66,11 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         return;
     }
 
-    const user = await getSessionUser(token);
+    const user = await getSessionUser(token, (expiresAt) => {
+        // Il cookie scade con la sessione (vedi routes/auth.ts): rinnovata la sessione, lo si
+        // riscrive con la nuova scadenza, altrimenti il browser lo scarterebbe alla vecchia.
+        res.cookie(sessionCookieName, token, { ...sessionCookieOptions, expires: expiresAt });
+    });
 
     if (!user) {
         // Con le stesse opzioni con cui è nato: un `__Host-` cancellato senza `Secure` il

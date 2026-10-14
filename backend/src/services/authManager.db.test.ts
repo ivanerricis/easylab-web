@@ -133,6 +133,40 @@ describe("getSessionUser: con un database vero", () => {
         expect(row.lastSeenAt.getTime()).toBeGreaterThan(oldLastSeen.getTime());
     });
 
+    it("rinnova la scadenza, ma mai oltre i trenta giorni dal login", async () => {
+        const user = await insertUser();
+        const day = 24 * 60 * 60 * 1000;
+        const fresh = "token-rinnovabile";
+        const old = "token-vicino-al-tetto";
+        await insertSession({
+            userId: user.id,
+            tokenHash: tokenHashOf(fresh),
+            expiresAt: new Date(Date.now() + day),
+            lastSeenAt: new Date(Date.now() - 10 * 60 * 1000),
+        });
+        const oldCreatedAt = new Date(Date.now() - 29 * day);
+        await insertSession({
+            userId: user.id,
+            tokenHash: tokenHashOf(old),
+            createdAt: oldCreatedAt,
+            expiresAt: new Date(Date.now() + day),
+            lastSeenAt: new Date(Date.now() - 10 * 60 * 1000),
+        });
+
+        await getSessionUser(fresh);
+        await getSessionUser(old);
+
+        const expiry = async (token: string) =>
+            (
+                await db
+                    .select()
+                    .from(sessionTable)
+                    .where(eq(sessionTable.tokenHash, tokenHashOf(token)))
+            )[0].expiresAt;
+        expect((await expiry(fresh)).getTime()).toBeGreaterThan(Date.now() + 6.9 * day);
+        expect((await expiry(old)).getTime()).toBe(oldCreatedAt.getTime() + 30 * day);
+    });
+
     it("non riscrive l'ultimo utilizzo appena aggiornato", async () => {
         const user = await insertUser();
         const token = "token-appena-usato";

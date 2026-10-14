@@ -16,6 +16,8 @@ type DashboardStatsState = {
     // `null` finché non arriva una risposta: su errore la scheda mostra "—" e non un falso
     // "0,00 €" (o "0 report aperti"), indistinguibile da un mese davvero vuoto.
     reportStats: ReportStatsDto | null;
+    /** Il mese a cui si riferiscono `reportStats`: resta quello vecchio finché non arriva la risposta del nuovo. */
+    loadedMonth: string | null;
     interventionStats: InterventionStatsDto | null;
     isReportStatsLoading: boolean;
     isInterventionStatsLoading: boolean;
@@ -39,6 +41,7 @@ export const useDashboardStats = () => {
     const [state, setState] = useState<DashboardStatsState>(() => ({
         selectedMonth: getMonthKey(new Date()),
         reportStats: null,
+        loadedMonth: null,
         interventionStats: null,
         isReportStatsLoading: true,
         isInterventionStatsLoading: true,
@@ -87,7 +90,7 @@ export const useDashboardStats = () => {
             }
 
             loadedMonthRef.current = month;
-            setState((previous) => ({ ...previous, reportStats: stats }));
+            setState((previous) => ({ ...previous, reportStats: stats, loadedMonth: month }));
         } catch (error) {
             if (requestId !== latestReportStatsRequestIdRef.current) {
                 return;
@@ -173,20 +176,28 @@ export const useDashboardStats = () => {
     const monthlyRevenueSeries = useMemo(() => reportStats?.series ?? [], [reportStats]);
     const previousMonthToDate = reportStats?.previousMonthToDate ?? null;
 
+    // Etichetta e confronto seguono i numeri a schermo e non il clic: scritti per il mese nuovo
+    // sopra la cifra del vecchio, cambiavano due volte (subito, poi all'arrivo dei dati) e
+    // dicevano per un istante un confronto sbagliato. La freccia e la barra scelta, invece,
+    // rispondono subito.
+    const displayedMonth = state.loadedMonth ?? selectedMonth;
+    const isDisplayedMonthCurrent = displayedMonth === getMonthKey(new Date());
+
     const revenueComparison = useMemo(
         () =>
             getRevenueComparison({
-                selectedMonth,
-                isCurrentMonth,
+                selectedMonth: displayedMonth,
+                isCurrentMonth: isDisplayedMonthCurrent,
                 monthlyRevenue,
                 series: monthlyRevenueSeries,
                 previousMonthToDate,
             }),
-        [isCurrentMonth, monthlyRevenue, monthlyRevenueSeries, previousMonthToDate, selectedMonth]
+        [displayedMonth, isDisplayedMonthCurrent, monthlyRevenue, monthlyRevenueSeries, previousMonthToDate]
     );
 
     return {
         selectedMonth,
+        displayedMonth,
         isCurrentMonth,
         selectMonth,
         selectPreviousMonth,

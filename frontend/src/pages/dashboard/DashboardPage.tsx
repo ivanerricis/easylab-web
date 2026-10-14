@@ -106,6 +106,7 @@ const DashboardPage = () => {
     // il perché di ogni dettaglio (id della richiesta, annullamento, ritorno dell'etichetta).
     const {
         selectedMonth: selectedRevenueMonth,
+        displayedMonth: displayedRevenueMonth,
         isCurrentMonth: isCurrentRevenueMonth,
         selectMonth: selectRevenueMonth,
         selectPreviousMonth: handlePreviousRevenueMonth,
@@ -121,7 +122,7 @@ const DashboardPage = () => {
         reloadInterventionStats,
     } = useDashboardStats();
 
-    const selectedRevenueLabel = useMemo(() => getMonthLabel(selectedRevenueMonth), [selectedRevenueMonth]);
+    const selectedRevenueLabel = useMemo(() => getMonthLabel(displayedRevenueMonth), [displayedRevenueMonth]);
 
     const maxMonthlyRevenue = useMemo(
         () => monthlyRevenueSeries.reduce((max, point) => Math.max(max, point.value), 0),

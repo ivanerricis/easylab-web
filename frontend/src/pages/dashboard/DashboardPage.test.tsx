@@ -343,7 +343,8 @@ describe("DashboardPage", () => {
         const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
         await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
         await userEvent.click(within(dialog).getByRole("button", { name: "Mese precedente" }));
-        expect(within(dialog).getByText("luglio 2026")).toBeInTheDocument();
+        // L'etichetta segue i numeri a schermo: finché non arrivano quelli di luglio non cambia.
+        expect(within(dialog).queryByText("luglio 2026")).not.toBeInTheDocument();
 
         await act(async () => {
             pending.get("2026-07")?.({ ...reportStats, monthlyRevenue: 700, monthlyNetRevenue: 600 });

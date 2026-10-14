@@ -24,6 +24,10 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-14 — Class diagram del database: generato da uno script e tenuto allineato allo schema](changelog/2026-10.md#2026-10-14-class-diagram-del-database-generato-da-uno-script-e-tenuto-allineato-allo-schema)
+- [2026-10-14 — Ricerca globale: "#" per il numero esatto di un report o di un intervento](changelog/2026-10.md#2026-10-14-ricerca-globale-per-il-numero-esatto-di-un-report-o-di-un-intervento)
+- [2026-10-14 — Ricerca clienti: nome e cognome scritti insieme](changelog/2026-10.md#2026-10-14-ricerca-clienti-nome-e-cognome-scritti-insieme)
+- [2026-10-14 — Dialoghi: il corpo scorrevole non lascia più vuoto in fondo, da telefono](changelog/2026-10.md#2026-10-14-dialoghi-il-corpo-scorrevole-non-lascia-piu-vuoto-in-fondo-da-telefono)
 - [2026-10-07 — Interventi: tipi e stati salvati in inglese, e il ripristino aggiorna lo schema](changelog/2026-10.md#2026-10-07-interventi-tipi-e-stati-salvati-in-inglese-e-il-ripristino-aggiorna-lo-schema)
 - [2026-10-06 — Login: il limite di tentativi regge anche alle richieste in parallelo](changelog/2026-10.md#2026-10-06-login-il-limite-di-tentativi-regge-anche-alle-richieste-in-parallelo)
 - [2026-10-05 — Dipendenze: aggiornamenti di Dependabot di frontend e backend](changelog/2026-10.md#2026-10-05-dipendenze-aggiornamenti-di-dependabot-di-frontend-e-backend)

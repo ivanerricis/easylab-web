@@ -11,6 +11,13 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 ## Indice
 
 **Interfaccia**
+- **"Nome Cognome" nella ricerca di report e interventi.** Dal 2026-10-14 i campi cliente e la lista
+  Clienti trovano "Anna Romano" scritto per intero (vedi il CHANGELOG), ma le liste Report e Interventi
+  no: `matchingReportIds` e il suo equivalente per gli interventi confrontano la frase intera con ogni
+  colonna del cliente (e del collaboratore) per conto suo, quindi "Anna Romano" non trova nulla; e usano
+  `containsText`, non la versione senza accenti, quindi "Nicolo" non trova "Nicolò". Non toccate di
+  proposito: sono i `union` riscritti il 2026-09-17 per le prestazioni. La strada è `matchesAllWords` di
+  `db/queries/search.ts` come ramo in più di ogni `union`, da misurare con `EXPLAIN` sui dati generati.
 - [Contrasto del testo sulle righe gialle e verdi](#contrasto-del-testo-sulle-righe-e-sugli-eventi-gialli-e-verdi):
   testo bianco su giallo a 1,91:1, serve una scelta fra due strade.
 - [Eventi del calendario con fondo tenue e striscia di stato](#eventi-del-calendario-con-fondo-tenue-e-striscia-di-stato):

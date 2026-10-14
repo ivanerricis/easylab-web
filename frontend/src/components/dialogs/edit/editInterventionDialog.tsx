@@ -2,6 +2,7 @@ import CustomDialog from "@/components/dialogs/customDialog";
 import {
     InterventionCollaboratorField,
     InterventionDetailsSection,
+    InterventionProgressSection,
 } from "@/components/dialogs/intervention-form-fields";
 import FormField from "@/components/form-field";
 import FormSection from "@/components/dialogs/form-section";
@@ -188,7 +189,7 @@ const EditInterventionDialog = ({
             onOpenChange={onOpenChange}
             isDirty={isDirty}
             title={interventionId ? `Modifica intervento #${interventionId}` : "Modifica intervento"}
-            contentClassName="sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
+            contentClassName="sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
             confirmIcon={Save}
             cancelLabel="Annulla"
@@ -203,38 +204,50 @@ const EditInterventionDialog = ({
                             Caricamento dati dell'intervento...
                         </div>
                     ) : (
-                        // L'altezza segue lo schermo, come in `EditReportDialog`: con un 70vh fisso,
-                        // su un telefono basso intestazione, pulsanti e margini non ci stavano nel
-                        // 30% che restava, e il dialogo usciva dallo schermo.
-                        <div className="grid max-h-[calc(100dvh-15rem)] gap-2 overflow-y-auto pr-1 sm:max-h-[calc(100dvh-12rem)]">
-                            <FormSection title="Anagrafica">
-                                {/*
-                                    `items-start` in tutte le griglie di campi: quando un campo
-                                    mostra l'errore sotto di sé la riga si allunga, e senza le celle
-                                    vicine si stiravano con lei spingendo in giù etichetta e campo.
-                                */}
-                                <div className="grid items-start gap-4 lg:grid-cols-2">
-                                    <FormField id="customerName" label="Cliente" className="gap-1">
-                                        <Select disabled value={customerName}>
-                                            <SelectTrigger id="customerName" className="w-full">
-                                                <SelectValue placeholder={customerName} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={customerName}>{customerName}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
+                        // Niente contenitore scorrevole proprio: il corpo di `CustomDialog` scorre già,
+                        // e un secondo `max-h` qui dentro lasciava due scroll uno nell'altro (e un
+                        // corpo scorrevole di 160-240px oltre il contenuto, per i `<select>` nascosti
+                        // di Radix che restavano alla posizione che avevano dentro il contenitore).
+                        // Da lg in su due colonne, come `EditReportDialog`: a sinistra i dati del
+                        // lavoro, a destra stato e pagamento; sotto lg si impilano.
+                        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                            <div className="grid gap-4">
+                                <FormSection title="Anagrafica">
+                                    {/*
+                                        `items-start` in tutte le griglie di campi: quando un campo
+                                        mostra l'errore sotto di sé la riga si allunga, e senza le celle
+                                        vicine si stiravano con lei spingendo in giù etichetta e campo.
+                                    */}
+                                    <div className="grid items-start gap-4 lg:grid-cols-2">
+                                        <FormField labelSize="sm" id="customerName" label="Cliente" className="gap-1">
+                                            <Select disabled value={customerName}>
+                                                <SelectTrigger id="customerName" className="w-full">
+                                                    <SelectValue placeholder={customerName} />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value={customerName}>{customerName}</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormField>
 
-                                    <InterventionCollaboratorField
-                                        values={formValues}
-                                        errors={errors}
-                                        onChange={handleChange}
-                                        collaborators={collaborators}
-                                    />
-                                </div>
-                            </FormSection>
+                                        <InterventionCollaboratorField
+                                            values={formValues}
+                                            errors={errors}
+                                            onChange={handleChange}
+                                            collaborators={collaborators}
+                                        />
+                                    </div>
+                                </FormSection>
 
-                            <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
+                                <InterventionDetailsSection
+                                    values={formValues}
+                                    errors={errors}
+                                    onChange={handleChange}
+                                    withoutProgress
+                                />
+                            </div>
+
+                            <InterventionProgressSection values={formValues} errors={errors} onChange={handleChange} />
                         </div>
                     )}
                 </div>

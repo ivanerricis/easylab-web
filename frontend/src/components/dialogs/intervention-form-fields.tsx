@@ -1,7 +1,7 @@
 import DatePickerField from "@/components/date-picker-field";
 import EuroInput from "@/components/euro-input";
 import FormField from "@/components/form-field";
-import FormSection from "@/components/dialogs/form-section";
+import FormSection, { tintedSectionClassName } from "@/components/dialogs/form-section";
 import PaidStatusSelector from "@/components/paid-status-selector";
 import ToInvoiceSelector from "@/components/to-invoice-selector";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,9 @@ import {
     isCompletedInterventionStatus,
 } from "@/lib/interventions";
 import { formatPersonName } from "@/lib/people";
+import { cn } from "@/lib/utils";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import type { ReactNode } from "react";
 
 /**
  * I campi dell'intervento, uguali nei dialoghi di creazione e di modifica: prima ciascuno aveva
@@ -45,7 +47,14 @@ export const InterventionCollaboratorField = ({
     onChange,
     collaborators,
 }: FieldsProps & { collaborators: CollaboratorDto[] }) => (
-    <FormField id="collaboratorId" label="Collaboratore" className="gap-1" required error={errors.collaboratorId}>
+    <FormField
+        labelSize="sm"
+        id="collaboratorId"
+        label="Collaboratore"
+        className="gap-1"
+        required
+        error={errors.collaboratorId}
+    >
         <Select value={values.collaboratorId} onValueChange={(collaboratorId) => onChange({ collaboratorId })}>
             <SelectTrigger
                 id="collaboratorId"
@@ -65,20 +74,221 @@ export const InterventionCollaboratorField = ({
     </FormField>
 );
 
-/** L'intera sezione "Intervento": tipo, stato, data, prezzo, pagamento, orari, problema, descrizione, note. */
+/** Il tipo: decide quali altri campi compaiono (orari e problema solo per l'assistenza) e come si chiamano. */
+const InterventionTypeField = ({ values, onChange }: Pick<FieldsProps, "values" | "onChange">) => (
+    <FormField labelSize="sm" id="type" label="Tipo intervento" className="gap-1">
+        <Select value={values.type} onValueChange={(type) => onChange({ type: type as InterventionType })}>
+            <SelectTrigger id="type" className="w-full">
+                <SelectValue placeholder="Seleziona tipo" />
+            </SelectTrigger>
+            <SelectContent>
+                {interventionTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    </FormField>
+);
+
+const InterventionStatusField = ({ values, onChange }: Pick<FieldsProps, "values" | "onChange">) => (
+    <FormField labelSize="sm" id="status" label="Stato" className="gap-1">
+        <Select value={values.status} onValueChange={(status) => onChange({ status: status as InterventionStatus })}>
+            <SelectTrigger id="status" className="w-full">
+                <SelectValue placeholder="Seleziona stato" />
+            </SelectTrigger>
+            <SelectContent>
+                {interventionStatusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    </FormField>
+);
+
+const InterventionDateField = ({ values, errors, onChange }: FieldsProps) => (
+    <FormField
+        labelSize="sm"
+        id="interventionDate"
+        label={interventionDateLabel(values.type)}
+        className="gap-1"
+        required
+        error={errors.interventionDate}
+    >
+        <DatePickerField
+            id="interventionDate"
+            {...fieldErrorAria("interventionDate", errors.interventionDate)}
+            value={values.interventionDate}
+            onValueChange={(interventionDate) => onChange({ interventionDate })}
+        />
+    </FormField>
+);
+
+/**
+ * Orari e assistenza effettuata si chiedono solo a intervento completato: prima restano compilabili
+ * ma senza asterisco, che segue `values.status` anche quando lo Stato sta in un altro riquadro (o
+ * in un altro passo). L'asterisco rosso è l'unico segno dell'obbligo: le scritte "(facoltativo)"
+ * accanto agli altri campi sono state tolte perché affollavano il form, e dicevano la stessa cosa
+ * della sua assenza.
+ */
+const InterventionTimeFields = ({ values, errors, onChange }: FieldsProps) => (
+    // Occupano tutta la riga della griglia, come le altre coppie: stretti in mezza colonna le
+    // etichette andavano a capo ("Ora / inizio") e i campi non erano allineati con quelli sopra.
+    <div className="grid grid-cols-2 items-start gap-4 lg:col-span-2">
+        {(
+            [
+                ["startTime", "Ora inizio"],
+                ["endTime", "Ora fine"],
+            ] as const
+        ).map(([field, label]) => (
+            <FormField
+                labelSize="sm"
+                key={field}
+                id={field}
+                label={label}
+                className="gap-1"
+                required={isCompletedInterventionStatus(values.status)}
+                error={errors[field]}
+            >
+                <Input
+                    {...fieldProps(field, { error: errors[field] })}
+                    type="time"
+                    value={values[field]}
+                    onChange={(event) => onChange({ [field]: event.target.value })}
+                />
+            </FormField>
+        ))}
+    </div>
+);
+
+const InterventionProblemField = ({ values, errors, onChange }: FieldsProps) => (
+    <FormField labelSize="sm" id="problem" label="Problema" className="gap-1" required error={errors.problem}>
+        <Textarea
+            {...fieldProps("problem", { error: errors.problem })}
+            className="resize-none"
+            rows={4}
+            placeholder="Descrivi il problema riscontrato"
+            value={values.problem}
+            onChange={(event) => onChange({ problem: event.target.value })}
+        />
+    </FormField>
+);
+
+const InterventionDescriptionField = ({ values, errors, onChange }: FieldsProps) => (
+    <FormField
+        labelSize="sm"
+        id="description"
+        label={interventionDescriptionLabel(values.type)}
+        className="gap-1"
+        required={isCompletedInterventionStatus(values.status)}
+        error={errors.description}
+    >
+        <Textarea
+            {...fieldProps("description", { error: errors.description })}
+            className="resize-none"
+            rows={4}
+            placeholder={
+                values.type === "material_delivery"
+                    ? "Elenca i materiali da consegnare"
+                    : "Descrivi l'assistenza effettuata"
+            }
+            value={values.description}
+            onChange={(event) => onChange({ description: event.target.value })}
+        />
+    </FormField>
+);
+
+const InterventionNoteField = ({
+    values,
+    onChange,
+    className,
+}: Pick<FieldsProps, "values" | "onChange"> & { className?: string }) => (
+    <FormField labelSize="sm" id="note" label="Note" className={cn("gap-1", className)}>
+        <Textarea
+            id="note"
+            className="resize-none"
+            rows={4}
+            placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
+            value={values.note}
+            onChange={(event) => onChange({ note: event.target.value })}
+        />
+    </FormField>
+);
+
+const InterventionPriceField = ({ values, errors, onChange }: FieldsProps) => (
+    <FormField labelSize="sm" id="price" label="Prezzo" className="gap-1" error={errors.price}>
+        <EuroInput
+            {...fieldProps("price", { error: errors.price })}
+            value={values.price}
+            onChange={(event) => onChange({ price: event.target.value })}
+        />
+    </FormField>
+);
+
+/**
+ * Pagamento e fatturazione sono gruppi di radio, senza un controllo unico a cui legare
+ * l'etichetta (si chiamano da sé con `ariaLabel`): la scritta è solo visiva, nella stessa misura
+ * delle etichette dei campi accanto.
+ */
+const InterventionChoiceField = ({ label, children }: { label: string; children: ReactNode }) => (
+    <div className="grid gap-1">
+        <Label className="text-sm">{label}</Label>
+        {children}
+    </div>
+);
+
+const InterventionPaidField = ({ values, onChange }: Pick<FieldsProps, "values" | "onChange">) => (
+    <InterventionChoiceField label="Pagamento">
+        <PaidStatusSelector value={values.paid} onValueChange={(paid) => onChange({ paid })} orientation="stacked" />
+    </InterventionChoiceField>
+);
+
+const InterventionInvoiceField = ({ values, onChange }: Pick<FieldsProps, "values" | "onChange">) => (
+    <InterventionChoiceField label="Fatturazione">
+        <ToInvoiceSelector
+            value={values.toInvoice}
+            onValueChange={(toInvoice) => onChange({ toInvoice })}
+            orientation="stacked"
+        />
+    </InterventionChoiceField>
+);
+
+/**
+ * Il riquadro tinto con l'avanzamento della pratica, a destra da `lg` in su: stato, prezzo,
+ * pagamento e fatturazione, le parti che si toccano a ogni chiusura e che a 1280×720 restavano
+ * sotto la piega. Lo stato decide gli obblighi di orari e assistenza effettuata, che stanno
+ * nell'altra colonna.
+ */
+export const InterventionProgressSection = (props: FieldsProps) => (
+    <FormSection title="Stato e pagamento" className={tintedSectionClassName}>
+        <div className="grid items-start gap-4">
+            <InterventionStatusField {...props} />
+            <InterventionPriceField {...props} />
+            <InterventionPaidField {...props} />
+            <InterventionInvoiceField {...props} />
+        </div>
+    </FormSection>
+);
+
+/**
+ * La sezione "Intervento". Con `part` ne mostra una parte sola, per i passi del dialogo di
+ * creazione su telefono (lì Stato sta in "Pianificazione", prezzo e pagamento in "Pagamento").
+ * Con `withoutProgress` toglie stato, prezzo, pagamento e fatturazione, che da `lg` stanno nel
+ * riquadro `InterventionProgressSection` accanto. Senza nessuno dei due è la sezione intera.
+ */
 export const InterventionDetailsSection = ({
     values,
     errors,
     onChange,
     part,
-}: FieldsProps & { part?: InterventionDetailsPart }) => {
+    withoutProgress = false,
+}: FieldsProps & { part?: InterventionDetailsPart; withoutProgress?: boolean }) => {
     const shows = (fieldPart: InterventionDetailsPart) => part == null || part === fieldPart;
+    const common = { values, errors, onChange };
     const isAssistance = isAssistanceInterventionType(values.type);
-    // Orari e lavoro svolto si chiedono solo a intervento completed: prima restano
-    // compilabili ma senza asterisco. L'asterisco rosso è l'unico segno dell'obbligo: le
-    // scritte "(facoltativo)" accanto agli altri campi sono state tolte perché affollavano
-    // il form, e dicevano la stessa cosa della sua assenza.
-    const isCompleted = isCompletedInterventionStatus(values.status);
 
     return (
         <FormSection title={part ? interventionDetailsPartTitles[part] : "Intervento"}>
@@ -90,171 +300,32 @@ export const InterventionDetailsSection = ({
             <div className="grid items-start gap-4 lg:grid-cols-2">
                 {shows("schedule") ? (
                     <>
-                        <FormField id="type" label="Tipo intervento" className="gap-1">
-                            <Select
-                                value={values.type}
-                                onValueChange={(type) => onChange({ type: type as InterventionType })}
-                            >
-                                <SelectTrigger id="type" className="w-full">
-                                    <SelectValue placeholder="Seleziona tipo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {interventionTypeOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-
-                        <FormField id="status" label="Stato" className="gap-1">
-                            <Select
-                                value={values.status}
-                                onValueChange={(status) => onChange({ status: status as InterventionStatus })}
-                            >
-                                <SelectTrigger id="status" className="w-full">
-                                    <SelectValue placeholder="Seleziona stato" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {interventionStatusOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-
-                        <FormField
-                            id="interventionDate"
-                            label={interventionDateLabel(values.type)}
-                            className="gap-1"
-                            required
-                            error={errors.interventionDate}
-                        >
-                            <DatePickerField
-                                id="interventionDate"
-                                {...fieldErrorAria("interventionDate", errors.interventionDate)}
-                                value={values.interventionDate}
-                                onValueChange={(interventionDate) => onChange({ interventionDate })}
-                            />
-                        </FormField>
+                        <InterventionTypeField {...common} />
+                        {withoutProgress ? null : <InterventionStatusField {...common} />}
+                        <InterventionDateField {...common} />
                     </>
                 ) : null}
 
-                {shows("payment") ? (
+                {!withoutProgress && shows("payment") ? (
                     <>
-                        <FormField id="price" label="Prezzo" className="gap-1" error={errors.price}>
-                            <EuroInput
-                                {...fieldProps("price", { error: errors.price })}
-                                value={values.price}
-                                onChange={(event) => onChange({ price: event.target.value })}
-                            />
-                        </FormField>
-
-                        {/*
-                         * Larghi quanto tutta la sezione: dentro mezza colonna le due schede radio si
-                         * stringono sotto i 200px e "Non da fatturare" andava a capo, lasciando la riga
-                         * sfalsata rispetto al pagamento qui accanto.
-                         */}
-                        <div className="grid gap-1 lg:col-span-2">
-                            <Label className="text-lg">Pagamento</Label>
-                            <PaidStatusSelector value={values.paid} onValueChange={(paid) => onChange({ paid })} />
-                        </div>
-
-                        <div className="grid gap-1 lg:col-span-2">
-                            <Label className="text-lg">Fatturazione</Label>
-                            <ToInvoiceSelector
-                                value={values.toInvoice}
-                                onValueChange={(toInvoice) => onChange({ toInvoice })}
-                            />
-                        </div>
+                        <InterventionPriceField {...common} />
+                        <InterventionPaidField {...common} />
+                        <InterventionInvoiceField {...common} />
                     </>
                 ) : null}
 
-                {isAssistance && shows("schedule") ? (
-                    // Anche gli orari occupano tutta la sezione, come le altre coppie: stretti in
-                    // mezza colonna le etichette andavano a capo ("Ora / inizio") e i campi non
-                    // erano allineati con quelli sopra.
-                    <div className="grid grid-cols-2 items-start gap-4 lg:col-span-2">
-                        {(
-                            [
-                                ["startTime", "Ora inizio"],
-                                ["endTime", "Ora fine"],
-                            ] as const
-                        ).map(([field, label]) => (
-                            <FormField
-                                key={field}
-                                id={field}
-                                label={label}
-                                className="gap-1"
-                                required={isCompleted}
-                                error={errors[field]}
-                            >
-                                <Input
-                                    {...fieldProps(field, { error: errors[field] })}
-                                    type="time"
-                                    value={values[field]}
-                                    onChange={(event) => onChange({ [field]: event.target.value })}
-                                />
-                            </FormField>
-                        ))}
-                    </div>
-                ) : null}
+                {isAssistance && shows("schedule") ? <InterventionTimeFields {...common} /> : null}
 
-                {isAssistance && shows("work") ? (
-                    <FormField
-                        id="problem"
-                        label="Problema"
-                        className="gap-1 lg:col-span-2"
-                        required
-                        error={errors.problem}
-                    >
-                        <Textarea
-                            {...fieldProps("problem", { error: errors.problem })}
-                            className="resize-none"
-                            rows={4}
-                            placeholder="Descrivi il problema riscontrato"
-                            value={values.problem}
-                            onChange={(event) => onChange({ problem: event.target.value })}
-                        />
-                    </FormField>
-                ) : null}
+                {/*
+                    Problema e assistenza effettuata affiancati, le note sotto a tutta larghezza;
+                    senza problema (consegna materiale) le note stanno accanto al lavoro svolto.
+                */}
+                {isAssistance && shows("work") ? <InterventionProblemField {...common} /> : null}
 
                 {shows("work") ? (
                     <>
-                        <FormField
-                            id="description"
-                            label={interventionDescriptionLabel(values.type)}
-                            className="gap-1 lg:col-span-2"
-                            required={isCompleted}
-                            error={errors.description}
-                        >
-                            <Textarea
-                                {...fieldProps("description", { error: errors.description })}
-                                className="resize-none"
-                                rows={4}
-                                placeholder={
-                                    values.type === "material_delivery"
-                                        ? "Elenca i materiali da consegnare"
-                                        : "Descrivi l'assistenza effettuata"
-                                }
-                                value={values.description}
-                                onChange={(event) => onChange({ description: event.target.value })}
-                            />
-                        </FormField>
-
-                        <FormField id="note" label="Note" className="gap-1 lg:col-span-2">
-                            <Textarea
-                                id="note"
-                                className="resize-none"
-                                rows={4}
-                                placeholder="Annotazioni libere: accordi col cliente, promemoria, materiale da riportare"
-                                value={values.note}
-                                onChange={(event) => onChange({ note: event.target.value })}
-                            />
-                        </FormField>
+                        <InterventionDescriptionField {...common} />
+                        <InterventionNoteField {...common} className={isAssistance ? "lg:col-span-2" : undefined} />
                     </>
                 ) : null}
             </div>

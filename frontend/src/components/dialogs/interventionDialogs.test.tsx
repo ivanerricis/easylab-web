@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,6 +44,13 @@ const chooseOption = async (label: string | RegExp, option: string) => {
 /** I campi orario sono `type="time"`: si impostano direttamente, come fa il selettore nativo. */
 const setTime = (label: RegExp, value: string) => {
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
+};
+
+/** Il riquadro tinto di destra: stato, prezzo, pagamento e fatturazione (vedi `InterventionProgressSection`). */
+const progressPanel = () => {
+    const panel = screen.getByRole("heading", { name: "Stato e pagamento" }).closest("section");
+    expect(panel).not.toBeNull();
+    return within(panel as HTMLElement);
 };
 
 const save = () => userEvent.click(screen.getByRole("button", { name: "Salva" }));
@@ -105,6 +112,20 @@ describe("CreateInterventionDialog", () => {
         // Una consegna non ha orari né problema.
         expect(screen.queryByLabelText(/^Ora inizio/)).not.toBeInTheDocument();
         expect(screen.queryByLabelText("Problema")).not.toBeInTheDocument();
+    });
+
+    it('da desktop tiene stato, prezzo, pagamento e fatturazione nel riquadro "Stato e pagamento"', async () => {
+        await renderDialog();
+
+        const panel = progressPanel();
+        expect(panel.getByRole("combobox", { name: "Stato" })).toBeInTheDocument();
+        expect(panel.getByLabelText(/^Prezzo/)).toBeInTheDocument();
+        expect(panel.getByRole("radiogroup", { name: "Pagamento" })).toBeInTheDocument();
+        expect(panel.getByRole("radiogroup", { name: "Fatturazione" })).toBeInTheDocument();
+        // Il resto sta nell'altra colonna: il riquadro non ha né il tipo né il collaboratore.
+        expect(panel.queryByRole("combobox", { name: "Tipo intervento" })).not.toBeInTheDocument();
+        expect(panel.queryByRole("combobox", { name: /^Collaboratore/ })).not.toBeInTheDocument();
+        expect(screen.getAllByRole("radiogroup")).toHaveLength(2);
     });
 
     it("usa la data dello slot cliccato nel calendario", async () => {
@@ -320,10 +341,18 @@ describe("CreateInterventionDialog", () => {
             // verifica sul server (quel percorso ha i suoi test, sotto).
             expect(await screen.findByRole("combobox", { name: "Tipo intervento" })).toBeInTheDocument();
             expect(screen.queryByLabelText(/^Prezzo/)).not.toBeInTheDocument();
+            // Su telefono lo stato resta nella pianificazione e il riquadro di destra non c'è.
+            expect(screen.getByRole("combobox", { name: "Stato" })).toBeInTheDocument();
+            expect(screen.queryByRole("heading", { name: "Stato e pagamento" })).not.toBeInTheDocument();
 
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             expect(screen.getByLabelText(/^Note/)).toBeInTheDocument();
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(screen.getByRole("radiogroup", { name: "Pagamento" })).toBeInTheDocument();
+            expect(screen.getByRole("radiogroup", { name: "Fatturazione" })).toBeInTheDocument();
+            expect(screen.queryByRole("combobox", { name: "Stato" })).not.toBeInTheDocument();
+            expect(screen.queryByRole("heading", { name: "Stato e pagamento" })).not.toBeInTheDocument();
 
             await userEvent.type(screen.getByLabelText(/^Prezzo/), "45");
             await userEvent.click(screen.getByRole("button", { name: "Salva" }));
@@ -404,6 +433,17 @@ describe("EditInterventionDialog", () => {
         expect(screen.getByLabelText(/^Ora fine/)).toHaveValue("10:15");
         expect(screen.getByLabelText(/^Problema/)).toHaveValue("Rete assente");
         expect(screen.getByRole("combobox", { name: /^Collaboratore/ })).toHaveTextContent("Luca Bianchi");
+    });
+
+    it('tiene stato, prezzo, pagamento e fatturazione nel riquadro "Stato e pagamento"', async () => {
+        await renderDialog();
+
+        const panel = progressPanel();
+        expect(panel.getByRole("combobox", { name: "Stato" })).toHaveTextContent("Completato");
+        expect(panel.getByLabelText(/^Prezzo/)).toBeInTheDocument();
+        expect(panel.getByRole("radio", { name: "Pagato" })).toBeChecked();
+        expect(panel.getByRole("radio", { name: "Da fatturare" })).toBeChecked();
+        expect(panel.queryByLabelText(/^Problema/)).not.toBeInTheDocument();
     });
 
     it("salva le modifiche", async () => {

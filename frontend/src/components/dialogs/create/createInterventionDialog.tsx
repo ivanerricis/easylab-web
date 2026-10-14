@@ -8,6 +8,7 @@ import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDial
 import {
     InterventionCollaboratorField,
     InterventionDetailsSection,
+    InterventionProgressSection,
 } from "@/components/dialogs/intervention-form-fields";
 import StepProgress from "@/components/dialogs/step-progress";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -298,6 +299,60 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         }
     };
 
+    const anagraficaSection = (
+        <FormSection title="Anagrafica">
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+                {/* `gap-1` fra etichetta e campo, come il collaboratore accanto e
+                        tutti i campi dei dialoghi: senza, il campo del cliente stava
+                        4px più in alto di quello del collaboratore sulla stessa riga. */}
+                <FormField
+                    labelSize="sm"
+                    id="customer"
+                    label="Cliente"
+                    className="gap-1"
+                    required
+                    error={errors.customer}
+                >
+                    <div className="flex">
+                        <InputWithAdd
+                            id="customer"
+                            {...fieldErrorAria("customer", errors.customer)}
+                            placeholder="Cliente"
+                            inputClassName="rounded-r-none"
+                            value={formValues.customer}
+                            onSearch={searchCustomers}
+                            isSelectedOption={customerIdByOption[formValues.customer] != null}
+                            onChange={(customer) => handleChange({ customer })}
+                            required
+                        />
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-lg"
+                                    className="rounded-l-none border-l-0!"
+                                    onClick={() => setIsCreateCustomerDialogOpen(true)}
+                                    aria-label="Crea nuovo cliente"
+                                >
+                                    <Plus className="size-5" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Crea nuovo cliente</TooltipContent>
+                        </Tooltip>
+                    </div>
+                </FormField>
+
+                <InterventionCollaboratorField
+                    values={formValues}
+                    errors={errors}
+                    onChange={handleChange}
+                    collaborators={collaborators}
+                />
+            </div>
+        </FormSection>
+    );
+
     return (
         <>
             <CustomDialog
@@ -311,7 +366,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 // lato sui telefoni più bassi. Con l'altezza data dal contenuto ogni passo era alto
                 // diversamente (284–516px di campi) e "Avanti" cambiava posto fra un tocco e
                 // l'altro; così i campi scorrono dentro e i pulsanti restano fermi in fondo.
-                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl"
+                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl"
                 confirmLabel={
                     isLastStep
                         ? isSubmitting
@@ -329,74 +384,44 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                 cancelDisabled={isSubmitting || isCheckingCustomer}
                 confirmDisabled={isSubmitting || isCheckingCustomer}
                 content={
-                    <div className="grid max-h-[72vh] content-start gap-4 overflow-y-auto py-1 pr-1 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1">
+                    <div className="grid content-start gap-4 max-sm:min-h-0 max-sm:flex-1 max-sm:overflow-y-auto max-sm:py-1 max-sm:pr-1">
                         {isStepped ? (
                             <StepProgress steps={interventionSteps.map((item) => item.title)} current={step} />
                         ) : null}
 
-                        {!isStepped || step === 0 ? (
-                            <FormSection title="Anagrafica">
-                                <div className="grid items-start gap-4 lg:grid-cols-2">
-                                    {/* `gap-1` fra etichetta e campo, come il collaboratore accanto e
-                                        tutti i campi dei dialoghi: senza, il campo del cliente stava
-                                        4px più in alto di quello del collaboratore sulla stessa riga. */}
-                                    <FormField
-                                        id="customer"
-                                        label="Cliente"
-                                        className="gap-1"
-                                        required
-                                        error={errors.customer}
-                                    >
-                                        <div className="flex">
-                                            <InputWithAdd
-                                                id="customer"
-                                                {...fieldErrorAria("customer", errors.customer)}
-                                                placeholder="Cliente"
-                                                inputClassName="rounded-r-none"
-                                                value={formValues.customer}
-                                                onSearch={searchCustomers}
-                                                isSelectedOption={customerIdByOption[formValues.customer] != null}
-                                                onChange={(customer) => handleChange({ customer })}
-                                                required
-                                            />
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="icon-lg"
-                                                        className="rounded-l-none border-l-0!"
-                                                        onClick={() => setIsCreateCustomerDialogOpen(true)}
-                                                        aria-label="Crea nuovo cliente"
-                                                    >
-                                                        <Plus className="size-5" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>Crea nuovo cliente</TooltipContent>
-                                            </Tooltip>
-                                        </div>
-                                    </FormField>
-
-                                    <InterventionCollaboratorField
+                        {isStepped ? (
+                            <>
+                                {step === 0 ? anagraficaSection : null}
+                                {step > 0 ? (
+                                    <InterventionDetailsSection
                                         values={formValues}
                                         errors={errors}
                                         onChange={handleChange}
-                                        collaborators={collaborators}
+                                        part={interventionSteps[step].part}
+                                    />
+                                ) : null}
+                            </>
+                        ) : (
+                            // Da lg in su due colonne, come la modifica del report: a sinistra i dati del
+                            // lavoro, a destra stato e pagamento (vedi `InterventionProgressSection`).
+                            // Sotto lg il riquadro va sotto, a tutta larghezza.
+                            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                                <div className="grid gap-4">
+                                    {anagraficaSection}
+                                    <InterventionDetailsSection
+                                        values={formValues}
+                                        errors={errors}
+                                        onChange={handleChange}
+                                        withoutProgress
                                     />
                                 </div>
-                            </FormSection>
-                        ) : null}
-
-                        {!isStepped ? (
-                            <InterventionDetailsSection values={formValues} errors={errors} onChange={handleChange} />
-                        ) : step > 0 ? (
-                            <InterventionDetailsSection
-                                values={formValues}
-                                errors={errors}
-                                onChange={handleChange}
-                                part={interventionSteps[step].part}
-                            />
-                        ) : null}
+                                <InterventionProgressSection
+                                    values={formValues}
+                                    errors={errors}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        )}
                     </div>
                 }
             />

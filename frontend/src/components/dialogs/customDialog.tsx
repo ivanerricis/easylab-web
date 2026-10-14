@@ -238,8 +238,15 @@ const CustomDialog = ({
                         dello schermo. `-m-1 p-1`: `overflow` taglia anche in orizzontale, e senza
                         quei 4px di margine l'anello del focus e quello rosso dei campi invalidi
                         (3px) restavano tagliati sui bordi. `flex-col` perché i contenuti dei
-                        dialoghi a passi prendono con `flex-1` lo spazio che resta. */}
-                    <div className="-m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1">{content}</div>
+                        dialoghi a passi prendono con `flex-1` lo spazio che resta.
+                        `relative`: ancora qui gli elementi `absolute` dei campi (il `<select>`
+                        nascosto che Radix tiene accanto a ogni menu a tendina, i testi `sr-only`).
+                        Senza un antenato posizionato il loro blocco contenitore era il dialogo, che
+                        non li tagliava: restavano alla loro posizione dentro il corpo scorrevole e
+                        allungavano lo scroll del dialogo stesso: da telefono, un dialogo con più di uno
+                        schermo di campi e due menu a tendina in fondo scorreva per 365px di vuoto,
+                        con due scroll uno dentro l'altro. */}
+                    <div className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1">{content}</div>
 
                     {(showCancelButton || showConfirmButton) && (
                         <DialogFooter className={cn("mt-2", footerClassName)}>

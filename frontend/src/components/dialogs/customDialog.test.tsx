@@ -416,6 +416,8 @@ describe("CustomDialog: altezza entro lo schermo", () => {
 
         expect(dialog).toHaveClass("max-h-[calc(100dvh-2rem)]", "flex", "flex-col");
         const body = screen.getByLabelText("Note").parentElement;
-        expect(body).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+        // `relative`: gli elementi `absolute` dei campi (il `<select>` nascosto di Radix) devono
+        // restare dentro il corpo, che li taglia, e non allungare lo scroll del dialogo.
+        expect(body).toHaveClass("relative", "min-h-0", "flex-1", "overflow-y-auto");
     });
 });

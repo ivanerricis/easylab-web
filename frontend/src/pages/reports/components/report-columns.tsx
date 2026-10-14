@@ -72,6 +72,7 @@ export const reportColumns: ReportColumn[] = [
         // Stessa formulazione della scheda cliente, che questa colonna ce l'aveva già.
         key: "closed",
         header: "Stato",
+        hiddenByDefault: true,
         cardSlot: "badge",
         render: (row) => formatReportStatus(row.closed),
     },

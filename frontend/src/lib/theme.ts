@@ -567,22 +567,37 @@ export const setStoredTableColumnWidths = (tableKey: string, widths: Record<stri
  * larghezze. Si tengono i nomi delle colonne nascoste e non di quelle visibili: una colonna
  * aggiunta in futuro compare da sola, invece di restare nascosta a chi aveva già scelto.
  */
-export const getStoredHiddenColumns = (tableKey: string): string[] => {
+export const getStoredHiddenColumns = (tableKey: string, defaultHiddenKeys: readonly string[] = []): string[] => {
     try {
-        const parsedValue: unknown = JSON.parse(safeStorage.get(`${tableHiddenColumnsStorageKey}:${tableKey}`) ?? "[]");
+        const storedValue = safeStorage.get(`${tableHiddenColumnsStorageKey}:${tableKey}`);
+
+        // Nessuna scelta salvata: valgono le colonne nascoste di default della tabella.
+        if (storedValue == null) {
+            return [...defaultHiddenKeys];
+        }
+
+        const parsedValue: unknown = JSON.parse(storedValue);
 
         return Array.isArray(parsedValue) ? parsedValue.filter((item): item is string => typeof item === "string") : [];
     } catch {
-        return [];
+        return [...defaultHiddenKeys];
     }
 };
 
-export const setStoredHiddenColumns = (tableKey: string, columnKeys: readonly string[]) => {
+export const setStoredHiddenColumns = (
+    tableKey: string,
+    columnKeys: readonly string[],
+    defaultHiddenKeys: readonly string[] = []
+) => {
     const storageKey = `${tableHiddenColumnsStorageKey}:${tableKey}`;
+    const isDefault =
+        columnKeys.length === defaultHiddenKeys.length && columnKeys.every((key) => defaultHiddenKeys.includes(key));
 
     // Senza localStorage (dati del sito bloccati, quota) `safeStorage` non lancia: la scelta
     // vale finché la pagina resta aperta, che è comunque meglio di un errore.
-    if (columnKeys.length === 0) {
+    // Come per le altre preferenze si salva solo ciò che si discosta dal predefinito: anche una
+    // lista vuota, quando di default qualcosa è nascosto ("Mostra tutte" è una scelta).
+    if (isDefault) {
         safeStorage.remove(storageKey);
         return;
     }

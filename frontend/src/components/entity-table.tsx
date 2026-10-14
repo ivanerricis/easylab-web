@@ -32,6 +32,11 @@ export type EntityColumn<TRow> = {
      * riga, come il cliente: senza, la tabella diventa un elenco di valori senza padrone.
      */
     hideable?: boolean;
+    /**
+     * Nascosta finché l'utente non sceglie diversamente dal menu "Colonne": chi ha già una scelta
+     * salvata per la tabella la mantiene.
+     */
+    hiddenByDefault?: boolean;
 };
 
 const ariaSortValue = { asc: "ascending", desc: "descending" } as const;

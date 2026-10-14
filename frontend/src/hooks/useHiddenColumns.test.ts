@@ -87,4 +87,30 @@ describe("useHiddenColumns: mostrare e nascondere", () => {
         expect(getStoredHiddenColumns("customers")).toEqual(["phone"]);
         expect(getStoredHiddenColumns("reports")).toEqual(["password"]);
     });
+
+    describe("con colonne nascoste di default", () => {
+        const defaultColumns = [{ key: "id" }, { key: "closed", hiddenByDefault: true }];
+
+        it("nasconde la colonna finché non c'è una scelta salvata", () => {
+            const { result } = renderHook(() => useHiddenColumns("reports", defaultColumns));
+
+            expect(result.current.hiddenColumnKeys).toEqual(["closed"]);
+        });
+
+        it("ricorda anche 'Mostra tutte', e tornare al predefinito toglie la scelta salvata", () => {
+            const { result, rerender } = renderHook(() => useHiddenColumns("reports", defaultColumns));
+
+            act(() => result.current.showAllColumns());
+            expect(result.current.hiddenColumnKeys).toEqual([]);
+            expect(getStoredHiddenColumns("reports", ["closed"])).toEqual([]);
+
+            rerender();
+            expect(
+                renderHook(() => useHiddenColumns("reports", defaultColumns)).result.current.hiddenColumnKeys
+            ).toEqual([]);
+
+            act(() => result.current.setColumnVisible("closed", false));
+            expect(localStorage.length).toBe(0);
+        });
+    });
 });

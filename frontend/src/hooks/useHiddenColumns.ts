@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { getStoredHiddenColumns, setStoredHiddenColumns } from "@/lib/theme";
 
-type HideableColumn = { key: string; hideable?: boolean };
+type HideableColumn = { key: string; hideable?: boolean; hiddenByDefault?: boolean };
 
 /**
  * Toglie dalle colonne nascoste quelle che non si possono nascondere (`hideable: false`).
@@ -31,7 +31,14 @@ export const withoutLockedColumns = (
  * prossima modifica. Facoltativo: senza, si comporta come prima.
  */
 export const useHiddenColumns = (tableKey: string, columns?: readonly HideableColumn[]) => {
-    const [storedHiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>(() => getStoredHiddenColumns(tableKey));
+    // Le colonne nascoste finché l'utente non sceglie diversamente (`hiddenByDefault`).
+    const defaultHiddenKeys = useMemo(
+        () => (columns ?? []).filter((column) => column.hiddenByDefault).map((column) => column.key),
+        [columns]
+    );
+    const [storedHiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>(() =>
+        getStoredHiddenColumns(tableKey, defaultHiddenKeys)
+    );
     const hiddenColumnKeys = useMemo(
         () => (columns ? withoutLockedColumns(storedHiddenColumnKeys, columns) : storedHiddenColumnKeys),
         [columns, storedHiddenColumnKeys]
@@ -47,17 +54,17 @@ export const useHiddenColumns = (tableKey: string, columns?: readonly HideableCo
                       ? current
                       : [...current, columnKey];
 
-                setStoredHiddenColumns(tableKey, next);
+                setStoredHiddenColumns(tableKey, next, defaultHiddenKeys);
                 return next;
             });
         },
-        [columns, tableKey]
+        [columns, defaultHiddenKeys, tableKey]
     );
 
     const showAllColumns = useCallback(() => {
-        setStoredHiddenColumns(tableKey, []);
+        setStoredHiddenColumns(tableKey, [], defaultHiddenKeys);
         setHiddenColumnKeys([]);
-    }, [tableKey]);
+    }, [defaultHiddenKeys, tableKey]);
 
     return { hiddenColumnKeys, setColumnVisible, showAllColumns };
 };

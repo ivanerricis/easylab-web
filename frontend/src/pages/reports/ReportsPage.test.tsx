@@ -206,10 +206,21 @@ beforeEach(() => {
 });
 
 describe("ReportsPage", () => {
-    it("mostra di default i report aperti, e lo stato di ogni riga", async () => {
+    it("mostra di default i report aperti, con la colonna Stato nascosta", async () => {
         await renderPage();
 
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ visibility: "open" }));
+        expect(within(table()).queryByRole("columnheader", { name: "Stato" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 1 nascoste" })).toBeInTheDocument();
+    });
+
+    it("la colonna Stato si mostra dal menu, e lo stato di ogni riga è scritto", async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
+        await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Stato" }));
+        await userEvent.keyboard("{Escape}");
+
         expect(within(table()).getAllByText("Aperto")).toHaveLength(1);
         expect(within(table()).getByText("Chiuso")).toBeInTheDocument();
     });
@@ -258,7 +269,7 @@ describe("ReportsPage", () => {
     it('col menu "Colonne" aperto, "n" non apre la creazione', async () => {
         await renderPage();
 
-        await userEvent.click(screen.getByRole("button", { name: "Colonne" }));
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
         await screen.findByRole("menu");
         await userEvent.keyboard("n");
 
@@ -449,7 +460,7 @@ describe("ReportsPage", () => {
         const { unmount } = renderWithProviders(<ReportsPage />, { route: "/reports" });
         await within(table()).findByText("Cliente 1");
 
-        await userEvent.click(screen.getByRole("button", { name: "Colonne" }));
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
         // Il cliente identifica la riga: c'è, ma non si toglie.
         expect(screen.getByRole("menuitemcheckbox", { name: "Cliente" })).toHaveAttribute("aria-disabled", "true");
         await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Password" }));
@@ -458,7 +469,7 @@ describe("ReportsPage", () => {
 
         expect(within(table()).queryByRole("columnheader", { name: "Password" })).not.toBeInTheDocument();
         expect(within(table()).queryByRole("columnheader", { name: "Backup dati" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Colonne, 2 nascoste" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 3 nascoste" })).toBeInTheDocument();
         unmount();
 
         renderWithProviders(<ReportsPage />, { route: "/reports" });

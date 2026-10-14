@@ -66,6 +66,11 @@ export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
         render: (row) => row.id,
     },
     {
+        key: "collaborator",
+        header: "Collaboratore",
+        render: (row) => row.collaborator,
+    },
+    {
         key: "type",
         header: "Tipo",
         cardSlot: "title",
@@ -81,11 +86,6 @@ export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
                 endTime={row.endTime}
             />
         ),
-    },
-    {
-        key: "collaborator",
-        header: "Collaboratore",
-        render: (row) => row.collaborator,
     },
     {
         key: "status",

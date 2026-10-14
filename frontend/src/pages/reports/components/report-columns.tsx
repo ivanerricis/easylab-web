@@ -26,16 +26,6 @@ export const reportColumns: ReportColumn[] = [
         render: (row) => <CustomerLink customerId={row.customerId} name={row.customer} tone="inherit" />,
     },
     {
-        // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga
-        // (verde/rosso da reports-table.tsx), quindi l'informazione più importante della
-        // pagina era invisibile a chi non distingue i due colori e spariva in stampa.
-        // Stessa formulazione della scheda cliente, che questa colonna ce l'aveva già.
-        key: "closed",
-        header: "Stato",
-        cardSlot: "badge",
-        render: (row) => formatReportStatus(row.closed),
-    },
-    {
         key: "customerPhone",
         header: "Telefono",
         render: (row) => row.customerPhone ?? "-",
@@ -74,6 +64,16 @@ export const reportColumns: ReportColumn[] = [
         header: "Prezzo totale",
         cardCollapsed: true,
         render: (row) => formatEuro(row.totalPrice),
+    },
+    {
+        // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga
+        // (verde/rosso da reports-table.tsx), quindi l'informazione più importante della
+        // pagina era invisibile a chi non distingue i due colori e spariva in stampa.
+        // Stessa formulazione della scheda cliente, che questa colonna ce l'aveva già.
+        key: "closed",
+        header: "Stato",
+        cardSlot: "badge",
+        render: (row) => formatReportStatus(row.closed),
     },
     {
         key: "createdAt",

@@ -9,7 +9,7 @@
       <stop offset="100%" stop-color="#2A75B9"/>
     </linearGradient>
     <g id="wrench" transform="translate(166 92) rotate(45)">
-      <path d="M-12 -50 H12 L8 -30 H-8 Z"/>
+      <path d="M-8 -30 L0 -62 L8 -30 Z"/>
       <rect x="-8" y="-32" width="16" height="82"/>
       <rect x="-19" y="48" width="38" height="90" rx="15"/>
       <rect x="-11" y="60" width="22" height="66" rx="11" fill="#fff" fill-opacity=".18"/>

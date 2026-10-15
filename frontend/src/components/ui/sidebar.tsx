@@ -244,7 +244,13 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
                     data-slot="sidebar-trigger"
                     variant="outline"
                     size="icon-lg"
-                    className={cn(className)}
+                    // `aria-expanded` qui serve solo allo screen reader: senza questa riga la
+                    // variante `outline` lo leggerebbe come "popover aperto" e scurirebbe il
+                    // pulsante a menu aperto, a differenza di quando è chiuso.
+                    className={cn(
+                        "aria-expanded:bg-card aria-expanded:hover:bg-muted dark:aria-expanded:bg-input/30 dark:aria-expanded:hover:bg-input/50",
+                        className
+                    )}
                     // Dice allo screen reader se il menu è aperto: su mobile conta il pannello a
                     // comparsa, su desktop la barra fissa (che da chiusa resta come colonna di icone).
                     aria-expanded={isMobile ? openMobile : open}

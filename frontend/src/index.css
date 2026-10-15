@@ -283,6 +283,42 @@ body,
     }
 }
 
+/* Ombra sul bordo basso di un contenitore che scorre: dice "c'è altro sotto" dove la
+   scrollbar è un overlay che sparisce (telefono, tablet). Sparisce da sola arrivati in
+   fondo e non compare se non c'è nulla da scorrere: con la timeline `scroll()` inattiva
+   (nessun overflow) l'animazione non si applica e resta l'opacità 0 di base.
+   Solo CSS, sticky in fondo con altezza netta zero (margine negativo) per non allungare
+   il contenuto. Dove `animation-timeline` non esiste (Firefox) non si vede nulla: la
+   scrollbar classica resta l'indizio. */
+@utility scroll-hint-y {
+    @supports (animation-timeline: scroll()) {
+        &::after {
+            content: "";
+            display: block;
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+            height: 1.5rem;
+            margin-top: -1.5rem;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(to top, color-mix(in oklab, var(--foreground) 14%, transparent), transparent);
+            animation: scroll-hint-y linear both;
+            animation-timeline: scroll(nearest block);
+            animation-range: calc(100% - 2rem) 100%;
+        }
+    }
+}
+
+@keyframes scroll-hint-y {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
 /* Edge/IE render their own reveal-password icon inside type="password" fields,
    overlapping our custom show/hide button and intercepting clicks. */
 input[type="password"]::-ms-reveal,

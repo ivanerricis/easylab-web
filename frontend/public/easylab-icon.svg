@@ -16,7 +16,7 @@
     </g>
     <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
       <rect width="256" height="256" fill="#fff"/>
-      <use href="#wrench" fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"/>
+      <use href="#wrench" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
     </mask>
   </defs>
   <rect x="7" y="7" width="242" height="242" rx="56" fill="#F2F8FE" stroke="#9DC2E6" stroke-width="10"/>

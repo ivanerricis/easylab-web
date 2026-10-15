@@ -9,14 +9,14 @@
       <stop offset="100%" stop-color="#2A75B9"/>
     </linearGradient>
     <g id="wrench" transform="translate(166 92) rotate(45)">
-      <path d="M-4.5 -30 L-8.5 -37 L-5.5 -41 L-8.5 -45 L-2.5 -54 H2.5 L8.5 -45 L5.5 -41 L8.5 -37 L4.5 -30 Z"/>
-      <rect x="-4.5" y="-32" width="9" height="82"/>
-      <rect x="-15" y="48" width="30" height="90" rx="13"/>
-      <rect x="-9" y="60" width="18" height="66" rx="9" fill="#fff" fill-opacity=".18"/>
+      <path d="M-12 -50 H12 L8 -30 H-8 Z"/>
+      <rect x="-8" y="-32" width="16" height="82"/>
+      <rect x="-19" y="48" width="38" height="90" rx="15"/>
+      <rect x="-11" y="60" width="22" height="66" rx="11" fill="#fff" fill-opacity=".18"/>
     </g>
     <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
       <rect width="256" height="256" fill="#fff"/>
-      <use href="#wrench" fill="#000" stroke="#000" stroke-width="12" stroke-linejoin="round"/>
+      <use href="#wrench" fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"/>
     </mask>
   </defs>
   <rect x="7" y="7" width="242" height="242" rx="56" fill="#F2F8FE" stroke="#9DC2E6" stroke-width="10"/>

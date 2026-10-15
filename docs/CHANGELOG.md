@@ -26,6 +26,7 @@ data porta alla voce da qui.
 
 - [2026-10-14 — Disattiva e Rigenera: pulsante spento finché password e codice non sono validi](changelog/2026-10.md#2026-10-14-disattiva-e-rigenera-pulsante-spento-finche-password-e-codice-non-sono-validi)
 - [2026-10-14 — Menu a tendina: si aprono sempre sotto il campo](changelog/2026-10.md#2026-10-14-menu-a-tendina-si-aprono-sempre-sotto-il-campo)
+- [2026-10-15 — Icona dell'app: portatile con cacciavite su tessera chiara](changelog/2026-10.md#2026-10-15-icona-dellapp-portatile-con-cacciavite-su-tessera-chiara)
 - [2026-10-14 — Ogni pagina ha il suo scheletro, uguale mentre arriva il codice e mentre arrivano i dati](changelog/2026-10.md#2026-10-14-ogni-pagina-ha-il-suo-scheletro-uguale-mentre-arriva-il-codice-e-mentre-arrivano-i-dati)
 - [2026-10-14 — Scheletri al posto delle rotelline: dashboard, schede di dettaglio e cambio pagina](changelog/2026-10.md#2026-10-14-scheletri-al-posto-delle-rotelline-dashboard-schede-di-dettaglio-e-cambio-pagina)
 - [2026-10-14 — Dialoghi: il titolo lungo non passa più sotto la X](changelog/2026-10.md#2026-10-14-dialoghi-il-titolo-lungo-non-passa-piu-sotto-la-x)

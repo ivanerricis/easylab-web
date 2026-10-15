@@ -156,7 +156,7 @@ export const MainLayout = () => {
                         ref={mainRef}
                         id="contenuto-principale"
                         tabIndex={-1}
-                        className="relative flex min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto p-3 focus:outline-none"
+                        className="scroll-hint-y relative flex min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto p-3 after:-ml-[100%] after:w-full after:self-end focus:outline-none"
                     >
                         {/* Il caricamento delle pagine è già asincrono per conto suo: le rotte sono
                             `lazy` in App.tsx. Qui serve un confine `Suspense` *dentro* il layout,

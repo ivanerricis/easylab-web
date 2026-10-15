@@ -20,7 +20,7 @@
     </mask>
   </defs>
   <rect x="7" y="7" width="242" height="242" rx="56" fill="#F2F8FE" stroke="#9DC2E6" stroke-width="10"/>
-  <g transform="translate(128 128) scale(0.92) translate(-128 -128)">
+  <g transform="translate(128 128) scale(1.02) translate(-128 -128)">
   <g transform="translate(0 9)">
   <g mask="url(#gap)" fill="url(#teal)">
     <path fill-rule="evenodd" d="M62 34 H194 a24 24 0 0 1 24 24 V150 a24 24 0 0 1 -24 24 H62 a24 24 0 0 1 -24 -24 V58 a24 24 0 0 1 24 -24 Z M70 60 a6 6 0 0 0 -6 6 V142 a6 6 0 0 0 6 6 H186 a6 6 0 0 0 6 -6 V66 a6 6 0 0 0 -6 -6 Z"/>

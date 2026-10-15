@@ -1,0 +1,30 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="teal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#245F92"/>
+      <stop offset="100%" stop-color="#1A4A76"/>
+    </linearGradient>
+    <linearGradient id="blue" gradientUnits="userSpaceOnUse" x1="-34" y1="-34" x2="34" y2="140">
+      <stop offset="0%" stop-color="#2F82C6"/>
+      <stop offset="100%" stop-color="#2A75B9"/>
+    </linearGradient>
+    <g id="wrench" transform="translate(166 92) rotate(45)">
+      <path d="M-9 -44 H9 L5 -30 H-5 Z"/>
+      <rect x="-4.5" y="-32" width="9" height="82"/>
+      <rect x="-15" y="48" width="30" height="90" rx="13"/>
+      <rect x="-9" y="60" width="18" height="66" rx="9" fill="#fff" fill-opacity=".18"/>
+    </g>
+    <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
+      <rect width="256" height="256" fill="#fff"/>
+      <use href="#wrench" fill="#000" stroke="#000" stroke-width="22" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+
+  <g transform="translate(0 9)">
+  <g mask="url(#gap)" fill="url(#teal)">
+    <path fill-rule="evenodd" d="M62 34 H194 a24 24 0 0 1 24 24 V150 a24 24 0 0 1 -24 24 H62 a24 24 0 0 1 -24 -24 V58 a24 24 0 0 1 24 -24 Z M62 52 a6 6 0 0 0 -6 6 V150 a6 6 0 0 0 6 6 H194 a6 6 0 0 0 6 -6 V58 a6 6 0 0 0 -6 -6 Z"/>
+    <path d="M18 184 H238 V190 a14 14 0 0 1 -14 14 H32 a14 14 0 0 1 -14 -14 Z"/>
+  </g>
+  <use href="#wrench" fill="url(#blue)"/>
+  </g>
+</svg>

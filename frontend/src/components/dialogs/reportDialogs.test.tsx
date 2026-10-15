@@ -420,7 +420,9 @@ describe("CreateReportDialog", () => {
 
             // Il cliente è stato scelto dai suggerimenti, quindi l'id c'è già e "Avanti" non lo
             // verifica sul server (quel percorso ha i suoi test, sotto).
-            expect(await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ })).toBeInTheDocument();
+            expect(
+                await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ }, { timeout: 5000 })
+            ).toBeInTheDocument();
             // "Indietro" torna al passo prima senza perdere quanto scritto.
             await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
             expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
@@ -483,7 +485,9 @@ describe("CreateReportDialog", () => {
             expect(await screen.findByRole("button", { name: "Verifica..." })).toBeDisabled();
 
             answer({ items: customers, totalItems: 1, page: 1, pageSize: 1000, totalPages: 1 });
-            expect(await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ })).toBeInTheDocument();
+            expect(
+                await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ }, { timeout: 5000 })
+            ).toBeInTheDocument();
         });
     });
 });

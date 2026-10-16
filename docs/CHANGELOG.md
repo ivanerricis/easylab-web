@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-16 — Il dialogo "Cambia password" avvisa che gli altri dispositivi vengono disconnessi](changelog/2026-10.md#2026-10-16-il-dialogo-cambia-password-avvisa-che-gli-altri-dispositivi-vengono-disconnessi)
 - [2026-10-14 — Disattiva e Rigenera: pulsante spento finché password e codice non sono validi](changelog/2026-10.md#2026-10-14-disattiva-e-rigenera-pulsante-spento-finche-password-e-codice-non-sono-validi)
 - [2026-10-14 — Menu a tendina: si aprono sempre sotto il campo](changelog/2026-10.md#2026-10-14-menu-a-tendina-si-aprono-sempre-sotto-il-campo)
 - [2026-10-15 — Icona dell'app: portatile con cacciavite su tessera chiara](changelog/2026-10.md#2026-10-15-icona-dellapp-portatile-con-cacciavite-su-tessera-chiara)

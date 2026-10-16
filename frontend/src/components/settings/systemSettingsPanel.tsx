@@ -13,9 +13,7 @@ import { getApiErrorMessage, getSystemStatus, type SystemDiskDto, type SystemSta
 import { cn, formatDateTime, formatFileSize } from "@/lib/utils";
 
 const usedPercent = (disk: SystemDiskDto) =>
-    disk.totalBytes > 0
-        ? Math.min(100, Math.max(0, Math.round(((disk.totalBytes - disk.freeBytes) / disk.totalBytes) * 100)))
-        : 0;
+    disk.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round((disk.usedBytes / disk.totalBytes) * 100))) : 0;
 
 // Il valore del riquadro porta anche la barra: `SettingsTile` non ha uno spazio per contenuti
 // extra, e la barra fa parte di quel valore ("quanto è pieno"). Gli `span` a blocco evitano
@@ -27,7 +25,9 @@ const DiskValue = ({ disk }: { disk: SystemDiskDto }) => {
     return (
         <>
             <span className="block">
-                {formatFileSize(disk.freeBytes)} liberi su {formatFileSize(disk.totalBytes)}
+                {/* Usato e non libero: è il numero di Proxmox e di `df`, mentre il libero dell'API
+                    esclude il 5% riservato a root e non tornerebbe con quei due. */}
+                {formatFileSize(disk.usedBytes)} usati su {formatFileSize(disk.totalBytes)} ({percent}%)
             </span>
             <span
                 role="progressbar"
@@ -90,7 +90,7 @@ const SystemSettingsPanel = () => {
         <SettingsSection>
             <SettingsCard
                 title="Spazio su disco"
-                description="Spazio libero sul server e dimensione del database."
+                description="Occupazione dei dischi del server e dimensione del database."
                 action={<RefreshButton size="icon" onRefresh={loadStatus} label="Aggiorna stato del sistema" />}
             >
                 {isLoading ? (

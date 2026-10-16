@@ -25,6 +25,12 @@ export type DiskStatus = {
     key: "data" | "backups";
     label: string;
     totalBytes: number;
+    /**
+     * Occupato come lo contano `df` e Proxmox: totale meno blocchi liberi, compresi quelli che
+     * ext4 riserva a root (il 5%). È il numero da mostrare, per ritrovarlo uguale altrove.
+     */
+    usedBytes: number;
+    /** Libero per chi non è root, cioè per Postgres e per il backend: su questo si decide `low`. */
     freeBytes: number;
     low: boolean;
 };
@@ -59,6 +65,7 @@ const readDisk = async (key: DiskStatus["key"], label: string, folder: string): 
         const [stats, fsStats] = await Promise.all([fs.promises.stat(folder), fs.promises.statfs(folder)]);
         const totalBytes = Number(fsStats.blocks) * Number(fsStats.bsize);
         const freeBytes = Number(fsStats.bavail) * Number(fsStats.bsize);
+        const usedBytes = totalBytes - Number(fsStats.bfree) * Number(fsStats.bsize);
 
         // Un filesystem virtuale può dichiarare zero blocchi: niente da mostrare, e la
         // percentuale dell'avviso verrebbe NaN.
@@ -70,6 +77,7 @@ const readDisk = async (key: DiskStatus["key"], label: string, folder: string): 
             key,
             label,
             totalBytes,
+            usedBytes,
             freeBytes,
             low: freeBytes < totalBytes * lowFreeSpaceRatio || freeBytes < lowFreeSpaceBytes,
             dev: stats.dev,
@@ -126,8 +134,9 @@ export const resetDiskSpaceAlerts = () => {
 };
 
 const alertLowDisk = async (disk: DiskStatus) => {
-    const percent = Math.round((disk.freeBytes / disk.totalBytes) * 100);
-    const message = `${disk.label}: liberi ${formatBytes(disk.freeBytes)} su ${formatBytes(disk.totalBytes)} (${percent}%).`;
+    // Gli stessi numeri della sezione Sistema e di Proxmox: chi riceve l'avviso li ritrova uguali.
+    const percent = Math.round((disk.usedBytes / disk.totalBytes) * 100);
+    const message = `${disk.label}: usati ${formatBytes(disk.usedBytes)} su ${formatBytes(disk.totalBytes)} (${percent}%).`;
     const title = "Spazio su disco in esaurimento";
 
     await recordNotification({

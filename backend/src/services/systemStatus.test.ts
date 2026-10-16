@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stat = vi.fn<(folder: string) => Promise<{ dev: number }>>();
-const statfs = vi.fn<(folder: string) => Promise<{ blocks: number; bsize: number; bavail: number }>>();
+const statfs = vi.fn<(folder: string) => Promise<{ blocks: number; bsize: number; bavail: number; bfree: number }>>();
 
 vi.mock("node:fs", () => ({
     default: {
@@ -46,10 +46,12 @@ const GiB = 1024 ** 3;
 const bsize = 4096;
 
 // Un disco descritto in byte: blocchi e blocchi liberi se ne ricavano con la stessa dimensione di blocco.
-const disk = (totalBytes: number, freeBytes: number) => ({
+// `reservedBytes` è la parte libera che ext4 tiene per root: conta in `bfree` ma non in `bavail`.
+const disk = (totalBytes: number, freeBytes: number, reservedBytes = 0) => ({
     blocks: totalBytes / bsize,
     bsize,
     bavail: freeBytes / bsize,
+    bfree: (freeBytes + reservedBytes) / bsize,
 });
 
 const isBackups = (folder: string) => folder.endsWith("backups");
@@ -79,7 +81,23 @@ describe("getSystemStatus: dischi", () => {
     it("calcola totale e libero dai blocchi", async () => {
         const { disks } = await getSystemStatus();
 
-        expect(disks[0]).toMatchObject({ key: "data", totalBytes: 500 * GiB, freeBytes: 400 * GiB, low: false });
+        expect(disks[0]).toMatchObject({
+            key: "data",
+            totalBytes: 500 * GiB,
+            usedBytes: 100 * GiB,
+            freeBytes: 400 * GiB,
+            low: false,
+        });
+    });
+
+    // Il caso del CT di produzione (2026-10-16): Proxmox diceva 7,39 GiB usati su 19,52, la sezione
+    // ne ricavava 8,4 dal libero per i non root. L'usato si conta come Proxmox, la soglia no.
+    it("conta come libero, nell'usato, lo spazio riservato a root, ma non per la soglia", async () => {
+        givenDisks(disk(20 * GiB, 1.5 * GiB, 1 * GiB));
+
+        const [data] = (await getSystemStatus()).disks;
+
+        expect(data).toMatchObject({ usedBytes: 17.5 * GiB, freeBytes: 1.5 * GiB, low: true });
     });
 
     it("segnala come basso un disco con meno del 10% libero", async () => {
@@ -134,7 +152,7 @@ describe("getSystemStatus: dischi", () => {
     });
 
     it("salta un filesystem che dichiara zero blocchi", async () => {
-        givenDisks(disk(500 * GiB, 400 * GiB), { blocks: 0, bsize: 4096, bavail: 0 });
+        givenDisks(disk(500 * GiB, 400 * GiB), { blocks: 0, bsize: 4096, bavail: 0, bfree: 0 });
 
         const { disks } = await getSystemStatus();
 
@@ -180,7 +198,7 @@ describe("checkDiskSpace", () => {
             dedupeKey: "low-disk-space:data",
             severity: "warning",
             title: "Spazio su disco in esaurimento",
-            message: "Disco del server: liberi 5,0 GB su 100 GB (5%).",
+            message: "Disco del server: usati 95,0 GB su 100 GB (95%).",
             link: "/settings?section=system",
         });
         expect(sendAlertEmail).toHaveBeenCalledTimes(1);

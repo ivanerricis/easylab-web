@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Ottobre 2026
 
+- [2026-10-16 — Sistema: l'occupazione del disco si conta come Proxmox](changelog/2026-10.md#2026-10-16-sistema-loccupazione-del-disco-si-conta-come-proxmox)
 - [2026-10-16 — Impostazioni → Sistema: spazio su disco, dimensione del database e avviso quando si riempie](changelog/2026-10.md#2026-10-16-impostazioni-sistema-spazio-su-disco-dimensione-del-database-e-avviso-quando-si-riempie)
 - [2026-10-16 — Email per gli avvisi tecnici separata da quella dell'azienda](changelog/2026-10.md#2026-10-16-email-per-gli-avvisi-tecnici-separata-da-quella-dellazienda)
 - [2026-10-16 — Il dialogo "Cambia password" avvisa che gli altri dispositivi vengono disconnessi](changelog/2026-10.md#2026-10-16-il-dialogo-cambia-password-avvisa-che-gli-altri-dispositivi-vengono-disconnessi)

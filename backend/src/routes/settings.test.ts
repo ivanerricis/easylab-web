@@ -42,7 +42,9 @@ vi.mock("../services/logManager", () => ({
 }));
 vi.mock("../services/systemStatus", () => ({
     getSystemStatus: vi.fn().mockResolvedValue({
-        disks: [{ key: "data", label: "Disco del server", totalBytes: 1000, freeBytes: 500, low: false }],
+        disks: [
+            { key: "data", label: "Disco del server", totalBytes: 1000, usedBytes: 450, freeBytes: 500, low: false },
+        ],
         databaseSizeBytes: 42,
         checkedAt: "2026-10-16T10:00:00.000Z",
     }),
@@ -172,7 +174,16 @@ describe("settings router: permessi", () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
-            disks: [{ key: "data", label: "Disco del server", totalBytes: 1000, freeBytes: 500, low: false }],
+            disks: [
+                {
+                    key: "data",
+                    label: "Disco del server",
+                    totalBytes: 1000,
+                    usedBytes: 450,
+                    freeBytes: 500,
+                    low: false,
+                },
+            ],
             databaseSizeBytes: 42,
             checkedAt: "2026-10-16T10:00:00.000Z",
         });

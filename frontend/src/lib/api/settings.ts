@@ -259,6 +259,9 @@ export type SystemDiskDto = {
     key: "data" | "backups";
     label: string;
     totalBytes: number;
+    // Come lo contano Proxmox e `df`, riservato a root compreso nel libero: è quello da mostrare.
+    usedBytes: number;
+    // Libero per chi non è root (Postgres, backend): su questo il backend calcola `low`.
     freeBytes: number;
     // Vero sotto il 10% del totale o sotto i 2 GiB liberi: lo decide il backend.
     low: boolean;

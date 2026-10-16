@@ -28,7 +28,9 @@ const GiB = 1024 * 1024 * 1024;
 const diskLabel = "Disco del server (dati e backup)";
 
 const status = {
-    disks: [{ key: "data", label: diskLabel, totalBytes: 100 * GiB, freeBytes: 60 * GiB, low: false }],
+    disks: [
+        { key: "data", label: diskLabel, totalBytes: 100 * GiB, usedBytes: 40 * GiB, freeBytes: 60 * GiB, low: false },
+    ],
     databaseSizeBytes: 5 * 1024 * 1024,
     checkedAt: "2026-10-16T08:00:00.000Z",
 };
@@ -43,7 +45,7 @@ describe("SystemSettingsPanel", () => {
         renderWithProviders(<SystemSettingsPanel />);
 
         expect(await screen.findByText(diskLabel)).toBeInTheDocument();
-        expect(screen.getByText("60.0 GB liberi su 100.0 GB")).toBeInTheDocument();
+        expect(screen.getByText("40.0 GB usati su 100.0 GB (40%)")).toBeInTheDocument();
         expect(screen.getByText("5.0 MB")).toBeInTheDocument();
         expect(screen.getByText(/Ultimo controllo:/)).toBeInTheDocument();
         expect(screen.queryByText(/Libera spazio o sposta i backup/)).not.toBeInTheDocument();
@@ -61,7 +63,7 @@ describe("SystemSettingsPanel", () => {
     it("con un disco in esaurimento mostra l'avviso", async () => {
         api.getSystemStatus.mockResolvedValue({
             ...status,
-            disks: [{ ...status.disks[0], freeBytes: 1 * GiB, low: true }],
+            disks: [{ ...status.disks[0], usedBytes: 98 * GiB, freeBytes: 1 * GiB, low: true }],
         });
         renderWithProviders(<SystemSettingsPanel />);
 

@@ -19,7 +19,7 @@ import { cn, formatDateTime, formatRelativeTime } from "@/lib/utils";
  * uscire: prima era indistinguibile da quella in uso, ed è il motivo per cui tutte le
  * sessioni vecchie sembravano attive.
  */
-export const staleSessionMs = 24 * 60 * 60 * 1000;
+const staleSessionMs = 24 * 60 * 60 * 1000;
 
 type SessionsListProps = {
     sessions: SessionDto[];

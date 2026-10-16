@@ -378,9 +378,7 @@ const GlobalSearch = () => {
                                             </span>
                                             <span className="truncate text-xs text-muted-foreground">
                                                 {formatInterventionType(intervention.type)}
-                                                {intervention.interventionDate
-                                                    ? ` · ${formatDate(intervention.interventionDate)}`
-                                                    : ""}
+                                                {` · ${formatDate(intervention.interventionDate)}`}
                                             </span>
                                         </div>
                                         <CommandShortcut className="tracking-normal">

@@ -1,6 +1,5 @@
 import type { TechnicianDto } from "@/types/dtos";
 import { createEntityApi } from "./client";
-import type { EntityListParams } from "./client";
 
 export type TechnicianCreateInput = {
     firstName: string;
@@ -10,8 +9,6 @@ export type TechnicianCreateInput = {
 };
 
 export type TechnicianUpdateInput = Partial<TechnicianCreateInput>;
-
-export type ListTechniciansParams = EntityListParams;
 
 // Le chiamate vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano solo i nomi
 // che il resto dell'app già usa.

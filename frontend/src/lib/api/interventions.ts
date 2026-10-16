@@ -17,7 +17,7 @@ export type InterventionEntityDto = {
     /** Indipendente da `paid`: dice se va emessa fattura, non se è stato incassato. */
     toInvoice: boolean;
     status: InterventionStatus;
-    interventionDate: string | null;
+    interventionDate: string;
     startTime: string | null;
     endTime: string | null;
     customerId: number;

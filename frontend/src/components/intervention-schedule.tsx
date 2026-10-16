@@ -2,21 +2,17 @@ import { formatInterventionTime } from "@/lib/interventions";
 import { formatDate } from "@/lib/utils";
 
 type InterventionScheduleProps = {
-    interventionDate: string | null;
+    interventionDate: string;
     startTime: string | null;
     endTime: string | null;
 };
 
 /**
- * Data e orario di un intervento: "12/09/2026 09:00-10:30", solo la data se mancano gli orari, "-"
- * senza data. Era scritto uguale in quattro punti: le colonne "Data/Orario" dell'elenco interventi
- * e delle schede di cliente e collaboratore, e il popover del calendario (lì con un "·" in mezzo).
+ * Data e orario di un intervento: "12/09/2026 09:00-10:30", solo la data se mancano gli orari.
+ * Era scritto uguale in quattro punti: le colonne "Data/Orario" dell'elenco interventi e delle
+ * schede di cliente e collaboratore, e il popover del calendario (lì con un "·" in mezzo).
  */
 const InterventionSchedule = ({ interventionDate, startTime, endTime }: InterventionScheduleProps) => {
-    if (!interventionDate) {
-        return "-";
-    }
-
     if (!startTime || !endTime) {
         return formatDate(interventionDate);
     }

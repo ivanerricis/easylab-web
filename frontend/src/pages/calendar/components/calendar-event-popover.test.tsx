@@ -130,16 +130,13 @@ describe("CalendarEventWrapper", () => {
         expect(screen.getByText("Anna Bianchi")).toBeInTheDocument();
     });
 
-    it.each([
-        ["senza orario solo la data", { endTime: null }, "14/09/2026"],
-        ["senza data un trattino", { interventionDate: null }, "-"],
-    ])("%s", async (_label, overrides, expected) => {
-        renderWrapper({ ...intervention, ...overrides });
+    it("senza orario mostra solo la data", async () => {
+        renderWrapper({ ...intervention, endTime: null });
 
         fireEvent.mouseEnter(anchor());
 
         const when = await screen.findByText("Quando:");
-        expect(when.parentElement).toHaveTextContent(`Quando: ${expected}`);
+        expect(when.parentElement).toHaveTextContent("Quando: 14/09/2026");
     });
 
     it("senza descrizione non lascia una riga vuota", async () => {

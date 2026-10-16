@@ -98,26 +98,20 @@ describe("useCalendarInterventions", () => {
         expect(event.allDay).toBeUndefined();
     });
 
-    it("mette a giornata intera le consegne senza orario e i record senza data", async () => {
+    it("mette a giornata intera le consegne senza orario", async () => {
         listInterventions.mockResolvedValue(
-            page([
-                buildIntervention({ id: 1, type: "material_delivery", startTime: null, endTime: null }),
-                buildIntervention({ id: 2, interventionDate: null, startTime: null, endTime: null }),
-            ])
+            page([buildIntervention({ id: 1, type: "material_delivery", startTime: null, endTime: null })])
         );
 
         const { result } = renderHook(() => useCalendarInterventions(september));
 
         await waitFor(() => {
-            expect(result.current.events).toHaveLength(2);
+            expect(result.current.events).toHaveLength(1);
         });
 
-        const [delivery, legacy] = result.current.events;
+        const [delivery] = result.current.events;
         expect(delivery.allDay).toBe(true);
         expect(delivery.start).toEqual(new Date(2026, 8, 11));
-        // Ripiego sulla data di creazione per i record nati prima del campo data.
-        expect(legacy.allDay).toBe(true);
-        expect(legacy.start).toEqual(new Date("2026-09-01T08:00:00.000Z"));
     });
 
     /** Un calendario che tace e ne mostra solo una parte è il difetto che l'hook ha corretto. */

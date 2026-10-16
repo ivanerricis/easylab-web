@@ -63,12 +63,6 @@ describe("colonne degli interventi del collaboratore", () => {
         expect(cell()).toHaveTextContent(/^14\/09\/2026$/);
     });
 
-    it("Data/Orario: senza data un trattino", () => {
-        renderCell(collaboratorInterventionColumns, "schedule", { ...intervention, interventionDate: null });
-
-        expect(cell()).toHaveTextContent(/^-$/);
-    });
-
     it("il tipo in parole, e un trattino al posto del telefono mancante", () => {
         const { unmount } = renderCell(collaboratorInterventionColumns, "type", intervention);
         expect(cell()).toHaveTextContent("Intervento in sede");

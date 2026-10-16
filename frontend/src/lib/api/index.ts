@@ -1,5 +1,3 @@
-export { api } from "./client";
-
 export * from "./errors";
 export * from "./customers";
 export * from "./collaborators";

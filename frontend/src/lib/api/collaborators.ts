@@ -1,6 +1,5 @@
 import type { CollaboratorDto } from "@/types/dtos";
 import { api, createEntityApi } from "./client";
-import type { EntityListParams } from "./client";
 
 export type CollaboratorCreateInput = {
     firstName: string;
@@ -9,8 +8,6 @@ export type CollaboratorCreateInput = {
 };
 
 export type CollaboratorUpdateInput = Partial<CollaboratorCreateInput>;
-
-export type ListCollaboratorsParams = EntityListParams;
 
 // Le chiamate CRUD vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano i nomi
 // che il resto dell'app già usa e le rotte proprie dei collaboratori (le stampe).

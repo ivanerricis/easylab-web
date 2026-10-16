@@ -18,7 +18,7 @@ const toEventDate = (interventionDate: string, time: string) => new Date(`${inte
 const toCalendarEvent = (intervention: InterventionDto): InterventionCalendarEvent => {
     const title = `${intervention.customer} · ${formatInterventionType(intervention.type)}`;
 
-    if (intervention.interventionDate && intervention.startTime && intervention.endTime) {
+    if (intervention.startTime && intervention.endTime) {
         return {
             id: intervention.id,
             title,
@@ -28,18 +28,14 @@ const toCalendarEvent = (intervention: InterventionDto): InterventionCalendarEve
         };
     }
 
-    // Le consegne materiale hanno solo una data (senza orario). I record creati prima
-    // dell'introduzione di questo campo non hanno interventionDate: in quel caso si usa
-    // la data di creazione come ripiego.
-    const fallbackDate = intervention.interventionDate
-        ? new Date(`${intervention.interventionDate}T00:00:00`)
-        : new Date(intervention.createdAt);
+    // Le consegne materiale hanno solo una data (senza orario): evento a giornata intera.
+    const day = new Date(`${intervention.interventionDate}T00:00:00`);
 
     return {
         id: intervention.id,
         title,
-        start: fallbackDate,
-        end: fallbackDate,
+        start: day,
+        end: day,
         allDay: true,
         resource: intervention,
     };

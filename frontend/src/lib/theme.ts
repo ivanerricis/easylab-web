@@ -11,11 +11,6 @@ export type ThemeAccentPreset = {
     primaryForeground: string;
     sidebarPrimary: string;
     sidebarPrimaryForeground: string;
-    chart1: string;
-    chart2: string;
-    chart3: string;
-    chart4: string;
-    chart5: string;
 };
 
 export type TableRowIntensityKey = "soft" | "default" | "medium" | "strong";
@@ -203,11 +198,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.977 0.013 236.62)",
         sidebarPrimary: "#2A75B9",
         sidebarPrimaryForeground: "oklch(0.977 0.013 236.62)",
-        chart1: "oklch(0.78 0.16 84)",
-        chart2: "oklch(0.72 0.18 152)",
-        chart3: "oklch(0.68 0.16 32)",
-        chart4: "oklch(0.64 0.15 195)",
-        chart5: "oklch(0.58 0.14 18)",
     },
     {
         key: "ocean",
@@ -217,11 +207,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#0F766E",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.72 0.18 182)",
-        chart2: "oklch(0.68 0.16 152)",
-        chart3: "oklch(0.68 0.14 210)",
-        chart4: "oklch(0.64 0.12 250)",
-        chart5: "oklch(0.58 0.12 190)",
     },
     {
         key: "forest",
@@ -231,11 +216,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#2F855A",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.72 0.18 145)",
-        chart2: "oklch(0.68 0.14 165)",
-        chart3: "oklch(0.66 0.12 110)",
-        chart4: "oklch(0.64 0.12 75)",
-        chart5: "oklch(0.58 0.12 135)",
     },
     {
         key: "olive",
@@ -245,11 +225,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#57801F",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.72 0.16 130)",
-        chart2: "oklch(0.7 0.15 100)",
-        chart3: "oklch(0.66 0.13 160)",
-        chart4: "oklch(0.64 0.13 75)",
-        chart5: "oklch(0.58 0.12 140)",
     },
     {
         key: "amber",
@@ -259,11 +234,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#B7791F",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.76 0.16 80)",
-        chart2: "oklch(0.72 0.17 45)",
-        chart3: "oklch(0.68 0.12 100)",
-        chart4: "oklch(0.64 0.14 20)",
-        chart5: "oklch(0.58 0.11 55)",
     },
     {
         key: "brick",
@@ -273,11 +243,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#B34432",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.7 0.16 32)",
-        chart2: "oklch(0.72 0.15 62)",
-        chart3: "oklch(0.66 0.14 12)",
-        chart4: "oklch(0.64 0.12 92)",
-        chart5: "oklch(0.58 0.13 22)",
     },
     {
         key: "rose",
@@ -287,11 +252,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#C05678",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.7 0.16 350)",
-        chart2: "oklch(0.66 0.14 20)",
-        chart3: "oklch(0.62 0.12 320)",
-        chart4: "oklch(0.6 0.12 30)",
-        chart5: "oklch(0.56 0.1 355)",
     },
     {
         key: "violet",
@@ -301,11 +261,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         primaryForeground: "oklch(0.985 0 0)",
         sidebarPrimary: "#6D4AAF",
         sidebarPrimaryForeground: "oklch(0.985 0 0)",
-        chart1: "oklch(0.72 0.16 296)",
-        chart2: "oklch(0.68 0.15 326)",
-        chart3: "oklch(0.66 0.13 266)",
-        chart4: "oklch(0.64 0.12 236)",
-        chart5: "oklch(0.58 0.13 306)",
     },
     {
         key: "graphite",
@@ -318,11 +273,6 @@ export const themeAccentPresets: ThemeAccentPreset[] = [
         // Le serie dei grafici restano distinguibili anche qui: un accento neutro non è una
         // richiesta di grafici grigi, che sarebbero illeggibili. La saturazione è bassa —
         // il tono sobrio resta — ma le tinte sono ben separate fra loro.
-        chart1: "oklch(0.7 0.09 261)",
-        chart2: "oklch(0.72 0.1 200)",
-        chart3: "oklch(0.66 0.09 320)",
-        chart4: "oklch(0.62 0.1 150)",
-        chart5: "oklch(0.58 0.08 40)",
     },
 ];
 
@@ -364,11 +314,6 @@ const accentCssVariables = [
     "--primary-foreground",
     "--sidebar-primary",
     "--sidebar-primary-foreground",
-    "--chart-1",
-    "--chart-2",
-    "--chart-3",
-    "--chart-4",
-    "--chart-5",
 ] as const;
 
 // Le cinque preferenze d'aspetto (accento, intensità righe, raggio, densità, dimensione testo)
@@ -394,11 +339,6 @@ const appearancePreferences: {
             root.style.setProperty("--primary-foreground", preset.primaryForeground);
             root.style.setProperty("--sidebar-primary", preset.sidebarPrimary);
             root.style.setProperty("--sidebar-primary-foreground", preset.sidebarPrimaryForeground);
-            root.style.setProperty("--chart-1", preset.chart1);
-            root.style.setProperty("--chart-2", preset.chart2);
-            root.style.setProperty("--chart-3", preset.chart3);
-            root.style.setProperty("--chart-4", preset.chart4);
-            root.style.setProperty("--chart-5", preset.chart5);
         },
         reset: () => {
             const root = getThemeRoot();

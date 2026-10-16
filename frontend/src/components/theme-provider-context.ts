@@ -7,7 +7,7 @@ export type ThemeProviderState = {
     setTheme: (theme: Theme) => void;
 };
 
-export const initialThemeProviderState: ThemeProviderState = {
+const initialThemeProviderState: ThemeProviderState = {
     theme: "system",
     setTheme: () => null,
 };

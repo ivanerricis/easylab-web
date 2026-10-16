@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { fieldProps } from "@/lib/formField";
 
 /** Lo stesso tetto del server (`deviceNameBodySchema`). */
-export const deviceNameMaxLength = 60;
+const deviceNameMaxLength = 60;
 
 type Props = {
     open: boolean;

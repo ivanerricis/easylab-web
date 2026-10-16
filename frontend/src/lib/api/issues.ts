@@ -1,14 +1,11 @@
 import type { IssueDto } from "@/types/dtos";
 import { createEntityApi } from "./client";
-import type { EntityListParams } from "./client";
 
 export type IssueCreateInput = {
     description: string;
 };
 
 export type IssueUpdateInput = Partial<IssueCreateInput>;
-
-export type ListIssuesParams = EntityListParams;
 
 // Le chiamate vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano solo i nomi
 // che il resto dell'app già usa.

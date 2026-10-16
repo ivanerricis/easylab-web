@@ -144,10 +144,10 @@ describe("palette dei colori principali", () => {
     /**
      * Ogni variabile è confrontata con il campo da cui deve arrivare, non solo con "non
      * vuota": così il test coglie anche un'assegnazione incrociata dentro
-     * `applyPreference("accent", …)` (per esempio `--chart-4` scritta con `chart3`), che a valore
+     * `applyPreference("accent", …)` (per esempio `--primary` scritta con `primaryForeground`), che a valore
      * non vuoto passerebbe inosservata.
      */
-    it("ogni preset scrive tutte e nove le variabili CSS con i propri valori", () => {
+    it("ogni preset scrive tutte e quattro le variabili CSS con i propri valori", () => {
         for (const preset of themeAccentPresets.filter((item) => item.key !== "default")) {
             document.documentElement.removeAttribute("style");
             applyPreference("accent", preset.key);
@@ -157,11 +157,6 @@ describe("palette dei colori principali", () => {
                 ["--primary-foreground", preset.primaryForeground],
                 ["--sidebar-primary", preset.sidebarPrimary],
                 ["--sidebar-primary-foreground", preset.sidebarPrimaryForeground],
-                ["--chart-1", preset.chart1],
-                ["--chart-2", preset.chart2],
-                ["--chart-3", preset.chart3],
-                ["--chart-4", preset.chart4],
-                ["--chart-5", preset.chart5],
             ];
 
             for (const [variabile, atteso] of attese) {
@@ -197,7 +192,6 @@ describe("applicazione del tema al DOM", () => {
 
         const root = document.documentElement;
         expect(root.style.getPropertyValue("--primary")).toBe(ocean!.primary);
-        expect(root.style.getPropertyValue("--chart-1")).toBe(ocean!.chart1);
     });
 
     /**
@@ -211,7 +205,6 @@ describe("applicazione del tema al DOM", () => {
         const root = document.documentElement;
         expect(root.style.getPropertyValue("--primary")).toBe("");
         expect(root.style.getPropertyValue("--sidebar-primary")).toBe("");
-        expect(root.style.getPropertyValue("--chart-5")).toBe("");
     });
 
     it("ignora un preset sconosciuto senza toccare il DOM", () => {

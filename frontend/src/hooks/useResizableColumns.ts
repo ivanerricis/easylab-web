@@ -60,7 +60,7 @@ type UseResizableColumnsOptions = {
  * mobile, oppure non ancora in pagina: sono i casi in cui congelare le misure vorrebbe dire
  * congelare delle colonne larghe zero.
  */
-export const measureNaturalWidths = (
+const measureNaturalWidths = (
     table: HTMLTableElement,
     columnKeys: string[],
     { fitToContainer = false }: { fitToContainer?: boolean } = {}

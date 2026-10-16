@@ -87,7 +87,7 @@ export type InterventionDto = {
     /** Assente finché l'intervento è solo scheduled: il lavoro non è ancora stato svolto. */
     description: string | null;
     status: InterventionStatus;
-    interventionDate: string | null;
+    interventionDate: string;
     startTime: string | null;
     endTime: string | null;
     customerId: number;

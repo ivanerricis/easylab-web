@@ -128,7 +128,7 @@ const EditInterventionDialog = ({
                     paid: intervention.paid,
                     toInvoice: intervention.toInvoice,
                     collaboratorId: String(intervention.collaboratorId),
-                    interventionDate: intervention.interventionDate ?? "",
+                    interventionDate: intervention.interventionDate,
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
                     endTime: intervention.endTime?.slice(0, 5) ?? "",
                 };

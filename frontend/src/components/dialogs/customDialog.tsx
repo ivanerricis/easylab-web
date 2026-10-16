@@ -9,7 +9,6 @@ type Props = Readonly<{
     content?: ReactNode;
     contentClassName?: string;
     /** Classi in più per la riga dei pulsanti. */
-    footerClassName?: string;
 
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -94,7 +93,6 @@ const CustomDialog = ({
     onOpenAutoFocus,
     isDirty = false,
     contentClassName,
-    footerClassName,
 }: Props) => {
     const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
     const keepEditingButtonRef = useRef<HTMLButtonElement>(null);
@@ -323,7 +321,7 @@ const CustomDialog = ({
                     </div>
 
                     {(showCancelButton || showConfirmButton) && (
-                        <DialogFooter className={cn("mt-2 flex-row *:flex-1 sm:*:flex-none", footerClassName)}>
+                        <DialogFooter className={cn("mt-2 flex-row *:flex-1 sm:*:flex-none")}>
                             {showCancelButton && (
                                 <Button
                                     type="button"

@@ -45,11 +45,6 @@ body,
     --color-status-yellow-foreground: var(--status-yellow-foreground);
     --color-status-green: var(--status-green);
     --color-status-green-foreground: var(--status-green-foreground);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
     --color-focus-ring: var(--focus-ring);
     --color-primary-text: var(--primary-text);
@@ -168,11 +163,6 @@ body,
        era un grigio chiaro (sotto 3:1) e le preimpostazioni di colore ne scrivevano uno loro; da
        quando il focus usa `--focus-ring` non lo leggeva più nessuno. */
     --ring: var(--focus-ring);
-    --chart-1: oklch(0.78 0.16 84);
-    --chart-2: oklch(0.72 0.18 152);
-    --chart-3: oklch(0.68 0.16 32);
-    --chart-4: oklch(0.64 0.15 195);
-    --chart-5: oklch(0.58 0.14 18);
     /* 0.45rem: 5.8px su input e pulsanti (md), 7.2px (lg), 10px su card e dialog (xl).
      Con 0.3375rem le card avevano ~7px e sembravano rigide. */
     --radius: 0.45rem;
@@ -227,11 +217,6 @@ body,
     --destructive-text: color-mix(in oklab, var(--destructive) 70%, white);
     --border: oklch(1 0 0 / 13%);
     --input: oklch(1 0 0 / 17%);
-    --chart-1: oklch(0.78 0.16 84);
-    --chart-2: oklch(0.72 0.18 152);
-    --chart-3: oklch(0.68 0.16 32);
-    --chart-4: oklch(0.64 0.15 195);
-    --chart-5: oklch(0.58 0.14 18);
     --sidebar: oklch(0.19 0.013 var(--neutral-hue));
     --sidebar-foreground: oklch(0.975 0.004 var(--neutral-hue));
     --sidebar-primary: #2a75b9;

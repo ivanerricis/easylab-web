@@ -72,7 +72,7 @@ export type PaginatedResponse<T> = {
     totalPages: number;
 };
 
-export const mapEntityTimestamps = <T extends { created_at: string; updated_at: string | null }>(entity: T) => {
+const mapEntityTimestamps = <T extends { created_at: string; updated_at: string | null }>(entity: T) => {
     const { created_at, updated_at, ...rest } = entity;
 
     return {

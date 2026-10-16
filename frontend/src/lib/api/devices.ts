@@ -1,14 +1,11 @@
 import type { DeviceDto } from "@/types/dtos";
 import { createEntityApi } from "./client";
-import type { EntityListParams } from "./client";
 
 export type DeviceCreateInput = {
     name: string;
 };
 
 export type DeviceUpdateInput = Partial<DeviceCreateInput>;
-
-export type ListDevicesParams = EntityListParams;
 
 // Le chiamate vengono tutte da `createEntityApi` (vedi `client.ts`): qui restano solo i nomi
 // che il resto dell'app già usa.

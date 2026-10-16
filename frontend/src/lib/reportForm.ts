@@ -65,7 +65,7 @@ export const resolveReportReferences = async (values: CreateReportSubmitValues):
  * `toInterventionCreatePayload`, con lo stesso rischio: nel payload i campi sono facoltativi, e
  * una copia che dimentica un campo lo perde senza che niente se ne accorga.
  */
-export const toReportCreatePayload = (
+const toReportCreatePayload = (
     values: CreateReportSubmitValues,
     references: ResolvedReportReferences
 ): ReportCreateInput => ({

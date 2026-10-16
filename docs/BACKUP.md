@@ -9,7 +9,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`, **cifrato** 
 | Contenuto | Note |
 |---|---|
 | `dump.sql` | tutti i dati: clienti, report, interventi, utenti |
-| `data/email-settings.json` | server SMTP, porta, utente, mittente |
+| `data/email-settings.json` | server SMTP, porta, utente, mittente, email per gli avvisi tecnici |
 | `data/backup-settings.json` | pianificazione, destinazione NAS, retention |
 | `data/company-settings.json` | dati azienda (nome, email, indirizzo, telefono) nell'intestazione dei PDF |
 | `data/logo/` | logo del laboratorio usato nei PDF |

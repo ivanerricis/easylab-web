@@ -31,7 +31,7 @@ import { db } from "../db";
 // delle migrazioni sta nello schema `drizzle`, che il dump riporta insieme al resto, quindi il
 // migrator applica esattamente quelle mancanti. La cartella è relativa alla cwd del processo
 // (`/app` in produzione, `backend/` in sviluppo), come in `migrate.js`.
-export const runPendingMigrations = () => migrate(db, { migrationsFolder: path.resolve("drizzle") });
+const runPendingMigrations = () => migrate(db, { migrationsFolder: path.resolve("drizzle") });
 
 // Estrae l'archivio e restituisce dove trovare dump e impostazioni. Per il formato
 // storico (.sql puro) non c'è nulla da estrarre e non ci sono impostazioni.

@@ -2,7 +2,7 @@ import { and, desc, isNotNull, isNull, lt, eq, sql } from "drizzle-orm";
 import { db } from "../index";
 import { notificationTable } from "../schema";
 
-export type NotificationUpsert = {
+type NotificationUpsert = {
     dedupeKey: string;
     severity: string;
     title: string;

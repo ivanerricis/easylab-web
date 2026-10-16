@@ -29,7 +29,7 @@ export type InterventionEmailData = {
     logoCid: string | null;
 };
 
-export type InterventionEmailContent = {
+type InterventionEmailContent = {
     subject: string;
     text: string;
     html: string;

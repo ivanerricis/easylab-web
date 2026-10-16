@@ -154,7 +154,7 @@ const rasterizeSvg = async (svg: Buffer): Promise<Buffer> => {
         .toBuffer();
 };
 
-export type PrintableLogo = { content: Buffer; contentType: "image/png" };
+type PrintableLogo = { content: Buffer; contentType: "image/png" };
 
 /**
  * Il logo per PDF ed email, sempre PNG: pdfkit accetta solo JPEG e PNG (un SVG faceva

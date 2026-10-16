@@ -307,7 +307,7 @@ const assertCurrentPassword = async (user: UserRow, password: string, errorMessa
     }
 };
 
-export type LoginResult =
+type LoginResult =
     | { status: "twoFactorRequired"; challengeId: string }
     | { status: "authenticated"; token: string; expiresAt: Date; user: PublicUser };
 
@@ -586,7 +586,7 @@ export const stopSessionCleanupScheduler = () => {
 
 const deleteAllSessionsForUser = (userId: number) => db.delete(sessionTable).where(eq(sessionTable.userId, userId));
 
-export type SessionSummary = {
+type SessionSummary = {
     /**
      * Lo sha256 del token, lo stesso che sta in tabella: espone un one-way hash, non il
      * token stesso, e serve solo come identificativo per la revoca (vedi `revokeSession`).
@@ -1016,7 +1016,7 @@ export const completeTwoFactorLogin = async (
     return createSessionForUser(user, userAgent, deviceId);
 };
 
-export type TwoFactorStatus = { enabled: boolean; remainingRecoveryCodes: number };
+type TwoFactorStatus = { enabled: boolean; remainingRecoveryCodes: number };
 
 export const getTwoFactorStatus = async (userId: number): Promise<TwoFactorStatus> => {
     const user = await requireUserById(userId);
@@ -1027,7 +1027,7 @@ export const getTwoFactorStatus = async (userId: number): Promise<TwoFactorStatu
     };
 };
 
-export type TwoFactorSetup = { secretBase32: string; otpauthUri: string; qrDataUrl: string };
+type TwoFactorSetup = { secretBase32: string; otpauthUri: string; qrDataUrl: string };
 
 export const startTwoFactorSetup = async (userId: number, password: string): Promise<TwoFactorSetup> => {
     const user = await requireUserById(userId);

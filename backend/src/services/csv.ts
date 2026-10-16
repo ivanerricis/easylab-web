@@ -1,4 +1,4 @@
-export type CsvColumn<TRow> = {
+type CsvColumn<TRow> = {
     header: string;
     value: (row: TRow) => string | number | boolean | Date | null | undefined;
     /**
@@ -8,7 +8,7 @@ export type CsvColumn<TRow> = {
     asText?: boolean;
 };
 
-export type CsvOptions = {
+type CsvOptions = {
     /**
      * Il fuso in cui scrivere le date-ora (`Date`). Senza, restano l'istante in UTC in formato
      * ISO. Con il fuso del laboratorio escono come `2026-09-22 00:30`, che Excel legge come data.

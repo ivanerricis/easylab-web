@@ -13,7 +13,7 @@ let lastCleanupDay = "";
 const minRetentionDays = 1;
 const maxRetentionDays = 90;
 
-export type LogRetentionState = { maxDays: number };
+type LogRetentionState = { maxDays: number };
 
 const defaultRetention: LogRetentionState = { maxDays: 7 };
 
@@ -56,7 +56,7 @@ export const setLogRetentionDays = async (maxDays: number): Promise<LogRetention
 
 export class LogManagerError extends ApiError {}
 
-export type LogEntry = {
+type LogEntry = {
     timestamp: string;
     ip: string;
     user: string;
@@ -65,7 +65,7 @@ export type LogEntry = {
     error: string | null;
 };
 
-export type LogFileSummary = {
+type LogFileSummary = {
     dayKey: string;
     sizeBytes: number;
     updatedAt: string;

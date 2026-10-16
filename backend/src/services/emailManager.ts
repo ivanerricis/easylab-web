@@ -16,7 +16,7 @@ export type EmailSettingsState = {
     passwordEncrypted: string | null;
 };
 
-export type EmailConnectionConfig = {
+type EmailConnectionConfig = {
     host: string;
     port: number;
     secure: boolean;
@@ -24,7 +24,7 @@ export type EmailConnectionConfig = {
     password: string;
 };
 
-export type EmailConnectionTestConfig = EmailConnectionConfig & {
+type EmailConnectionTestConfig = EmailConnectionConfig & {
     fromName: string;
     fromEmail: string;
 };
@@ -92,7 +92,7 @@ export const isStoredEmailPasswordUsable = async () => {
     }
 };
 
-export type EmailSettingsPublic = Omit<EmailSettingsState, "passwordEncrypted"> & {
+type EmailSettingsPublic = Omit<EmailSettingsState, "passwordEncrypted"> & {
     passwordSet: boolean;
 };
 
@@ -221,7 +221,7 @@ type EmailAttachment = {
     cid?: string;
 };
 
-export type SendEmailInput = {
+type SendEmailInput = {
     to: string;
     /**
      * Dove vanno le risposte, quando non devono tornare al mittente SMTP: l'email al cliente

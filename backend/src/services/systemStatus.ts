@@ -21,7 +21,7 @@ const dataDirLabel = "Disco del server";
 const backupsDirLabel = "Cartella dei backup";
 const sharedDiskLabel = "Disco del server (dati e backup)";
 
-export type DiskStatus = {
+type DiskStatus = {
     key: "data" | "backups";
     label: string;
     totalBytes: number;
@@ -35,7 +35,7 @@ export type DiskStatus = {
     low: boolean;
 };
 
-export type SystemStatus = {
+type SystemStatus = {
     disks: DiskStatus[];
     databaseSizeBytes: number | null;
     checkedAt: string;

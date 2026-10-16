@@ -17,7 +17,7 @@ import { ApiError } from "./apiError";
  * rischio senza migration. Il prezzo è quello: il nome non si cambia più, ed è proprio quello
  * che le tre protezioni qui accanto impongono.
  */
-export const catchAllIssueDescription = "Altro";
+const catchAllIssueDescription = "Altro";
 
 export const isCatchAllIssueDescription = (description: string) =>
     description.trim().toLowerCase() === catchAllIssueDescription.toLowerCase();

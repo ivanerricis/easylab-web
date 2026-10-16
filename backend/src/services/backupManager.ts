@@ -30,13 +30,7 @@ import { recordNotification } from "./notificationManager";
 // Riesportazioni: mantengono un unico punto di import per rotte e test, indipendente
 // da come il backup è suddiviso internamente.
 export { BackupManagerError } from "./backupError";
-export {
-    getBackupDumpPath,
-    getBackupSortKey,
-    listBackupDumps,
-    sortBackupFileNamesByAge,
-    type BackupDumpFile,
-} from "./backupFiles";
+export { getBackupDumpPath, getBackupSortKey, listBackupDumps, sortBackupFileNamesByAge } from "./backupFiles";
 export {
     composeSmbErrorMessage,
     computeSmbFilesToDelete,
@@ -46,7 +40,7 @@ export {
 } from "./backupSmb";
 export { restoreBackupFromExisting, restoreBackupFromUpload } from "./backupRestore";
 export { exportBackupKey } from "./backupKey";
-export type { BackupSettingsPublic, BackupSettingsState } from "./backupState";
+export type { BackupSettingsState } from "./backupState";
 
 let schedulerStarted = false;
 let schedulerTimer: NodeJS.Timeout | null = null;
@@ -56,7 +50,7 @@ export const getBackupSettings = async () => {
     return toPublicState(state);
 };
 
-export type BackupSettingsInput = Pick<
+type BackupSettingsInput = Pick<
     BackupSettingsState,
     | "autoEnabled"
     | "frequencyDays"

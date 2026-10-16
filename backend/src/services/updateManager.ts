@@ -22,7 +22,7 @@ type UpdateStatusState = "unknown" | "idle" | "running" | "success" | "failed";
 // Le fasi che scripts/update-server.sh attraversa mentre `state` è "running": scritte lì una
 // per volta, servono solo a dire all'utente a che punto siamo durante i minuti di attesa, non
 // sono usate per nessuna logica qui. Tenute in sync a mano con quell'elenco di `write_status`.
-export type UpdatePhase = "verify" | "code" | "build" | "cleanup";
+type UpdatePhase = "verify" | "code" | "build" | "cleanup";
 
 const validPhases: UpdatePhase[] = ["verify", "code", "build", "cleanup"];
 

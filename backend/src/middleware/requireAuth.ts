@@ -36,7 +36,7 @@ export const sessionCookieOptions = {
 export const deviceCookieName = secureSessionCookie ? "__Host-device" : "device";
 
 /** I browser limitano comunque a circa 400 giorni la vita di un cookie. */
-export const deviceCookieMaxAgeMs = 400 * 24 * 60 * 60 * 1000;
+const deviceCookieMaxAgeMs = 400 * 24 * 60 * 60 * 1000;
 
 export const deviceCookieOptions = { ...sessionCookieOptions, maxAge: deviceCookieMaxAgeMs };
 

@@ -9,7 +9,7 @@
 import { BackupManagerError } from "./backupError";
 import { createKeyFile } from "./keyFile";
 
-export const backupKeyLength = 32;
+const backupKeyLength = 32;
 
 const backupKey = createKeyFile({
     fileName: "backup.key",

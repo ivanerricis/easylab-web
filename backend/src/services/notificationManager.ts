@@ -11,7 +11,7 @@ type NotificationSeverity = (typeof notificationSeverities)[number];
 const maxActiveNotifications = 50;
 const dismissedRetentionDays = 30;
 
-export type NotificationInput = {
+type NotificationInput = {
     /** Stessa chiave = stesso evento: aggiorna la notifica esistente invece di duplicarla. */
     dedupeKey: string;
     title: string;
@@ -20,7 +20,7 @@ export type NotificationInput = {
     severity?: NotificationSeverity;
 };
 
-export type NotificationPublic = {
+type NotificationPublic = {
     id: number;
     severity: string;
     title: string;

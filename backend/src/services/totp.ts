@@ -119,7 +119,7 @@ const codesMatch = (expected: string, provided: string): boolean => {
     return expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 };
 
-export type VerifyTotpOptions = {
+type VerifyTotpOptions = {
     now?: number;
     /**
      * Ultimo passo già accettato per questo utente. Un codice vale trenta secondi: chi lo
@@ -130,7 +130,7 @@ export type VerifyTotpOptions = {
     lastStep?: number | null;
 };
 
-export type VerifyTotpResult = { valid: false } | { valid: true; step: number };
+type VerifyTotpResult = { valid: false } | { valid: true; step: number };
 
 export const verifyTotp = (
     secretBase32: string,
@@ -170,7 +170,7 @@ export const verifyTotp = (
     return { valid: false };
 };
 
-export type OtpauthUriInput = {
+type OtpauthUriInput = {
     secretBase32: string;
     /** Lo username: è ciò che l'utente vede sotto l'emittente nell'elenco della sua app. */
     account: string;

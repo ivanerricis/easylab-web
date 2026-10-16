@@ -40,7 +40,7 @@ type ListParams = {
 
 // Le query di lista restituiscono un array semplice quando non è richiesta la
 // paginazione, altrimenti items + totale.
-export type ListResult<TRow> = TRow[] | { items: TRow[]; totalItems: number };
+type ListResult<TRow> = TRow[] | { items: TRow[]; totalItems: number };
 
 export const sendListResponse = <TRow>(res: Response, result: ListResult<TRow>, page?: number, pageSize?: number) => {
     if (page == null || pageSize == null || Array.isArray(result)) {

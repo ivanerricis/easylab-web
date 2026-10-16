@@ -88,7 +88,7 @@ export const getCompanySettings = async (): Promise<CompanySettingsState> => loa
 export const getAppTimeZone = async (): Promise<string> => (await loadState()).timeZone;
 
 /** Il fuso è facoltativo in ingresso: chi non lo manda tiene quello salvato. */
-export type CompanySettingsInput = Omit<CompanySettingsState, "timeZone"> & { timeZone?: string };
+type CompanySettingsInput = Omit<CompanySettingsState, "timeZone"> & { timeZone?: string };
 
 export const updateCompanySettings = async (input: CompanySettingsInput) => {
     if (!input.name?.trim()) {

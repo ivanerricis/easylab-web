@@ -162,7 +162,7 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             onOpenChange={handleOpenChange}
             isDirty={isDirty}
             title="Cambia password"
-            description="Inserisci la password attuale e quella nuova."
+            description="Inserisci la password attuale e quella nuova. Gli altri dispositivi con l'account aperto verranno disconnessi."
             confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
             confirmIcon={Save}
             cancelLabel="Annulla"

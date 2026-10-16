@@ -12,6 +12,7 @@ export type EmailSettingsState = {
     username: string;
     fromName: string;
     fromEmail: string;
+    alertEmail: string;
     passwordEncrypted: string | null;
 };
 
@@ -38,6 +39,7 @@ const defaultState: EmailSettingsState = {
     username: "",
     fromName: "",
     fromEmail: "",
+    alertEmail: "",
     passwordEncrypted: null,
 };
 
@@ -55,6 +57,7 @@ const sanitizeState = (input: Partial<EmailSettingsState>): EmailSettingsState =
         username: typeof input.username === "string" ? input.username.trim() : defaultState.username,
         fromName: typeof input.fromName === "string" ? input.fromName.trim() : defaultState.fromName,
         fromEmail: typeof input.fromEmail === "string" ? input.fromEmail.trim() : defaultState.fromEmail,
+        alertEmail: typeof input.alertEmail === "string" ? input.alertEmail.trim() : defaultState.alertEmail,
         passwordEncrypted: typeof input.passwordEncrypted === "string" ? input.passwordEncrypted : null,
     };
 };
@@ -111,7 +114,12 @@ export const getEmailSettings = async (): Promise<EmailSettingsPublic> => {
 export type EmailSettingsInput = Pick<
     EmailSettingsState,
     "enabled" | "host" | "port" | "secure" | "username" | "fromName" | "fromEmail"
-> & { password?: string };
+> & {
+    password?: string;
+    // Facoltativa nel corpo: una scheda aperta prima dell'aggiornamento non la manda, e non deve
+    // né ricevere un 400 né cancellare quella salvata.
+    alertEmail?: string;
+};
 
 export const updateEmailSettings = async (input: EmailSettingsInput) => {
     const current = await loadState();
@@ -126,8 +134,15 @@ export const updateEmailSettings = async (input: EmailSettingsInput) => {
         username: input.username.trim(),
         fromName: input.fromName.trim(),
         fromEmail: input.fromEmail.trim(),
+        alertEmail: input.alertEmail?.trim() ?? current.alertEmail,
         passwordEncrypted: input.password ? await encryptSecret(input.password) : current.passwordEncrypted,
     };
+
+    // Facoltativa: vuota, gli avvisi vanno all'email dell'azienda (vedi alertEmail.ts). Si controlla
+    // anche a invio spento, come fa la rotta.
+    if (next.alertEmail && !z.string().email().safeParse(next.alertEmail).success) {
+        throw new EmailManagerError("L'email per gli avvisi non è valida", 400);
+    }
 
     if (next.enabled) {
         if (!next.host || !next.username || !next.fromEmail) {

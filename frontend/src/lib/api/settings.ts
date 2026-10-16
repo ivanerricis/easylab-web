@@ -228,12 +228,13 @@ export type EmailSettingsDto = {
     username: string;
     fromName: string;
     fromEmail: string;
+    alertEmail: string;
     passwordSet: boolean;
 };
 
 export type EmailSettingsInput = Pick<
     EmailSettingsDto,
-    "enabled" | "host" | "port" | "secure" | "username" | "fromName" | "fromEmail"
+    "enabled" | "host" | "port" | "secure" | "username" | "fromName" | "fromEmail" | "alertEmail"
 > & { password?: string };
 
 export const getEmailSettings = async () => (await api.get<EmailSettingsDto>("/settings/email")).data;

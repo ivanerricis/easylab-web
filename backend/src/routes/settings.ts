@@ -148,6 +148,15 @@ const emailSettingsSchema = z
                 message: "L'email mittente non è valida",
             }),
     })
+        alertEmail: z
+            .string()
+            .trim()
+            .max(255)
+            .refine((value) => value === "" || z.string().email().safeParse(value).success, {
+                message: "L'email per gli avvisi non è valida",
+            })
+            // Facoltativa: una scheda aperta prima dell'aggiornamento non la manda (vedi emailManager).
+            .optional(),
     .strict();
 
 const emailTestSchema = z

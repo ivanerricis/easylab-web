@@ -23,7 +23,8 @@ import {
 } from "./backupState";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { getCompanySettings } from "./companyManager";
-import { isEmailConfigured, sendEmail } from "./emailManager";
+import { sendAlertEmail } from "./alertEmail";
+import { isEmailConfigured } from "./emailManager";
 import { recordNotification } from "./notificationManager";
 
 // Riesportazioni: mantengono un unico punto di import per rotte e test, indipendente
@@ -128,18 +129,9 @@ export const refreshBackupSchedule = async (previousTimeZone: string) => {
 // scadute...) l'errore resta solo nei log, la notifica in app è già stata registrata.
 const sendBackupFailureEmail = async (title: string, message: string) => {
     try {
-        if (!(await isEmailConfigured())) {
-            return;
-        }
-
         const company = await getCompanySettings();
 
-        if (!company.email) {
-            return;
-        }
-
-        await sendEmail({
-            to: company.email,
+        await sendAlertEmail({
             subject: `${title} - ${company.name}`,
             text: `${title}\n\n${message}`,
         });

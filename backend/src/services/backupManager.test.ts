@@ -64,8 +64,13 @@ const sendEmail = vi.fn<(input: { to: string; subject: string; text: string }) =
     Promise.resolve()
 );
 
+const getEmailSettings = vi.fn<() => Promise<{ alertEmail: string }>>(() => Promise.resolve({ alertEmail: "" }));
+
+// Il vero `alertEmail.ts` gira sopra questi mock: sceglie il destinatario fra `alertEmail` e
+// l'email dell'azienda.
 vi.mock("./emailManager", () => ({
     isEmailConfigured: () => isEmailConfigured(),
+    getEmailSettings: () => getEmailSettings(),
     isStoredEmailPasswordUsable: () => Promise.resolve(true),
     sendEmail: (input: { to: string; subject: string; text: string }) => sendEmail(input),
 }));
@@ -268,6 +273,7 @@ beforeEach(() => {
     state = { ...defaultState };
     vi.clearAllMocks();
     isEmailConfigured.mockResolvedValue(false);
+    getEmailSettings.mockResolvedValue({ alertEmail: "" });
     getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "lab@example.com" });
     createBackupArchive.mockResolvedValue(undefined);
     uploadDumpToSmb.mockResolvedValue(undefined);
@@ -459,6 +465,15 @@ describe("runBackupNow", () => {
                     subject: "Backup automatico non riuscito - Laboratorio",
                 })
             );
+        });
+
+        it("manda la mail all'indirizzo degli avvisi, se impostato", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            getEmailSettings.mockResolvedValue({ alertEmail: "tecnico@example.com" });
+
+            await expect(runBackupNow("auto")).rejects.toThrow("disco pieno");
+
+            expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "tecnico@example.com" }));
         });
 
         it("senza avviso email attivo si ferma alla notifica in app", async () => {

@@ -591,6 +591,7 @@ describe("EmailSettingsPanel", () => {
         username: "lab",
         fromName: "EasyLab",
         fromEmail: "info@example.com",
+        alertEmail: "tecnico@example.com",
         passwordSet: true,
     };
 
@@ -652,6 +653,29 @@ describe("EmailSettingsPanel", () => {
 
         await userEvent.type(fromEmail, "example.com");
         expect(fromEmail).not.toHaveAccessibleDescription();
+    });
+
+    it("rifiuta un'email per gli avvisi non valida, ma accetta di lasciarla vuota", async () => {
+        renderWithUser(<EmailSettingsPanel />);
+        const alertEmail = await screen.findByLabelText(/^Email per gli avvisi tecnici/);
+        await waitFor(() => {
+            expect(alertEmail).toHaveValue("tecnico@example.com");
+        });
+
+        await userEvent.clear(alertEmail);
+        await userEvent.type(alertEmail, "tecnico@");
+        await userEvent.click(saveButton());
+
+        expect(alertEmail).toHaveAccessibleDescription("L'email per gli avvisi non è valida");
+        expect(alertEmail).toHaveFocus();
+        expect(api.updateEmailSettings).not.toHaveBeenCalled();
+
+        await userEvent.clear(alertEmail);
+        await userEvent.click(saveButton());
+
+        await waitFor(() => {
+            expect(api.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ alertEmail: "" }));
+        });
     });
 
     /** Salvato con degli spazi, il form deve tornare pulito: prima Salva restava attivo. */
@@ -760,7 +784,7 @@ describe("EmailSettingsPanel", () => {
     it("disattivare l'invio salva senza validare i campi del server", async () => {
         await renderLoaded({ ...saved, host: "", username: "", fromEmail: "", passwordSet: false });
 
-        await userEvent.click(screen.getByLabelText("Abilita invio email ai clienti"));
+        await userEvent.click(screen.getByLabelText("Abilita invio email"));
         expect(screen.getByLabelText(/^Host SMTP/)).toBeDisabled();
         await userEvent.click(saveButton());
 

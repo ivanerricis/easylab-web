@@ -663,6 +663,7 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(response.status).toBe(400);
         expect(updateEmailSettings).not.toHaveBeenCalled();
     });
+        alertEmail: "tecnico@example.com",
 
     /**
      * Q4: prima il mittente delle impostazioni email non aveva nessun controllo di formato qui
@@ -695,7 +696,7 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
 
         const response = await request(buildApp(true))
             .post("/api/settings/email/test")
-            .send({ ...emailBody, enabled: undefined, password: "segreta" });
+            .send({ ...emailBody, enabled: undefined, alertEmail: undefined, password: "segreta" });
 
         expect(response.status).toBe(200);
         expect(response.body.message).toBe("Email di prova inviata con successo a lab@example.com");
@@ -704,11 +705,47 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
     it("la mail di prova rifiuta un mittente che non è un indirizzo", async () => {
         const response = await request(buildApp(true))
             .post("/api/settings/email/test")
-            .send({ ...emailBody, enabled: undefined, password: "segreta", fromEmail: "non-una-mail" });
+            .send({
+                ...emailBody,
+                enabled: undefined,
+                alertEmail: undefined,
+                password: "segreta",
+                fromEmail: "non-una-mail",
+            });
 
         expect(response.status).toBe(400);
         expect(testEmailConnection).not.toHaveBeenCalled();
     });
+    it("rifiuta un'email per gli avvisi non valida nelle impostazioni email", async () => {
+        const response = await request(buildApp(true))
+            .put("/api/settings/email")
+            .send({ ...emailBody, alertEmail: "non-una-mail" });
+
+        expect(response.status).toBe(400);
+        expect(updateEmailSettings).not.toHaveBeenCalled();
+    });
+
+    it("accetta un'email per gli avvisi vuota (ricade sull'email dell'azienda)", async () => {
+        vi.mocked(updateEmailSettings).mockResolvedValue({} as never);
+
+        const response = await request(buildApp(true))
+            .put("/api/settings/email")
+            .send({ ...emailBody, alertEmail: "" });
+
+        expect(response.status).toBe(200);
+        expect(updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ alertEmail: "" }));
+    });
+
+    it("accetta un corpo senza l'email per gli avvisi, come quello di una scheda aperta prima dell'aggiornamento", async () => {
+        vi.mocked(updateEmailSettings).mockResolvedValue({} as never);
+        const { alertEmail: _alertEmail, ...oldBody } = emailBody;
+
+        const response = await request(buildApp(true)).put("/api/settings/email").send(oldBody);
+
+        expect(response.status).toBe(200);
+        expect(updateEmailSettings).toHaveBeenCalledWith(oldBody);
+    });
+
 
     it("avvio e controllo dell'aggiornamento rispondono 202: il lavoro prosegue sull'host", async () => {
         vi.mocked(requestUpdate).mockResolvedValue({ state: "requested" } as never);

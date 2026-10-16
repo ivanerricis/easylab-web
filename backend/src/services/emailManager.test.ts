@@ -56,6 +56,7 @@ const storedState = (overrides: Partial<EmailSettingsState> = {}): EmailSettings
     username: "lab@easylab.it",
     fromName: "Laboratorio",
     fromEmail: "lab@easylab.it",
+    alertEmail: "",
     passwordEncrypted: "iv:tag:data",
     ...overrides,
 });
@@ -68,6 +69,7 @@ const enableInput = (overrides: Partial<EmailSettingsInput> = {}): EmailSettings
     username: "lab@easylab.it",
     fromName: "Laboratorio",
     fromEmail: "lab@easylab.it",
+    alertEmail: "",
     ...overrides,
 });
 
@@ -227,6 +229,38 @@ describe("updateEmailSettings", () => {
         await expect(
             updateEmailSettings(enableInput({ fromEmail: "a..b@x.it", password: "segreta" }))
         ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it("rifiuta un'email per gli avvisi malformata, anche a invio spento", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedState({ enabled: false })));
+
+        await expect(
+            updateEmailSettings(enableInput({ enabled: false, alertEmail: "non-una-email" }))
+        ).rejects.toMatchObject({ statusCode: 400, message: "L'email per gli avvisi non è valida" });
+        expect(writeFile).not.toHaveBeenCalled();
+    });
+
+    it("salva l'email per gli avvisi senza spazi e accetta di lasciarla vuota", async () => {
+        await expect(
+            updateEmailSettings(enableInput({ alertEmail: "  tecnico@easylab.it ", password: "segreta" }))
+        ).resolves.toMatchObject({ alertEmail: "tecnico@easylab.it" });
+        await expect(updateEmailSettings(enableInput({ alertEmail: "", password: "segreta" }))).resolves.toMatchObject({
+            alertEmail: "",
+        });
+    });
+
+    it("tiene l'email per gli avvisi salvata se il corpo non la manda", async () => {
+        readFile.mockResolvedValue(JSON.stringify(storedState({ alertEmail: "tecnico@easylab.it" })));
+        const { alertEmail: _alertEmail, ...input } = enableInput({ password: "segreta" });
+
+        await expect(updateEmailSettings(input)).resolves.toMatchObject({ alertEmail: "tecnico@easylab.it" });
+    });
+
+    it("carica un file vecchio, senza l'email per gli avvisi, con il valore vuoto", async () => {
+        const { alertEmail: _alertEmail, ...old } = storedState();
+        readFile.mockResolvedValue(JSON.stringify(old));
+
+        expect(await getEmailSettings()).toMatchObject({ host: "smtp.easylab.it", alertEmail: "" });
     });
 
     it("rifiuta l'abilitazione senza nessuna password, né nuova né già salvata", async () => {

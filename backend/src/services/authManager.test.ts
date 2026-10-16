@@ -162,9 +162,13 @@ vi.mock("./companyManager", () => ({
 
 const isEmailConfigured = vi.fn<() => Promise<boolean>>(() => Promise.resolve(false));
 const sendEmail = vi.fn<(input: unknown) => Promise<void>>(() => Promise.resolve());
+const getEmailSettings = vi.fn<() => Promise<{ alertEmail: string }>>(() => Promise.resolve({ alertEmail: "" }));
 
+// Il vero `alertEmail.ts` gira sopra questi mock: sceglie il destinatario fra `alertEmail` e
+// l'email dell'azienda, ed è quello che qui interessa verificare.
 vi.mock("./emailManager", () => ({
     isEmailConfigured: () => isEmailConfigured(),
+    getEmailSettings: () => getEmailSettings(),
     sendEmail: (input: unknown) => sendEmail(input),
 }));
 
@@ -259,6 +263,7 @@ beforeEach(() => {
     registerFailedTwoFactorAttempt.mockReturnValue(true);
     getCompanySettings.mockResolvedValue({ name: "Laboratorio" });
     isEmailConfigured.mockResolvedValue(false);
+    getEmailSettings.mockResolvedValue({ alertEmail: "" });
 });
 
 /** Un segreto Base32 valido: `verifyTotp` non è mockato, i codici si calcolano davvero. */
@@ -551,6 +556,19 @@ ${"x".repeat(400)}`
                     text: expect.stringContaining("EasyLab, il gestionale di Laboratorio") as unknown,
                 })
             );
+        });
+
+        it("usa l'email degli avvisi, se impostata, al posto di quella del laboratorio", async () => {
+            isEmailConfigured.mockResolvedValue(true);
+            getEmailSettings.mockResolvedValue({ alertEmail: "tecnico@esempio.it" });
+            getCompanySettings.mockResolvedValue({ name: "Laboratorio", email: "titolare@esempio.it" });
+            queueRows("select", userTable, [buildUser({ knownDeviceLabels: null })]);
+            queueAdminIdLookup(1);
+
+            await login("mario", "password-giusta", "1.2.3.4", chromeOnWindows);
+            await flushMicrotasks();
+
+            expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "tecnico@esempio.it" }));
         });
 
         it("senza email del laboratorio configurata non tenta l'invio", async () => {

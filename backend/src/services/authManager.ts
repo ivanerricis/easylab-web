@@ -34,7 +34,7 @@ import {
 } from "./twoFactorChallenge";
 import { decryptSecret, encryptSecret } from "./secretCrypto";
 import { getCompanySettings } from "./companyManager";
-import { isEmailConfigured, sendEmail } from "./emailManager";
+import { sendAlertEmail } from "./alertEmail";
 import { recordNotification } from "./notificationManager";
 import { ApiError } from "./apiError";
 
@@ -375,18 +375,9 @@ const notifyIfNewDevice = async (user: UserRow, label: string | null): Promise<v
 };
 
 const sendNewDeviceEmail = async (user: UserRow, label: string): Promise<void> => {
-    if (!(await isEmailConfigured())) {
-        return;
-    }
-
     const company = await getCompanySettings();
 
-    if (!company.email) {
-        return;
-    }
-
-    await sendEmail({
-        to: company.email,
+    await sendAlertEmail({
         subject: `Nuovo accesso a EasyLab - ${company.name}`,
         text: `L'utente "${user.username}" è entrato in EasyLab, il gestionale di ${company.name}, da un dispositivo mai visto prima (${label}).`,
     });

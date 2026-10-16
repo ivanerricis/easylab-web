@@ -36,15 +36,24 @@ const defaultForm: EmailSettingsInput = {
     username: "",
     fromName: "",
     fromEmail: "",
+    alertEmail: "",
     password: "",
 };
 
 /** Gli errori di validazione per id del controllo, ognuno sotto il proprio campo (vedi `FormField`). */
-type EmailField = "emailHost" | "emailPort" | "emailUsername" | "emailPassword" | "emailFromAddress";
+type EmailField =
+    "emailHost" | "emailPort" | "emailUsername" | "emailPassword" | "emailFromAddress" | "emailAlertAddress";
 type EmailFieldErrors = Partial<Record<EmailField, string>>;
 
 /** Nell'ordine in cui i campi stanno nella pagina: il primo sbagliato riceve il focus. */
-const emailFieldOrder: EmailField[] = ["emailHost", "emailPort", "emailUsername", "emailPassword", "emailFromAddress"];
+const emailFieldOrder: EmailField[] = [
+    "emailHost",
+    "emailPort",
+    "emailUsername",
+    "emailPassword",
+    "emailFromAddress",
+    "emailAlertAddress",
+];
 
 /**
  * I campi del modulo letti dal DTO del server. Prima questa stessa conversione era scritta due
@@ -59,6 +68,7 @@ const toFormValues = (settings: EmailSettingsDto): EmailSettingsInput => ({
     username: settings.username,
     fromName: settings.fromName,
     fromEmail: settings.fromEmail,
+    alertEmail: settings.alertEmail,
     password: "",
 });
 
@@ -94,6 +104,13 @@ const validateEmailForm = (values: EmailSettingsInput, settings: EmailSettingsDt
         nextErrors.emailFromAddress = "L'email mittente non è valida";
     }
 
+    // Facoltativa: vuota, gli avvisi vanno all'email dell'azienda.
+    const alertEmail = values.alertEmail.trim();
+
+    if (alertEmail && !isValidEmail(alertEmail)) {
+        nextErrors.emailAlertAddress = "L'email per gli avvisi non è valida";
+    }
+
     return nextErrors;
 };
 
@@ -123,6 +140,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                 username: values.username.trim(),
                 fromName: values.fromName.trim(),
                 fromEmail: values.fromEmail.trim(),
+                alertEmail: values.alertEmail.trim(),
             }),
         toForm: toFormValues,
         defaultValues: defaultForm,
@@ -223,7 +241,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                     }}
                                 />
                                 <Label htmlFor="emailEnabled" className="cursor-pointer leading-snug">
-                                    Abilita invio email ai clienti
+                                    Abilita invio email
                                 </Label>
                             </div>
                         </SettingsGroup>
@@ -414,6 +432,32 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                 </p>
                             </SettingsGroup>
                         </div>
+
+                        <SettingsGroup title="Avvisi">
+                            <SettingsFieldRow>
+                                <SettingsField>
+                                    <Label htmlFor="emailAlertAddress">Email per gli avvisi tecnici</Label>
+                                    <div>
+                                        <Input
+                                            {...fieldProps("emailAlertAddress", { error: errors.emailAlertAddress })}
+                                            type="email"
+                                            placeholder="es: tecnico@easylab.local"
+                                            disabled={!formValues.enabled}
+                                            value={formValues.alertEmail}
+                                            onChange={(event) =>
+                                                changeField("emailAlertAddress", { alertEmail: event.target.value })
+                                            }
+                                        />
+                                        <FieldError id="emailAlertAddress" error={errors.emailAlertAddress} />
+                                    </div>
+                                </SettingsField>
+                            </SettingsFieldRow>
+
+                            <p className="text-xs text-muted-foreground">
+                                Accessi da nuovi dispositivi, backup falliti e spazio su disco in esaurimento. Se la
+                                lasci vuota, gli avvisi vanno all'email dell'azienda.
+                            </p>
+                        </SettingsGroup>
 
                         <p className="text-xs text-muted-foreground">
                             "Testa connessione" invia una vera email di prova all'indirizzo mittente configurato, per

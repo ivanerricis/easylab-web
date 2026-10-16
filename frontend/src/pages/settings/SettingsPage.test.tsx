@@ -20,6 +20,7 @@ vi.mock("@/components/settings/companySettingsPanel", () => ({
 vi.mock("@/components/settings/emailSettingsPanel", () => ({ default: () => <h2>Sezione email</h2> }));
 vi.mock("@/components/settings/exportSettingsSection", () => ({ default: () => <h2>Sezione esportazione</h2> }));
 vi.mock("@/components/settings/backupSettingsPanel", () => ({ default: () => <h2>Sezione backup</h2> }));
+vi.mock("@/components/settings/systemSettingsPanel", () => ({ default: () => <h2>Sezione sistema</h2> }));
 vi.mock("@/components/settings/updateSettingsPanel", () => ({ default: () => <h2>Sezione aggiornamenti</h2> }));
 vi.mock("@/components/settings/logsSettingsPanel", () => ({ default: () => <h2>Sezione log</h2> }));
 
@@ -88,6 +89,20 @@ describe("SettingsPage", () => {
         expect(screen.queryByRole("heading", { name: "Sezione backup" })).not.toBeInTheDocument();
     });
 
+    it("la sezione Sistema è solo dell'amministratore", async () => {
+        renderPage("/settings?section=system", user);
+
+        expect(await screen.findByRole("heading", { name: "Sezione tema" })).toBeInTheDocument();
+        expect(sectionButtons()).not.toContain("Sistema");
+        expect(screen.queryByRole("heading", { name: "Sezione sistema" })).not.toBeInTheDocument();
+    });
+
+    it("apre la sezione Sistema all'amministratore", async () => {
+        renderPage("/settings?section=system", { ...user, isAdmin: true });
+
+        expect(await screen.findByRole("heading", { name: "Sezione sistema" })).toBeInTheDocument();
+    });
+
     it("all'amministratore mostra tutte le sezioni e apre quella dell'indirizzo", async () => {
         renderPage("/settings?section=users", { ...user, isAdmin: true });
 
@@ -99,6 +114,7 @@ describe("SettingsPage", () => {
             "Email",
             "Esportazione",
             "Backup",
+            "Sistema",
             "Aggiornamenti",
             "Log",
         ]);

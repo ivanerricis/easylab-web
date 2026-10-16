@@ -144,7 +144,12 @@ export function formatFileSize(sizeBytes: number) {
         return `${(sizeBytes / 1024).toFixed(1)} KB`;
     }
 
-    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+    // I dischi del server si contano in GB: senza, 200 GB si leggerebbero "204800.0 MB".
+    if (sizeBytes < 1024 * 1024 * 1024) {
+        return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    return `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export function formatEuro(value: number | null | undefined) {

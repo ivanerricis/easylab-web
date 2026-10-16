@@ -254,3 +254,20 @@ export type EmailConnectionTestInput = {
 
 export const testEmailConnection = async (payload: EmailConnectionTestInput) =>
     (await api.post<{ message: string }>("/settings/email/test", payload)).data;
+
+export type SystemDiskDto = {
+    key: "data" | "backups";
+    label: string;
+    totalBytes: number;
+    freeBytes: number;
+    // Vero sotto il 10% del totale o sotto i 2 GiB liberi: lo decide il backend.
+    low: boolean;
+};
+
+export type SystemStatusDto = {
+    disks: SystemDiskDto[];
+    databaseSizeBytes: number | null;
+    checkedAt: string;
+};
+
+export const getSystemStatus = async () => (await api.get<SystemStatusDto>("/settings/system")).data;

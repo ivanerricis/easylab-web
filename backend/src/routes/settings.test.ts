@@ -40,6 +40,13 @@ vi.mock("../services/logManager", () => ({
     readLogEntries: vi.fn().mockResolvedValue([]),
     setLogRetentionDays: vi.fn(),
 }));
+vi.mock("../services/systemStatus", () => ({
+    getSystemStatus: vi.fn().mockResolvedValue({
+        disks: [{ key: "data", label: "Disco del server", totalBytes: 1000, freeBytes: 500, low: false }],
+        databaseSizeBytes: 42,
+        checkedAt: "2026-10-16T10:00:00.000Z",
+    }),
+}));
 vi.mock("../services/authManager", () => ({
     assertOwnPassword: vi.fn(),
 }));
@@ -132,6 +139,7 @@ describe("settings router: permessi", () => {
         ["get", "/api/settings/logs/failed-logins"],
         ["get", "/api/settings/email"],
         ["get", "/api/settings/update"],
+        ["get", "/api/settings/system"],
         ["put", "/api/settings/company"],
         ["post", "/api/settings/backup/run"],
         ["post", "/api/settings/backup/smb/test"],
@@ -157,6 +165,17 @@ describe("settings router: permessi", () => {
         const response = await request(buildApp(false)).get("/api/settings/update-state");
 
         expect(response.body).toEqual({ state: "idle", phase: null });
+    });
+
+    it("restituisce lo stato del sistema all'amministratore", async () => {
+        const response = await request(buildApp(true)).get("/api/settings/system");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            disks: [{ key: "data", label: "Disco del server", totalBytes: 1000, freeBytes: 500, low: false }],
+            databaseSizeBytes: 42,
+            checkedAt: "2026-10-16T10:00:00.000Z",
+        });
     });
 
     it("lascia passare l'amministratore sulle rotte protette", async () => {
@@ -644,6 +663,7 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         username: "lab",
         fromName: "Laboratorio",
         fromEmail: "lab@example.com",
+        alertEmail: "tecnico@example.com",
     };
 
     it("salva le impostazioni email, senza obbligare a reinserire la password", async () => {
@@ -663,7 +683,6 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(response.status).toBe(400);
         expect(updateEmailSettings).not.toHaveBeenCalled();
     });
-        alertEmail: "tecnico@example.com",
 
     /**
      * Q4: prima il mittente delle impostazioni email non aveva nessun controllo di formato qui
@@ -691,31 +710,6 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ fromEmail: "" }));
     });
 
-    it("la mail di prova conferma l'indirizzo a cui è partita", async () => {
-        vi.mocked(testEmailConnection).mockResolvedValue(undefined as never);
-
-        const response = await request(buildApp(true))
-            .post("/api/settings/email/test")
-            .send({ ...emailBody, enabled: undefined, alertEmail: undefined, password: "segreta" });
-
-        expect(response.status).toBe(200);
-        expect(response.body.message).toBe("Email di prova inviata con successo a lab@example.com");
-    });
-
-    it("la mail di prova rifiuta un mittente che non è un indirizzo", async () => {
-        const response = await request(buildApp(true))
-            .post("/api/settings/email/test")
-            .send({
-                ...emailBody,
-                enabled: undefined,
-                alertEmail: undefined,
-                password: "segreta",
-                fromEmail: "non-una-mail",
-            });
-
-        expect(response.status).toBe(400);
-        expect(testEmailConnection).not.toHaveBeenCalled();
-    });
     it("rifiuta un'email per gli avvisi non valida nelle impostazioni email", async () => {
         const response = await request(buildApp(true))
             .put("/api/settings/email")
@@ -746,6 +740,31 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(updateEmailSettings).toHaveBeenCalledWith(oldBody);
     });
 
+    it("la mail di prova conferma l'indirizzo a cui è partita", async () => {
+        vi.mocked(testEmailConnection).mockResolvedValue(undefined as never);
+
+        const response = await request(buildApp(true))
+            .post("/api/settings/email/test")
+            .send({ ...emailBody, enabled: undefined, alertEmail: undefined, password: "segreta" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe("Email di prova inviata con successo a lab@example.com");
+    });
+
+    it("la mail di prova rifiuta un mittente che non è un indirizzo", async () => {
+        const response = await request(buildApp(true))
+            .post("/api/settings/email/test")
+            .send({
+                ...emailBody,
+                enabled: undefined,
+                alertEmail: undefined,
+                password: "segreta",
+                fromEmail: "non-una-mail",
+            });
+
+        expect(response.status).toBe(400);
+        expect(testEmailConnection).not.toHaveBeenCalled();
+    });
 
     it("avvio e controllo dell'aggiornamento rispondono 202: il lavoro prosegue sull'host", async () => {
         vi.mocked(requestUpdate).mockResolvedValue({ state: "requested" } as never);

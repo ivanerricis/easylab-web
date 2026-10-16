@@ -1,6 +1,7 @@
 import "dotenv/config";
 import app from "./app";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backupManager";
+import { startDiskSpaceMonitor, stopDiskSpaceMonitor } from "./services/systemStatus";
 import { ensureCatchAllIssue } from "./services/issueCatalog";
 import { getCompanySettings } from "./services/companyManager";
 import { ensureDefaultAdmin, startSessionCleanupScheduler, stopSessionCleanupScheduler } from "./services/authManager";
@@ -13,6 +14,7 @@ const server = app.listen(3000, "0.0.0.0", () => {
         console.error("Lettura dei dati azienda non riuscita:", error);
     });
     startBackupScheduler();
+    startDiskSpaceMonitor();
     startSessionCleanupScheduler();
     // Il `.catch` non è decorativo: senza, un errore qui diventa una rejection non
     // gestita e su Node 24 abbatte il processo appena avviato. In produzione il
@@ -49,6 +51,7 @@ const shutdown = (signal: NodeJS.Signals) => {
     console.log(`Ricevuto ${signal}, arresto in corso...`);
 
     stopBackupScheduler();
+    stopDiskSpaceMonitor();
     stopSessionCleanupScheduler();
 
     // Se una richiesta resta appesa non possiamo aspettarla all'infinito: Docker manderebbe

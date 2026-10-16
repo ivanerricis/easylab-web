@@ -31,6 +31,7 @@ import {
     readLogEntries,
     setLogRetentionDays,
 } from "../services/logManager";
+import { getSystemStatus } from "../services/systemStatus";
 import { getUpdateStatus, requestUpdate, requestUpdateCheck } from "../services/updateManager";
 
 // Le rotte qui sotto non hanno try/catch: i servizi sollevano `ApiError` (messaggio e
@@ -147,7 +148,6 @@ const emailSettingsSchema = z
             .refine((value) => value === "" || z.string().email().safeParse(value).success, {
                 message: "L'email mittente non è valida",
             }),
-    })
         alertEmail: z
             .string()
             .trim()
@@ -157,6 +157,7 @@ const emailSettingsSchema = z
             })
             // Facoltativa: una scheda aperta prima dell'aggiornamento non la manda (vedi emailManager).
             .optional(),
+    })
     .strict();
 
 const emailTestSchema = z
@@ -404,6 +405,11 @@ settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (
 // stack. Come il resto del router, sono coperte dal requireAdmin qui sopra.
 settingsRouter.get("/update", async (_req, res) => {
     res.json(await getUpdateStatus());
+});
+
+// Sola lettura di spazio su disco e database: sotto il requireAdmin, e le GET non finiscono nel registro azioni.
+settingsRouter.get("/system", async (_req, res) => {
+    res.json(await getSystemStatus());
 });
 
 settingsRouter.post("/update/run", async (_req, res) => {

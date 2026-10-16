@@ -34,7 +34,7 @@ export const SettingsSectionSkeleton = ({ label = "Caricamento sezione..." }: { 
 
 // Quante voci ha ogni gruppo del menu (Preferenze, Laboratorio, Dati e sistema) per un
 // amministratore; chi non lo è vede solo Preferenze, con due voci.
-const adminNavGroups = [2, 3, 4];
+const adminNavGroups = [2, 3, 5];
 const userNavGroups = [2];
 
 /**

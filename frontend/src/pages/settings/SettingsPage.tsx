@@ -1,7 +1,18 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Building2, Database, FileDown, Mail, Palette, RefreshCw, ScrollText, ShieldCheck, Users } from "lucide-react";
+import {
+    Building2,
+    Database,
+    FileDown,
+    HardDrive,
+    Mail,
+    Palette,
+    RefreshCw,
+    ScrollText,
+    ShieldCheck,
+    Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -34,11 +45,12 @@ const CompanySettingsPanel = lazy(() => import("@/components/settings/companySet
 const EmailSettingsPanel = lazy(() => import("@/components/settings/emailSettingsPanel"));
 const ExportSettingsSection = lazy(() => import("@/components/settings/exportSettingsSection"));
 const BackupSettingsPanel = lazy(() => import("@/components/settings/backupSettingsPanel"));
+const SystemSettingsPanel = lazy(() => import("@/components/settings/systemSettingsPanel"));
 const UpdateSettingsPanel = lazy(() => import("@/components/settings/updateSettingsPanel"));
 const LogsSettingsPanel = lazy(() => import("@/components/settings/logsSettingsPanel"));
 
 type SettingsSectionKey =
-    "theme" | "security" | "users" | "company" | "email" | "export" | "backup" | "update" | "logs";
+    "theme" | "security" | "users" | "company" | "email" | "export" | "backup" | "system" | "update" | "logs";
 
 const settingsSectionKeys: SettingsSectionKey[] = [
     "theme",
@@ -48,6 +60,7 @@ const settingsSectionKeys: SettingsSectionKey[] = [
     "email",
     "export",
     "backup",
+    "system",
     "update",
     "logs",
 ];
@@ -119,6 +132,13 @@ const settingsSections: Array<{
         icon: Database,
     },
     {
+        key: "system",
+        group: "system",
+        label: "Sistema",
+        description: "Spazio su disco e database",
+        icon: HardDrive,
+    },
+    {
         key: "update",
         group: "system",
         label: "Aggiornamenti",
@@ -142,7 +162,15 @@ const isSettingsSectionKey = (value: string | null): value is SettingsSectionKey
 // tutti, credenziali NAS e SMTP, aggiornamento dello stack), non preferenze personali.
 // Qui le sezioni corrispondenti vengono nascoste, perché a un non-admin risponderebbero
 // solo 403. Al di fuori dell'amministratore resta il tema, che è una scelta di chi guarda.
-const adminOnlySections = new Set<SettingsSectionKey>(["users", "company", "email", "backup", "update", "logs"]);
+const adminOnlySections = new Set<SettingsSectionKey>([
+    "users",
+    "company",
+    "email",
+    "backup",
+    "system",
+    "update",
+    "logs",
+]);
 
 /** Dove si voleva andare quando è comparsa la domanda "Modifiche non salvate". */
 type PendingLeave = { type: "section"; section: SettingsSectionKey } | { type: "link"; to: string };
@@ -219,6 +247,7 @@ const SettingsPage = () => {
         email: <EmailSettingsPanel onDirtyChange={setIsSectionDirty} />,
         export: <ExportSettingsSection />,
         backup: <BackupSettingsPanel onDirtyChange={setIsSectionDirty} />,
+        system: <SystemSettingsPanel />,
         update: <UpdateSettingsPanel />,
         logs: <LogsSettingsPanel />,
     };

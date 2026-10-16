@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# For the Proxmox VM (production/LAN mode).
+# For the Proxmox VM (production; reached from outside via the Cloudflare Tunnel, no direct LAN access).
 # Usage: scripts/start-server.sh [--no-build]
 set -euo pipefail
 

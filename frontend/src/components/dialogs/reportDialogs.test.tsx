@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { customerCandidatePageSize } from "@/lib/customerLookup";
 
 const listDevices = vi.fn();
 const listIssues = vi.fn();
@@ -473,12 +474,18 @@ describe("CreateReportDialog", () => {
             await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
             await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
 
+            // Resta in sospeso solo la verifica di "Avanti" (`findCustomerByText`, che chiede i
+            // candidati a pagine da `customerCandidatePageSize`). Prima si sospendeva la prossima
+            // chiamata qualunque: se la ricerca dei suggerimenti, che parte 250ms dopo l'ultima
+            // lettera, arrivava dopo questo punto, `answer` risolveva lei e la verifica restava
+            // appesa per sempre. In CI capitava (2026-10-16): passo 2 mai comparso, 5s di attesa.
             let answer: (value: unknown) => void = () => {};
-            listCustomers.mockImplementation(
-                () =>
-                    new Promise((resolve) => {
-                        answer = resolve;
-                    })
+            listCustomers.mockImplementation(({ pageSize }: { pageSize: number }) =>
+                pageSize === customerCandidatePageSize
+                    ? new Promise((resolve) => {
+                          answer = resolve;
+                      })
+                    : Promise.resolve({ items: customers, totalItems: 1, page: 1, pageSize, totalPages: 1 })
             );
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 

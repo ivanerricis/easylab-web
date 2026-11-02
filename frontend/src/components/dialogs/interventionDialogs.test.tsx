@@ -582,18 +582,63 @@ describe("contratto di assistenza negli interventi", () => {
         });
     });
 
-    it("toglie il contratto scelto quando il tipo non lo consuma più", async () => {
+    it("toglie il contratto scelto quando il tipo non lo consuma più e prende l'unico rimasto", async () => {
         const onSubmit = await renderCreate();
         await chooseOption("Tipo intervento", "Intervento in laboratorio");
         await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
         await chooseOption("Contratto di assistenza", /#2 In sede/);
 
+        // Da remoto il #2 non vale più; l'unico valido è il #1, che si sceglie da solo.
         await chooseOption("Tipo intervento", "Intervento da remoto");
+        await waitFor(() => {
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#1 Remota");
+        });
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "remote", contractId: 1 }));
+        });
+    });
+
+    it("con un solo contratto valido lo sceglie già, e non lo ripropone se si sceglie nessuno", async () => {
+        const onSubmit = await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Rete");
+
+        await waitFor(() => {
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#1 Remota");
+        });
+
+        await chooseOption("Contratto di assistenza", "Nessun contratto");
+        expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("Nessun contratto");
         await save();
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "remote", contractId: null }));
         });
+    });
+
+    it("con più contratti validi non ne sceglie nessuno", async () => {
+        listContracts.mockResolvedValue(pageOf([contract(1, "remote"), contract(4, "remote")]));
+        await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+
+        const select = await screen.findByRole("combobox", { name: "Contratto di assistenza" });
+        expect(select).toHaveTextContent("Nessun contratto");
+        await userEvent.click(select);
+        expect(screen.getByRole("option", { name: /#1 Remota/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /#4 Remota/ })).toBeInTheDocument();
+    });
+
+    it("senza contratti validi il menu non c'è", async () => {
+        listContracts.mockResolvedValue(pageOf([]));
+        await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+
+        await waitFor(() => {
+            expect(listContracts).toHaveBeenCalled();
+        });
+        expect(screen.queryByRole("combobox", { name: "Contratto di assistenza" })).not.toBeInTheDocument();
     });
 
     it("in modifica tiene il contratto già collegato anche se scaduto e non lo rimanda se non cambia", async () => {
@@ -633,6 +678,49 @@ describe("contratto di assistenza negli interventi", () => {
         await waitFor(() => {
             expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#5 Remota");
         });
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        expect(onSubmit.mock.calls[0][0].contractId).toBeUndefined();
+    });
+
+    it("in modifica non collega da solo un intervento salvato senza contratto", async () => {
+        getIntervention.mockResolvedValue({
+            id: 10,
+            type: "remote",
+            description: "Fatto",
+            problem: "Rete",
+            note: null,
+            price: null,
+            paid: false,
+            toInvoice: false,
+            status: "completed",
+            interventionDate: "2026-10-05",
+            startTime: "09:00:00",
+            endTime: "10:00:00",
+            customerId: 30,
+            collaboratorId: 40,
+            contractId: null,
+            created_at: "2026-10-05T00:00:00.000Z",
+            updated_at: null,
+        });
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        renderWithProviders(
+            <EditInterventionDialog
+                open
+                interventionId={10}
+                customerName="Mario Rossi"
+                onOpenChange={() => {}}
+                onSubmit={onSubmit}
+            />
+        );
+
+        // Il #1 è l'unico valido: il menu c'è, ma resta su "Nessun contratto".
+        expect(
+            await screen.findByRole("combobox", { name: "Contratto di assistenza" }, { timeout: 10_000 })
+        ).toHaveTextContent("Nessun contratto");
         await save();
 
         await waitFor(() => {

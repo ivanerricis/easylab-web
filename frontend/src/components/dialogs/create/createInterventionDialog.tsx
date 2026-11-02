@@ -105,7 +105,18 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
     // Una copia di com'era il modulo all'apertura, non una costante: la data di partenza
     // cambia con lo slot del calendario (e con il giorno, se la pagina resta aperta a lungo).
     const [initialFormValues, setInitialFormValues] = useState(formValues);
-    const isDirty = hasFormChanged(formValues, initialFormValues);
+    // Il contratto scelto da solo (vedi sotto) e quelli che l'utente ha tolto a mano: un contratto
+    // tolto non si ripropone, altrimenti "Nessun contratto" tornerebbe subito al contratto.
+    const [autoContractId, setAutoContractId] = useState<string | null>(null);
+    const [declinedContractIds, setDeclinedContractIds] = useState<readonly string[]>([]);
+    // Il contratto scelto da solo non è una modifica dell'utente: aperto il dialogo dalla scheda di un
+    // cliente con un contratto, chiudere subito non deve chiedere se buttare le modifiche.
+    const isDirty = hasFormChanged(
+        formValues.contractId !== "" && formValues.contractId === autoContractId
+            ? { ...formValues, contractId: initialFormValues.contractId }
+            : formValues,
+        initialFormValues
+    );
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
     const [customerIdByOption, setCustomerIdByOption] = useState<Record<string, number>>({});
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
@@ -144,6 +155,19 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         }
     }, [isSelectedContractValid]);
 
+    // Con un solo contratto valido lo si sceglie già: lasciato su "Nessun contratto", dimenticarlo
+    // voleva dire ore non conteggiate. Con più contratti la scelta resta all'utente.
+    const onlyContractId = areContractsReady && contractOptions.length === 1 ? String(contractOptions[0].id) : null;
+
+    useEffect(() => {
+        if (onlyContractId != null && selectedContractId === "" && !declinedContractIds.includes(onlyContractId)) {
+            startTransition(() => {
+                setFormValues((prev) => ({ ...prev, contractId: onlyContractId }));
+                setAutoContractId(onlyContractId);
+            });
+        }
+    }, [onlyContractId, selectedContractId, declinedContractIds]);
+
     const initialCustomerId = initialCustomer?.id ?? null;
     const initialCustomerOption = initialCustomer
         ? formatCustomerOption(
@@ -156,6 +180,11 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
 
     /** Applica i campi cambiati e toglie l'errore a quelli toccati. */
     const handleChange = (patch: Partial<FormValues>) => {
+        if (patch.contractId === "" && formValues.contractId !== "") {
+            const declinedContractId = formValues.contractId;
+            setDeclinedContractIds((prev) => [...prev, declinedContractId]);
+        }
+
         setFormValues((prev) => ({ ...prev, ...patch }));
         setErrors((prev) => {
             const next = { ...prev };
@@ -177,6 +206,8 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
             const emptyFormValues = buildEmptyFormValues(initialDate, initialCustomerOption);
             setFormValues(emptyFormValues);
             setInitialFormValues(emptyFormValues);
+            setAutoContractId(null);
+            setDeclinedContractIds([]);
             setCustomerIdByOption(initialCustomerId == null ? {} : { [initialCustomerOption]: initialCustomerId });
         });
 

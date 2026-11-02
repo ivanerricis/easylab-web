@@ -84,6 +84,7 @@ data porta alla voce da qui.
 - [2026-10-14 — Login: si atterra sempre sulla dashboard](changelog/2026-10.md#2026-10-14-login-si-atterra-sempre-sulla-dashboard)
 - [2026-10-14 — Aggiornamento: le fasi si vedono anche sulle altre postazioni](changelog/2026-10.md#2026-10-14-aggiornamento-le-fasi-si-vedono-anche-sulle-altre-postazioni)
 - [2026-10-14 — Incassi mese: etichetta e confronto cambiano insieme alla cifra](changelog/2026-10.md#2026-10-14-incassi-mese-etichetta-e-confronto-cambiano-insieme-alla-cifra)
+- [2026-10-14 — Nuovo intervento: il contratto si sceglie da solo se è uno, e il menu c'è solo se serve](changelog/2026-10.md#2026-10-14-nuovo-intervento-il-contratto-si-sceglie-da-solo-se-e-uno-e-il-menu-ce-solo-se-serve)
 - [2026-10-14 — Ricerca globale: anche i contratti](changelog/2026-10.md#2026-10-14-ricerca-globale-anche-i-contratti)
 - [2026-10-14 — Class diagram del database: generato da uno script e tenuto allineato allo schema](changelog/2026-10.md#2026-10-14-class-diagram-del-database-generato-da-uno-script-e-tenuto-allineato-allo-schema)
 - [2026-10-14 — Ricerca globale: "#" per il numero esatto di un report o di un intervento](changelog/2026-10.md#2026-10-14-ricerca-globale-per-il-numero-esatto-di-un-report-o-di-un-intervento)

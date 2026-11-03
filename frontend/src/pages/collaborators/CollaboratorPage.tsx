@@ -1,9 +1,8 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import DetailStats from "@/components/detail-stats";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import { useGoBack } from "@/hooks/useGoBack";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
 import RefreshButton from "@/components/refresh-button";
@@ -76,8 +75,6 @@ const CollaboratorPage = () => {
         errorMessage: "Impossibile caricare il collaboratore",
     });
     const collaboratorName = collaborator ? formatPersonName(collaborator) : "Collaboratore";
-    // Sotto `sm` il nome sta nella card dei dati invece che nell'intestazione (`hideTitleOnMobile`).
-    const isPhone = useIsMobile(640);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     useDocumentTitle(collaboratorName);
@@ -193,30 +190,15 @@ const CollaboratorPage = () => {
             </DetailHeader>
 
             {collaborator ? (
-                <DetailSection
-                    isBusy={isCollaboratorReloading}
-                    // Su telefono il titolo è l'`h1` della pagina: vedi `titleAs`.
-                    titleAs={isPhone ? "div" : "h2"}
-                    title={
-                        // Su telefono il nome sta qui invece che nell'intestazione (vedi
-                        // `hideTitleOnMobile`), come nella scheda cliente: a 390px freccia, titolo e
-                        // quattro pulsanti non stanno su una riga, e il nome finiva spezzato su due o
-                        // tre righe con le azioni spinte sotto.
-                        isPhone ? (
-                            // L'`h1` della pagina sotto `sm`: vedi `hideTitleOnMobile`.
-                            <h1 className="min-w-0 text-lg wrap-break-word">{collaboratorName}</h1>
-                        ) : (
-                            "Dati del collaboratore"
-                        )
-                    }
-                >
-                    {/* A righe come la scheda report, su più colonne come la scheda cliente, così le
-                        righe hanno la stessa lunghezza in tutte le schede (vedi `DetailGrid`). */}
-                    <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
-                        <DetailItem label="Telefono" value={collaborator.phoneNumber ?? "-"} />
-                        <DetailItem label="Collaboratore dal" value={formatDateTime(collaborator.createdAt)} />
-                    </DetailGrid>
-                </DetailSection>
+                // Le card dei dati, come nella scheda report e nella scheda cliente.
+                <DetailStats
+                    mobileTitle={collaboratorName}
+                    gridClassName="xl:grid-cols-4"
+                    items={[
+                        { label: "Telefono", value: collaborator.phoneNumber ?? "-" },
+                        { label: "Collaboratore dal", value: formatDateTime(collaborator.createdAt) },
+                    ]}
+                />
             ) : null}
 
             <ReportsInterventionsTabs

@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 
 /**
  * Le tre forme delle schede di dettaglio: `report` e `intervention` hanno la riga dei numeri
- * (`DetailStats`) e le sezioni a righe; `person` (cliente, collaboratore, tecnico) ha una card di
- * dati e sotto la tabella dei report/interventi.
+ * (`DetailStats`) e le sezioni a righe; `customer` (quattro card di dati) e `person` (collaboratore e tecnico, due card)
+ * hanno le card dei dati e sotto la tabella dei report/interventi.
  */
-export type DetailSkeletonVariant = "report" | "intervention" | "person";
+export type DetailSkeletonVariant = "report" | "intervention" | "customer" | "person";
 
 /**
  * La forma di scheda che spetta a un indirizzo, per chi mostra lo scheletro prima ancora che la
@@ -24,6 +24,10 @@ const detailSkeletonVariantForPath = (pathname: string): DetailSkeletonVariant =
         return "intervention";
     }
 
+    if (/^\/clients\/[^/]+/.test(pathname)) {
+        return "customer";
+    }
+
     return "person";
 };
 
@@ -34,6 +38,7 @@ const detailSkeletonVariantForPath = (pathname: string): DetailSkeletonVariant =
 const headerActions: Record<DetailSkeletonVariant, boolean[]> = {
     report: [false, true, true, false],
     intervention: [false, true, true, true, false],
+    customer: [false, true, true, false],
     person: [false, true, true, false],
 };
 
@@ -95,7 +100,7 @@ const HeaderSkeleton = ({ variant }: { variant: DetailSkeletonVariant }) => (
 );
 
 /** I cinque numeri in cima: la stessa markup di `DetailStats` (righe sotto `xl`, card da `xl`). */
-const StatsSkeleton = () => (
+const StatsSkeleton = ({ count = 5, gridClassName }: { count?: number; gridClassName?: string }) => (
     <div
         aria-hidden="true"
         className="rounded-xl bg-card text-card-foreground shadow-xs ring-1 ring-foreground/10 xl:rounded-none xl:bg-transparent xl:shadow-none xl:ring-0"
@@ -104,8 +109,8 @@ const StatsSkeleton = () => (
         <div className="px-6 pt-3.5 pb-1 sm:hidden">
             <Skeleton className="my-1 h-5 w-48 max-w-full" />
         </div>
-        <div className="divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-4 xl:divide-y-0">
-            {Array.from({ length: 5 }, (_, item) => (
+        <div className={cn("divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-2 xl:divide-y-0", gridClassName)}>
+            {Array.from({ length: count }, (_, item) => (
                 <div
                     key={item}
                     className="flex min-w-0 items-center justify-between gap-3 px-6 py-2.5 xl:flex-col xl:items-start xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-card xl:px-6 xl:py-5 xl:shadow-xs xl:ring-1 xl:ring-foreground/10"
@@ -141,29 +146,12 @@ const InterventionBodySkeleton = () => (
 );
 
 /**
- * La card dei dati di cliente, collaboratore e tecnico e la tabella sotto: tab (o titolo) e filtro
+ * Le card dei dati di cliente, collaboratore e tecnico (le stesse di `DetailStats`) e la tabella sotto: tab (o titolo) e filtro
  * sulla stessa riga, tabella da `sm`, schede su telefono, impaginazione in fondo.
  */
-const PersonBodySkeleton = () => (
+const PersonBodySkeleton = ({ cards }: { cards: number }) => (
     <>
-        <DetailSection
-            title={
-                <div aria-hidden="true" className="max-sm:flex max-sm:h-10 max-sm:items-center">
-                    <SectionTitleSkeleton className="sm:w-40" />
-                </div>
-            }
-            titleAs="div"
-        >
-            <div aria-hidden="true">
-                <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
-                    <RowSkeleton />
-                    <RowSkeleton className="max-sm:hidden" />
-                    <RowSkeleton className="max-sm:hidden" />
-                    <RowSkeleton className="max-sm:hidden" />
-                    <RowSkeleton className="max-sm:hidden" />
-                </DetailGrid>
-            </div>
-        </DetailSection>
+        <StatsSkeleton count={cards} gridClassName="xl:grid-cols-4" />
 
         <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
@@ -208,12 +196,15 @@ const DetailPageSkeleton = ({
         aria-busy="true"
         // Le schede di report e intervento scorrono nel `main` (`self-start`); le altre tre
         // riempiono l'altezza, perché la tabella sotto prenda il resto: vedi le pagine.
-        className={cn("flex w-full flex-col gap-4", variant === "person" ? "h-full min-h-0" : "self-start")}
+        className={cn(
+            "flex w-full flex-col gap-4",
+            variant === "person" || variant === "customer" ? "h-full min-h-0" : "self-start"
+        )}
     >
         <span className="sr-only">{label}</span>
         <HeaderSkeleton variant={variant} />
-        {variant === "person" ? (
-            <PersonBodySkeleton />
+        {variant === "person" || variant === "customer" ? (
+            <PersonBodySkeleton cards={variant === "customer" ? 4 : 2} />
         ) : (
             <div className="flex flex-col gap-4">
                 <StatsSkeleton />

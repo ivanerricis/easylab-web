@@ -164,7 +164,7 @@ describe("CollaboratorPage", () => {
         });
         await renderPage();
 
-        expect(screen.getByText("Dati del collaboratore")).toBeInTheDocument();
+        expect(screen.getByText("Collaboratore dal")).toBeInTheDocument();
 
         await userEvent.click(screen.getByRole("button", { name: "Modifica collaboratore" }));
         const dialog = await screen.findByRole("dialog");

@@ -7,19 +7,22 @@ describe("detailSkeletonVariantForPath", () => {
     it("sceglie la forma dall'indirizzo", () => {
         expect(detailSkeletonVariantForPath("/reports/3174")).toBe("report");
         expect(detailSkeletonVariantForPath("/interventions/8012")).toBe("intervention");
-        expect(detailSkeletonVariantForPath("/clients/5")).toBe("person");
-        expect(detailSkeletonVariantForPath("/clients/5/interventions")).toBe("person");
+        expect(detailSkeletonVariantForPath("/clients/5")).toBe("customer");
+        expect(detailSkeletonVariantForPath("/clients/5/interventions")).toBe("customer");
         expect(detailSkeletonVariantForPath("/collaborators/2")).toBe("person");
         expect(detailSkeletonVariantForPath("/technicians/2")).toBe("person");
     });
 });
 
 describe("DetailPageSkeleton", () => {
-    it.each(["report", "intervention", "person"] as const)("la forma %s è uno stato di caricamento", (variant) => {
-        renderWithProviders(<DetailPageSkeleton variant={variant} />);
+    it.each(["report", "intervention", "customer", "person"] as const)(
+        "la forma %s è uno stato di caricamento",
+        (variant) => {
+            renderWithProviders(<DetailPageSkeleton variant={variant} />);
 
-        const status = screen.getByRole("status");
-        expect(status).toHaveAttribute("aria-busy", "true");
-        expect(status).toHaveTextContent("Caricamento in corso");
-    });
+            const status = screen.getByRole("status");
+            expect(status).toHaveAttribute("aria-busy", "true");
+            expect(status).toHaveTextContent("Caricamento in corso");
+        }
+    );
 });

@@ -15,9 +15,11 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
   - **Invio per email.** Contratto o preventivo mandato al cliente con il PDF allegato.
   - **Resoconto stampabile di tutti i contratti di un cliente.** Un pulsante «Stampa» in intestazione
     sulla tab Contratti della scheda cliente.
-  - **Prezzo o canone nel preventivo.** Richiede un campo nuovo nello schema (e quindi migration e
-    class diagram).
-  - **Testo legale definitivo.** Recesso, rinnovo, SLA, foro competente: il testo va fornito.
+  - **Importo del contratto (da inserire).** Il contratto non ha un prezzo o un canone, quindi il
+    preventivo e il contratto stampati non mostrano importi. Serve un campo nuovo nello schema (migration
+    e class diagram), da compilare nel dialogo del contratto e da stampare nel PDF.
+  - **Testi legali (da inserire).** Oggi il PDF ha solo la frase sulla privacy e la regola delle ore:
+    mancano le clausole vere (recesso, rinnovo, SLA, foro competente), che l'utente deve ancora fornire.
   - **Giorni di validità dell'offerta nel preventivo.**
 - Rimandati dai contratti (CHANGELOG del 2026-10-07):
   - **Un gruppo Fornitori nella ricerca globale.** Banale: `listProviders` e la pagina esistono,

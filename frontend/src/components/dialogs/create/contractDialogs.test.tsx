@@ -173,7 +173,7 @@ describe("CreateContractDialog", () => {
         const fillNewCustomer = async () => {
             await userEvent.click(screen.getByRole("button", { name: "Crea nuovo cliente" }));
             const dialog = await screen.findByRole("dialog", { name: "Nuovo cliente" });
-            await userEvent.type(within(dialog).getByLabelText(/^Nome \(Nome azienda\)/), "Anna");
+            await userEvent.type(within(dialog).getByLabelText(/^Nome o azienda/), "Anna");
             await userEvent.type(within(dialog).getByLabelText(/^Cognome/), "Bianchi");
             await userEvent.type(within(dialog).getByLabelText(/^Telefono 1/), "340 111");
             await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));

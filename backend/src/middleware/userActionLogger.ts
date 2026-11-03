@@ -60,6 +60,11 @@ const actionLabelRules: { method: string; match: string | RegExp; label: string 
     },
     {
         method: "GET",
+        match: /^\/api\/customers\/\d+\/contracts\/print$/,
+        label: "stampa contratti del cliente",
+    },
+    {
+        method: "GET",
         match: /^\/api\/collaborators\/\d+\/reports\/print$/,
         label: "stampa resoconto report collaboratore",
     },

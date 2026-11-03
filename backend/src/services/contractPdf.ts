@@ -1,7 +1,16 @@
 import pdfmake from "pdfmake";
-import { dualFieldRow, loadLogoDataUrl, sectionBarRow, tableLayout, wrapPdfDocument } from "./pdf/shared";
-import type { ContractStatus, ContractType } from "../db/schema";
-import { formatContractStatus, formatContractType } from "./contractLabels";
+import {
+    buildCustomerSummaryHeader,
+    buildCustomerSummaryInfoSection,
+    dualFieldRow,
+    loadLogoDataUrl,
+    sectionBarRow,
+    tableLayout,
+    wrapPdfDocument,
+    type CustomerSummaryHeaderData,
+} from "./pdf/shared";
+import type { AssistanceType, ContractStatus, ContractType } from "../db/schema";
+import { formatAssistanceType, formatContractStatus, formatContractType, formatHours } from "./contractLabels";
 
 /**
  * "Preventivo" Ã¨ un contratto in bozza: non ancora accettato dal cliente. Ogni altro stato
@@ -335,4 +344,124 @@ export const createContractPdfBuffer = async (contract: ContractPrintData) => {
     const pdfDocument = pdfmake.createPdf(documentDefinition);
 
     return await pdfDocument.getBuffer();
+};
+
+export type CustomerContractSummaryItem = {
+    id: number;
+    type: ContractType;
+    /** Lo stato effettivo (compreso `expired`). */
+    status: ContractStatus;
+    providerName: string;
+    device: string;
+    /** Solo per i contratti di assistenza; `includedHours` null = ore illimitate. */
+    assistance: { assistanceType: AssistanceType; includedHours: number | null } | null;
+    startDateLabel: string;
+    /** La data di fine esclusiva, come la mostra la pagina ("Data fine"). */
+    endDateLabel: string;
+};
+
+export type CustomerContractsPrintData = CustomerSummaryHeaderData & {
+    contractCount: number;
+    /** Già nell'ordine di stampa: dal più recente. */
+    contracts: CustomerContractSummaryItem[];
+};
+
+// Una bozza è un preventivo: lo si dice, perché nell'elenco non c'è altro a distinguerla.
+const formatSummaryStatus = (status: ContractStatus) =>
+    status === "draft" ? `${formatContractStatus(status)} (preventivo)` : formatContractStatus(status);
+
+const formatPackage = (assistance: CustomerContractSummaryItem["assistance"]) => {
+    if (!assistance) {
+        return "-";
+    }
+
+    const hours =
+        assistance.includedHours === null ? "ore illimitate" : `${formatHours(assistance.includedHours)}/mese`;
+
+    return `${formatAssistanceType(assistance.assistanceType)} - ${hours}`;
+};
+
+const statusSummaryOrder: [ContractStatus, string, string][] = [
+    ["active", "attivo", "attivi"],
+    ["draft", "bozza", "bozze"],
+    ["expired", "scaduto", "scaduti"],
+    ["cancelled", "annullato", "annullati"],
+];
+
+/** "2 attivi, 1 bozza": solo gli stati presenti. */
+const buildStatusSummary = (contracts: CustomerContractSummaryItem[]) =>
+    statusSummaryOrder
+        .map(([status, singular, plural]) => {
+            const count = contracts.filter((contract) => contract.status === status).length;
+
+            return count === 0 ? null : `${count} ${count === 1 ? singular : plural}`;
+        })
+        .filter((part): part is string => part !== null)
+        .join(", ");
+
+const summaryColumnCount = 8;
+
+const buildCustomerContractsTable = (contracts: CustomerContractSummaryItem[]) => {
+    const body: object[][] = [
+        sectionBarRow("RESOCONTO CONTRATTI", summaryColumnCount),
+        ["ID", "Tipo", "Stato", "Fornitore", "Dispositivo", "Pacchetto", "Inizio", "Fine"].map((text) => ({
+            text,
+            style: "summaryHeader",
+        })),
+    ];
+
+    if (contracts.length === 0) {
+        body.push([
+            {
+                text: "Nessun contratto",
+                colSpan: summaryColumnCount,
+                alignment: "center",
+                italics: true,
+                margin: [0, 8, 0, 8],
+            },
+            ...new Array<object>(summaryColumnCount - 1).fill({}),
+        ]);
+    } else {
+        for (const contract of contracts) {
+            body.push([
+                { text: String(contract.id), alignment: "center", bold: true },
+                { text: formatContractType(contract.type) },
+                { text: formatSummaryStatus(contract.status) },
+                { text: contract.providerName },
+                { text: contract.device, bold: true },
+                { text: formatPackage(contract.assistance), fontSize: 8.5 },
+                { text: contract.startDateLabel, alignment: "center" },
+                { text: contract.endDateLabel, alignment: "center" },
+            ]);
+        }
+    }
+
+    return {
+        table: {
+            // Barra di sezione + intestazione colonne: si ripetono a ogni pagina.
+            headerRows: 2,
+            widths: [28, 52, 62, 70, "*", 86, 54, 54],
+            body,
+        },
+        layout: tableLayout,
+    };
+};
+
+export const createCustomerContractsPdfBuffer = async (customer: CustomerContractsPrintData) => {
+    const logoDataUrl = await loadLogoDataUrl();
+    const statusSummary = buildStatusSummary(customer.contracts);
+
+    const documentDefinition = wrapPdfDocument([
+        buildCustomerSummaryHeader(
+            customer,
+            logoDataUrl,
+            customer.contractCount === 1 ? "1 contratto" : `${customer.contractCount} contratti`
+        ),
+        buildCustomerSummaryInfoSection(customer),
+        { text: "Contratti", style: "sectionTitle", margin: [0, 0, 0, 2] },
+        ...(statusSummary ? [{ text: statusSummary, style: "fineprint", margin: [0, 0, 0, 4] }] : []),
+        buildCustomerContractsTable(customer.contracts),
+    ]);
+
+    return await pdfmake.createPdf(documentDefinition).getBuffer();
 };

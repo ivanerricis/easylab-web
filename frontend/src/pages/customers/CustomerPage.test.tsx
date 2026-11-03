@@ -39,6 +39,7 @@ vi.mock("@/lib/api", async () => {
         listContracts: (...args: unknown[]) => api.listContracts(...args),
         createContract: (...args: unknown[]) => api.createContract(...args),
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
+        getCustomerContractsPrintUrl: (id: number) => `/api/customers/${id}/contracts/print`,
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
         getCustomerInterventionsPrintUrl: (id: number) => `interventions:${id}`,
     };
@@ -175,6 +176,15 @@ describe("CustomerPage", () => {
         expect(openPrintWindow).toHaveBeenCalledWith("reports:3");
     });
 
+    it("sulle tab report e interventi la stampa apre ancora il dialogo con l'intervallo", async () => {
+        await renderPage("/clients/3/interventions", "/clients/:id/interventions");
+
+        await userEvent.click(screen.getByRole("button", { name: "Stampa resoconto interventi" }));
+
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(openPrintWindow).not.toHaveBeenCalled();
+    });
+
     it("modifica i dati del cliente dalla scheda", async () => {
         api.updateCustomer.mockImplementation(async (id: number, payload: object) => ({
             ...(await api.getCustomer.mock.results[0].value),
@@ -255,8 +265,10 @@ describe("CustomerPage", () => {
         expect(screen.getAllByRole("link", { name: "Apri contratto 21" })[0]).toHaveAttribute("href", "/contracts/21");
         // La colonna del cliente non c'è: nella sua scheda sarebbe sempre lo stesso nome.
         expect(screen.queryByRole("columnheader", { name: "Cliente" })).not.toBeInTheDocument();
-        // Per i contratti non c'è un resoconto da stampare.
-        expect(screen.queryByRole("button", { name: /^Stampa resoconto/ })).not.toBeInTheDocument();
+        // L'intestazione stampa il resoconto dei contratti del cliente, subito e senza dialogo.
+        await userEvent.click(screen.getByRole("button", { name: "Stampa i contratti del cliente" }));
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/customers/3/contracts/print");
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
         // Il pulsante di riga stampa il PDF di quel contratto.
         await userEvent.click(screen.getAllByRole("button", { name: "Stampa contratto 21" })[0]);

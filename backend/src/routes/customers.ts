@@ -7,12 +7,14 @@ import {
     listCustomers,
     updateCustomerById,
 } from "../db/queries/customer";
+import { listContracts } from "../db/queries/contract";
 import { personDisplayName } from "../db/queries/personName";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
-import { formatPhoneLabel } from "./formatting";
-import { createCrudRouter } from "./crudRouter";
+import { formatDayLabel, formatPhoneLabel } from "./formatting";
+import { createCrudRouter, idParamsSchema } from "./crudRouter";
+import { createCustomerContractsPdfBuffer } from "../services/contractPdf";
 import { registerSummaryPrintRoutes } from "./summaryPrint";
 import { validate } from "./validation";
 
@@ -105,6 +107,45 @@ const customersRouter = createCrudRouter({
             res.setHeader("Content-Type", "text/csv; charset=utf-8");
             res.setHeader("Content-Disposition", "attachment; filename=clienti.csv");
             res.send(csv);
+        });
+
+        // Il resoconto di tutti i contratti del cliente, senza periodo: sono pochi, e uno scaduto
+        // o una bozza serve vederli accanto a quelli attivi.
+        router.get("/:id/contracts/print", validate({ params: idParamsSchema }), async (req, res) => {
+            const { id } = req.params as unknown as { id: number };
+            const context = await loadCustomerPrintContext(id);
+
+            if (!context) {
+                res.status(404).json({ message: "Cliente non trovato" });
+                return;
+            }
+
+            const result = await listContracts({ customerId: id, timeZone: await getAppTimeZone() });
+            // Senza `page` la lista è sempre un array: il ramo `items` serve solo al tipo.
+            const rows = Array.isArray(result) ? result : result.items;
+            // Dal più recente, come l'elenco dei contratti.
+            const contracts = [...rows].sort((a, b) => b.id - a.id);
+
+            const pdfBuffer = await createCustomerContractsPdfBuffer({
+                ...context,
+                contractCount: contracts.length,
+                contracts: contracts.map((contract) => ({
+                    id: contract.id,
+                    type: contract.type,
+                    status: contract.effectiveStatus,
+                    providerName: contract.providerName,
+                    device: contract.device,
+                    assistance: contract.assistanceType
+                        ? { assistanceType: contract.assistanceType, includedHours: contract.includedHours }
+                        : null,
+                    startDateLabel: formatDayLabel(contract.startDate),
+                    endDateLabel: formatDayLabel(contract.endDate),
+                })),
+            });
+
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader("Content-Disposition", `inline; filename=contratti-cliente-${id}.pdf`);
+            res.send(pdfBuffer);
         });
 
         registerSummaryPrintRoutes(router, {

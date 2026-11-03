@@ -24,6 +24,7 @@ import {
     createContract,
     deleteCustomer,
     getCustomer,
+    getCustomerContractsPrintUrl,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
     updateCustomer,
@@ -108,9 +109,22 @@ const CustomerPage = () => {
         });
     };
 
-    // La stampa segue il tab: dal tab dei report stampa il resoconto dei report, dall'altro
-    // quello degli interventi. Prima ognuna delle due pagine aveva il suo pulsante.
-    const printTitle = activeTab === "interventions" ? "Stampa resoconto interventi" : "Stampa resoconto report";
+    // La stampa segue il tab: report e interventi chiedono prima l'intervallo di date, i contratti
+    // aprono subito il PDF (tutti i contratti del cliente, senza intervallo).
+    const printTitle =
+        activeTab === "contracts"
+            ? "Stampa i contratti del cliente"
+            : activeTab === "interventions"
+              ? "Stampa resoconto interventi"
+              : "Stampa resoconto report";
+
+    const handlePrint = () => {
+        if (activeTab === "contracts") {
+            openPrintWindow(getCustomerContractsPrintUrl(customerId));
+        } else {
+            setIsPrintDialogOpen(true);
+        }
+    };
 
     const handleConfirmPrint = (range: { dateFrom?: string; dateTo?: string }) => {
         openPrintWindow(
@@ -263,15 +277,8 @@ const CustomerPage = () => {
                     aria-label="Modifica cliente"
                 />
 
-                {/* La stampa segue il tab, e per i contratti un resoconto non c'è. */}
-                {activeTab !== "contracts" ? (
-                    <DetailHeaderAction
-                        icon={Printer}
-                        text="Stampa"
-                        onClick={() => setIsPrintDialogOpen(true)}
-                        aria-label={printTitle}
-                    />
-                ) : null}
+                {/* La stampa segue il tab (vedi `handlePrint`). */}
+                <DetailHeaderAction icon={Printer} text="Stampa" onClick={handlePrint} aria-label={printTitle} />
 
                 <DetailDeleteButton
                     label="Elimina cliente"

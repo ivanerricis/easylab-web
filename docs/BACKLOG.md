@@ -13,8 +13,6 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 **Interfaccia**
 - Rimandati dal PDF dei contratti (CHANGELOG del 2026-11-03):
   - **Invio per email.** Contratto o preventivo mandato al cliente con il PDF allegato.
-  - **Resoconto stampabile di tutti i contratti di un cliente.** Un pulsante «Stampa» in intestazione
-    sulla tab Contratti della scheda cliente.
   - **Importo del contratto (da inserire).** Il contratto non ha un prezzo o un canone, quindi il
     preventivo e il contratto stampati non mostrano importi. Serve un campo nuovo nello schema (migration
     e class diagram), da compilare nel dialogo del contratto e da stampare nel PDF.

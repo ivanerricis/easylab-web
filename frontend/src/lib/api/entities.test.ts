@@ -11,6 +11,7 @@ import {
     createCustomer,
     deleteCustomer,
     getCustomer,
+    getCustomerContractsPrintUrl,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
     listCustomers,
@@ -219,5 +220,12 @@ describe("api clienti e tecnici per id", () => {
         const interventionsUrl = getCustomerInterventionsPrintUrl(3);
         expect(interventionsUrl).toContain("/customers/3/interventions/print");
         expect(interventionsUrl).not.toContain("dateFrom");
+    });
+
+    it("costruisce l'URL di stampa dei contratti del cliente, senza query string", () => {
+        const url = getCustomerContractsPrintUrl(3);
+
+        expect(url).toMatch(/\/customers\/3\/contracts\/print$/);
+        expect(url).not.toContain("?");
     });
 });

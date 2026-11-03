@@ -15,6 +15,7 @@ import CardDashboard, {
     dashboardCardLayoutClassName,
     dashboardCardValueClassName,
 } from "./components/cardDashboard";
+import SetupChecklistCard from "./components/setupChecklistCard";
 import CalendarSkeleton from "@/pages/calendar/components/calendar-skeleton";
 import { Card } from "@/components/ui/card";
 import PageHeader from "@/components/page-header";
@@ -194,6 +195,8 @@ const DashboardPage = () => {
                     </div>
                 }
             />
+
+            <SetupChecklistCard />
 
             {/*
                 Una griglia vera anche da `sm` in su, non più un flex-wrap: le schede andavano a capo

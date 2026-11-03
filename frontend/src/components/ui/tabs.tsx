@@ -32,7 +32,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         <TabsPrimitive.Trigger
             data-slot="tabs-trigger"
             className={cn(
-                "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-none border border-border bg-card px-3 text-sm font-medium whitespace-nowrap text-foreground focus-outline transition-colors outline-none not-first:-ml-px first:rounded-l-md last:rounded-r-md hover:bg-muted focus-visible:z-10 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:data-[state=active]:border-primary dark:data-[state=active]:bg-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+                "inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-none border border-border bg-card px-3 text-sm font-medium whitespace-nowrap text-foreground focus-outline transition-colors outline-none not-first:-ml-px first:rounded-l-md last:rounded-r-md hover:bg-muted focus-visible:z-10 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:border-input dark:hover:bg-muted/50 dark:data-[state=active]:border-primary dark:data-[state=active]:bg-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
                 className
             )}
             {...props}

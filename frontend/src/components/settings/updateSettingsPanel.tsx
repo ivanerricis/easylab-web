@@ -97,7 +97,7 @@ const UpdateSettingsPanel = () => {
                     if (result.lastCheckedAt && result.lastCheckedAt !== previousCheckedAt) {
                         setStatus(result);
                         if (result.updateAvailable) {
-                            toast.warning("È disponibile un aggiornamento", { id: toastId, richColors: true });
+                            toast.warning("È disponibile un aggiornamento", { id: toastId });
                         } else {
                             toast.success("Applicazione già aggiornata", { id: toastId });
                         }

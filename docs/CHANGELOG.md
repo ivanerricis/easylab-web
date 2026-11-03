@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-03 — Notifiche e toast riconoscibili per tipo, colori dei componenti allineati](changelog/2026-11.md#2026-11-03-notifiche-e-toast-riconoscibili-per-tipo-colori-dei-componenti-allineati)
 - [2026-11-03 — Schede cliente, collaboratore e tecnico con le card dei dati](changelog/2026-11.md#2026-11-03-schede-cliente-collaboratore-e-tecnico-con-le-card-dei-dati)
 - [2026-11-03 — «Primi passi»: i dati azienda già compilati contano come fatti](changelog/2026-11.md#2026-11-03-primi-passi-i-dati-azienda-già-compilati-contano-come-fatti)
 - [2026-11-03 — Installazione guidata (`install.sh`) e guida "Primi passi"](changelog/2026-11.md#2026-11-03-installazione-guidata-installsh-e-guida-primi-passi)

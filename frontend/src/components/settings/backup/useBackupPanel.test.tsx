@@ -336,7 +336,7 @@ describe("useBackupPanel: NAS e backup manuale", () => {
             await result.current.handleRunBackup();
         });
 
-        expect(toast.warning).toHaveBeenCalledWith("Dump creato, copia sul NAS non riuscita", { richColors: true });
+        expect(toast.warning).toHaveBeenCalledWith("Dump creato, copia sul NAS non riuscita");
         expect(toast.success).not.toHaveBeenCalled();
     });
 
@@ -457,9 +457,7 @@ describe("useBackupPanel: ripristino", () => {
             await result.current.handleConfirmRestore();
         });
 
-        expect(toast.warning).toHaveBeenCalledWith("Ripristino completato: reinserisci la password SMTP", {
-            richColors: true,
-        });
+        expect(toast.warning).toHaveBeenCalledWith("Ripristino completato: reinserisci la password SMTP");
         expect(result.current.secretsToReconfigure).toEqual(["Password SMTP"]);
     });
 

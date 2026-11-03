@@ -14,10 +14,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
             theme={theme}
             className="toaster group"
             icons={{
-                success: <CircleCheckIcon className="size-5" />,
-                info: <InfoIcon className="size-5" />,
-                warning: <TriangleAlertIcon className="size-5" />,
-                error: <OctagonXIcon className="size-5" />,
+                success: <CircleCheckIcon className="size-5 text-status-green-foreground" />,
+                info: <InfoIcon className="size-5 text-primary-text" />,
+                warning: <TriangleAlertIcon className="size-5 text-status-yellow-foreground" />,
+                error: <OctagonXIcon className="size-5 text-destructive-text" />,
                 loading: <Loader2Icon className="size-5 animate-spin" />,
             }}
             style={
@@ -28,12 +28,20 @@ const Toaster = ({ ...props }: ToasterProps) => {
                     "--border-radius": "var(--radius)",
                 } as React.CSSProperties
             }
+            {...props}
+            // Dopo `{...props}`: chi usa il Toaster passa le proprie classi (titolo, chiusura) e non
+            // deve perdere il bordo colorato per tipo, che vale al posto di `richColors`.
             toastOptions={{
+                ...props.toastOptions,
                 classNames: {
-                    toast: "cn-toast",
+                    toast: "cn-toast border-l-4!",
+                    success: "border-l-status-green!",
+                    info: "border-l-primary!",
+                    warning: "border-l-status-yellow!",
+                    error: "border-l-destructive!",
+                    ...props.toastOptions?.classNames,
                 },
             }}
-            {...props}
         />
     );
 };

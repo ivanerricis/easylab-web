@@ -1,6 +1,6 @@
 import { Fragment, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Bell, X } from "lucide-react";
+import { AlertTriangle, Bell, CircleCheck, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -40,7 +40,7 @@ export function NotificationsMenu() {
                             {badgeCount > 0 ? (
                                 <span
                                     aria-hidden="true"
-                                    className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-white"
+                                    className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-white dark:text-background"
                                 >
                                     {badgeCount > 9 ? "9+" : badgeCount}
                                 </span>
@@ -93,7 +93,17 @@ export function NotificationsMenu() {
                                     return (
                                         <DropdownMenuItem
                                             key={notification.id}
-                                            className="flex-col items-start gap-0.5 pr-1.5"
+                                            className={cn(
+                                                // Il bordo a sinistra e la tinta dicono il tipo a colpo d'occhio:
+                                                // avviso in ambra (il rosso resta per gli errori e per il contatore),
+                                                // voce risolta in verde, le altre nel colore principale.
+                                                "flex-col items-start gap-0.5 border-l-2 pr-1.5",
+                                                notification.resolved
+                                                    ? "border-status-green bg-status-green/5"
+                                                    : notification.tone === "warning"
+                                                      ? "border-status-yellow bg-status-yellow/10"
+                                                      : "border-primary/60"
+                                            )}
                                             onClick={href ? () => navigate(href) : undefined}
                                         >
                                             <div className="flex w-full items-start justify-between gap-2">
@@ -101,12 +111,18 @@ export function NotificationsMenu() {
                                                     className={cn(
                                                         // Il titolo va a capo invece di spingere fuori il pulsante di chiusura.
                                                         "flex min-w-0 flex-1 items-start gap-1.5 font-medium whitespace-normal",
-                                                        notification.tone === "warning" && "text-destructive"
+                                                        notification.tone === "warning" &&
+                                                            !notification.resolved &&
+                                                            "text-status-yellow-foreground"
                                                     )}
                                                 >
-                                                    {notification.tone === "warning" ? (
+                                                    {notification.resolved ? (
+                                                        <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-status-green-foreground" />
+                                                    ) : notification.tone === "warning" ? (
                                                         <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                                                    ) : null}
+                                                    ) : (
+                                                        <Info className="mt-0.5 size-3.5 shrink-0 text-primary-text" />
+                                                    )}
                                                     {notification.title}
                                                 </span>
                                                 <Button

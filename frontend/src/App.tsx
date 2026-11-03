@@ -71,13 +71,13 @@ export function App() {
                 <Toaster
                     closeButton={true}
                     position="top-center"
-                    richColors
                     swipeDirections={["left", "right", "top"]}
                     toastOptions={{
                         classNames: {
                             title: "text-base",
                             description: "text-sm",
-                            closeButton: "[&>svg]:h-4 [&>svg]:w-4 w-6! h-6!",
+                            // Dentro la card, in alto a destra (di serie sonner la mette fuori, sull'angolo sinistro).
+                            closeButton: "[&>svg]:h-4 [&>svg]:w-4 w-6! h-6! top-2! right-2! left-auto! transform-none!",
                         },
                     }}
                 />

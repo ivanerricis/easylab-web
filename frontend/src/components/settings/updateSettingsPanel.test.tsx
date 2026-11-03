@@ -127,10 +127,7 @@ describe("UpdateSettingsPanel", () => {
         api.getUpdateStatus.mockResolvedValue({ ...status, lastCheckedAt: "2026-09-11T10:00:00.000Z" });
         await nextPoll();
 
-        expect(toast.warning).toHaveBeenCalledWith("È disponibile un aggiornamento", {
-            id: "toast-id",
-            richColors: true,
-        });
+        expect(toast.warning).toHaveBeenCalledWith("È disponibile un aggiornamento", { id: "toast-id" });
         expect(screen.getByRole("button", { name: "Verifica aggiornamenti" })).toBeEnabled();
     });
 

@@ -71,7 +71,6 @@ export function App() {
                 <Toaster
                     closeButton={true}
                     position="top-center"
-                    richColors
                     swipeDirections={["left", "right", "top"]}
                     toastOptions={{
                         classNames: {

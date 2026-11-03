@@ -9,7 +9,7 @@ export type AppNotification = {
     description?: string;
     /** Testo breve allineato a destra: orario, data. */
     meta?: string;
-    /** "warning" evidenzia il titolo in rosso con l'icona di avviso. */
+    /** "warning" evidenzia la voce in ambra con l'icona di avviso (il rosso è degli errori). */
     tone?: "default" | "warning";
     /** Rotta aperta cliccando la voce. */
     href?: string;

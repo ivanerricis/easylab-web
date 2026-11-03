@@ -319,7 +319,7 @@ export const useBackupPanel = ({ onDirtyChange }: Options = {}) => {
             setSettings(result);
 
             if (result.smbEnabled && result.smbLastStatus === "failed") {
-                toast.warning(result.message, { richColors: true });
+                toast.warning(result.message);
             } else {
                 toast.success(result.message);
             }
@@ -429,7 +429,7 @@ export const useBackupPanel = ({ onDirtyChange }: Options = {}) => {
             setSettings(result);
 
             if (result.restoreSecretsToReconfigure.length > 0) {
-                toast.warning(result.message, { richColors: true });
+                toast.warning(result.message);
             } else {
                 toast.success(result.message);
             }

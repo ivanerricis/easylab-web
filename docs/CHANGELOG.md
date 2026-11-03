@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-03 — Dialoghi in colonna, bordi del menu Impostazioni, nome dell'app nell'OTP](changelog/2026-11.md#2026-11-03-dialoghi-in-colonna-bordi-del-menu-impostazioni-nome-dellapp-nellotp)
 - [2026-11-03 — `main` protetto: PR obbligatoria, CI obbligatoria, solo squash](changelog/2026-11.md#2026-11-03-main-protetto-pr-obbligatoria-ci-obbligatoria-solo-squash)
 - [2026-11-03 — Aggiornamento del server per versione: si installano i tag firmati, non la punta di main](changelog/2026-11.md#2026-11-03-aggiornamento-del-server-per-versione-si-installano-i-tag-firmati-non-la-punta-di-main)
 - [2026-11-03 — Release: un workflow crea la pagina della release da un tag firmato](changelog/2026-11.md#2026-11-03-release-un-workflow-crea-la-pagina-della-release-da-un-tag-firmato)

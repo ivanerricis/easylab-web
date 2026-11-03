@@ -218,7 +218,7 @@ const EditInterventionDialog = ({
                                         mostra l'errore sotto di sé la riga si allunga, e senza le celle
                                         vicine si stiravano con lei spingendo in giù etichetta e campo.
                                     */}
-                                    <div className="grid items-start gap-4 lg:grid-cols-2">
+                                    <div className="grid items-start gap-4">
                                         <FormField labelSize="sm" id="customerName" label="Cliente" className="gap-1">
                                             <Select disabled value={customerName}>
                                                 <SelectTrigger id="customerName" className="w-full">

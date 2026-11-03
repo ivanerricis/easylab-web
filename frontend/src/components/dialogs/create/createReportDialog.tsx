@@ -406,7 +406,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                 l'errore sotto di sé la riga si allunga, e senza le celle vicine si
                                 stiravano con lei spingendo in giù etichetta e campo.
                             */}
-                                <div className="grid items-start gap-3 sm:grid-cols-2">
+                                <div className="grid items-start gap-3">
                                     <FormField
                                         id="client"
                                         labelSize="sm"
@@ -497,7 +497,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
 
                         {!isStepped || step === 0 ? (
                             <FormSection title="Intervento" ruled>
-                                <div className="grid items-start gap-3 sm:grid-cols-2">
+                                <div className="grid items-start gap-3">
                                     <FormField
                                         id="issue"
                                         labelSize="sm"
@@ -565,7 +565,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                             id="issueDescription"
                                             labelSize="sm"
                                             label="Problema riscontrato"
-                                            className="gap-1 sm:col-span-2"
+                                            className="gap-1"
                                             required
                                             error={fieldErrors.issueDescription}
                                         >
@@ -590,7 +590,7 @@ const CreateReportDialog = ({ open, onOpenChange, onSubmit, initialCustomer = nu
                                         </FormField>
                                     ) : null}
 
-                                    <FormField id="notes" label="Note" labelSize="sm" className="gap-1 sm:col-span-2">
+                                    <FormField id="notes" label="Note" labelSize="sm" className="gap-1">
                                         <Textarea
                                             id="notes"
                                             placeholder="Note"

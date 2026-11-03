@@ -1048,8 +1048,10 @@ export const startTwoFactorSetup = async (userId: number, password: string): Pro
         .set({ totpSecret: await encryptSecret(secretBase32), totpConfirmedAt: null, totpLastStep: null })
         .where(eq(userTable.id, userId));
 
+    // "EasyLab - azienda": nell'app di autenticazione l'account dice a cosa serve il codice (EasyLab) e di chi è
+    // l'installazione, come nell'oggetto delle email di accesso.
     const company = await getCompanySettings();
-    const otpauthUri = buildOtpauthUri({ secretBase32, account: user.username, issuer: company.name });
+    const otpauthUri = buildOtpauthUri({ secretBase32, account: user.username, issuer: `EasyLab - ${company.name}` });
 
     // Il QR nasce qui e viaggia dentro il JSON come data URL: se il segreto stesse in un URL
     // finirebbe nei log del server, nella cronologia del browser e nel referrer.

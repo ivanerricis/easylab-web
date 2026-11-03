@@ -11,6 +11,14 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 ## Indice
 
 **Interfaccia**
+- Rimandati dal PDF dei contratti (CHANGELOG del 2026-11-03):
+  - **Invio per email.** Contratto o preventivo mandato al cliente con il PDF allegato.
+  - **Resoconto stampabile di tutti i contratti di un cliente.** Un pulsante «Stampa» in intestazione
+    sulla tab Contratti della scheda cliente.
+  - **Prezzo o canone nel preventivo.** Richiede un campo nuovo nello schema (e quindi migration e
+    class diagram).
+  - **Testo legale definitivo.** Recesso, rinnovo, SLA, foro competente: il testo va fornito.
+  - **Giorni di validità dell'offerta nel preventivo.**
 - Rimandati dai contratti (CHANGELOG del 2026-10-07):
   - **Un gruppo Fornitori nella ricerca globale.** Banale: `listProviders` e la pagina esistono,
     serve una richiesta in più nello stesso `Promise.allSettled`, un gruppo e un "Vedi tutti".

@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { createContract, deleteContract, getContract, listContracts, updateContract } from "./contracts";
+import {
+    createContract,
+    deleteContract,
+    getContract,
+    getContractPrintUrl,
+    listContracts,
+    updateContract,
+} from "./contracts";
 import { createProvider, deleteProvider, getProvider, listProviders, updateProvider } from "./providers";
 
 const raw = { id: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: null };
@@ -11,6 +18,10 @@ beforeEach(() => {
 });
 
 describe("contratti", () => {
+    it("costruisce l'indirizzo del PDF da stampare", () => {
+        expect(getContractPrintUrl(7)).toContain("/contracts/7/print");
+    });
+
     it("lista con i filtri e rinomina i timestamp", async () => {
         const get = vi.spyOn(api, "get").mockResolvedValue({
             data: { items: [raw], totalItems: 1, page: 1, pageSize: 10, totalPages: 1 },

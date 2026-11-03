@@ -18,9 +18,19 @@ import {
     contractTypes,
     type AssistanceType,
 } from "../db/schema";
-import { getAppTimeZone } from "../config/lab";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { currentMonthKey } from "../db/queries/timeZone";
-import { getContractHoursSummary, recheckAssistanceHours } from "../services/assistanceHours";
+import { getCustomerById } from "../db/queries/customer";
+import { getProviderById } from "../db/queries/provider";
+import {
+    consumingInterventionTypes,
+    getContractHoursSummary,
+    recheckAssistanceHours,
+} from "../services/assistanceHours";
+import { formatAssistanceType, formatContractTerm, formatHours, formatMonthLabel } from "../services/contractLabels";
+import { createContractPdfBuffer, type ContractPrintData } from "../services/contractPdf";
+import { formatInterventionType } from "../services/interventionLabels";
+import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
 import { validate } from "./validation";
 
@@ -142,6 +152,97 @@ contractsRouter.get("/", validate({ query: contractListQuerySchema }), async (re
         query.page,
         query.pageSize
     );
+});
+
+/**
+ * I dati del PDF di un contratto. Una bozza è un preventivo, ogni altro stato un contratto.
+ * Il riepilogo ore c'è solo per un contratto di assistenza che abbia davvero ore registrate:
+ * un preventivo non ne ha, e una tabella di soli zeri sarebbe rumore.
+ */
+const loadContractPrintData = async (id: number): Promise<ContractPrintData | null> => {
+    const timeZone = await getAppTimeZone();
+    const [contract] = await getContractById(id, timeZone);
+
+    if (!contract) {
+        return null;
+    }
+
+    const kind = contract.effectiveStatus === "draft" ? "quote" : "contract";
+    const [[customer], [provider], lab, hoursSummary] = await Promise.all([
+        getCustomerById(contract.customerId),
+        getProviderById(contract.providerId),
+        getLabConfig(),
+        contract.assistanceType
+            ? getContractHoursSummary(id, contract.includedHours, currentMonthKey(timeZone))
+            : Promise.resolve(null),
+    ]);
+    const { assistanceType, includedHours } = contract;
+    const providerContact = [provider.firstName, provider.lastName].filter(Boolean).join(" ");
+
+    return {
+        id: contract.id,
+        kind,
+        status: contract.effectiveStatus,
+        labName: lab.labName,
+        labEmail: lab.labEmail,
+        labAddress: lab.labAddress,
+        labPhone: lab.labPhone,
+        issuedAtLabel: formatDateLabel(new Date(), timeZone),
+        customerName: contract.customerName ?? "",
+        customerPhone: customer.phoneNumber
+            ? formatPhoneLabel(customer.phoneNumber, customer.phoneNumberSecondary)
+            : null,
+        customerEmail: customer.email?.trim() || null,
+        customerCity: customer.city?.trim() || null,
+        providerName: provider.providerName,
+        providerContact: providerContact || null,
+        providerEmail: provider.email,
+        providerPhone: formatPhoneLabel(provider.phoneNumber),
+        type: contract.type,
+        device: contract.device,
+        termLabel: formatContractTerm(contract.term),
+        // Date "solo giorno" (YYYY-MM-DD): niente fuso, quindi `formatDayLabel`. La data di fine è
+        // quella della pagina del contratto, senza sottrazioni.
+        startDateLabel: formatDayLabel(contract.startDate),
+        endDateLabel: formatDayLabel(contract.endDate),
+        note: contract.note?.trim() || null,
+        assistance: assistanceType
+            ? {
+                  assistanceTypeLabel: formatAssistanceType(assistanceType),
+                  includedHoursLabel:
+                      includedHours === null ? "Ore illimitate" : `${formatHours(includedHours)} al mese`,
+                  coveredInterventionTypes: consumingInterventionTypes(assistanceType).map(formatInterventionType),
+              }
+            : null,
+        monthlyHours:
+            kind === "contract" && hoursSummary?.monthlyHours.some((entry) => entry.usedHours > 0)
+                ? hoursSummary.monthlyHours.map((entry) => ({
+                      monthLabel: formatMonthLabel(entry.month),
+                      usedHoursLabel: formatHours(entry.usedHours),
+                      usageLabel:
+                          includedHours === null ? "-" : `${Math.round((entry.usedHours / includedHours) * 100)}%`,
+                  }))
+                : [],
+    };
+};
+
+contractsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req, res) => {
+    const { id } = req.params as unknown as { id: number };
+    const data = await loadContractPrintData(id);
+
+    if (!data) {
+        res.status(404).json({ message: contractNotFoundMessage });
+        return;
+    }
+
+    const pdfBuffer = await createContractPdfBuffer(data);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+        "Content-Disposition",
+        `inline; filename=${data.kind === "quote" ? "preventivo" : "contratto"}-${id}.pdf`
+    );
+    res.send(pdfBuffer);
 });
 
 contractsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {

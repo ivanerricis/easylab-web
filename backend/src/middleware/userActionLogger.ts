@@ -37,6 +37,7 @@ const actionLabelRules: { method: string; match: string | RegExp; label: string 
     { method: "POST", match: "/api/auth/2fa/recovery-codes", label: "rigenerazione codici di recupero 2FA" },
     { method: "GET", match: /^\/api\/reports\/\d+\/print$/, label: "download ricevuta report" },
     { method: "GET", match: /^\/api\/interventions\/\d+\/print$/, label: "download ricevuta intervento" },
+    { method: "GET", match: /^\/api\/contracts\/\d+\/print$/, label: "stampa contratto" },
     { method: "GET", match: /^\/api\/settings\/backup\/download\/.+$/, label: "download backup" },
     { method: "GET", match: /^\/api\/settings\/logs\/\d{4}-\d{2}-\d{2}\/download$/, label: "download log azioni" },
     { method: "POST", match: "/api/settings/backup/key", label: "esportazione chiave di backup" },

@@ -14,10 +14,16 @@ vi.mock("../db/queries/contract", () => ({
 }));
 
 // Le ore (query sugli interventi e avvisi) sono coperte da `services/assistanceHours.db.test.ts`.
-vi.mock("../services/assistanceHours", () => ({
+vi.mock("../services/assistanceHours", async (importOriginal) => ({
+    // `consumingInterventionTypes` è la tabella vera: serve a tradurre gli interventi coperti.
+    ...(await importOriginal<typeof import("../services/assistanceHours")>()),
     getContractHoursSummary: vi.fn(),
     recheckAssistanceHours: vi.fn(),
 }));
+
+vi.mock("../services/contractPdf", () => ({ createContractPdfBuffer: vi.fn() }));
+vi.mock("../db/queries/customer", () => ({ getCustomerById: vi.fn() }));
+vi.mock("../db/queries/provider", () => ({ getProviderById: vi.fn() }));
 
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
@@ -32,7 +38,11 @@ import {
     listContracts,
     updateContractById,
 } from "../db/queries/contract";
+import { getCustomerById } from "../db/queries/customer";
+import { getProviderById } from "../db/queries/provider";
+import { getLabConfig } from "../config/lab";
 import { getContractHoursSummary, recheckAssistanceHours } from "../services/assistanceHours";
+import { createContractPdfBuffer } from "../services/contractPdf";
 import contractsRouter from "./contracts";
 import { errorHandler } from "../middleware/errorHandler";
 
@@ -194,6 +204,141 @@ describe("contracts router", () => {
 
             expect(response.status).toBe(400);
             expect(listContracts).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("stampa", () => {
+        const customerRow = {
+            phoneNumber: "333123456",
+            phoneNumberSecondary: null,
+            email: " mario@rossi.it ",
+            city: "Torino",
+        };
+        const providerRow = {
+            providerName: "Acme Srl",
+            firstName: "Luca",
+            lastName: "Neri",
+            email: "info@acme.it",
+            phoneNumber: "011222333",
+        };
+        const pdfBuffer = Buffer.from("%PDF-finto");
+
+        beforeEach(() => {
+            vi.mocked(getCustomerById).mockResolvedValue([customerRow] as never);
+            vi.mocked(getProviderById).mockResolvedValue([providerRow] as never);
+            vi.mocked(getLabConfig).mockResolvedValue({
+                labName: "Laboratorio Rossi",
+                labEmail: "info@rossi.it",
+                labAddress: "Via Roma 1",
+                labPhone: "0123456789",
+                timeZone: "Europe/Rome",
+            });
+            vi.mocked(createContractPdfBuffer).mockResolvedValue(pdfBuffer);
+        });
+
+        const printedData = () => vi.mocked(createContractPdfBuffer).mock.calls[0][0];
+
+        it("risponde 404 se il contratto non esiste", async () => {
+            vi.mocked(getContractById).mockResolvedValue([] as never);
+
+            const response = await request(buildApp()).get("/api/contracts/99/print");
+
+            expect(response.status).toBe(404);
+            expect(response.body).toEqual({ message: "Contratto non trovato" });
+            expect(createContractPdfBuffer).not.toHaveBeenCalled();
+        });
+
+        it("stampa il contratto di assistenza attivo con il riepilogo ore", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+
+            const response = await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-type"]).toBe("application/pdf");
+            expect(response.headers["content-disposition"]).toBe("inline; filename=contratto-7.pdf");
+            expect(getContractById).toHaveBeenCalledWith(7, "Europe/Rome");
+            expect(getCustomerById).toHaveBeenCalledWith(3);
+            expect(getProviderById).toHaveBeenCalledWith(2);
+            expect(getContractHoursSummary).toHaveBeenCalledWith(7, 20, expect.stringMatching(/^\d{4}-\d{2}$/));
+
+            expect(printedData()).toMatchObject({
+                id: 7,
+                kind: "contract",
+                status: "active",
+                labName: "Laboratorio Rossi",
+                customerName: "Mario Rossi",
+                customerPhone: "333123456",
+                customerEmail: "mario@rossi.it",
+                customerCity: "Torino",
+                providerName: "Acme Srl",
+                providerContact: "Luca Neri",
+                providerEmail: "info@acme.it",
+                providerPhone: "011222333",
+                type: "assistance",
+                device: "Server NAS",
+                termLabel: "12 mesi",
+                startDateLabel: "1 ott 2026",
+                endDateLabel: "1 ott 2027",
+                note: null,
+                assistance: {
+                    assistanceTypeLabel: "In sede o in laboratorio",
+                    includedHoursLabel: "20 h al mese",
+                    coveredInterventionTypes: ["Intervento in sede", "Intervento in laboratorio"],
+                },
+                monthlyHours: [
+                    { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%" },
+                    { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%" },
+                ],
+            });
+        });
+
+        it("una bozza è un preventivo, senza riepilogo ore", async () => {
+            vi.mocked(getContractById).mockResolvedValue([
+                { ...flatRow, status: "draft", effectiveStatus: "draft" },
+            ] as never);
+
+            const response = await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-disposition"]).toBe("inline; filename=preventivo-7.pdf");
+            expect(printedData()).toMatchObject({ kind: "quote", status: "draft", monthlyHours: [] });
+        });
+
+        it("il noleggio non ha assistenza e non calcola le ore", async () => {
+            vi.mocked(getContractById).mockResolvedValue([rentalRow] as never);
+
+            const response = await request(buildApp()).get("/api/contracts/8/print");
+
+            expect(response.status).toBe(200);
+            expect(getContractHoursSummary).not.toHaveBeenCalled();
+            expect(printedData()).toMatchObject({ type: "rental", assistance: null, monthlyHours: [] });
+        });
+
+        it("senza ore registrate il riepilogo è omesso e il full time mostra ore illimitate", async () => {
+            vi.mocked(getContractById).mockResolvedValue([
+                { ...flatRow, assistanceType: "full_time", includedHours: null },
+            ] as never);
+            vi.mocked(getContractHoursSummary).mockResolvedValue({
+                hours: {},
+                monthlyHours: [{ month: "2026-10", usedHours: 0 }],
+            } as never);
+
+            await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(printedData()).toMatchObject({
+                assistance: { includedHoursLabel: "Ore illimitate" },
+                monthlyHours: [],
+            });
+        });
+
+        it("un contratto annullato si stampa come contratto", async () => {
+            vi.mocked(getContractById).mockResolvedValue([
+                { ...flatRow, status: "cancelled", effectiveStatus: "cancelled" },
+            ] as never);
+
+            await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(printedData()).toMatchObject({ kind: "contract", status: "cancelled" });
         });
     });
 

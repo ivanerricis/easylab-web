@@ -38,6 +38,7 @@ vi.mock("@/lib/api", async () => {
         listCustomers: (...args: unknown[]) => api.listCustomers(...args),
         listContracts: (...args: unknown[]) => api.listContracts(...args),
         createContract: (...args: unknown[]) => api.createContract(...args),
+        getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
         getCustomerInterventionsPrintUrl: (id: number) => `interventions:${id}`,
     };
@@ -256,6 +257,10 @@ describe("CustomerPage", () => {
         expect(screen.queryByRole("columnheader", { name: "Cliente" })).not.toBeInTheDocument();
         // Per i contratti non c'è un resoconto da stampare.
         expect(screen.queryByRole("button", { name: /^Stampa resoconto/ })).not.toBeInTheDocument();
+
+        // Il pulsante di riga stampa il PDF di quel contratto.
+        await userEvent.click(screen.getAllByRole("button", { name: "Stampa contratto 21" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
 
         await userEvent.click(screen.getByRole("combobox", { name: "Filtra i contratti per stato" }));
         await userEvent.click(await screen.findByRole("option", { name: "Scaduto" }));

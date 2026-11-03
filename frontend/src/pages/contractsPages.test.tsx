@@ -35,7 +35,15 @@ vi.mock("@/lib/api", async () => {
         updateProvider: vi.fn(),
         deleteProvider: vi.fn(),
         listCustomers: vi.fn(),
+        getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
     };
+});
+
+const openPrintWindow = vi.fn();
+
+vi.mock("@/lib/utils", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/utils")>("@/lib/utils");
+    return { ...actual, openPrintWindow: (...args: unknown[]) => openPrintWindow(...args) };
 });
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -125,6 +133,18 @@ describe("ContractsPage", () => {
         });
     });
 
+    it("stampa dalla riga: contratto per l'attivo, preventivo per la bozza", async () => {
+        api.listContracts.mockResolvedValue(page([contract(), contract({ id: 23, effectiveStatus: "draft" })]));
+        renderWithProviders(<ContractsPage />, { route: "/contracts" });
+        const table = await screen.findByRole("table");
+
+        await userEvent.click(await within(table).findByRole("button", { name: "Stampa contratto 21" }));
+        expect(openPrintWindow).toHaveBeenLastCalledWith("/api/contracts/21/print");
+
+        await userEvent.click(within(table).getByRole("button", { name: "Stampa preventivo 23" }));
+        expect(openPrintWindow).toHaveBeenLastCalledWith("/api/contracts/23/print");
+    });
+
     it("dice quando nessun contratto corrisponde ai filtri", async () => {
         api.listContracts.mockResolvedValue(page([]));
         renderWithProviders(<ContractsPage />, { route: "/contracts?status=draft" });
@@ -182,6 +202,22 @@ describe("ContractPage", () => {
             expect(api.listInterventions).toHaveBeenCalledWith(expect.objectContaining({ contractId: 21 }));
         });
         expect((await screen.findAllByRole("link", { name: "Apri intervento 9" })).length).toBeGreaterThan(0);
+    });
+
+    it("Stampa apre il PDF del contratto", async () => {
+        api.getContract.mockResolvedValue(contract());
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Stampa contratto" }));
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
+    });
+
+    it("con una bozza il pulsante dice Stampa preventivo", async () => {
+        api.getContract.mockResolvedValue(contract({ status: "draft", effectiveStatus: "draft" }));
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: "Stampa preventivo" }));
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
     });
 
     it("per il full time scrive Ore illimitate", async () => {

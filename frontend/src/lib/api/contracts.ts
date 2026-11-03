@@ -6,7 +6,7 @@ import type {
     ContractTerm,
     ContractType,
 } from "@/types/dtos";
-import { createEntityApi } from "./client";
+import { api, createEntityApi } from "./client";
 import type { EntityListParams } from "./client";
 
 export type ContractCreateInput = {
@@ -60,3 +60,6 @@ export const getContract = contractsApi.get;
 export const createContract = contractsApi.create;
 export const updateContract = contractsApi.update;
 export const deleteContract = contractsApi.remove;
+
+/** Indirizzo del PDF: preventivo se il contratto è in bozza, contratto altrimenti (lo decide il server). */
+export const getContractPrintUrl = (id: number) => api.getUri({ url: `/contracts/${id}/print` });

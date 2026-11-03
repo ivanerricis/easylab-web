@@ -1,4 +1,4 @@
-import { contractStatusColor } from "@/lib/contracts";
+import { contractPrintName, contractStatusColor } from "@/lib/contracts";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import CreateEntityButton from "@/components/create-entity-button";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
@@ -13,13 +13,14 @@ import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from 
 import { usePageShortcut } from "@/hooks/usePageShortcut";
 import { usePendingAction } from "@/hooks/usePendingAction";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
-import { createContract, deleteContract, updateContract } from "@/lib/api";
+import { createContract, deleteContract, getContractPrintUrl, updateContract } from "@/lib/api";
 import { toContractCreatePayload, toContractUpdatePayload } from "@/lib/contractForm";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import type { ContractDto } from "@/types/dtos";
-import { Pencil, Trash2 } from "lucide-react";
+import { openPrintWindow } from "@/lib/utils";
+import { Pencil, Printer, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { contractColumns } from "./components/contract-columns";
@@ -199,6 +200,15 @@ const ContractsPage = () => {
                                     aria-label={`Modifica contratto ${row.id}`}
                                 >
                                     <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
+                                </TableActionButton>
+                                <TableActionButton
+                                    variant="default"
+                                    size="icon-lg"
+                                    className="bg-muted hover:bg-action-print/20"
+                                    onClick={() => openPrintWindow(getContractPrintUrl(row.id))}
+                                    aria-label={`Stampa ${contractPrintName(row.effectiveStatus)} ${row.id}`}
+                                >
+                                    <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
                                 </TableActionButton>
                                 <TableActionButton
                                     variant="destructive"

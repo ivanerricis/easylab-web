@@ -1,12 +1,15 @@
 import EntityTable from "@/components/entity-table";
 import FilterSelect from "@/components/filters/filter-select";
 import OpenEntityButton from "@/components/open-entity-button";
+import TableActionButton from "@/components/table-action-button";
 import TablePagination from "@/components/table-pagination";
 import type { CustomerContractsList } from "@/hooks/useCustomerContracts";
-import { contractEffectiveStatusOptions, contractStatusColor } from "@/lib/contracts";
+import { getContractPrintUrl } from "@/lib/api";
+import { contractEffectiveStatusOptions, contractPrintName, contractStatusColor } from "@/lib/contracts";
 import { entityPaths } from "@/lib/entityPaths";
+import { openPrintWindow } from "@/lib/utils";
 import { contractColumnsWithout } from "@/pages/contracts/components/contract-columns";
-import { ListFilter } from "lucide-react";
+import { ListFilter, Printer } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,11 +48,22 @@ export const CustomerContractsTable = ({ contracts }: { contracts: CustomerContr
                     getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}
                     emptyMessage="Nessun contratto associato a questo cliente."
                     renderRowActions={(row) => (
-                        <OpenEntityButton
-                            size="icon-lg"
-                            to={entityPaths.contract(row.id)}
-                            aria-label={`Apri contratto ${row.id}`}
-                        />
+                        <>
+                            <OpenEntityButton
+                                size="icon-lg"
+                                to={entityPaths.contract(row.id)}
+                                aria-label={`Apri contratto ${row.id}`}
+                            />
+                            <TableActionButton
+                                variant="default"
+                                size="icon-lg"
+                                className="bg-muted hover:bg-action-print/20"
+                                onClick={() => openPrintWindow(getContractPrintUrl(row.id))}
+                                aria-label={`Stampa ${contractPrintName(row.effectiveStatus)} ${row.id}`}
+                            >
+                                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
+                            </TableActionButton>
+                        </>
                     )}
                     onRowOpen={(row) => void navigate(entityPaths.contract(row.id))}
                     isInitialLoading={contracts.isInitialLoading}

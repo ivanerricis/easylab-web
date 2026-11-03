@@ -14,9 +14,10 @@ import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
-import { deleteContract, getContract, listInterventions, updateContract } from "@/lib/api";
+import { deleteContract, getContract, getContractPrintUrl, listInterventions, updateContract } from "@/lib/api";
 import { toContractUpdatePayload } from "@/lib/contractForm";
 import {
+    contractPrintName,
     contractStatusColor,
     formatAssistanceType,
     formatContractStatus,
@@ -28,9 +29,9 @@ import {
 import { entityPaths } from "@/lib/entityPaths";
 import { interventionStatusColor } from "@/lib/interventions";
 import { getMonthLabel } from "@/lib/monthKey";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, openPrintWindow } from "@/lib/utils";
 import type { ContractDto, InterventionDto } from "@/types/dtos";
-import { Pencil } from "lucide-react";
+import { Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns } from "../customers/components/customer-detail-columns";
@@ -136,6 +137,14 @@ const ContractPage = () => {
                     text="Modifica"
                     onClick={() => setIsEditDialogOpen(true)}
                     aria-label="Modifica contratto"
+                />
+
+                <DetailHeaderAction
+                    variant="outline"
+                    icon={Printer}
+                    text="Stampa"
+                    onClick={() => openPrintWindow(getContractPrintUrl(contract.id))}
+                    aria-label={`Stampa ${contractPrintName(contract.effectiveStatus)}`}
                 />
 
                 <DetailDeleteButton

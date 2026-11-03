@@ -115,6 +115,9 @@ export const contractStatusColor = (value: ContractEffectiveStatus): StatusColor
  * Quanto del pacchetto del mese è stato consumato, in percentuale (anche oltre il 100). `null`
  * per le ore illimitate, dove una percentuale non ha senso.
  */
+/** Nome del documento stampato: la bozza è un preventivo, il resto un contratto. */
+export const contractPrintName = (status: ContractEffectiveStatus) => (status === "draft" ? "preventivo" : "contratto");
+
 export const hoursUsagePercent = (usedHours: number, includedHours: number | null) =>
     includedHours == null || includedHours <= 0 ? null : (usedHours / includedHours) * 100;
 

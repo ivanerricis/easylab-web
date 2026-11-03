@@ -237,6 +237,7 @@ describe("userActionLogger", () => {
             ["/api/customers/7/interventions/print", "stampa resoconto interventi cliente"],
             ["/api/collaborators/3/reports/print", "stampa resoconto report collaboratore"],
             ["/api/collaborators/3/interventions/print", "stampa resoconto interventi collaboratore"],
+            ["/api/contracts/7/print", "stampa contratto"],
         ];
 
         for (const [url, label] of cases) {

@@ -203,11 +203,11 @@ settingsRouter.get("/logo", async (_req, res) => {
 
 // L'aggiornamento lo avvia un amministratore da un solo browser, ma ricostruisce i container
 // per tutti: chi sta lavorando altrove deve fermarsi e ricaricare, quindi ogni sessione
-// autenticata deve poter sapere se è in corso. Esce solo lo stato e la fase corrente: commit installato, log e
+// autenticata deve poter sapere se è in corso. Esce solo lo stato, la fase corrente e a che punto � la ricostruzione: commit installato, log e
 // messaggio d'errore restano su /update, riservato all'amministratore.
 settingsRouter.get("/update-state", async (_req, res) => {
-    const { state, phase } = await getUpdateStatus();
-    res.json({ state, phase });
+    const { state, phase, build } = await getUpdateStatus();
+    res.json({ state, phase, build });
 });
 
 /**

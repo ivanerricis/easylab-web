@@ -26,9 +26,21 @@ type UpdatePhase = "verify" | "code" | "build" | "cleanup";
 
 const validPhases: UpdatePhase[] = ["verify", "code", "build", "cleanup"];
 
+// Dove sta arrivando la ricostruzione dei container, ricavato da scripts/update-server.sh
+// dalle righe di BuildKit ("#12 [backend 5/9] RUN ..."). Approssimato: i servizi si
+// costruiscono in parallelo, quindi è l'ultima riga che si è mossa, e i totali sono per stadio.
+// Opzionale in status.json: lo script vecchio, che fa sempre per primo la transizione, non lo scrive.
+export type UpdateBuildProgress = {
+    service: string;
+    step: number;
+    total: number;
+    name: string;
+};
+
 export type UpdateStatus = {
     state: UpdateStatusState;
     phase: UpdatePhase | null;
+    build: UpdateBuildProgress | null;
     currentCommit: string | null;
     // La versione di rilascio installata ("v1.2.0", "v1.2.0 + 3 commit") e quella disponibile
     // ("v1.3.0", null se non c'Ã¨ un aggiornamento): sono i tag firmati che il server installa. Per
@@ -49,6 +61,7 @@ export class UpdateManagerError extends ApiError {}
 const defaultStatus: UpdateStatus = {
     state: "unknown",
     phase: null,
+    build: null,
     currentCommit: null,
     currentVersion: null,
     remoteCommit: null,
@@ -63,12 +76,34 @@ const defaultStatus: UpdateStatus = {
 
 const validStates: UpdateStatusState[] = ["unknown", "idle", "running", "success", "failed"];
 
+const sanitizeBuild = (input: unknown): UpdateBuildProgress | null => {
+    const build = input as Partial<UpdateBuildProgress> | null | undefined;
+
+    if (
+        typeof build?.service !== "string" ||
+        !Number.isInteger(build.step) ||
+        !Number.isInteger(build.total) ||
+        (build.step as number) < 1 ||
+        (build.total as number) < (build.step as number)
+    ) {
+        return null;
+    }
+
+    return {
+        service: build.service.slice(0, 40),
+        step: build.step as number,
+        total: build.total as number,
+        name: typeof build.name === "string" ? build.name.slice(0, 80) : "",
+    };
+};
+
 // Defensive: the host script is the only writer of status.json, so treat its
 // contents as untrusted input and fill in sane defaults for anything missing
 // or malformed rather than throwing.
 const sanitizeStatus = (input: Partial<UpdateStatus> | null | undefined): UpdateStatus => ({
     state: validStates.includes(input?.state as UpdateStatusState) ? (input!.state as UpdateStatusState) : "unknown",
     phase: validPhases.includes(input?.phase as UpdatePhase) ? (input!.phase as UpdatePhase) : null,
+    build: sanitizeBuild(input?.build),
     currentCommit: typeof input?.currentCommit === "string" ? input.currentCommit : null,
     currentVersion: typeof input?.currentVersion === "string" ? input.currentVersion : null,
     remoteCommit: typeof input?.remoteCommit === "string" ? input.remoteCommit : null,

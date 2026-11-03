@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useBusyGuard } from "@/components/use-busy-guard";
 import { getUpdateState } from "@/lib/api";
-import { updatePhaseSteps } from "@/lib/updatePhases";
+import { buildProgressDetail, updatePhaseSteps } from "@/lib/updatePhases";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -22,9 +22,10 @@ export const useUpdateWatcher = () => {
         const poll = async () => {
             let state;
             let phase;
+            let build;
 
             try {
-                ({ state, phase } = await getUpdateState());
+                ({ state, phase, build } = await getUpdateState());
             } catch {
                 // Mentre i container si ricostruiscono il backend non risponde: un errore di
                 // rete non è la fine dell'aggiornamento, quindi il blocco resta dov'è.
@@ -50,6 +51,7 @@ export const useUpdateWatcher = () => {
                         "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
                     steps: updatePhaseSteps,
                     activeStepKey: phase ?? prev?.activeStepKey ?? updatePhaseSteps[0].key,
+                    detail: buildProgressDetail(phase, build),
                 }));
                 return;
             }

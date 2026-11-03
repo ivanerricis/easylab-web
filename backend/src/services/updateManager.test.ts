@@ -31,6 +31,7 @@ import {
 const storedStatus = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
     state: "idle",
     phase: null,
+    build: null,
     currentCommit: "abc123",
     currentVersion: "v1.0.0",
     remoteCommit: "abc123",
@@ -137,6 +138,41 @@ describe("getUpdateStatus", () => {
         const status = await getUpdateStatus();
 
         expect(status.phase).toBeNull();
+    });
+
+    it("legge l'avanzamento della ricostruzione", async () => {
+        const build = { service: "backend", step: 5, total: 9, name: "RUN npm ci" };
+        readFile.mockResolvedValue(JSON.stringify(storedStatus({ state: "running", phase: "build", build })));
+
+        expect((await getUpdateStatus()).build).toEqual(build);
+    });
+
+    it("accetta lo status.json scritto dallo script vecchio, senza avanzamento", async () => {
+        const { build: _build, ...old } = storedStatus({ state: "running", phase: "build" });
+        readFile.mockResolvedValue(JSON.stringify(old));
+
+        expect((await getUpdateStatus()).build).toBeNull();
+    });
+
+    it.each([
+        ["un testo", "boom"],
+        ["un passo oltre il totale", { service: "backend", step: 9, total: 5, name: "x" }],
+        ["un passo zero", { service: "backend", step: 0, total: 5, name: "x" }],
+        ["un passo non intero", { service: "backend", step: "5", total: 9, name: "x" }],
+        ["un servizio mancante", { step: 5, total: 9, name: "x" }],
+    ])("scarta un avanzamento malformato (%s)", async (_label, build) => {
+        readFile.mockResolvedValue(JSON.stringify(storedStatus({ build: build as never })));
+
+        expect((await getUpdateStatus()).build).toBeNull();
+    });
+
+    it("accorcia i testi troppo lunghi dell'avanzamento", async () => {
+        const build = { service: "s".repeat(100), step: 1, total: 2, name: "n".repeat(500) };
+        readFile.mockResolvedValue(JSON.stringify(storedStatus({ build })));
+
+        const result = (await getUpdateStatus()).build;
+        expect(result?.service).toHaveLength(40);
+        expect(result?.name).toHaveLength(80);
     });
 
     it("preserva una phase valida mentre l'aggiornamento è in corso", async () => {

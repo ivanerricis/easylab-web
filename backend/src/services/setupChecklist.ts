@@ -1,4 +1,5 @@
 import { getBackupSettings } from "./backupManager";
+import { getCompanySettings } from "./companyManager";
 import { isEmailConfigured } from "./emailManager";
 import { createJsonSettingsStore } from "./jsonSettingsStore";
 
@@ -19,6 +20,14 @@ type SetupProgressState = {
     companySaved: boolean;
 };
 
+// I valori che scrivono `install.sh` e `edit-env.sh` quando nessuno ha ancora inserito i propri.
+const placeholderCompany = {
+    name: "EasyLab",
+    email: "info@easylab.local",
+    address: "Indirizzo laboratorio",
+    phone: "+39 000 000 0000",
+};
+
 const defaultState: SetupProgressState = { dismissed: false, companySaved: false };
 
 const store = createJsonSettingsStore({
@@ -32,11 +41,23 @@ const store = createJsonSettingsStore({
 
 /** Lo stato della guida "Primi passi": i passi si ricavano dalle impostazioni, non da un registro a parte. */
 export const getSetupChecklist = async (): Promise<SetupChecklist> => {
-    const [state, emailDone, backup] = await Promise.all([store.load(), isEmailConfigured(), getBackupSettings()]);
+    const [state, emailDone, backup, company] = await Promise.all([
+        store.load(),
+        isEmailConfigured(),
+        getBackupSettings(),
+        getCompanySettings(),
+    ]);
+    // Un'installazione già in uso ha i dati compilati ma nessun salvataggio registrato qui.
+    const companyDone =
+        state.companySaved ||
+        company.name !== placeholderCompany.name ||
+        company.email !== placeholderCompany.email ||
+        company.address !== placeholderCompany.address ||
+        company.phone !== placeholderCompany.phone;
 
     return {
         steps: [
-            { key: "company", done: state.companySaved },
+            { key: "company", done: companyDone },
             { key: "email", done: emailDone },
             { key: "backup", done: backup.autoEnabled },
         ],

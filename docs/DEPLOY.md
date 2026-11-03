@@ -271,6 +271,10 @@ Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 > vedi il CHANGELOG), quindi al primo accesso successivo tutti dovranno rifare il login una
 > volta sola. Le password non cambiano.
 
+### Come entrano le modifiche in `main`
+
+`main` è protetto (regola "Protect main" di GitHub, Settings → Rules): non ci si pubblica con un push diretto. Ogni modifica passa da una **pull request** da un branch, e si unisce solo quando sono verdi i quattro controlli della CI (frontend, test nel browser, backend, immagini di produzione), **soltanto con "Squash and merge"**: un commit per modifica, titolo della PR come messaggio. Non serve la revisione di un'altra persona né che i commit siano firmati: la firma sta sul tag di versione, non sui commit (vedi sotto). La regola non può essere aggirata da un push diretto, da un force-push o dalla cancellazione del ramo; solo l'amministratore del repository può forzare un'unione a controlli non verdi, e solo da una PR. Il branch di una PR si può cancellare dopo l'unione.
+
 ### Pubblicare una versione
 
 Il server installa solo i tag `vX.Y.Z` firmati: unire una modifica in `main` non lo aggiorna, pubblicare un tag sì. Quando una serie di modifiche in `main` è pronta (CI verde, provata), dal computer con la chiave di firma:

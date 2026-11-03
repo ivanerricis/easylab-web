@@ -418,7 +418,9 @@ describe("settings router: download di log e backup", () => {
         const response = await request(buildApp(true)).get("/api/settings/logs/2026-09-14/download");
 
         expect(response.status).toBe(200);
-        expect(response.headers["content-disposition"]).toContain('filename="2026-09-14.log"');
+        // content-disposition 1.1 non mette le virgolette attorno a un nome fatto di soli caratteri
+        // da token; entrambe le forme sono valide (RFC 6266), quindi il test non ne vincola una.
+        expect(response.headers["content-disposition"]).toMatch(/^attachment; filename="?2026-09-14\.log"?$/);
     });
 
     it("un log che non esiste risponde 404 con un messaggio", async () => {

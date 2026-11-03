@@ -16,8 +16,9 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     serve una richiesta in più nello stesso `Promise.allSettled`, un gruppo e un "Vedi tutti".
   - **Date e durata di un contratto con interventi.** Si può spostare l'inizio o accorciare la
     durata anche dopo aver collegato interventi: restano collegati, fuori dal periodo, e le ore
-    dei loro mesi si contano lo stesso. Va bene come storico; se si vuole un blocco, come per il
-    cambio di cliente, la regola sta in `PUT /api/contracts/:id`.
+    dei loro mesi si contano lo stesso. Deciso il 2026-11-03: si lascia così, va bene come storico.
+    Se un giorno si volesse un blocco, come per il cambio di cliente, la regola sta in
+    `PUT /api/contracts/:id`.
 - **"Nome Cognome" nella ricerca di report e interventi.** Dal 2026-10-14 i campi cliente e la lista
   Clienti trovano "Anna Romano" scritto per intero (vedi il CHANGELOG), ma le liste Report e Interventi
   no: `matchingReportIds` e il suo equivalente per gli interventi confrontano la frase intera con ogni

@@ -274,3 +274,14 @@ export type SystemStatusDto = {
 };
 
 export const getSystemStatus = async () => (await api.get<SystemStatusDto>("/settings/system")).data;
+
+export type SetupStepKey = "company" | "email" | "backup";
+
+export type SetupChecklistDto = {
+    steps: Array<{ key: SetupStepKey; done: boolean }>;
+    dismissed: boolean;
+};
+
+export const getSetupChecklist = async () => (await api.get<SetupChecklistDto>("/settings/setup")).data;
+
+export const dismissSetupChecklist = async () => (await api.post<SetupChecklistDto>("/settings/setup/dismiss")).data;

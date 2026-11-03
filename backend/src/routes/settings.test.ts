@@ -27,6 +27,11 @@ vi.mock("../services/emailManager", () => ({
     testEmailConnection: vi.fn(),
     updateEmailSettings: vi.fn(),
 }));
+vi.mock("../services/setupChecklist", () => ({
+    getSetupChecklist: vi.fn().mockResolvedValue({ steps: [{ key: "company", done: false }], dismissed: false }),
+    dismissSetupChecklist: vi.fn(),
+    markCompanySaved: vi.fn(),
+}));
 vi.mock("../services/logoManager", () => ({
     getLogoStatus: vi.fn().mockResolvedValue({ hasCustomLogo: false, updatedAt: null }),
     resetLogo: vi.fn(),
@@ -82,6 +87,7 @@ import {
     updateBackupSettings,
 } from "../services/backupManager";
 import { updateCompanySettings } from "../services/companyManager";
+import { markCompanySaved } from "../services/setupChecklist";
 import { testEmailConnection, updateEmailSettings } from "../services/emailManager";
 import { resetLogo, saveLogo } from "../services/logoManager";
 import {
@@ -147,6 +153,8 @@ describe("settings router: permessi", () => {
         ["post", "/api/settings/backup/run"],
         ["post", "/api/settings/backup/smb/test"],
         ["post", "/api/settings/update/run"],
+        ["get", "/api/settings/setup"],
+        ["post", "/api/settings/setup/dismiss"],
     ] as const)("nega a un utente non amministratore %s %s", async (method, path) => {
         const response = await request(buildApp(false))[method](path).send({});
 
@@ -188,6 +196,15 @@ describe("settings router: permessi", () => {
             databaseSizeBytes: 42,
             checkedAt: "2026-10-16T10:00:00.000Z",
         });
+    });
+
+    it("l'amministratore legge la guida dei primi passi e la chiude", async () => {
+        const read = await request(buildApp(true)).get("/api/settings/setup");
+        const dismiss = await request(buildApp(true)).post("/api/settings/setup/dismiss");
+
+        expect(read.status).toBe(200);
+        expect(read.body.steps).toEqual([{ key: "company", done: false }]);
+        expect(dismiss.status).toBe(200);
     });
 
     it("lascia passare l'amministratore sulle rotte protette", async () => {
@@ -638,6 +655,20 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(saved.status).toBe(200);
         expect(updateCompanySettings).toHaveBeenCalledWith({ name: "Laboratorio", email: "", address: "", phone: "" });
         expect(empty.status).toBe(400);
+    });
+
+    it("il primo salvataggio dei dati azienda spunta il passo della guida, un rifiuto no", async () => {
+        vi.mocked(updateCompanySettings).mockResolvedValue({} as never);
+
+        await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ name: " ", email: "", address: "", phone: "" });
+        expect(markCompanySaved).not.toHaveBeenCalled();
+
+        await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ name: "Laboratorio", email: "", address: "", phone: "" });
+        expect(markCompanySaved).toHaveBeenCalledOnce();
     });
 
     it("accetta un fuso orario valido e rifiuta uno inventato", async () => {

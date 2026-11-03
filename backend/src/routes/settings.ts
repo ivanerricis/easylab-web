@@ -22,6 +22,7 @@ import { maxPageSize } from "../db/queries/pagination";
 import { smbPathPattern, smbPathRequirementsMessage } from "../services/backupSmb";
 import { canonicalTimeZone, getCompanySettings, updateCompanySettings } from "../services/companyManager";
 import { getEmailSettings, testEmailConnection, updateEmailSettings } from "../services/emailManager";
+import { dismissSetupChecklist, getSetupChecklist, markCompanySaved } from "../services/setupChecklist";
 import { getLogoStatus, resetLogo, saveLogo } from "../services/logoManager";
 import {
     getLogFilePath,
@@ -203,7 +204,7 @@ settingsRouter.get("/logo", async (_req, res) => {
 
 // L'aggiornamento lo avvia un amministratore da un solo browser, ma ricostruisce i container
 // per tutti: chi sta lavorando altrove deve fermarsi e ricaricare, quindi ogni sessione
-// autenticata deve poter sapere se è in corso. Esce solo lo stato, la fase corrente e a che punto � la ricostruzione: commit installato, log e
+// autenticata deve poter sapere se è in corso. Esce solo lo stato, la fase corrente e a che punto è la ricostruzione: commit installato, log e
 // messaggio d'errore restano su /update, riservato all'amministratore.
 settingsRouter.get("/update-state", async (_req, res) => {
     const { state, phase, build } = await getUpdateStatus();
@@ -220,6 +221,16 @@ settingsRouter.get("/update-state", async (_req, res) => {
  * un singolo account compromesso non deve bastare per arrivarci.
  */
 settingsRouter.use(requireAdmin);
+
+// La guida "Primi passi" della dashboard: cosa resta da configurare dopo l'installazione.
+settingsRouter.get("/setup", async (_req, res) => {
+    res.json(await getSetupChecklist());
+});
+
+settingsRouter.post("/setup/dismiss", async (_req, res) => {
+    await dismissSetupChecklist();
+    res.json(await getSetupChecklist());
+});
 
 settingsRouter.get("/logs", async (_req, res) => {
     res.json(await listLogFiles());
@@ -318,6 +329,7 @@ settingsRouter.post("/backup/key", validate({ body: backupKeyExportSchema }), as
 settingsRouter.put("/company", validate({ body: companySettingsSchema }), async (req, res) => {
     const previousTimeZone = (await getCompanySettings()).timeZone;
     const saved = await updateCompanySettings(req.body);
+    await markCompanySaved();
 
     // Il prossimo backup automatico era stato calcolato con l'ora del fuso precedente.
     if (saved.timeZone !== previousTimeZone) {

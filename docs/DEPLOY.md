@@ -16,7 +16,23 @@ Per lo sviluppo locale vedi il [README](https://github.com/ivanerricis/easylab-w
 > Non include `check-updates.sh` e `update-server.sh`: quelli li lancia systemd da solo (vedi
 > [Aggiornamento applicazione](#aggiornamento-applicazione)), non vanno eseguiti a mano.
 
-## Installazione su Proxmox VM (prima volta)
+## Installazione rapida (consigliata)
+
+Su una VM o un CT Debian/Ubuntu nuovo, con un solo comando (da root o con `sudo`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ivanerricis/easylab-web/main/scripts/install.sh | sudo bash
+```
+
+Lo script (`scripts/install.sh`) fa al posto tuo i passi della procedura manuale qui sotto: installa i prerequisiti (`git`, `jq`, `ssh-keygen`, Docker se manca, chiedendo prima), clona il repository in `/opt/easylab-web` (cambiabile con `EASYLAB_DIR`) **sull'ultima versione firmata** (verifica la firma come l'aggiornamento: un clone di `main` potrebbe stare davanti all'ultimo tag e bloccare i futuri aggiornamenti), crea il `.env` con una **password del database generata** (nessuno la deve conoscere), chiede il dominio pubblico (stesso script del passo Cloudflare), avvia i container, attiva gli aggiornamenti automatici e infine **stampa la password dell'amministratore** con l'indirizzo dell'app.
+
+Si può rilanciare: clone, `.env` e tunnel già presenti non vengono toccati. La parte di Cloudflare resta guidata (serve il login nel browser del tuo account, non automatizzabile).
+
+Al primo accesso l'app chiede la nuova password e la verifica in due passaggi; poi la dashboard mostra la guida **Primi passi** (dati del laboratorio, email, backup), che si spunta da sola e si può chiudere.
+
+La procedura manuale qui sotto resta valida per chi vuole decidere ogni passo.
+
+## Installazione su Proxmox VM (prima volta, passo per passo)
 
 1. **Crea la VM** su Proxmox: Debian 13 o Ubuntu Server (consigliato Debian 13), rete in bridge sulla LAN, risorse minime indicative 2 vCPU / 4 GB RAM / 20 GB disco.
 

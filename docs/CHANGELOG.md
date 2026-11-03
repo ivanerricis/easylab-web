@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-03 — «Primi passi»: i dati azienda già compilati contano come fatti](changelog/2026-11.md#2026-11-03-primi-passi-i-dati-azienda-già-compilati-contano-come-fatti)
 - [2026-11-03 — Installazione guidata (`install.sh`) e guida "Primi passi"](changelog/2026-11.md#2026-11-03-installazione-guidata-installsh-e-guida-primi-passi)
 - [2026-11-03 — Avanzamento della ricostruzione durante l'aggiornamento](changelog/2026-11.md#2026-11-03-avanzamento-della-ricostruzione-durante-laggiornamento)
 - [2026-11-03 — Dialoghi in colonna, bordi del menu Impostazioni, nome dell'app nell'OTP](changelog/2026-11.md#2026-11-03-dialoghi-in-colonna-bordi-del-menu-impostazioni-nome-dellapp-nellotp)

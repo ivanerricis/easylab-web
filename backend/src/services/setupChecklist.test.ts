@@ -21,9 +21,11 @@ vi.mock("node:fs", () => {
     return { default: fsMock, ...fsMock };
 });
 vi.mock("./backupManager", () => ({ getBackupSettings: vi.fn() }));
+vi.mock("./companyManager", () => ({ getCompanySettings: vi.fn() }));
 vi.mock("./emailManager", () => ({ isEmailConfigured: vi.fn() }));
 
 import { getBackupSettings } from "./backupManager";
+import { getCompanySettings } from "./companyManager";
 import { isEmailConfigured } from "./emailManager";
 import { invalidateJsonSettingsCaches } from "./jsonSettingsStore";
 import { dismissSetupChecklist, getSetupChecklist, markCompanySaved } from "./setupChecklist";
@@ -32,6 +34,12 @@ describe("setupChecklist", () => {
     beforeEach(() => {
         files.clear();
         invalidateJsonSettingsCaches();
+        vi.mocked(getCompanySettings).mockResolvedValue({
+            name: "EasyLab",
+            email: "info@easylab.local",
+            address: "Indirizzo laboratorio",
+            phone: "+39 000 000 0000",
+        } as never);
         vi.mocked(isEmailConfigured).mockResolvedValue(false);
         vi.mocked(getBackupSettings).mockResolvedValue({ autoEnabled: false } as never);
     });
@@ -54,6 +62,17 @@ describe("setupChecklist", () => {
         const { steps } = await getSetupChecklist();
 
         expect(steps.map((step) => step.done)).toEqual([false, true, true]);
+    });
+
+    it("dati azienda già personalizzati contano come fatti anche senza un salvataggio registrato", async () => {
+        vi.mocked(getCompanySettings).mockResolvedValue({
+            name: "FutureOffice",
+            email: "info@easylab.local",
+            address: "Indirizzo laboratorio",
+            phone: "+39 000 000 0000",
+        } as never);
+
+        expect((await getSetupChecklist()).steps[0]).toEqual({ key: "company", done: true });
     });
 
     it("il primo salvataggio dei dati azienda spunta il passo, anche dopo una rilettura dal disco", async () => {

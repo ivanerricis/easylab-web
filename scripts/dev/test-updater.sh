@@ -110,6 +110,41 @@ SRV=$T/server; rm -f $SRV/ops/allowed_signers
 expect "update rifiutato" 1 "$(run update-server.sh)"
 echo "$(status .lastError)" | grep -q "Manca ops/allowed_signers" && ok "messaggio chiaro" || ko "messaggio" "Manca ops/allowed_signers" "$(status .lastError)"
 
+echo "J) avanzamento durante la ricostruzione"
+cd $T; rm -rf progserver; git clone -q origin.git progserver 2>/dev/null; SRV=$T/progserver
+git -C $SRV reset -q --hard v1.0.0
+# Un docker lento che stampa righe come BuildKit: lo stato deve cambiare mentre gira, non solo alla fine.
+printf '#!/bin/sh
+echo "#11 [backend builder 2/9] RUN npm ci"
+echo "#12 [frontend 5/7] RUN npm run build"
+sleep 5
+echo "#13 [backend stage-1 3/4] COPY dist"
+sleep 4
+exit 0
+' >bin/docker
+(cd $SRV && bash scripts/update-server.sh >$T/out.log 2>&1) &
+sleep 6
+expect "durante la build la fase è build" "build" "$(status .phase)"
+expect "servizio in costruzione" "frontend" "$(status .build.service)"
+expect "passo n" "5" "$(status .build.step)"
+expect "passo m" "7" "$(status .build.total)"
+status .log | grep -q "npm run build" && ok "il log si aggiorna durante la build" || ko "log durante la build" "si" "no"
+wait
+expect "a fine corsa success" "success" "$(status .lastUpdateStatus)"
+expect "build azzerato a fine corsa" "null" "$(status .build)"
+
+echo "K) la build fallisce: il ciclo si ferma e lo stato è failed"
+git -C $SRV reset -q --hard v1.0.0
+printf '#!/bin/sh
+echo "#12 [backend 5/9] RUN boom"
+sleep 4
+exit 1
+' >bin/docker
+expect "update fallisce" 1 "$(run update-server.sh)"
+expect "stato failed" "failed" "$(status .state)"
+sleep 4
+expect "lo stato resta failed (nessuno lo riscrive)" "failed" "$(status .state)"
+
 echo
 echo "RISULTATO: $pass ok, $fail falliti"
 [ "$fail" -eq 0 ]

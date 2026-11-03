@@ -19,6 +19,8 @@ export type BusyGuardState = {
      */
     steps?: BusyGuardStep[];
     activeStepKey?: string | null;
+    /** Una riga sotto i passi per dire a che punto è quello attivo (es. "backend, passo 5 di 9"). */
+    detail?: string;
 };
 
 export type BusyGuardContextValue = {

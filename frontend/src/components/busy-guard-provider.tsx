@@ -106,6 +106,14 @@ export const BusyGuardProvider = ({ children }: { children: ReactNode }) => {
                     <p className="text-lg font-semibold">{busy.title}</p>
                     <p className="max-w-sm text-center text-sm text-muted-foreground">{busy.description}</p>
                     <BusySteps steps={busy.steps} activeStepKey={busy.activeStepKey} />
+                    {busy.detail ? (
+                        <p
+                            data-testid="busy-detail"
+                            className="w-full max-w-xs pl-6 text-left text-xs break-words text-muted-foreground"
+                        >
+                            {busy.detail}
+                        </p>
+                    ) : null}
                 </div>
             ) : null}
         </BusyGuardContext.Provider>

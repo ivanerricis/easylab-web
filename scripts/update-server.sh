@@ -65,11 +65,49 @@ write_status() {
         # After a successful apply, HEAD now matches the release we just installed, so clear the
         # stale "update available" flag left over from the last check instead of waiting for the
         # next timer run.
+        # The build progress only means something while the build runs.
+        + (if ($phase != "" and $phase != "build") or $lastUpdateStatus == "success" then { build: null } else {} end)
         + (if $lastUpdateStatus == "success" then { remoteCommit: $currentCommit, remoteVersion: null, updateAvailable: false } else {} end)'
+}
+
+# `docker compose up --build` takes minutes and write_status only runs between phases, so while it
+# builds status.json would not change at all. write_build_progress refreshes the log tail and, when
+# BuildKit's plain output has a "#12 [backend 5/9] RUN ..." line, which service and step it is on.
+# BuildKit builds services in parallel, so this is the line that moved last: an approximation of
+# "where it is", not a percentage (cached steps finish at once and the totals are per stage).
+write_build_progress() {
+    local line service="" step="0" total="0" name="" log_tail
+    line="$(grep -E '^#[0-9]+ \[[^]]+ [0-9]+/[0-9]+\] ' "$LOG_FILE" 2>/dev/null | tail -n 1 || true)"
+    if [[ "$line" =~ ^#[0-9]+\ \[([^]]+)\ ([0-9]+)/([0-9]+)\]\ (.*)$ ]]; then
+        service="${BASH_REMATCH[1]%% *}"
+        step="${BASH_REMATCH[2]}"
+        total="${BASH_REMATCH[3]}"
+        name="${BASH_REMATCH[4]:0:80}"
+    fi
+    log_tail="$(tail -c 4000 "$LOG_FILE" 2>/dev/null || true)"
+
+    update_status \
+        --arg service "$service" \
+        --arg step "$step" \
+        --arg total "$total" \
+        --arg name "$name" \
+        --arg log "$log_tail" \
+        '. + { log: $log }
+        + (if $service == "" then {} else { build: { service: $service, step: ($step | tonumber), total: ($total | tonumber), name: $name } } end)'
+}
+
+PROGRESS_PID=""
+stop_build_progress() {
+    if [ -n "$PROGRESS_PID" ]; then
+        kill "$PROGRESS_PID" 2>/dev/null || true
+        wait "$PROGRESS_PID" 2>/dev/null || true
+        PROGRESS_PID=""
+    fi
 }
 
 on_exit() {
     local exit_code=$?
+    stop_build_progress
     if [ "$exit_code" -ne 0 ]; then
         write_status "failed" "failed" "${FAILURE_MESSAGE:-Aggiornamento fallito (exit $exit_code). Dettagli: journalctl -u easylab-update.service}"
     fi
@@ -126,10 +164,17 @@ write_status "running" "" "" "code"
 
 write_status "running" "" "" "build"
 
+# A failed refresh must never stop the update, so the loop swallows its own errors. It is stopped
+# before the next write_status, otherwise it could overwrite the next phase with a stale one.
+(while sleep 3; do write_build_progress || true; done) &
+PROGRESS_PID=$!
+
 {
     echo "=== docker compose up --build -d --remove-orphans ==="
     docker compose up --build -d --remove-orphans
 } >>"$LOG_FILE" 2>&1
+
+stop_build_progress
 
 write_status "running" "" "" "cleanup"
 

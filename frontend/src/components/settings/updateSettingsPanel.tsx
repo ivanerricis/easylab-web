@@ -24,7 +24,7 @@ import {
     type UpdateStatusDto,
 } from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
-import { updatePhaseSteps } from "@/lib/updatePhases";
+import { buildProgressDetail, updatePhaseSteps } from "@/lib/updatePhases";
 import { Download, RefreshCw } from "lucide-react";
 
 const POLL_INTERVAL_MS = 3000;
@@ -144,13 +144,14 @@ const UpdateSettingsPanel = () => {
     // `activeStepKey: null` è "oltre l'ultima fase": usato a fine aggiornamento per spuntare
     // anche l'ultima invece di lasciarla segnata come ancora in corso durante l'attesa prima
     // del reload (vedi il commento su BusyGuardState.activeStepKey).
-    const setUpdateBusy = (activeStepKey: string | null) => {
+    const setUpdateBusy = (activeStepKey: string | null, detail?: string) => {
         setBusy({
             title: "Aggiornamento in corso...",
             description:
                 "Non chiudere o ricaricare la pagina: l'applicazione si ricaricherà automaticamente al termine.",
             steps: updatePhaseSteps,
             activeStepKey,
+            detail,
         });
     };
 
@@ -210,7 +211,7 @@ const UpdateSettingsPanel = () => {
                     // non arriva più nulla per quella finestra, ma la fase resta quella scritta
                     // prima del riavvio finché il polling successivo non ne legge una nuova.
                     if (result.state === "running" && result.phase) {
-                        setUpdateBusy(result.phase);
+                        setUpdateBusy(result.phase, buildProgressDetail(result.phase, result.build));
                     }
                 } catch {
                     // atteso: i container vengono ricreati durante l'aggiornamento

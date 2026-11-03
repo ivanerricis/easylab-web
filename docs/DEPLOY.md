@@ -260,7 +260,7 @@ Lo script installa ed abilita le unit systemd in `ops/systemd/` (`easylab-update
 
 Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 - **Verifica aggiornamenti**: esegue un `git fetch` e mostra la versione installata e, se c'è, quella disponibile (`v1.2.0`), senza modificare nulla. Un server non ancora passato alle versioni mostra il codice del commit.
-- **Aggiorna adesso**: applica l'aggiornamento e ricostruisce i container. Per tutta la durata l'app è coperta da un avviso in **ogni** scheda aperta, anche sulle altre postazioni, così nessuno scrive dati mentre girano le migrazioni; a fine aggiornamento le schede si ricaricano da sole con la versione nuova.
+- **Aggiorna adesso**: applica l'aggiornamento e ricostruisce i container. Per tutta la durata l'app è coperta da un avviso in **ogni** scheda aperta, anche sulle altre postazioni, così nessuno scrive dati mentre girano le migrazioni; a fine aggiornamento le schede si ricaricano da sole con la versione nuova. Durante la ricostruzione dei container sotto l'elenco delle fasi compare a che punto è ("backend, passo 5 di 9"): lo scrive `scripts/update-server.sh` ogni 3 secondi nel campo opzionale `build` di `status.json`, ed è un'indicazione approssimata, non una percentuale.
 
 > **Nota (aggiornamento del 07/09/2026):** questo aggiornamento cambia il modo in cui le
 > sessioni sono salvate nel database (ora solo l'hash del token, mai il token stesso), quindi

@@ -87,6 +87,7 @@ import {
     updateBackupSettings,
 } from "../services/backupManager";
 import { updateCompanySettings } from "../services/companyManager";
+import { markCompanySaved } from "../services/setupChecklist";
 import { testEmailConnection, updateEmailSettings } from "../services/emailManager";
 import { resetLogo, saveLogo } from "../services/logoManager";
 import {
@@ -654,6 +655,20 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
         expect(saved.status).toBe(200);
         expect(updateCompanySettings).toHaveBeenCalledWith({ name: "Laboratorio", email: "", address: "", phone: "" });
         expect(empty.status).toBe(400);
+    });
+
+    it("il primo salvataggio dei dati azienda spunta il passo della guida, un rifiuto no", async () => {
+        vi.mocked(updateCompanySettings).mockResolvedValue({} as never);
+
+        await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ name: " ", email: "", address: "", phone: "" });
+        expect(markCompanySaved).not.toHaveBeenCalled();
+
+        await request(buildApp(true))
+            .put("/api/settings/company")
+            .send({ name: "Laboratorio", email: "", address: "", phone: "" });
+        expect(markCompanySaved).toHaveBeenCalledOnce();
     });
 
     it("accetta un fuso orario valido e rifiuta uno inventato", async () => {

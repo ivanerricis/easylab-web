@@ -329,6 +329,7 @@ settingsRouter.post("/backup/key", validate({ body: backupKeyExportSchema }), as
 settingsRouter.put("/company", validate({ body: companySettingsSchema }), async (req, res) => {
     const previousTimeZone = (await getCompanySettings()).timeZone;
     const saved = await updateCompanySettings(req.body);
+    await markCompanySaved();
 
     // Il prossimo backup automatico era stato calcolato con l'ora del fuso precedente.
     if (saved.timeZone !== previousTimeZone) {

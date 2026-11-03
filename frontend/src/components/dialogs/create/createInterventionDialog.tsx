@@ -296,7 +296,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
 
     const anagraficaSection = (
         <FormSection title="Anagrafica">
-            <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="grid items-start gap-4">
                 {/* `gap-1` fra etichetta e campo, come il collaboratore accanto e
                         tutti i campi dei dialoghi: senza, il campo del cliente stava
                         4px più in alto di quello del collaboratore sulla stessa riga. */}

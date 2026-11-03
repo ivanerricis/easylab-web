@@ -1559,7 +1559,7 @@ describe("startTwoFactorSetup", () => {
             totpLastStep: null,
         });
         expect(setup.otpauthUri).toContain(`secret=${setup.secretBase32}`);
-        expect(setup.otpauthUri).toContain("issuer=Laboratorio");
+        expect(setup.otpauthUri).toContain("issuer=EasyLab+-+Laboratorio");
         expect(setup.otpauthUri).toContain("mario");
         expect(setup.qrDataUrl).toMatch(/^data:image\/png;base64,/);
     });

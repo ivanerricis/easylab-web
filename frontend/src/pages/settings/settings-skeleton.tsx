@@ -56,7 +56,7 @@ const SettingsPageSkeleton = () => {
 
             <div
                 aria-hidden="true"
-                className="hidden max-h-full w-56 shrink-0 self-start overflow-y-auto rounded-2xl border bg-card p-2 shadow-sm xl:block"
+                className="hidden max-h-full w-56 shrink-0 self-start overflow-y-auto rounded-xl border bg-card p-2 shadow-sm xl:block"
             >
                 <div className="grid gap-3">
                     {navGroups.map((items, group) => (

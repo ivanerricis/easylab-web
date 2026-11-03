@@ -371,7 +371,7 @@ const SettingsPage = () => {
                 dal flex, per chi non è amministratore (due voci) era una card con ~600px vuoti. */}
             <nav
                 aria-label="Sezioni delle impostazioni"
-                className="hidden max-h-full w-56 shrink-0 self-start overflow-y-auto rounded-2xl border bg-card p-2 shadow-sm xl:block"
+                className="hidden max-h-full w-56 shrink-0 self-start overflow-y-auto rounded-xl border bg-card p-2 shadow-sm xl:block"
             >
                 <div className="grid gap-3">
                     {visibleSettingsGroups.map((group) => (

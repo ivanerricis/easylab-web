@@ -22,6 +22,10 @@ periodo. Un periodo nuovo vuol dire un file nuovo, una sezione nuova qui e una v
 `mkdocs.yml`. I rimandi "vedi CHANGELOG del AAAA-MM-GG" nelle altre pagine restano validi: la
 data porta alla voce da qui.
 
+## Novembre 2026
+
+- [2026-11-03 — Release: un workflow crea la pagina della release da un tag firmato](changelog/2026-11.md#2026-11-03-release-un-workflow-crea-la-pagina-della-release-da-un-tag-firmato)
+
 ## Ottobre 2026
 
 - [2026-10-16 — Pulizia del dead code](changelog/2026-10.md#2026-10-16-pulizia-del-dead-code)

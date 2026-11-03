@@ -1,5 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import DetailStats from "@/components/detail-stats";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import RefreshButton from "@/components/refresh-button";
@@ -27,10 +27,9 @@ import {
     getCustomerReportsPrintUrl,
     updateCustomer,
 } from "@/lib/api";
-import { cn, formatDateTime, openPrintWindow } from "@/lib/utils";
+import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { useCallback, useState } from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { ChevronDown, ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
+import { ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
@@ -83,9 +82,6 @@ const CustomerPage = () => {
 
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     // Solo su telefono: la card dei dati parte chiusa, con nome e telefono (vedi sotto).
-    const [isCustomerDataExpanded, setIsCustomerDataExpanded] = useState(false);
-    // Sotto `sm` il nome sta nella card dei dati invece che nell'intestazione (`hideTitleOnMobile`).
-    const isPhone = useIsMobile(640);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
     const [isCreateInterventionDialogOpen, setIsCreateInterventionDialogOpen] = useState(false);
@@ -157,7 +153,7 @@ const CustomerPage = () => {
                     backTo: "/clients",
                     backLabel: "Vai ai clienti",
                 }}
-                variant="person"
+                variant="customer"
             />
         );
     }
@@ -253,74 +249,31 @@ const CustomerPage = () => {
             </DetailHeader>
 
             {customer ? (
-                <DetailSection
-                    isBusy={isCustomerReloading}
-                    // Su telefono il titolo contiene già l'`h1` della pagina: vedi `titleAs`.
-                    titleAs={isPhone ? "div" : "h2"}
-                    title={
-                        // Su telefono il nome sta qui invece che nell'intestazione (vedi
-                        // `hideTitleOnMobile`): lì freccia e sei pulsanti occupano la riga, e
-                        // "Dati del cliente" sopra ai dati di un cliente senza il suo nome non
-                        // diceva di chi fossero.
-                        isPhone ? (
-                            <span className="flex items-center justify-between gap-2">
-                                {/* L'`h1` della pagina sotto `sm`: vedi `hideTitleOnMobile`. */}
-                                <h1 className="min-w-0 text-lg wrap-break-word">{customerName}</h1>
-                                {/* Su telefono la card parte chiusa: nome e telefono bastano quasi
-                                    sempre (si apre la scheda per chiamare o per vedere i report), e
-                                    le altre quattro righe spingevano l'elenco dei report fuori dal
-                                    primo schermo. La freccia apre la card intera. */}
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="-mr-2 shrink-0"
-                                    aria-expanded={isCustomerDataExpanded}
-                                    aria-controls="dati-cliente"
-                                    aria-label={
-                                        isCustomerDataExpanded
-                                            ? "Nascondi i dati del cliente"
-                                            : "Mostra tutti i dati del cliente"
-                                    }
-                                    onClick={() => setIsCustomerDataExpanded((expanded) => !expanded)}
-                                >
-                                    <ChevronDown
-                                        className={cn(
-                                            "size-5 transition-transform",
-                                            isCustomerDataExpanded && "rotate-180"
-                                        )}
-                                    />
-                                </Button>
-                            </span>
-                        ) : (
-                            "Dati del cliente"
-                        )
-                    }
-                >
-                    {/* A righe come la scheda report, su più colonne perché la card è larga quanto
-                        la pagina (vedi `DetailGrid`). Da chiusa, su telefono, resta solo il
-                        telefono: le altre voci sono nascoste solo sotto `sm`. */}
-                    <div id="dati-cliente">
-                        <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
-                            <DetailItem label="Telefono" value={customer.phoneNumber ?? "-"} />
-                            {(
-                                [
-                                    ["Telefono 2", customer.phoneNumberSecondary ?? "-"],
-                                    ["Email", customer.email ?? "-"],
-                                    ["Località", customer.city ?? "-"],
-                                    ["Cliente dal", formatDateTime(customer.createdAt)],
-                                ] as const
-                            ).map(([label, value]) => (
-                                <DetailItem
-                                    key={label}
-                                    label={label}
-                                    value={value}
-                                    className={isCustomerDataExpanded ? undefined : "max-sm:hidden"}
-                                />
-                            ))}
-                        </DetailGrid>
-                    </div>
-                </DetailSection>
+                // Le stesse card dei numeri in cima alla scheda report: qui sono i dati del cliente.
+                // Sotto `sm` diventano una card sola con il nome come titolo (vedi `DetailStats`).
+                <DetailStats
+                    mobileTitle={customerName}
+                    gridClassName="xl:grid-cols-4"
+                    items={[
+                        {
+                            // I due numeri uno sotto l'altro: recuperano la larghezza di una card,
+                            // che va all'email (l'indirizzo lungo non va più a capo).
+                            label: "Telefono",
+                            value: (
+                                <>
+                                    <span className="block">{customer.phoneNumber ?? "-"}</span>
+                                    {customer.phoneNumberSecondary ? (
+                                        <span className="block">{customer.phoneNumberSecondary}</span>
+                                    ) : null}
+                                </>
+                            ),
+                        },
+                        // `break-all`: un indirizzo lungo non ha punti dove andare a capo e usciva dalla card.
+                        { label: "Email", value: <span className="break-all">{customer.email ?? "-"}</span> },
+                        { label: "Località", value: customer.city ?? "-" },
+                        { label: "Cliente dal", value: formatDateTime(customer.createdAt) },
+                    ]}
+                />
             ) : null}
 
             <ReportsInterventionsTabs

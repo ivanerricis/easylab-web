@@ -1,5 +1,5 @@
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import DetailStats from "@/components/detail-stats";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import EntityTable from "@/components/entity-table";
 import EntityDetailGate from "@/components/entity-detail-gate";
@@ -20,7 +20,6 @@ import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
 import OpenEntityButton from "@/components/open-entity-button";
 import { useGoBack } from "@/hooks/useGoBack";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
@@ -65,8 +64,6 @@ const TechnicianPage = () => {
     const technicianName = technician ? formatPersonName(technician) : "Tecnico";
     useDocumentTitle(technicianName);
     const [visibilityFilter, setVisibilityFilter] = useState<ReportVisibilityFilter>("open");
-    // Sotto `sm` il nome sta nella card dei dati invece che nell'intestazione (`hideTitleOnMobile`).
-    const isPhone = useIsMobile(640);
     const [isEditTechnicianDialogOpen, setIsEditTechnicianDialogOpen] = useState(false);
     // Un solo stato per dialogo + bersaglio: `open={reportToEdit != null}` basta da solo.
     const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
@@ -182,30 +179,15 @@ const TechnicianPage = () => {
             ) : null}
 
             {technician ? (
-                <DetailSection
-                    isBusy={isTechnicianReloading}
-                    // Su telefono il titolo è l'`h1` della pagina: vedi `titleAs`.
-                    titleAs={isPhone ? "div" : "h2"}
-                    title={
-                        // Su telefono il nome sta qui invece che nell'intestazione (vedi
-                        // `hideTitleOnMobile`), come nella scheda cliente: a 390px freccia, titolo e
-                        // quattro pulsanti non stanno su una riga, e il nome finiva spezzato su due o
-                        // tre righe con le azioni spinte sotto.
-                        isPhone ? (
-                            // L'`h1` della pagina sotto `sm`: vedi `hideTitleOnMobile`.
-                            <h1 className="min-w-0 text-lg wrap-break-word">{technicianName}</h1>
-                        ) : (
-                            "Dati del tecnico"
-                        )
-                    }
-                >
-                    {/* A righe come la scheda report, su più colonne come la scheda cliente, così le
-                        righe hanno la stessa lunghezza in tutte le schede (vedi `DetailGrid`). */}
-                    <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
-                        <DetailItem label="Telefono" value={technician.phoneNumber ?? "-"} />
-                        <DetailItem label="Partita IVA" value={technician.vatNumber ?? "-"} />
-                    </DetailGrid>
-                </DetailSection>
+                // Le card dei dati, come nella scheda report e nella scheda cliente.
+                <DetailStats
+                    mobileTitle={technicianName}
+                    gridClassName="xl:grid-cols-4"
+                    items={[
+                        { label: "Telefono", value: technician.phoneNumber ?? "-" },
+                        { label: "Partita IVA", value: technician.vatNumber ?? "-" },
+                    ]}
+                />
             ) : null}
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">

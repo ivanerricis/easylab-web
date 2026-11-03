@@ -2,6 +2,7 @@ import StatusBadge from "@/components/status-badge";
 import type { StatusColor } from "@/lib/statusColors";
 import type { ReactNode } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 export type DetailStat = {
     label: string;
@@ -20,7 +21,16 @@ export type DetailStat = {
  * seconda della larghezza: così ogni valore compare una volta sola nel DOM, per i lettori di
  * schermo e per i test che lo cercano.
  */
-const DetailStats = ({ items, mobileTitle }: { items: DetailStat[]; mobileTitle?: ReactNode }) => {
+const DetailStats = ({
+    items,
+    mobileTitle,
+    gridClassName,
+}: {
+    items: DetailStat[];
+    mobileTitle?: ReactNode;
+    /** Le colonne da `xl` se non sono cinque uguali (es. `xl:grid-cols-4`, o larghezze diverse). */
+    gridClassName?: string;
+}) => {
     const isMobile = useIsMobile(640);
 
     return (
@@ -34,7 +44,7 @@ const DetailStats = ({ items, mobileTitle }: { items: DetailStat[]; mobileTitle?
             ) : null}
             {/* `px-6` come il contenuto delle card delle sezioni sotto (`CardContent`): con `px-4`
                 etichette e valori partivano 8px più a sinistra di quelli delle sezioni. */}
-            <dl className="divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-4 xl:divide-y-0">
+            <dl className={cn("divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-2 xl:divide-y-0", gridClassName)}>
                 {items.map((item) => (
                     <div
                         key={item.label}
@@ -42,7 +52,7 @@ const DetailStats = ({ items, mobileTitle }: { items: DetailStat[]; mobileTitle?
                         className="flex min-w-0 items-center justify-between gap-3 px-6 py-2.5 xl:flex-col xl:items-start xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-card xl:px-6 xl:py-5 xl:shadow-xs xl:ring-1 xl:ring-foreground/10"
                     >
                         <dt className="shrink-0 text-sm text-muted-foreground">{item.label}</dt>
-                        <dd className="min-w-0 text-right text-sm font-semibold wrap-break-word xl:text-left xl:text-xl">
+                        <dd className="min-w-0 text-right text-sm font-semibold wrap-break-word xl:text-left xl:text-lg">
                             {item.value}
                         </dd>
                     </div>

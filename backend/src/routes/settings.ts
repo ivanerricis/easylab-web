@@ -401,8 +401,8 @@ settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (
 });
 
 // Le rotte di aggiornamento sono il caso più delicato di tutti: non modificano una
-// preferenza, eseguono sull'host il codice presente su origin/main e ricostruiscono lo
-// stack. Come il resto del router, sono coperte dal requireAdmin qui sopra.
+// preferenza, eseguono sull'host il codice dell'ultima versione firmata (tag vX.Y.Z) e
+// ricostruiscono lo stack. Come il resto del router, sono coperte dal requireAdmin qui sopra.
 settingsRouter.get("/update", async (_req, res) => {
     res.json(await getUpdateStatus());
 });

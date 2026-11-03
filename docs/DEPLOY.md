@@ -176,7 +176,7 @@ Comportamento rete:
 - nginx inoltra `/api` e `/assets` al backend interno
 - il dominio non è scritto da nessuna parte nel codice né nella build: cambiarlo è una modifica di configurazione, non una ricompilazione
 
-Nota sicurezza: la funzione di aggiornamento esegue codice preso da `origin/main` sull'host. È protetta dal login, e dal 15/09/2026 installa solo commit **firmati** con una chiave ammessa (vedi [Firma dei commit](#firma-dei-commit)): un account GitHub compromesso non basta più a far girare codice sulla VM, serve anche la chiave di firma. Tieni comunque protetto l'account GitHub del repository (2FA).
+Nota sicurezza: la funzione di aggiornamento esegue sull'host codice preso dal repository. È protetta dal login e installa solo **versioni firmate**, cioè tag `vX.Y.Z` firmati con una chiave ammessa (vedi [Firma dei commit e versioni](#firma-dei-commit-e-versioni)): un account GitHub compromesso non basta a far girare codice sulla VM, serve anche la chiave di firma. Tieni comunque protetto l'account GitHub del repository (2FA).
 
 ## Dominio pubblico e Cloudflare Tunnel
 
@@ -237,9 +237,9 @@ docker compose -f docker-compose.dev.yml down
 
 ## Aggiornamento applicazione
 
-Sulla VM Proxmox, la pagina **Impostazioni > Aggiornamenti** permette di verificare e applicare gli aggiornamenti (`git fetch`/`reset --hard origin/main` + rebuild Docker) direttamente dall'interfaccia web, senza accesso SSH.
+Sulla VM Proxmox, la pagina **Impostazioni > Aggiornamenti** permette di verificare e applicare gli aggiornamenti (`git fetch`, `reset --hard` sull'ultimo tag di versione firmato + rebuild Docker) direttamente dall'interfaccia web, senza accesso SSH. Il server installa le **versioni** (tag `vX.Y.Z`), non l'ultimo commit di `main`: unire una modifica in `main` non aggiorna il server, pubblicare un tag sì (vedi [Pubblicare una versione](#pubblicare-una-versione)).
 
-Il backend gira in un container senza accesso a `git`/Docker (scelta di sicurezza): quando si clicca "Aggiorna adesso", il backend scrive solo un file trigger in una cartella condivisa (`ops/update/`); sull'host, un **systemd path unit** osserva quel file ed esegue realmente l'aggiornamento. Un timer periodico (ogni 30 minuti) controlla in background se è disponibile un nuovo commit su `origin/main`.
+Il backend gira in un container senza accesso a `git`/Docker (scelta di sicurezza): quando si clicca "Aggiorna adesso", il backend scrive solo un file trigger in una cartella condivisa (`ops/update/`); sull'host, un **systemd path unit** osserva quel file ed esegue realmente l'aggiornamento. Un timer periodico (ogni 30 minuti) controlla in background se è disponibile una versione nuova: l'ultimo tag firmato, se il suo commit non è già nel codice installato.
 
 Le cartelle sono due, una per direzione, e la separazione è una scelta di sicurezza:
 
@@ -259,7 +259,7 @@ sudo ./scripts/install-updater.sh
 Lo script installa ed abilita le unit systemd in `ops/systemd/` (`easylab-update.path`, `easylab-check-updates.path`, `easylab-check-updates.timer`), installa `jq` se mancante e imposta i permessi delle cartelle `ops/update/` e `ops/update-status/`. Le due cartelle si creano comunque da sole al primo avvio o controllo: rilanciare lo script dopo un aggiornamento non è necessario.
 
 Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
-- **Verifica aggiornamenti**: esegue un `git fetch` e mostra se è disponibile un nuovo commit, senza modificare nulla.
+- **Verifica aggiornamenti**: esegue un `git fetch` e mostra la versione installata e, se c'è, quella disponibile (`v1.2.0`), senza modificare nulla. Un server non ancora passato alle versioni mostra il codice del commit.
 - **Aggiorna adesso**: applica l'aggiornamento e ricostruisce i container. Per tutta la durata l'app è coperta da un avviso in **ogni** scheda aperta, anche sulle altre postazioni, così nessuno scrive dati mentre girano le migrazioni; a fine aggiornamento le schede si ricaricano da sole con la versione nuova.
 
 > **Nota (aggiornamento del 07/09/2026):** questo aggiornamento cambia il modo in cui le
@@ -271,23 +271,41 @@ Da quel momento, in Impostazioni > Aggiornamenti sono disponibili:
 > vedi il CHANGELOG), quindi al primo accesso successivo tutti dovranno rifare il login una
 > volta sola. Le password non cambiano.
 
-### Firma dei commit
+### Pubblicare una versione
 
-L'aggiornamento installa `origin/main` solo se il suo ultimo commit porta una firma valida di una delle chiavi elencate in `ops/allowed_signers` (`git verify-commit`). Senza questo controllo chiunque riuscisse a pubblicare su `main` — un token GitHub rubato, un account compromesso — farebbe eseguire il proprio codice come root sulla VM, perché `docker compose up --build` esegue quello che dicono i Dockerfile nuovi.
+Il server installa solo i tag `vX.Y.Z` firmati: unire una modifica in `main` non lo aggiorna, pubblicare un tag sì. Quando una serie di modifiche in `main` è pronta (CI verde, provata), dal computer con la chiave di firma:
 
-- **Da dove si legge la lista.** Dalla versione *già installata*, prima del `reset`: un commit non firmato non può aggiungere la propria chiave, perché la lista che modificherebbe non è quella con cui viene controllato. Il primo aggiornamento che porta il file sulla VM non ha ancora niente con cui confrontarsi e passa; da lì in poi la firma è obbligatoria.
-- **Se la firma manca o non è fra quelle ammesse**, l'aggiornamento si ferma prima di toccare qualunque cosa e Impostazioni > Aggiornamenti mostra il motivo. Succede per esempio con un commit fatto dal sito di GitHub (lo firma la chiave di GitHub, che non è in lista) o da un computer senza la chiave di firma configurata: basta un commit firmato dal computer abituale sopra quello.
-- **Aggiungere una chiave** (un nuovo computer da cui si pubblica): una riga in `ops/allowed_signers` nel formato `email namespaces="git" <chiave pubblica>`, dove l'email è quella del committer. La modifica va pubblicata con un commit firmato da una chiave già in lista.
-- **In emergenza** (chiave persa) l'aggiornamento si fa a mano sulla VM, come nel rollback qui sotto: `git fetch && git reset --hard origin/main && docker compose up --build -d`, dopo aver aggiornato `ops/allowed_signers`.
+```bash
+git switch main && git pull
+git tag -s v1.1.0 -m "Contratti"     # firmato con la chiave di commit.gpgsign / user.signingkey
+git push origin v1.1.0
+```
+
+Il numero segue il [versionamento semantico](https://semver.org/lang/it/): la cifra centrale sale per le funzioni nuove, l'ultima per le sole correzioni, la prima solo se cambia qualcosa che richiede una cura particolare (un restore, un cambio di server). Il workflow `.github/workflows/release.yml` controlla il tag (firmato da una chiave ammessa, su un commit di `main`, CI verde su quel commit) e crea la pagina della release con le note. Poco dopo, **Verifica aggiornamenti** sul server mostra la versione nuova, e **Aggiorna adesso** la installa. Un tag non firmato, firmato da un'altra chiave o che non ha la forma `vX.Y.Z` viene ignorato dal server: non si offre e non si installa.
+
+Un server che sta più avanti dell'ultimo tag (per esempio dopo il passaggio ai tag, con `main` già oltre l'ultima versione) non viene riportato indietro: l'aggiornamento si ferma con un messaggio e non cambia nulla. Per tornare a una versione precedente serve il rollback manuale qui sotto.
+
+### Firma dei commit e versioni
+
+L'aggiornamento installa un tag di versione solo se porta una firma valida di una delle chiavi elencate in `ops/allowed_signers` (`git verify-tag`). Senza questo controllo chiunque riuscisse a pubblicare sul repository — un token GitHub rubato, un account compromesso — farebbe eseguire il proprio codice come root sulla VM, perché `docker compose up --build` esegue quello che dicono i Dockerfile nuovi. Fino al 2026-11-03 si controllava la firma dell'ultimo commit di `main`; ora si controlla quella del tag, quindi i commit in `main` non devono più essere firmati uno per uno e un'unione fatta dal sito di GitHub non blocca più gli aggiornamenti.
+
+- **Da dove si legge la lista.** Dalla versione *già installata*, prima del `reset`: un tag non firmato non può aggiungere la propria chiave, perché la lista che modificherebbe non è quella con cui viene controllato.
+- **Se non c'è una versione firmata valida**, l'aggiornamento si ferma prima di toccare qualunque cosa e Impostazioni > Aggiornamenti mostra il motivo. Succede per esempio con un tag creato dal sito di GitHub (lo firma la chiave di GitHub, che non è in lista) o da un computer senza la chiave di firma configurata: basta ricreare il tag, firmato, dal computer abituale.
+- **Aggiungere una chiave** (un nuovo computer da cui si pubblica): una riga in `ops/allowed_signers` nel formato `email namespaces="git" <chiave pubblica>`, dove l'email è quella del committer. La modifica va pubblicata in una versione firmata da una chiave già in lista; solo da quell'aggiornamento in poi il server riconosce la chiave nuova.
+- **In emergenza** (chiave persa) l'aggiornamento si fa a mano sulla VM, come nel rollback qui sotto, dopo aver aggiornato `ops/allowed_signers`: `git fetch --tags && git reset --hard <tag o commit> && docker compose up --build -d`.
 
 **Rollback manuale** (nessun rollback automatico in caso di crash post-deploy): sulla VM,
 
 ```bash
 cd /percorso/del/repo
-git log --oneline -5        # individua il commit precedente funzionante
-git reset --hard <sha>
+git tag -l 'v*' --sort=-v:refname | head -5   # le versioni disponibili, dalla più nuova
+git reset --hard v1.0.0                       # la versione precedente funzionante
 docker compose up --build -d
 ```
+
+Il codice torna indietro, il database no: se la versione che si lascia ha applicato migrazioni, il rollback del solo codice può non bastare e va ripristinato anche un backup (vedi [BACKUP](BACKUP.md)).
+
+**Passaggio ai tag (una tantum, 2026-11-03).** Fino ad allora il server seguiva la punta di `main`. L'aggiornamento che porta gli script nuovi è l'ultimo ad essere installato "alla vecchia maniera", cioè con l'ultimo commit di `main` firmato; da lì in poi il server segue solo i tag. Prima di quell'aggiornamento: snapshot del CT. Subito dopo, finché non esiste il primo tag, **Verifica aggiornamenti** dice che non c'è niente da installare: è normale.
 
 Log dettagliati dell'ultima esecuzione: `journalctl -u easylab-update.service` (aggiornamento) o `journalctl -u easylab-check-updates.service` (verifica).
 

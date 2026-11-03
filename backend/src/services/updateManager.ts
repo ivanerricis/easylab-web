@@ -30,7 +30,12 @@ export type UpdateStatus = {
     state: UpdateStatusState;
     phase: UpdatePhase | null;
     currentCommit: string | null;
+    // La versione di rilascio installata ("v1.2.0", "v1.2.0 + 3 commit") e quella disponibile
+    // ("v1.3.0", null se non c'è un aggiornamento): sono i tag firmati che il server installa. Per
+    // un server mai aggiornato a un tag la prima è il commit e la seconda null.
+    currentVersion: string | null;
     remoteCommit: string | null;
+    remoteVersion: string | null;
     updateAvailable: boolean;
     lastCheckedAt: string | null;
     lastUpdateAt: string | null;
@@ -45,7 +50,9 @@ const defaultStatus: UpdateStatus = {
     state: "unknown",
     phase: null,
     currentCommit: null,
+    currentVersion: null,
     remoteCommit: null,
+    remoteVersion: null,
     updateAvailable: false,
     lastCheckedAt: null,
     lastUpdateAt: null,
@@ -63,7 +70,9 @@ const sanitizeStatus = (input: Partial<UpdateStatus> | null | undefined): Update
     state: validStates.includes(input?.state as UpdateStatusState) ? (input!.state as UpdateStatusState) : "unknown",
     phase: validPhases.includes(input?.phase as UpdatePhase) ? (input!.phase as UpdatePhase) : null,
     currentCommit: typeof input?.currentCommit === "string" ? input.currentCommit : null,
+    currentVersion: typeof input?.currentVersion === "string" ? input.currentVersion : null,
     remoteCommit: typeof input?.remoteCommit === "string" ? input.remoteCommit : null,
+    remoteVersion: typeof input?.remoteVersion === "string" ? input.remoteVersion : null,
     updateAvailable: Boolean(input?.updateAvailable),
     lastCheckedAt: typeof input?.lastCheckedAt === "string" ? input.lastCheckedAt : null,
     lastUpdateAt: typeof input?.lastUpdateAt === "string" ? input.lastUpdateAt : null,

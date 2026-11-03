@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks whether an update is available: git fetch + compare local vs origin/main HEAD.
+# Checks whether an update is available: git fetch + look for a newer signed release tag (vX.Y.Z).
 # Never touches the working tree. Triggered by easylab-check-updates.path (on-demand from
 # the UI) and easylab-check-updates.timer (every 30 min) — see ops/systemd/.
 
@@ -48,25 +48,37 @@ if [ "$current_state" = "running" ]; then
         '. + { state: "failed", lastUpdateAt: $now, lastUpdateStatus: "failed", lastError: $lastError }'
 fi
 
-git fetch --all --prune >/dev/null 2>&1 || exit 0
+git fetch --all --prune --tags --force >/dev/null 2>&1 || exit 0
 
 local_commit="$(git rev-parse --short HEAD)"
-remote_commit="$(git rev-parse --short origin/main 2>/dev/null || echo "$local_commit")"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# What is offered is the newest release tag signed by an allowed key, read from the installed
+# version of ops/allowed_signers (same rule as update-server.sh). It is an update only if the tag's
+# commit is not already part of what is installed: a merge into main without a tag offers nothing,
+# and a server ahead of the latest tag is not asked to go back.
+remote_commit="$local_commit"
+remote_version=""
 update_available="false"
-if [ "$local_commit" != "$remote_commit" ]; then
+if release_tag="$(latest_signed_release_tag "$REPO_ROOT/ops/allowed_signers")" &&
+    ! git merge-base --is-ancestor "refs/tags/$release_tag^{commit}" HEAD; then
+    remote_commit="$(git rev-parse --short "refs/tags/$release_tag^{commit}")"
+    remote_version="$release_tag"
     update_available="true"
 fi
 
 update_status \
     --arg currentCommit "$local_commit" \
+    --arg currentVersion "$(current_version)" \
     --arg remoteCommit "$remote_commit" \
+    --arg remoteVersion "$remote_version" \
     --arg now "$now" \
     --argjson updateAvailable "$update_available" \
     '. + {
         currentCommit: $currentCommit,
+        currentVersion: $currentVersion,
         remoteCommit: $remoteCommit,
+        remoteVersion: (if $remoteVersion == "" then null else $remoteVersion end),
         updateAvailable: $updateAvailable,
         lastCheckedAt: $now,
         state: (if (.state // "idle") == "running" then .state else "idle" end)

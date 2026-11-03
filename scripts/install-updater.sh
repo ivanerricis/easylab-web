@@ -38,8 +38,8 @@ if ! command -v jq >/dev/null 2>&1; then
     apt-get install -y jq
 fi
 
-# update-server.sh verifies the signature of origin/main with `git verify-commit`, which checks
-# SSH signatures through ssh-keygen (see docs/DEPLOY.md, "Firma dei commit").
+# update-server.sh verifies the signature of the release tag with `git verify-tag`, which checks
+# SSH signatures through ssh-keygen (see docs/DEPLOY.md, "Firma dei commit e versioni").
 if ! command -v ssh-keygen >/dev/null 2>&1; then
     echo "ssh-keygen non trovato, installazione..."
     apt-get update -y

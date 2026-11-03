@@ -32,7 +32,9 @@ const storedStatus = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
     state: "idle",
     phase: null,
     currentCommit: "abc123",
+    currentVersion: "v1.0.0",
     remoteCommit: "abc123",
+    remoteVersion: null,
     updateAvailable: false,
     lastCheckedAt: "2026-09-10T08:00:00Z",
     lastUpdateAt: null,
@@ -88,6 +90,29 @@ describe("getUpdateStatus", () => {
 
         expect(status.state).toBe("unknown");
         expect(status.currentCommit).toBeNull();
+    });
+
+    it("legge la versione installata e quella disponibile", async () => {
+        readFile.mockResolvedValue(
+            JSON.stringify(
+                storedStatus({ currentVersion: "v1.0.0 + 2 commit", remoteVersion: "v1.1.0", updateAvailable: true })
+            )
+        );
+
+        const status = await getUpdateStatus();
+
+        expect(status.currentVersion).toBe("v1.0.0 + 2 commit");
+        expect(status.remoteVersion).toBe("v1.1.0");
+    });
+
+    // Un server aggiornato solo a metà (script nuovi, stato scritto da quelli vecchi) non ha i campi.
+    it("lascia a null le versioni mancanti o non testuali", async () => {
+        readFile.mockResolvedValue(JSON.stringify({ state: "idle", currentVersion: 1, remoteVersion: {} }));
+
+        const status = await getUpdateStatus();
+
+        expect(status.currentVersion).toBeNull();
+        expect(status.remoteVersion).toBeNull();
     });
 
     it("scarta un lastUpdateStatus non tra i valori ammessi", async () => {

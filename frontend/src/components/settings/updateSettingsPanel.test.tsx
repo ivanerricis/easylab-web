@@ -35,7 +35,9 @@ const status = {
     state: "idle",
     phase: null,
     currentCommit: "abc1234",
+    currentVersion: "v1.0.0",
     remoteCommit: "def5678",
+    remoteVersion: "v1.1.0",
     updateAvailable: true,
     lastCheckedAt: "2026-09-11T08:00:00.000Z",
     lastUpdateAt: null,
@@ -88,9 +90,18 @@ describe("UpdateSettingsPanel", () => {
     it("mostra versione installata e aggiornamento disponibile", async () => {
         await renderPanel();
 
+        expect(screen.getByText("v1.0.0")).toBeInTheDocument();
+        expect(screen.getByText("Sì (v1.1.0)")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Aggiorna adesso" })).toBeEnabled();
+    });
+
+    /** Un server non ancora passato ai tag (o con lo stato scritto dagli script vecchi): si vedono i commit. */
+    it("senza versioni di rilascio mostra i commit", async () => {
+        api.getUpdateStatus.mockResolvedValue({ ...status, currentVersion: null, remoteVersion: null });
+        await renderPanel();
+
         expect(screen.getByText("abc1234")).toBeInTheDocument();
         expect(screen.getByText("Sì (def5678)")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Aggiorna adesso" })).toBeEnabled();
     });
 
     it("senza aggiornamenti non lascia avviare l'aggiornamento", async () => {

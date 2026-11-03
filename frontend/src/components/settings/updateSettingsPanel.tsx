@@ -256,14 +256,21 @@ const UpdateSettingsPanel = () => {
                 ) : (
                     <>
                         <SettingsTileGrid>
-                            <SettingsTile label="Versione installata" value={status?.currentCommit ?? "-"} />
+                            <SettingsTile
+                                label="Versione installata"
+                                value={status?.currentVersion ?? status?.currentCommit ?? "-"}
+                            />
                             <SettingsTile
                                 label="Ultima verifica"
                                 value={formatDateTime(status?.lastCheckedAt ?? null)}
                             />
                             <SettingsTile
                                 label="Aggiornamento disponibile"
-                                value={status?.updateAvailable ? `Sì (${status.remoteCommit ?? "-"})` : "No"}
+                                value={
+                                    status?.updateAvailable
+                                        ? `Sì (${status.remoteVersion ?? status.remoteCommit ?? "-"})`
+                                        : "No"
+                                }
                                 highlight={status?.updateAvailable}
                             />
                             <SettingsTile

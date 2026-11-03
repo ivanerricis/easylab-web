@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-03 — Aggiornamento del server per versione: si installano i tag firmati, non la punta di main](changelog/2026-11.md#2026-11-03-aggiornamento-del-server-per-versione-si-installano-i-tag-firmati-non-la-punta-di-main)
 - [2026-11-03 — Release: un workflow crea la pagina della release da un tag firmato](changelog/2026-11.md#2026-11-03-release-un-workflow-crea-la-pagina-della-release-da-un-tag-firmato)
 
 ## Ottobre 2026

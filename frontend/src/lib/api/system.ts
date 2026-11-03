@@ -4,7 +4,11 @@ export type UpdateStatusDto = {
     state: "unknown" | "idle" | "running" | "success" | "failed";
     phase: "verify" | "code" | "build" | "cleanup" | null;
     currentCommit: string | null;
+    /** Il tag di rilascio installato ("v1.2.0", "v1.2.0 + 3 commit"); il commit se non ce n'è uno. */
+    currentVersion: string | null;
     remoteCommit: string | null;
+    /** Il tag di rilascio da installare; `null` se non c'è un aggiornamento. */
+    remoteVersion: string | null;
     updateAvailable: boolean;
     lastCheckedAt: string | null;
     lastUpdateAt: string | null;

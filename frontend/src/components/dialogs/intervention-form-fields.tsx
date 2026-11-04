@@ -302,6 +302,7 @@ export const InterventionDetailsSection = ({
     onChange,
     withoutProgress = false,
     contractOptions,
+    contractHint,
 }: FieldsProps & {
     withoutProgress?: boolean;
     /**
@@ -309,6 +310,8 @@ export const InterventionDetailsSection = ({
      * campo non c'è; c'è solo per i tipi che consumano ore, cioè non per la consegna di materiale.
      */
     contractOptions?: ContractDto[];
+    /** Perché il menu dei contratti manca pur avendo il cliente dei contratti (vedi `explainNoLinkableContract`). */
+    contractHint?: string | null;
 }) => {
     const common = { values, errors, onChange };
     const isAssistance = isAssistanceInterventionType(values.type);
@@ -327,6 +330,12 @@ export const InterventionDetailsSection = ({
 
                 {/* Solo se c'è qualcosa da scegliere: un menu spento "Nessun contratto disponibile"
                     su ogni intervento di un cliente senza contratti era solo rumore. */}
+                {contractHint && isAssistance ? (
+                    <p role="status" className="text-sm text-muted-foreground lg:col-span-2">
+                        {contractHint}
+                    </p>
+                ) : null}
+
                 {contractOptions && contractOptions.length > 0 && isAssistance ? (
                     <FormField
                         labelSize="sm"

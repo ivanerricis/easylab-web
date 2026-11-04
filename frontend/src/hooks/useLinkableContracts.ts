@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage, getContract, listContracts } from "@/lib/api";
-import { linkableContracts } from "@/lib/contracts";
+import { explainNoLinkableContract, linkableContracts } from "@/lib/contracts";
 import type { ContractDto, InterventionType } from "@/types/dtos";
 import { toast } from "sonner";
 
@@ -76,9 +76,16 @@ export const useLinkableContracts = ({ customerId, type, date, keepContractId = 
         [isCurrent, loaded, type, date, keepContractId]
     );
 
+    const hint = useMemo(
+        () => (isCurrent && options.length === 0 ? explainNoLinkableContract(loaded.contracts, { type, date }) : null),
+        [isCurrent, loaded, options, type, date]
+    );
+
     return {
         /** I contratti validi per cliente, data e tipo correnti. */
         options,
+        /** Se il cliente ha contratti ma nessuno vale per questo intervento, il perché; altrimenti `null`. */
+        hint,
         /** Vero quando l'elenco è quello del cliente attuale: finché non lo è non si deve azzerare la scelta. */
         isReady: isCurrent,
     };

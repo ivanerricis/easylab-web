@@ -729,6 +729,15 @@ describe("contratto di assistenza negli interventi", () => {
         expect(onSubmit.mock.calls[0][0].contractId).toBeUndefined();
     });
 
+    it("se il cliente ha contratti ma nessuno copre la data, spiega perché non c'è il menu", async () => {
+        listContracts.mockResolvedValue(pageOf([contract(3, "remote", { startDate: "2026-11-05" })]));
+        await renderCreate();
+        await chooseOption("Tipo intervento", "Intervento da remoto");
+
+        expect(await screen.findByText(/Il contratto #3 vale dal 05\/11\/2026/)).toBeInTheDocument();
+        expect(screen.queryByRole("combobox", { name: "Contratto di assistenza" })).not.toBeInTheDocument();
+    });
+
     it("una consegna di materiale non ha il menu del contratto", async () => {
         await renderCreate();
 

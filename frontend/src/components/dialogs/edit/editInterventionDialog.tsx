@@ -81,7 +81,11 @@ const EditInterventionDialog = ({
     const isDirty =
         loadedInterventionId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
 
-    const { isReady: areContractsReady, options: contractOptions } = useLinkableContracts({
+    const {
+        isReady: areContractsReady,
+        options: contractOptions,
+        hint: contractHint,
+    } = useLinkableContracts({
         customerId,
         type: formValues.type,
         date: formValues.interventionDate,
@@ -282,6 +286,7 @@ const EditInterventionDialog = ({
                                     onChange={handleChange}
                                     withoutProgress
                                     contractOptions={contractOptions}
+                                    contractHint={contractHint}
                                 />
                             </div>
 

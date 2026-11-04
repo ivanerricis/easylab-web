@@ -141,7 +141,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
         date: formValues.interventionDate,
     });
     const { contractId: selectedContractId } = formValues;
-    const { isReady: areContractsReady, options: contractOptions } = linkableContracts;
+    const { isReady: areContractsReady, options: contractOptions, hint: contractHint } = linkableContracts;
     const isSelectedContractValid =
         selectedContractId === "" ||
         (selectedCustomerId != null &&
@@ -449,6 +449,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         errors={errors}
                                         onChange={handleChange}
                                         contractOptions={contractOptions}
+                                        contractHint={contractHint}
                                     />
                                 ) : null}
                             </>
@@ -465,6 +466,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         onChange={handleChange}
                                         withoutProgress
                                         contractOptions={contractOptions}
+                                        contractHint={contractHint}
                                     />
                                 </div>
                                 <InterventionProgressSection

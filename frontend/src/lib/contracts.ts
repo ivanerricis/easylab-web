@@ -171,6 +171,43 @@ export const linkableContracts = (
         isContractLinkable(contract, context, { ignoreStatus: contract.id === keepContractId })
     );
 
+/**
+ * Perché, per un cliente con contratti di assistenza attivi, nessuno si può collegare a questo
+ * intervento: serve ai dialoghi per spiegarlo, invece di far sparire il menu senza una parola.
+ * `null` se non c'è niente da dire: nessun contratto, data ancora da scegliere, consegna di
+ * materiale (non è assistenza) o almeno un contratto valido.
+ */
+export const explainNoLinkableContract = (
+    contracts: readonly ContractDto[],
+    { type, date }: InterventionContractContext
+): string | null => {
+    if (contracts.length === 0 || date === "" || type === "material_delivery") {
+        return null;
+    }
+
+    if (contracts.some((contract) => isContractLinkable(contract, { type, date }))) {
+        return null;
+    }
+
+    const consuming = contracts.filter(
+        (contract) =>
+            contract.assistance != null &&
+            interventionTypesForAssistance(contract.assistance.assistanceType).includes(type)
+    );
+
+    if (consuming.length === 0) {
+        return "Il tipo di intervento scelto non consuma le ore del contratto di assistenza del cliente.";
+    }
+
+    if (consuming.length === 1) {
+        const [contract] = consuming;
+
+        return `Il contratto #${contract.id} vale dal ${formatDate(contract.startDate)} al ${formatDate(contract.endDate)}: la data dell'intervento è fuori da questo periodo.`;
+    }
+
+    return "La data dell'intervento è fuori dal periodo dei contratti di assistenza del cliente.";
+};
+
 /** Come un contratto compare nel menu dell'intervento: "Remota 10 h/mese - Notebook (fino al 01/12/2026)". */
 export const formatContractOption = (contract: ContractDto) => {
     const assistance = contract.assistance

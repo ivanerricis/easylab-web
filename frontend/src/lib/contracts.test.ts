@@ -7,6 +7,7 @@ import {
     hoursUsageLevel,
     hoursUsagePercent,
     interventionTypesForAssistance,
+    explainNoLinkableContract,
     isContractLinkable,
     linkableContracts,
     packageHours,
@@ -96,6 +97,40 @@ describe("consumo delle ore", () => {
         expect(hoursUsageLevel(99.9)).toBe("warning");
         expect(hoursUsageLevel(100)).toBe("exceeded");
         expect(hoursUsageLevel(null)).toBe("ok");
+    });
+});
+
+describe("perché nessun contratto si collega", () => {
+    const context = { type: "remote" as const, date: "2026-10-05" };
+
+    it("non dice niente se c'è un contratto valido, se non ci sono contratti o la data manca", () => {
+        expect(explainNoLinkableContract([contract()], context)).toBeNull();
+        expect(explainNoLinkableContract([], context)).toBeNull();
+        expect(explainNoLinkableContract([contract()], { ...context, date: "" })).toBeNull();
+    });
+
+    it("non dice niente per la consegna di materiale, che non è assistenza", () => {
+        expect(explainNoLinkableContract([contract()], { ...context, type: "material_delivery" })).toBeNull();
+    });
+
+    it("con un solo contratto adatto al tipo spiega il suo periodo", () => {
+        const message = explainNoLinkableContract([contract({ id: 4, startDate: "2026-11-05" })], context);
+
+        expect(message).toContain("Il contratto #4 vale dal 05/11/2026");
+        expect(message).toContain("fuori da questo periodo");
+    });
+
+    it("se il tipo non è consumato da nessun pacchetto lo dice", () => {
+        expect(explainNoLinkableContract([contract()], { ...context, type: "lab" })).toContain("non consuma le ore");
+    });
+
+    it("con più contratti adatti ma tutti fuori data dà un messaggio generico", () => {
+        const message = explainNoLinkableContract(
+            [contract({ id: 1, startDate: "2026-11-05" }), contract({ id: 2, startDate: "2026-12-01" })],
+            context
+        );
+
+        expect(message).toContain("fuori dal periodo dei contratti");
     });
 });
 

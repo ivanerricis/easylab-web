@@ -34,7 +34,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             toastOptions={{
                 ...props.toastOptions,
                 classNames: {
-                    toast: "cn-toast border-l-4!",
+                    toast: "cn-toast border-l-4! pr-12!",
                     success: "border-l-status-green!",
                     info: "border-l-primary!",
                     warning: "border-l-status-yellow!",

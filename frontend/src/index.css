@@ -245,6 +245,14 @@ body,
         @apply bg-background text-foreground;
     }
 
+    /* Le scrollbar: sottili e nel colore del testo, trasparente la guida. Seguono il tema da sole
+     (il colore parte da `--foreground`) e valgono per ogni contenitore che scorre; dove una
+     classe le nasconde (`no-scrollbar`) vince quella, che sta in un layer successivo. */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(in oklab, var(--foreground) 30%, transparent) transparent;
+    }
+
     html {
         @apply font-sans;
     }

@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-05 — Pulsante X dei toast, Modifica report in colonna, scrollbar sottili](changelog/2026-11.md#2026-11-05-pulsante-x-dei-toast-modifica-report-in-colonna-scrollbar-sottili)
 - [2026-11-03 — Notifiche e toast riconoscibili per tipo, colori dei componenti allineati](changelog/2026-11.md#2026-11-03-notifiche-e-toast-riconoscibili-per-tipo-colori-dei-componenti-allineati)
 - [2026-11-03 — Schede cliente, collaboratore e tecnico con le card dei dati](changelog/2026-11.md#2026-11-03-schede-cliente-collaboratore-e-tecnico-con-le-card-dei-dati)
 - [2026-11-03 — «Primi passi»: i dati azienda già compilati contano come fatti](changelog/2026-11.md#2026-11-03-primi-passi-i-dati-azienda-già-compilati-contano-come-fatti)

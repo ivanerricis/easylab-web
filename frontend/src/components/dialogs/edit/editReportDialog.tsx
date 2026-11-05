@@ -342,8 +342,13 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                     mostra l'errore sotto di sé la riga si allunga, e senza le celle
                                     vicine si stiravano con lei spingendo in giù le etichette.
                                 */}
-                                        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
-                                            <FormField labelSize="sm" id="customerId" label="Cliente" className="gap-1">
+                                        <div className="grid items-start gap-4 sm:grid-cols-2">
+                                            <FormField
+                                                labelSize="sm"
+                                                id="customerId"
+                                                label="Cliente"
+                                                className="gap-1 sm:col-span-2"
+                                            >
                                                 <Select disabled value={formValues.customerId}>
                                                     <SelectTrigger id="customerId" className="w-full">
                                                         <SelectValue placeholder={customerName} />
@@ -392,7 +397,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 labelSize="sm"
                                                 id="collaboratorId"
                                                 label="Collaboratore"
-                                                className="gap-1 sm:col-span-2 xl:col-span-1"
+                                                className="gap-1"
                                                 required={formValues.closed}
                                                 error={errors.collaboratorId}
                                             >

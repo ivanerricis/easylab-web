@@ -76,8 +76,11 @@ export function App() {
                         classNames: {
                             title: "text-base",
                             description: "text-sm",
-                            // Dentro la card, in alto a destra (di serie sonner la mette fuori, sull'angolo sinistro).
-                            closeButton: "[&>svg]:h-4 [&>svg]:w-4 w-6! h-6! top-2! right-2! left-auto! transform-none!",
+                            // Dentro la card, a destra e centrata in verticale (di serie sonner la mette fuori,
+                            // sull'angolo sinistro). Il `translate` è la proprietà a sé: `transform-none` toglie solo
+                            // lo spostamento di sonner. Il testo lascia lo spazio con `pr-12` (vedi `ui/sonner.tsx`).
+                            closeButton:
+                                "[&>svg]:h-4 [&>svg]:w-4 w-6! h-6! top-1/2! right-3! left-auto! -translate-y-1/2! transform-none!",
                         },
                     }}
                 />

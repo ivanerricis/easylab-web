@@ -1,14 +1,13 @@
 import { contractStatusColor } from "@/lib/contracts";
 import DetailDeleteButton from "@/components/detail-delete-button";
 import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
-import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
+import DetailStats from "@/components/detail-stats";
 import CreateProviderDialog, { type ProviderSubmitValues } from "@/components/dialogs/create/createProviderDialog";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import EntityTable from "@/components/entity-table";
 import OpenEntityButton from "@/components/open-entity-button";
 import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { useGoBack } from "@/hooks/useGoBack";
@@ -49,8 +48,6 @@ const ProviderPage = () => {
     });
     const providerName = provider?.providerName ?? "Fornitore";
     useDocumentTitle(providerName);
-    // Sotto `sm` il nome sta nella card dei dati invece che nell'intestazione (`hideTitleOnMobile`).
-    const isPhone = useIsMobile(640);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const handleBack = useGoBack("/providers");
     const columns = useMemo(() => contractColumnsWithout("providerName"), []);
@@ -141,24 +138,18 @@ const ProviderPage = () => {
             ) : null}
 
             {provider ? (
-                <DetailSection
-                    isBusy={isProviderReloading}
-                    // Su telefono il titolo è l'`h1` della pagina: vedi `titleAs`.
-                    titleAs={isPhone ? "div" : "h2"}
-                    title={
-                        isPhone ? (
-                            <h1 className="min-w-0 text-lg wrap-break-word">{providerName}</h1>
-                        ) : (
-                            "Dati del fornitore"
-                        )
-                    }
-                >
-                    <DetailGrid layout="rows" className="sm:grid-cols-2 xl:grid-cols-3">
-                        <DetailItem label="Referente" value={formatProviderContact(provider)} />
-                        <DetailItem label="Email" value={provider.email} />
-                        <DetailItem label="Telefono" value={provider.phoneNumber} />
-                    </DetailGrid>
-                </DetailSection>
+                // Le stesse card dei dati del cliente e del tecnico. Sotto `sm` diventano una card sola
+                // con il nome come titolo (vedi `DetailStats`).
+                <DetailStats
+                    mobileTitle={providerName}
+                    gridClassName="xl:grid-cols-3"
+                    items={[
+                        { label: "Referente", value: formatProviderContact(provider) },
+                        // `break-all`: un indirizzo lungo non ha punti dove andare a capo e usciva dalla card.
+                        { label: "Email", value: <span className="break-all">{provider.email}</span> },
+                        { label: "Telefono", value: provider.phoneNumber },
+                    ]}
+                />
             ) : null}
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">

@@ -35,6 +35,7 @@ data porta alla voce da qui.
 - [2026-11-06 — Skill di Claude Code per il progetto](changelog/2026-11.md#2026-11-06-skill-di-claude-code-per-il-progetto)
 - [2026-11-06 — Righe a blocchi con «Tutte», scrollbar da 14 px](changelog/2026-11.md#2026-11-06-righe-a-blocchi-con-tutte-scrollbar-da-14-px)
 - [2026-11-05 — Pulsante X dei toast, Modifica report in colonna, scrollbar sottili](changelog/2026-11.md#2026-11-05-pulsante-x-dei-toast-modifica-report-in-colonna-scrollbar-sottili)
+- [2026-11-05 — Scheda del fornitore con le card dei dati](changelog/2026-11.md#2026-11-05-scheda-del-fornitore-con-le-card-dei-dati)
 - [2026-11-04 — Intervento: se nessun contratto si può collegare, il dialogo dice perché](changelog/2026-11.md#2026-11-04-intervento-se-nessun-contratto-si-puo-collegare-il-dialogo-dice-perche)
 - [2026-11-03 — Contratti e preventivi stampabili in PDF](changelog/2026-11.md#2026-11-03-contratti-e-preventivi-stampabili-in-pdf)
 - [2026-11-03 — Notifiche e toast riconoscibili per tipo, colori dei componenti allineati](changelog/2026-11.md#2026-11-03-notifiche-e-toast-riconoscibili-per-tipo-colori-dei-componenti-allineati)

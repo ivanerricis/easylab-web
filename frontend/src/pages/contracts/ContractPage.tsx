@@ -103,6 +103,7 @@ const ContractPage = () => {
             <EntityDetailGate
                 isNotFound={isNotFound}
                 isLoading={isLoading}
+                variant="contract"
                 notFound={{
                     title: "Contratto non trovato",
                     description: "Il contratto che cerchi non esiste, oppure è stato eliminato.",

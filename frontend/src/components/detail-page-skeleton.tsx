@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 /**
- * Le tre forme delle schede di dettaglio: `report` e `intervention` hanno la riga dei numeri
- * (`DetailStats`) e le sezioni a righe; `customer` (quattro card di dati) e `person` (collaboratore e tecnico, due card)
- * hanno le card dei dati e sotto la tabella dei report/interventi.
+ * Le forme delle schede di dettaglio: `report`, `intervention` e `contract` hanno la riga dei numeri
+ * (`DetailStats`) e le sezioni a righe; `customer` (quattro card di dati), `person` (collaboratore e tecnico, due card)
+ * e `provider` (tre card) hanno le card dei dati e sotto la tabella dei report/interventi/contratti.
  */
-export type DetailSkeletonVariant = "report" | "intervention" | "customer" | "person";
+export type DetailSkeletonVariant = "report" | "intervention" | "customer" | "person" | "contract" | "provider";
 
 /**
  * La forma di scheda che spetta a un indirizzo, per chi mostra lo scheletro prima ancora che la
@@ -28,6 +28,14 @@ const detailSkeletonVariantForPath = (pathname: string): DetailSkeletonVariant =
         return "customer";
     }
 
+    if (/^\/contracts\/[^/]+/.test(pathname)) {
+        return "contract";
+    }
+
+    if (/^\/providers\/[^/]+/.test(pathname)) {
+        return "provider";
+    }
+
     return "person";
 };
 
@@ -40,6 +48,8 @@ const headerActions: Record<DetailSkeletonVariant, boolean[]> = {
     intervention: [false, true, true, true, false],
     customer: [false, true, true, false],
     person: [false, true, true, false],
+    provider: [false, true, true],
+    contract: [false, true, true, true],
 };
 
 /** Il titolo di una sezione: una riga alta quanto il `CardTitle` (24px). */
@@ -89,7 +99,12 @@ const HeaderSkeleton = ({ variant }: { variant: DetailSkeletonVariant }) => (
     <div aria-hidden="true" className="flex flex-wrap items-center gap-x-2 gap-y-3">
         <div className="flex min-w-0 flex-auto items-center gap-2">
             <Skeleton className="-ml-2 size-10 shrink-0" />
-            <Skeleton className="h-7 w-56 max-w-full max-sm:hidden" />
+            {variant === "contract" ? (
+                // Il contratto tiene il titolo (lungo, su due righe) nell'intestazione anche su telefono.
+                <Skeleton className="h-7 w-56 max-w-full max-sm:h-14 max-sm:w-64" />
+            ) : (
+                <Skeleton className="h-7 w-56 max-w-full max-sm:hidden" />
+            )}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
             {headerActions[variant].map((wide, index) => (
@@ -100,15 +115,29 @@ const HeaderSkeleton = ({ variant }: { variant: DetailSkeletonVariant }) => (
 );
 
 /** I cinque numeri in cima: la stessa markup di `DetailStats` (righe sotto `xl`, card da `xl`). */
-const StatsSkeleton = ({ count = 5, gridClassName }: { count?: number; gridClassName?: string }) => (
+const StatsSkeleton = ({
+    count = 5,
+    gridClassName,
+    plainValues = false,
+    mobileTitle = true,
+}: {
+    count?: number;
+    gridClassName?: string;
+    /** Valori di solo testo (senza badge): la card � pi� bassa, come per il fornitore. */
+    plainValues?: boolean;
+    /** Il titolo nella prima card su telefono: la scheda contratto non lo ha (resta nell'intestazione). */
+    mobileTitle?: boolean;
+}) => (
     <div
         aria-hidden="true"
         className="rounded-xl bg-card text-card-foreground shadow-xs ring-1 ring-foreground/10 xl:rounded-none xl:bg-transparent xl:shadow-none xl:ring-0"
     >
         {/* Il titolo della scheda, solo su telefono: nella pagina vera sostituisce quello dell'intestazione. */}
-        <div className="px-6 pt-3.5 pb-1 sm:hidden">
-            <Skeleton className="my-1 h-5 w-48 max-w-full" />
-        </div>
+        {mobileTitle ? (
+            <div className="px-6 pt-3.5 pb-1 sm:hidden">
+                <Skeleton className="my-1 h-5 w-48 max-w-full" />
+            </div>
+        ) : null}
         <div className={cn("divide-y divide-border xl:grid xl:grid-cols-5 xl:gap-2 xl:divide-y-0", gridClassName)}>
             {Array.from({ length: count }, (_, item) => (
                 <div
@@ -116,7 +145,9 @@ const StatsSkeleton = ({ count = 5, gridClassName }: { count?: number; gridClass
                     className="flex min-w-0 items-center justify-between gap-3 px-6 py-2.5 xl:flex-col xl:items-start xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-card xl:px-6 xl:py-5 xl:shadow-xs xl:ring-1 xl:ring-foreground/10"
                 >
                     <Skeleton className="my-[3px] h-3.5 w-20" />
-                    <Skeleton className="my-[3px] h-3.5 w-24 xl:my-2 xl:h-5 xl:w-28" />
+                    <Skeleton
+                        className={cn("my-[3px] h-3.5 w-24 xl:h-5 xl:w-28", plainValues ? "xl:my-1" : "xl:my-2")}
+                    />
                 </div>
             ))}
         </div>
@@ -146,18 +177,62 @@ const InterventionBodySkeleton = () => (
 );
 
 /**
+ * Le sezioni della scheda contratto (forma assistenza, il tipo non � noto): anagrafica e dettagli
+ * affiancate da `xl`, poi "Ore del mese" (testo, barra, riga) e "Storico mensile" (tabella).
+ */
+const ContractBodySkeleton = () => (
+    <>
+        <div className="grid gap-4 xl:grid-cols-2">
+            <RowsSectionSkeleton rows={3} className="self-start" />
+            <RowsSectionSkeleton rows={5} />
+        </div>
+        <DetailSection title={<SectionTitleSkeleton />} titleAs="div">
+            <div aria-hidden="true" className="grid gap-2">
+                <div className="flex items-baseline justify-between gap-4">
+                    <Skeleton className="my-[3px] h-3.5 w-32" />
+                    <Skeleton className="my-[3px] h-3.5 w-20" />
+                </div>
+                <Skeleton className="my-0.5 h-2 w-full rounded-full" />
+                <Skeleton className="my-[3px] h-3.5 w-48" />
+            </div>
+        </DetailSection>
+        <DetailSection title={<SectionTitleSkeleton />} titleAs="div">
+            <div aria-hidden="true" className="grid gap-px">
+                <Skeleton className="h-10 w-full" />
+                {Array.from({ length: 3 }, (_, row) => (
+                    <Skeleton key={row} className="h-12 w-full" />
+                ))}
+            </div>
+        </DetailSection>
+    </>
+);
+
+/**
  * Le card dei dati di cliente, collaboratore e tecnico (le stesse di `DetailStats`) e la tabella sotto: tab (o titolo) e filtro
  * sulla stessa riga, tabella da `sm`, schede su telefono, impaginazione in fondo.
  */
-const PersonBodySkeleton = ({ cards }: { cards: number }) => (
+const PersonBodySkeleton = ({
+    cards,
+    gridClassName = "xl:grid-cols-4",
+    tableTitle = false,
+}: {
+    cards: number;
+    gridClassName?: string;
+    /** Un titolo di sezione al posto di tab e filtro (la tabella dei contratti del fornitore). */
+    tableTitle?: boolean;
+}) => (
     <>
-        <StatsSkeleton count={cards} gridClassName="xl:grid-cols-4" />
+        <StatsSkeleton count={cards} gridClassName={gridClassName} plainValues={tableTitle} />
 
         <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-                <Skeleton className="h-10 w-44" />
-                <Skeleton className="h-10 w-40 max-sm:w-32" />
-            </div>
+            {tableTitle ? (
+                <Skeleton className="my-1 h-5 w-24" />
+            ) : (
+                <div className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-10 w-44" />
+                    <Skeleton className="h-10 w-40 max-sm:w-32" />
+                </div>
+            )}
             {/* Taglia le righe che non stanno: l'impaginazione resta in fondo, come nella pagina vera. */}
             <div className="min-h-0 flex-1 overflow-hidden">
                 <div className="grid gap-px max-sm:hidden">
@@ -190,29 +265,38 @@ const DetailPageSkeleton = ({
 }: {
     label?: string;
     variant?: DetailSkeletonVariant;
-}) => (
-    <div
-        role="status"
-        aria-busy="true"
-        // Le schede di report e intervento scorrono nel `main` (`self-start`); le altre tre
-        // riempiono l'altezza, perché la tabella sotto prenda il resto: vedi le pagine.
-        className={cn(
-            "flex w-full flex-col gap-4",
-            variant === "person" || variant === "customer" ? "h-full min-h-0" : "self-start"
-        )}
-    >
-        <span className="sr-only">{label}</span>
-        <HeaderSkeleton variant={variant} />
-        {variant === "person" || variant === "customer" ? (
-            <PersonBodySkeleton cards={variant === "customer" ? 4 : 2} />
-        ) : (
-            <div className="flex flex-col gap-4">
-                <StatsSkeleton />
-                {variant === "report" ? <ReportBodySkeleton /> : <InterventionBodySkeleton />}
-            </div>
-        )}
-    </div>
-);
+}) => {
+    const fillsHeight = variant === "person" || variant === "customer" || variant === "provider";
+
+    return (
+        <div
+            role="status"
+            aria-busy="true"
+            // Le schede di report, intervento e contratto scorrono nel `main` (`self-start`); le altre
+            // riempiono l'altezza, perché la tabella sotto prenda il resto: vedi le pagine.
+            className={cn("flex w-full flex-col gap-4", fillsHeight ? "h-full min-h-0" : "self-start")}
+        >
+            <span className="sr-only">{label}</span>
+            <HeaderSkeleton variant={variant} />
+            {variant === "provider" ? (
+                <PersonBodySkeleton cards={3} gridClassName="xl:grid-cols-3" tableTitle />
+            ) : variant === "person" || variant === "customer" ? (
+                <PersonBodySkeleton cards={variant === "customer" ? 4 : 2} />
+            ) : (
+                <div className="flex flex-col gap-4">
+                    <StatsSkeleton mobileTitle={variant !== "contract"} />
+                    {variant === "report" ? (
+                        <ReportBodySkeleton />
+                    ) : variant === "contract" ? (
+                        <ContractBodySkeleton />
+                    ) : (
+                        <InterventionBodySkeleton />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Funzione pura accanto al componente che ne usa la forma: tenerle insieme vale più del fast refresh.
 // eslint-disable-next-line react-refresh/only-export-components

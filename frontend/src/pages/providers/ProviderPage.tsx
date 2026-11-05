@@ -89,6 +89,7 @@ const ProviderPage = () => {
             <EntityDetailGate
                 isNotFound={isNotFound}
                 isLoading={isProviderLoading}
+                variant="provider"
                 notFound={{
                     title: "Fornitore non trovato",
                     description: "Il fornitore che cerchi non esiste, oppure è stato eliminato.",

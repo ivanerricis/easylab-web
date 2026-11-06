@@ -182,7 +182,7 @@ const EntityCardImpl = <T,>({
                     ) : null}
                     {/* `h2` e non `h3`: nelle liste il titolo sopra è l'`h1` della pagina, e un
                         salto di livello fa credere a chi naviga per titoli che manchi un pezzo. */}
-                    <h2 className="text-base leading-snug font-semibold break-words">{renderTitle()}</h2>
+                    <h2 className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{renderTitle()}</h2>
                 </div>
                 {badgeColumn ? (
                     <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>

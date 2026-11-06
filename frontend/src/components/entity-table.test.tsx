@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EntityCardList from "./entity-card-list";
 import EntityTable, { type EntityColumn } from "./entity-table";
 
@@ -361,4 +361,104 @@ describe("EntityCardList", () => {
         expect(screen.queryByText("Nessun elemento.")).not.toBeInTheDocument();
         expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
     });
+});
+
+describe("EntityTable: righe a blocchi", () => {
+    const manyRows: Row[] = Array.from({ length: 250 }, (_, index) => ({
+        id: index + 1,
+        firstName: `Nome${index + 1}`,
+        lastName: "Rossi",
+        status: "Aperto",
+        email: `n${index + 1}@example.com`,
+    }));
+
+    type FakeObserver = { callback: IntersectionObserverCallback; disconnected: boolean };
+    let observers: FakeObserver[] = [];
+
+    beforeEach(() => {
+        sessionStorage.clear();
+        observers = [];
+        vi.stubGlobal(
+            "IntersectionObserver",
+            class {
+                entry: FakeObserver;
+                constructor(callback: IntersectionObserverCallback) {
+                    this.entry = { callback, disconnected: false };
+                    observers.push(this.entry);
+                }
+                observe() {}
+                disconnect() {
+                    this.entry.disconnected = true;
+                }
+            }
+        );
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const liveObservers = () => observers.filter((observer) => !observer.disconnected);
+
+    /** Fa arrivare la sentinella vicino allo schermo, come lo scroll. */
+    const reachBottom = () =>
+        act(() => {
+            liveObservers()
+                .at(-1)
+                ?.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+        });
+
+    const tableRowCount = () => within(screen.getByRole("table")).getAllByRole("row").length - 1;
+
+    it("disegna solo il primo blocco e aggiunge il successivo quando si arriva in fondo", () => {
+        renderTable({ rows: manyRows });
+
+        expect(tableRowCount()).toBe(100);
+
+        reachBottom();
+        expect(tableRowCount()).toBe(200);
+
+        reachBottom();
+        expect(tableRowCount()).toBe(250);
+        // Finite le righe la sentinella sparisce e nessun osservatore resta attivo.
+        expect(liveObservers()).toHaveLength(0);
+        // Centinaia di righe in jsdom: a suite intera, con i worker in parallelo, i 5s non bastano.
+    }, 30_000);
+
+    it("non osserva niente se la lista sta nel primo blocco", () => {
+        renderTable({ rows: manyRows.slice(0, 100) });
+
+        expect(tableRowCount()).toBe(100);
+        expect(liveObservers()).toHaveLength(0);
+    });
+
+    it("riparte dal primo blocco quando la lista cambia", () => {
+        const view = renderTable({ rows: manyRows });
+        reachBottom();
+        expect(tableRowCount()).toBe(200);
+
+        view.rerender(
+            <EntityTable<Row>
+                tableKey="test"
+                columns={columns}
+                rows={[...manyRows].reverse()}
+                getRowKey={(row) => row.id}
+                emptyMessage="Nessun elemento."
+                renderRowActions={(row) => <button>Modifica {row.id}</button>}
+            />
+        );
+
+        expect(tableRowCount()).toBe(100);
+    });
+
+    it("ritrova le righe già disegnate tornando alla stessa voce di cronologia", () => {
+        const first = renderTable({ rows: manyRows });
+        reachBottom();
+        expect(tableRowCount()).toBe(200);
+        first.unmount();
+
+        renderTable({ rows: manyRows });
+
+        expect(tableRowCount()).toBe(200);
+    }, 30_000);
 });

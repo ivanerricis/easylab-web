@@ -127,6 +127,17 @@ export const tableLayout = {
 };
 
 /**
+ * Larghezza delle colonne con le etichette fisse (Cliente, Telefono, Collaboratore, ...), uguale in
+ * tutti i PDF e in tutte le sezioni, così i bordi restano allineati.
+ *
+ * Misurata sulla più lunga fra quelle usate, "Collaboratore": 53,9pt in Roboto 9pt più 10pt di
+ * padding laterale (`tableLayout`), cioè 63,9pt; 66 lascia un po' di margine. Prima erano 90pt, e lo
+ * spazio in più era tolto ai valori. Se si aggiunge un'etichetta più lunga, o cambia il carattere
+ * o il padding, va rimisurata.
+ */
+export const labelColumnWidth = 66;
+
+/**
  * L'involucro del documento pdfmake comune a tutti i PDF "semplici" (senza l'hook di misura
  * della ricevuta, che resta a parte in reportPdf.ts): pagina A4, margini, font/colore di
  * default, stili condivisi.
@@ -304,7 +315,7 @@ export const buildCustomerSummaryInfoSection = (customer: CustomerSummaryHeaderD
 
     return {
         table: {
-            widths: [90, "*", 90, "*"],
+            widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
             body: [
                 sectionBarRow(subjectLabel.toUpperCase(), 4),
                 dualFieldRow(subjectLabel, customer.customerName, "Telefono", customer.customerPhone),

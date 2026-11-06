@@ -4,6 +4,7 @@ import {
     buildCustomerSummaryInfoSection,
     dualFieldRow,
     formatEuro,
+    labelColumnWidth,
     loadLogoDataUrl,
     sectionBarRow,
     tableLayout,
@@ -126,7 +127,7 @@ const buildHeader = (intervention: InterventionPrintData, logoDataUrl: string | 
 
 const buildCustomerSection = (intervention: InterventionPrintData) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("CLIENTE", 4),
             dualFieldRow("Cliente", intervention.customerName, "Telefono", intervention.customerPhone),
@@ -168,7 +169,7 @@ const buildPriceRows = (intervention: InterventionPrintData) => {
 
 const buildActivitySection = (intervention: InterventionPrintData) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("REPORT ATTIVITÀ", 4),
             dualFieldRow("Codice", `#${intervention.id}`, "Data", intervention.interventionDateLabel),

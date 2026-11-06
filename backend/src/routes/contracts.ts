@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { auditAs, describeSubject, setAuditSubject } from "../middleware/auditContext";
 import {
     createContract,
     deleteContractById,
@@ -264,104 +265,126 @@ contractsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, re
     res.json({ ...toContractDto(contract), ...hours });
 });
 
-contractsRouter.post("/", validate({ body: contractCreateBodySchema }), async (req, res) => {
-    const { assistance, ...data } = req.body as z.infer<typeof contractCreateBodySchema>;
-    const includedHours = assistance?.includedHours ?? null;
+contractsRouter.post(
+    "/",
+    auditAs("creato contratto"),
+    validate({ body: contractCreateBodySchema }),
+    async (req, res) => {
+        const { assistance, ...data } = req.body as z.infer<typeof contractCreateBodySchema>;
+        const includedHours = assistance?.includedHours ?? null;
 
-    if (assistance && !isValidPackage(assistance.assistanceType, includedHours)) {
-        res.status(400).json({ message: invalidPackageMessage });
-        return;
-    }
-
-    // Contratto e riga di assistenza nella stessa transazione: la totalità della
-    // specializzazione non è espressa in SQL, la garantisce questa chiamata.
-    const created = await createContract(
-        data,
-        assistance ? { assistanceType: assistance.assistanceType, includedHours } : undefined
-    );
-    const [contract] = await getContractById(created.id, await getAppTimeZone());
-
-    res.status(201).json(toContractDto(contract));
-});
-
-contractsRouter.put("/:id", validate({ params: idParamsSchema, body: contractUpdateBodySchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
-    const { assistance, ...data } = req.body as z.infer<typeof contractUpdateBodySchema>;
-    const timeZone = await getAppTimeZone();
-    const [current] = await getContractById(id, timeZone);
-
-    if (!current) {
-        res.status(404).json({ message: contractNotFoundMessage });
-        return;
-    }
-
-    if (data.type !== undefined && data.type !== current.type) {
-        res.status(400).json({ message: "Il tipo di contratto non si può cambiare" });
-        return;
-    }
-
-    // I suoi interventi sono dello stesso cliente (chiave composta sull'intervento): cambiarlo li
-    // lascerebbe di un altro. Il database rifiuta comunque, ma con un messaggio sull'eliminazione.
-    if (data.customerId !== undefined && data.customerId !== current.customerId && (await hasLinkedInterventions(id))) {
-        res.status(400).json({
-            message: "Il cliente non si può cambiare: il contratto ha interventi collegati",
-            field: "customerId",
-        });
-        return;
-    }
-
-    if (assistance && current.type !== "assistance") {
-        res.status(400).json({ message: "Solo un contratto di assistenza ha dati di assistenza" });
-        return;
-    }
-
-    // La riga risultante, come per gli interventi: il corpo è parziale, quindi il pacchetto
-    // si valida sull'unione con i dati attuali. Cambiando solo il tipo in `full_time` le
-    // ore diventano illimitate senza doverle azzerare a mano.
-    let assistanceChanges: { assistanceType?: AssistanceType; includedHours?: number | null } | undefined;
-
-    if (assistance && Object.keys(assistance).length > 0) {
-        const assistanceType = assistance.assistanceType ?? (current.assistanceType as AssistanceType);
-        const includedHours =
-            assistance.includedHours !== undefined
-                ? assistance.includedHours
-                : assistance.assistanceType === "full_time"
-                  ? null
-                  : current.includedHours;
-
-        if (!isValidPackage(assistanceType, includedHours)) {
+        if (assistance && !isValidPackage(assistance.assistanceType, includedHours)) {
             res.status(400).json({ message: invalidPackageMessage });
             return;
         }
 
-        assistanceChanges = { assistanceType, includedHours };
+        // Contratto e riga di assistenza nella stessa transazione: la totalità della
+        // specializzazione non è espressa in SQL, la garantisce questa chiamata.
+        const created = await createContract(
+            data,
+            assistance ? { assistanceType: assistance.assistanceType, includedHours } : undefined
+        );
+        const [contract] = await getContractById(created.id, await getAppTimeZone());
+
+        setAuditSubject(res, describeSubject(contract.id));
+        res.status(201).json(toContractDto(contract));
     }
+);
 
-    // `type` è già uguale a quello attuale (controllo qui sopra): non si riscrive.
-    const { type: _type, ...changes } = data;
+contractsRouter.put(
+    "/:id",
+    auditAs("modificato contratto"),
+    validate({ params: idParamsSchema, body: contractUpdateBodySchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+        const { assistance, ...data } = req.body as z.infer<typeof contractUpdateBodySchema>;
+        const timeZone = await getAppTimeZone();
+        const [current] = await getContractById(id, timeZone);
 
-    await updateContractById(id, changes, assistanceChanges);
-    const [updated] = await getContractById(id, timeZone);
+        if (!current) {
+            res.status(404).json({ message: contractNotFoundMessage });
+            return;
+        }
 
-    // Il pacchetto può essere cambiato: più ore possono far rientrare il mese corrente sotto una
-    // soglia (e riarmare l'avviso), meno ore possono farne scattare una.
-    if (assistanceChanges) {
-        await recheckAssistanceHours([{ contractId: id, month: currentMonthKey(timeZone) }]);
+        if (data.type !== undefined && data.type !== current.type) {
+            res.status(400).json({ message: "Il tipo di contratto non si può cambiare" });
+            return;
+        }
+
+        // I suoi interventi sono dello stesso cliente (chiave composta sull'intervento): cambiarlo li
+        // lascerebbe di un altro. Il database rifiuta comunque, ma con un messaggio sull'eliminazione.
+        if (
+            data.customerId !== undefined &&
+            data.customerId !== current.customerId &&
+            (await hasLinkedInterventions(id))
+        ) {
+            res.status(400).json({
+                message: "Il cliente non si può cambiare: il contratto ha interventi collegati",
+                field: "customerId",
+            });
+            return;
+        }
+
+        if (assistance && current.type !== "assistance") {
+            res.status(400).json({ message: "Solo un contratto di assistenza ha dati di assistenza" });
+            return;
+        }
+
+        // La riga risultante, come per gli interventi: il corpo è parziale, quindi il pacchetto
+        // si valida sull'unione con i dati attuali. Cambiando solo il tipo in `full_time` le
+        // ore diventano illimitate senza doverle azzerare a mano.
+        let assistanceChanges: { assistanceType?: AssistanceType; includedHours?: number | null } | undefined;
+
+        if (assistance && Object.keys(assistance).length > 0) {
+            const assistanceType = assistance.assistanceType ?? (current.assistanceType as AssistanceType);
+            const includedHours =
+                assistance.includedHours !== undefined
+                    ? assistance.includedHours
+                    : assistance.assistanceType === "full_time"
+                      ? null
+                      : current.includedHours;
+
+            if (!isValidPackage(assistanceType, includedHours)) {
+                res.status(400).json({ message: invalidPackageMessage });
+                return;
+            }
+
+            assistanceChanges = { assistanceType, includedHours };
+        }
+
+        // `type` è già uguale a quello attuale (controllo qui sopra): non si riscrive.
+        const { type: _type, ...changes } = data;
+
+        await updateContractById(id, changes, assistanceChanges);
+        const [updated] = await getContractById(id, timeZone);
+
+        // Il pacchetto può essere cambiato: più ore possono far rientrare il mese corrente sotto una
+        // soglia (e riarmare l'avviso), meno ore possono farne scattare una.
+        if (assistanceChanges) {
+            await recheckAssistanceHours([{ contractId: id, month: currentMonthKey(timeZone) }]);
+        }
+
+        setAuditSubject(res, describeSubject(updated.id));
+        res.json(toContractDto(updated));
     }
+);
 
-    res.json(toContractDto(updated));
-});
+contractsRouter.delete(
+    "/:id",
+    auditAs("eliminato contratto"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+        const deleted = await deleteContractById(id);
 
-contractsRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
-    const deleted = await deleteContractById(id);
+        if (deleted.length === 0) {
+            res.status(404).json({ message: contractNotFoundMessage });
+            return;
+        }
 
-    if (deleted.length === 0) {
-        res.status(404).json({ message: contractNotFoundMessage });
-        return;
+        setAuditSubject(res, describeSubject(deleted[0].id));
+        res.json(deleted[0]);
     }
-
-    res.json(deleted[0]);
-});
+);
 
 export default contractsRouter;

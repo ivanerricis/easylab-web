@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { describeSubject } from "../middleware/auditContext";
 import {
     createProvider,
     deleteProviderById,
@@ -26,6 +27,7 @@ const providerUpdateBodySchema = providerCreateBodySchema.partial().refine((valu
 });
 
 const providersRouter = createCrudRouter({
+    audit: { noun: "fornitore", describe: (row) => describeSubject(row.id, row.providerName) },
     notFoundMessage: "Fornitore non trovato",
     createBodySchema: providerCreateBodySchema,
     updateBodySchema: providerUpdateBodySchema,

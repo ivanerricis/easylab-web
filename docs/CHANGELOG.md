@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-06 — Registro azioni: cosa è stato toccato](changelog/2026-11.md#2026-11-06-registro-azioni-cosa-è-stato-toccato)
 - [2026-11-06 — Skill di Claude Code per il progetto](changelog/2026-11.md#2026-11-06-skill-di-claude-code-per-il-progetto)
 - [2026-11-06 — Righe a blocchi con «Tutte», scrollbar da 14 px](changelog/2026-11.md#2026-11-06-righe-a-blocchi-con-tutte-scrollbar-da-14-px)
 - [2026-11-05 — Pulsante X dei toast, Modifica report in colonna, scrollbar sottili](changelog/2026-11.md#2026-11-05-pulsante-x-dei-toast-modifica-report-in-colonna-scrollbar-sottili)

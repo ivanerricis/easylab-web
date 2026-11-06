@@ -47,9 +47,15 @@ scripts/dev/certs/
 
 # Roba di Claude Code: permessi della singola postazione (settings.local.json) e skill
 # installate lì dentro, che possono pesare decine di MB. È configurazione di chi lavora,
-# non del progetto: se un giorno serve condividere una skill o un comando col repo, va
-# tolta l'esclusione per quel percorso specifico.
-.claude/
+# non del progetto. Fanno eccezione le skill scritte per questo progetto, elencate una a una:
+# una skill nuova da condividere va aggiunta qui, quelle di terzi restano fuori.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/release-flow/
+!.claude/skills/visual-check/
+!.claude/skills/changelog-entry/
+!.claude/skills/schema-change/
 
 # OS / editor
 .DS_Store

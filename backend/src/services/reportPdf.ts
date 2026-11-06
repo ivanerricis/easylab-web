@@ -4,6 +4,7 @@ import {
     buildCustomerSummaryInfoSection,
     dualFieldRow,
     formatEuro,
+    labelColumnWidth,
     loadLogoDataUrl,
     pdfStyles,
     sectionBarCell,
@@ -295,7 +296,7 @@ const sectionMargin = (compact: boolean) => (compact ? [0, 0, 0, 4] : [0, 0, 0, 
 
 const buildCustomerSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("CLIENTE", 4),
             dualFieldRow("Cliente", report.customerName, "Telefono", report.customerPhone, valueFontSize),
@@ -307,7 +308,7 @@ const buildCustomerSection = (report: ReportPrintData, rowPadding: number, value
 
 const buildDeviceSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("DISPOSITIVO", 4),
             dualFieldRow("Dispositivo", report.deviceName, "Password", report.password, valueFontSize),
@@ -326,7 +327,7 @@ const buildDeviceSection = (report: ReportPrintData, rowPadding: number, valueFo
 
 const buildDetailsSection = (report: ReportPrintData, rowPadding: number, valueFontSize: number, compact = false) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("DETTAGLI", 4),
             fullWidthRow("Problema riscontrato", "label", [0, 1, 0, 0]),

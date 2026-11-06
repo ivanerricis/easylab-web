@@ -248,9 +248,39 @@ body,
     /* Le scrollbar: sottili e nel colore del testo, trasparente la guida. Seguono il tema da sole
      (il colore parte da `--foreground`) e valgono per ogni contenitore che scorre; dove una
      classe le nasconde (`no-scrollbar`) vince quella, che sta in un layer successivo. */
-    * {
-        scrollbar-width: thin;
-        scrollbar-color: color-mix(in oklab, var(--foreground) 30%, transparent) transparent;
+    /* Larghe 14px (`thin` di Chrome/Edge su Windows ne fa 10, e non si può scegliere): per
+     questo le disegniamo con ::-webkit-scrollbar. Chrome ed Edge ignorano quelle regole se
+     `scrollbar-width` o `scrollbar-color` sono impostati, quindi lo standard sta solo nel
+     ramo per Firefox, che non ha ::-webkit-scrollbar e non permette una larghezza a scelta
+     (lì resta `thin`). Il pollice è inset di 3px (bordo trasparente + background-clip). */
+    @supports selector(::-webkit-scrollbar) {
+        ::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+
+        ::-webkit-scrollbar-track,
+        ::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            border: 3px solid transparent;
+            border-radius: 9999px;
+            background-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+            background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: color-mix(in oklab, var(--foreground) 45%, transparent);
+        }
+    }
+
+    @supports not selector(::-webkit-scrollbar) {
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in oklab, var(--foreground) 30%, transparent) transparent;
+        }
     }
 
     html {

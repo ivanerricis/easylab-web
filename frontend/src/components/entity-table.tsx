@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListScrollRestoration } from "@/hooks/useListScrollRestoration";
 import { withoutLockedColumns } from "@/hooks/useHiddenColumns";
+import { useProgressiveRows } from "@/hooks/useProgressiveRows";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
@@ -277,7 +278,7 @@ const EntityTableRow = memo(EntityTableRowImpl, areRowPropsEqual) as typeof Enti
 const EntityTable = <TRow,>({
     tableKey,
     columns: allColumns,
-    rows,
+    rows: allRows,
     getRowKey,
     emptyMessage,
     loadError,
@@ -314,6 +315,17 @@ const EntityTable = <TRow,>({
     // un `.filter` dentro il JSX, perché altrimenti ogni render di `EntityTable` produceva un
     // array nuovo e invalidava da solo il `memo` di ogni scheda più sotto.
     const cardColumns = useMemo(() => allColumns.filter((column) => column.key !== actionsColumnKey), [allColumns]);
+    // Le righe si disegnano a blocchi mentre si scorre: con "Tutte" sono fino a 5000. Un'unica
+    // sentinella sta sotto tabella e schede (una delle due è sempre nascosta e senza layout).
+    const {
+        visibleRows: rows,
+        hasMore,
+        sentinelRef,
+    } = useProgressiveRows({
+        rows: allRows,
+        tableKey,
+        resetKey: allRows.length > 0 ? getRowKey(allRows[0]) : null,
+    });
     const visibleSkeletonRows = Math.min(skeletonRowCount, maxSkeletonRows);
 
     const { tableRef, isResizable, getColumnWidth, getResizeHandleProps, tableStyle } = useResizableColumns({
@@ -496,6 +508,8 @@ const EntityTable = <TRow,>({
                 isInitialLoading={isInitialLoading}
                 skeletonCardCount={Math.min(visibleSkeletonRows, 4)}
             />
+
+            {hasMore ? <div ref={sentinelRef} aria-hidden="true" className="h-px" /> : null}
         </>
     );
 };

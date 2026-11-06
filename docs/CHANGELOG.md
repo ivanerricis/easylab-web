@@ -32,6 +32,7 @@ data porta alla voce da qui.
 - [2026-11-07 — Campo orario a tendina con completamento](changelog/2026-11.md#2026-11-07-campo-orario-a-tendina-con-completamento)
 - [2026-11-07 — Fix dalla lista Bugs: righe che si aprono da sole, Pagato nei report, Aggiornamenti in sola lettura](changelog/2026-11.md#2026-11-07-fix-dalla-lista-bugs-righe-che-si-aprono-da-sole-pagato-nei-report-aggiornamenti-in-sola-lettura)
 - [2026-11-06 — Registro azioni: cosa è stato toccato](changelog/2026-11.md#2026-11-06-registro-azioni-cosa-è-stato-toccato)
+- [2026-11-06 — PDF dei contratti: colonne delle etichette strette](changelog/2026-11.md#2026-11-06-pdf-dei-contratti-colonne-delle-etichette-strette)
 - [2026-11-06 — Skill di Claude Code per il progetto](changelog/2026-11.md#2026-11-06-skill-di-claude-code-per-il-progetto)
 - [2026-11-06 — Righe a blocchi con «Tutte», scrollbar da 14 px](changelog/2026-11.md#2026-11-06-righe-a-blocchi-con-tutte-scrollbar-da-14-px)
 - [2026-11-05 — Skeleton di caricamento per la scheda del contratto e del fornitore](changelog/2026-11.md#2026-11-05-skeleton-di-caricamento-per-la-scheda-del-contratto-e-del-fornitore)

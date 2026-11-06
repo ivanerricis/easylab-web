@@ -3,6 +3,7 @@ import {
     buildCustomerSummaryHeader,
     buildCustomerSummaryInfoSection,
     dualFieldRow,
+    labelColumnWidth,
     loadLogoDataUrl,
     sectionBarRow,
     tableLayout,
@@ -134,7 +135,7 @@ const singleValueRow = (label: string, value: string) => [
 
 const buildCustomerSection = (contract: ContractPrintData) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("CLIENTE", 4),
             dualFieldRow("Cliente", contract.customerName, "Telefono", contract.customerPhone || "-"),
@@ -147,7 +148,7 @@ const buildCustomerSection = (contract: ContractPrintData) => ({
 
 const buildProviderSection = (contract: ContractPrintData) => ({
     table: {
-        widths: [90, "*", 90, "*"],
+        widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
         body: [
             sectionBarRow("FORNITORE", 4),
             dualFieldRow("Fornitore", contract.providerName, "Referente", contract.providerContact || "-"),
@@ -163,16 +164,16 @@ const buildContractDataSection = (contract: ContractPrintData) => {
 
     return {
         table: {
-            widths: [90, "*", 90, "*"],
+            widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
             body: [
                 sectionBarRow(isQuote ? "DATI DEL PREVENTIVO" : "DATI DEL CONTRATTO", 4),
                 dualFieldRow("Codice", `#${contract.id}`, "Tipo", formatContractType(contract.type)),
                 singleValueRow("Dispositivo", contract.device),
                 isQuote
                     ? dualFieldRow(
-                          "Decorrenza proposta",
+                          "Decorrenza",
                           contract.startDateLabel,
-                          "Durata proposta",
+                          "Durata",
                           contract.termLabel
                       )
                     : dualFieldRow("Stato", formatContractStatus(contract.status), "Durata", contract.termLabel),
@@ -180,7 +181,7 @@ const buildContractDataSection = (contract: ContractPrintData) => {
                     ? []
                     : [
                           singleValueRow(
-                              "Periodo di validità",
+                              "Validità",
                               `dal ${contract.startDateLabel} al ${contract.endDateLabel}`
                           ),
                       ]),
@@ -200,11 +201,11 @@ const buildAssistanceSection = (contract: ContractPrintData) => {
 
     return {
         table: {
-            widths: [90, "*", 90, "*"],
+            widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
             body: [
                 sectionBarRow("PACCHETTO DI ASSISTENZA", 4),
                 dualFieldRow("Assistenza", assistanceTypeLabel, "Ore incluse", includedHoursLabel),
-                singleValueRow("Interventi coperti", coveredInterventionTypes.join(", ") || "-"),
+                singleValueRow("Copre", coveredInterventionTypes.join(", ") || "-"),
                 [
                     {
                         text: "Le ore valgono per mese di calendario e non si riportano al mese successivo",

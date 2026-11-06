@@ -107,7 +107,7 @@ describe("createContractPdfBuffer", () => {
             expect(text).not.toContain("Preventivo");
             expect(doc.watermark).toBeUndefined();
             expect(text).toContain("DATI DEL CONTRATTO");
-            expect(text).toContain("Periodo di validità");
+            expect(text).toContain("Validità");
             expect(text).toContain("dal 1 ott 2026 al 1 ott 2027");
             expect(text).not.toContain("non costituisce contratto");
         });
@@ -142,9 +142,9 @@ describe("createContractPdfBuffer", () => {
             const text = allText(await captureDoc(quote()));
 
             expect(text).toContain("DATI DEL PREVENTIVO");
-            expect(text).toContain("Decorrenza proposta");
-            expect(text).toContain("Durata proposta");
-            expect(text).not.toContain("Periodo di validità");
+            expect(text).toContain("Decorrenza");
+            expect(text).toContain("Durata");
+            expect(text).not.toContain("Validità");
         });
 
         it("aggiunge la dicitura di non vincolo e le firme di accettazione", async () => {

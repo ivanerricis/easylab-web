@@ -1,3 +1,4 @@
+import { auditAs, describeSubject, setAuditSubject } from "../middleware/auditContext";
 import { Router } from "express";
 import { z } from "zod";
 import {
@@ -376,48 +377,55 @@ interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req
     res.json(intervention);
 });
 
-interventionsRouter.post("/", validate({ body: interventionBodySchema }), async (req, res) => {
-    const isOnSite = onSiteInterventionTypes.has(req.body.type);
+interventionsRouter.post(
+    "/",
+    auditAs("creato intervento"),
+    validate({ body: interventionBodySchema }),
+    async (req, res) => {
+        const isOnSite = onSiteInterventionTypes.has(req.body.type);
 
-    /**
-     * Un'unica riga normalizzata, non una per la validazione e una per la scrittura: prima
-     * `isOnSite ? (x ?? null) : null`, `description || null` e il default dello stato erano
-     * calcolati due volte identici, col rischio che una modifica futura li disallineasse.
-     * Per una creazione il corpo appena arrivato È la riga risultante: vedi
-     * `validateInterventionRow`, la stessa funzione che la PUT chiama sulla riga unione.
-     */
-    const normalizedIntervention = {
-        type: req.body.type,
-        // Stringa vuota e campo assente sono la stessa cosa: "non ancora compilato" si
-        // scrive NULL, come per `problem`.
-        description: req.body.description || null,
-        problem: isOnSite ? (req.body.problem ?? null) : null,
-        note: req.body.note || null,
-        price: req.body.price ?? null,
-        paid: req.body.paid ?? false,
-        toInvoice: req.body.toInvoice ?? false,
-        status: req.body.status ?? "scheduled",
-        customerId: req.body.customerId,
-        collaboratorId: req.body.collaboratorId,
-        interventionDate: req.body.interventionDate ?? null,
-        startTime: isOnSite ? (req.body.startTime ?? null) : null,
-        endTime: isOnSite ? (req.body.endTime ?? null) : null,
-    };
+        /**
+         * Un'unica riga normalizzata, non una per la validazione e una per la scrittura: prima
+         * `isOnSite ? (x ?? null) : null`, `description || null` e il default dello stato erano
+         * calcolati due volte identici, col rischio che una modifica futura li disallineasse.
+         * Per una creazione il corpo appena arrivato È la riga risultante: vedi
+         * `validateInterventionRow`, la stessa funzione che la PUT chiama sulla riga unione.
+         */
+        const normalizedIntervention = {
+            type: req.body.type,
+            // Stringa vuota e campo assente sono la stessa cosa: "non ancora compilato" si
+            // scrive NULL, come per `problem`.
+            description: req.body.description || null,
+            problem: isOnSite ? (req.body.problem ?? null) : null,
+            note: req.body.note || null,
+            price: req.body.price ?? null,
+            paid: req.body.paid ?? false,
+            toInvoice: req.body.toInvoice ?? false,
+            status: req.body.status ?? "scheduled",
+            customerId: req.body.customerId,
+            collaboratorId: req.body.collaboratorId,
+            interventionDate: req.body.interventionDate ?? null,
+            startTime: isOnSite ? (req.body.startTime ?? null) : null,
+            endTime: isOnSite ? (req.body.endTime ?? null) : null,
+        };
 
-    const validationFailure = validateInterventionRow(normalizedIntervention);
+        const validationFailure = validateInterventionRow(normalizedIntervention);
 
-    if (validationFailure) {
-        res.status(400).json({ message: validationFailure.message });
-        return;
+        if (validationFailure) {
+            res.status(400).json({ message: validationFailure.message });
+            return;
+        }
+
+        const createdIntervention = await createIntervention(normalizedIntervention);
+
+        setAuditSubject(res, describeSubject(createdIntervention[0].id));
+        res.status(201).json(createdIntervention[0]);
     }
-
-    const createdIntervention = await createIntervention(normalizedIntervention);
-
-    res.status(201).json(createdIntervention[0]);
-});
+);
 
 interventionsRouter.put(
     "/:id",
+    auditAs("modificato intervento"),
     validate({ params: idParamsSchema, body: interventionUpdateBodySchema }),
     async (req, res) => {
         const { id } = req.params as unknown as { id: number };
@@ -473,20 +481,27 @@ interventionsRouter.put(
             return;
         }
 
+        setAuditSubject(res, describeSubject(updatedIntervention[0].id));
         res.json(updatedIntervention[0]);
     }
 );
 
-interventionsRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
-    const deletedIntervention = await deleteInterventionById(id);
+interventionsRouter.delete(
+    "/:id",
+    auditAs("eliminato intervento"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+        const deletedIntervention = await deleteInterventionById(id);
 
-    if (deletedIntervention.length === 0) {
-        res.status(404).json({ message: "Intervento non trovato" });
-        return;
+        if (deletedIntervention.length === 0) {
+            res.status(404).json({ message: "Intervento non trovato" });
+            return;
+        }
+
+        setAuditSubject(res, describeSubject(deletedIntervention[0].id));
+        res.json(deletedIntervention[0]);
     }
-
-    res.json(deletedIntervention[0]);
-});
+);
 
 export default interventionsRouter;

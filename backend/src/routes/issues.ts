@@ -1,3 +1,4 @@
+import { describeSubject } from "../middleware/auditContext";
 import { z } from "zod";
 import { createIssue, deleteIssueById, getIssueById, listIssues, updateIssueById } from "../db/queries/issue";
 import { createCrudRouter } from "./crudRouter";
@@ -13,6 +14,7 @@ const issueUpdateBodySchema = issueCreateBodySchema.partial().refine((value) => 
 });
 
 const issuesRouter = createCrudRouter({
+    audit: { noun: "difetto", describe: (row) => describeSubject(row.id, row.description) },
     notFoundMessage: "Difetto non trovato",
     createBodySchema: issueCreateBodySchema,
     updateBodySchema: issueUpdateBodySchema,

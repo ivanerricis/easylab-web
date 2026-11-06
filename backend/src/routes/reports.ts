@@ -1,3 +1,4 @@
+import { auditAs, describeSubject, setAuditSubject } from "../middleware/auditContext";
 import { Router } from "express";
 import { z } from "zod";
 import {
@@ -276,7 +277,7 @@ const validateIssueDescription = async (issueId: number, issueDescription: strin
     return catchAllIssueDescriptionMessage;
 };
 
-reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, res) => {
+reportsRouter.post("/", auditAs("creato report"), validate({ body: reportCreateBodySchema }), async (req, res) => {
     const { report, technician } = splitTechnician(req.body as z.infer<typeof reportCreateBodySchema>);
     const paymentMethod = report.paymentMethod ?? "non_paid";
     const price = report.price ?? 0;
@@ -292,51 +293,58 @@ reportsRouter.post("/", validate({ body: reportCreateBodySchema }), async (req, 
     // Postgres sia questa sia la PUT qui sotto: vedi il commento su `reportCreateBodySchema`.
     const createdReport = await createReport({ ...report, paymentMethod, price }, technician);
 
+    setAuditSubject(res, describeSubject(createdReport[0].id));
     res.status(201).json(createdReport[0]);
 });
 
-reportsRouter.put("/:id", validate({ params: idParamsSchema, body: reportUpdateBodySchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
-    const existingReport = await getReportById(id);
+reportsRouter.put(
+    "/:id",
+    auditAs("modificato report"),
+    validate({ params: idParamsSchema, body: reportUpdateBodySchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+        const existingReport = await getReportById(id);
 
-    if (existingReport.length === 0) {
-        res.status(404).json({ message: "Report non trovato" });
-        return;
+        if (existingReport.length === 0) {
+            res.status(404).json({ message: "Report non trovato" });
+            return;
+        }
+
+        const { report, technician } = splitTechnician(req.body as z.infer<typeof reportUpdateBodySchema>);
+
+        // La riga risultante (unione di questo corpo parziale con quella esistente, appena letta
+        // qui sopra) è quella su cui vale la regola "Altro" ⇒ descrizione non vuota: senza la riga
+        // esistente non sapremmo con quale difetto o quale descrizione confrontarci quando la PUT
+        // ne cambia solo uno dei due. È anche il motivo per cui questa SELECT preliminare resta
+        // (vedi il resoconto finale dell'agente).
+        const nextIssueId = report.issueId ?? existingReport[0].issueId;
+        const nextIssueDescription =
+            "issueDescription" in report ? report.issueDescription : existingReport[0].issueDescription;
+        const issueDescriptionError = await validateIssueDescription(nextIssueId, nextIssueDescription);
+
+        if (issueDescriptionError) {
+            res.status(400).json({ message: issueDescriptionError });
+            return;
+        }
+
+        // Prezzo/pagamento e chiusura/collaboratore non si controllano più qui a mano: la riga
+        // risultante (l'unione di questo corpo parziale con quella esistente) è quella che Postgres
+        // vede al momento dell'UPDATE, e il CHECK di riga della migration 0035_report_domain_checks
+        // la rifiuta da solo se viola una delle due regole. `errorHandler.ts` traduce la violazione
+        // nello stesso messaggio italiano che questa rotta dava prima a mano.
+        const updatedReport = await updateReportById(id, report, technician);
+
+        if (updatedReport.length === 0) {
+            res.status(404).json({ message: "Report non trovato" });
+            return;
+        }
+
+        setAuditSubject(res, describeSubject(updatedReport[0].id));
+        res.json(updatedReport[0]);
     }
+);
 
-    const { report, technician } = splitTechnician(req.body as z.infer<typeof reportUpdateBodySchema>);
-
-    // La riga risultante (unione di questo corpo parziale con quella esistente, appena letta
-    // qui sopra) è quella su cui vale la regola "Altro" ⇒ descrizione non vuota: senza la riga
-    // esistente non sapremmo con quale difetto o quale descrizione confrontarci quando la PUT
-    // ne cambia solo uno dei due. È anche il motivo per cui questa SELECT preliminare resta
-    // (vedi il resoconto finale dell'agente).
-    const nextIssueId = report.issueId ?? existingReport[0].issueId;
-    const nextIssueDescription =
-        "issueDescription" in report ? report.issueDescription : existingReport[0].issueDescription;
-    const issueDescriptionError = await validateIssueDescription(nextIssueId, nextIssueDescription);
-
-    if (issueDescriptionError) {
-        res.status(400).json({ message: issueDescriptionError });
-        return;
-    }
-
-    // Prezzo/pagamento e chiusura/collaboratore non si controllano più qui a mano: la riga
-    // risultante (l'unione di questo corpo parziale con quella esistente) è quella che Postgres
-    // vede al momento dell'UPDATE, e il CHECK di riga della migration 0035_report_domain_checks
-    // la rifiuta da solo se viola una delle due regole. `errorHandler.ts` traduce la violazione
-    // nello stesso messaggio italiano che questa rotta dava prima a mano.
-    const updatedReport = await updateReportById(id, report, technician);
-
-    if (updatedReport.length === 0) {
-        res.status(404).json({ message: "Report non trovato" });
-        return;
-    }
-
-    res.json(updatedReport[0]);
-});
-
-reportsRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res) => {
+reportsRouter.delete("/:id", auditAs("eliminato report"), validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
     const deletedReport = await deleteReportById(id);
 
@@ -345,6 +353,7 @@ reportsRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, r
         return;
     }
 
+    setAuditSubject(res, describeSubject(deletedReport[0].id));
     res.json(deletedReport[0]);
 });
 

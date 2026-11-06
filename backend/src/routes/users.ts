@@ -1,3 +1,4 @@
+import { auditAs, describeSubject, setAuditSubject } from "../middleware/auditContext";
 import { Router } from "express";
 import { z } from "zod";
 import {
@@ -35,10 +36,13 @@ usersRouter.get("/", async (_req, res) => {
     res.json(await listUsers());
 });
 
-usersRouter.post("/", validate({ body: createUserBodySchema }), async (req, res) => {
+usersRouter.post("/", auditAs("creato utente"), validate({ body: createUserBodySchema }), async (req, res) => {
     const { username } = req.body as { username: string };
 
-    res.status(201).json(await createUser(username));
+    const created = await createUser(username);
+
+    setAuditSubject(res, describeSubject(created.user.id, created.user.username));
+    res.status(201).json(created);
 });
 
 /**
@@ -47,16 +51,26 @@ usersRouter.post("/", validate({ body: createUserBodySchema }), async (req, res)
  * admin rubata bastava a prendersi l'account per sempre, chiudendo fuori il proprietario.
  * Per sé c'è "Cambia password", che la password attuale la chiede.
  */
-usersRouter.post("/:id/regenerate-password", validate({ params: idParamsSchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+usersRouter.post(
+    "/:id/regenerate-password",
+    auditAs("rigenerata password di utente"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
 
-    if (id === req.user!.id) {
-        res.status(400).json({ message: 'Per la tua password usa "Cambia password" nelle impostazioni dell\'account' });
-        return;
+        if (id === req.user!.id) {
+            res.status(400).json({
+                message: 'Per la tua password usa "Cambia password" nelle impostazioni dell\'account',
+            });
+            return;
+        }
+
+        const regenerated = await regeneratePassword(id);
+
+        setAuditSubject(res, describeSubject(regenerated.user.id, regenerated.user.username));
+        res.json(regenerated);
     }
-
-    res.json(await regeneratePassword(id));
-});
+);
 
 // Il corpo può mancare del tutto: la password serve solo quando l'admin agisce su di sé.
 const disableTwoFactorBodySchema = z
@@ -92,24 +106,40 @@ usersRouter.post(
     }
 );
 
-usersRouter.post("/:id/disable", validate({ params: idParamsSchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+usersRouter.post(
+    "/:id/disable",
+    auditAs("disabilitato utente"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
 
-    if (id === req.user!.id) {
-        res.status(400).json({ message: "Non puoi disabilitare il tuo stesso account" });
-        return;
+        if (id === req.user!.id) {
+            res.status(400).json({ message: "Non puoi disabilitare il tuo stesso account" });
+            return;
+        }
+
+        const disabled = await setUserActive(id, false);
+
+        setAuditSubject(res, describeSubject(disabled.id, disabled.username));
+        res.json(disabled);
     }
+);
 
-    res.json(await setUserActive(id, false));
-});
+usersRouter.post(
+    "/:id/enable",
+    auditAs("riabilitato utente"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
 
-usersRouter.post("/:id/enable", validate({ params: idParamsSchema }), async (req, res) => {
-    const { id } = req.params as unknown as { id: number };
+        const enabled = await setUserActive(id, true);
 
-    res.json(await setUserActive(id, true));
-});
+        setAuditSubject(res, describeSubject(enabled.id, enabled.username));
+        res.json(enabled);
+    }
+);
 
-usersRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res) => {
+usersRouter.delete("/:id", auditAs("eliminato utente"), validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
 
     if (id === req.user!.id) {
@@ -118,6 +148,7 @@ usersRouter.delete("/:id", validate({ params: idParamsSchema }), async (req, res
     }
 
     await deleteUser(id);
+    setAuditSubject(res, describeSubject(id));
     res.status(204).end();
 });
 

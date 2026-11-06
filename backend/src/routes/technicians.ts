@@ -1,3 +1,4 @@
+import { describeSubject } from "../middleware/auditContext";
 import { z } from "zod";
 import {
     createTechnician,
@@ -24,6 +25,7 @@ const technicianUpdateBodySchema = technicianCreateBodySchema
     });
 
 const techniciansRouter = createCrudRouter({
+    audit: { noun: "tecnico", describe: (row) => describeSubject(row.id, row.firstName, row.lastName) },
     notFoundMessage: "Tecnico non trovato",
     createBodySchema: technicianCreateBodySchema,
     updateBodySchema: technicianUpdateBodySchema,

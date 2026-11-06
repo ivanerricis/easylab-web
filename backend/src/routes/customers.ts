@@ -1,3 +1,4 @@
+import { describeSubject } from "../middleware/auditContext";
 import { z } from "zod";
 import {
     createCustomer,
@@ -62,6 +63,7 @@ const loadCustomerPrintContext = async (id: number) => {
 };
 
 const customersRouter = createCrudRouter({
+    audit: { noun: "cliente", describe: (row) => describeSubject(row.id, row.firstName, row.lastName) },
     notFoundMessage: "Cliente non trovato",
     createBodySchema: customerCreateBodySchema,
     updateBodySchema: customerUpdateBodySchema,

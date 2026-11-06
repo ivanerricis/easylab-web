@@ -4,6 +4,7 @@ import { appendUserActionLog, getDayKey } from "../services/logManager";
 // valore scrivibile dal chiamante, quindi un IP a piacere nel registro delle azioni.
 // Un log di controllo falsificabile da chi lo dovrebbe incriminare non serve a niente.
 import { getClientIp } from "./clientIp";
+import { readAuditContext } from "./auditContext";
 
 const actionVerbByMethod: Record<string, string> = {
     POST: "creato",
@@ -118,8 +119,15 @@ export const userActionLogger = (request: Request, _response: Response, next: Ne
     // campo non deve restare l'unico dei quattro senza la stessa protezione.
     const rawIp = getClientIp(request);
     const ip = rawIp.replace(/\|/g, "/").replace(/\s+/g, " ").trim() || "unknown";
-    const action = specificLabel ?? formatAction(request.method, normalizedPath);
+    const fallbackAction = specificLabel ?? formatAction(request.method, normalizedPath);
     response.once("finish", () => {
+        // L'etichetta dichiarata dalla rotta (`auditAs`) vince sulla tabella e sul verbo
+        // generico; se la rotta ha anche detto su cosa ha agito, si aggiunge in coda. Le
+        // richieste respinte prima di arrivare alla rotta (401, 403) non l'hanno: restano
+        // con la voce di ripiego, che è quella che le identifica anche senza.
+        const audit = readAuditContext(response);
+        const baseAction = audit.action ?? fallbackAction;
+        const action = audit.subject ? `${baseAction} ${audit.subject}` : baseAction;
         const now = new Date();
         const timestamp = now.toISOString();
         const dayKey = getDayKey(now);

@@ -1,3 +1,4 @@
+import { describeSubject } from "../middleware/auditContext";
 import { z } from "zod";
 import { createDevice, deleteDeviceById, getDeviceById, listDevices, updateDeviceById } from "../db/queries/device";
 import { createCrudRouter } from "./crudRouter";
@@ -13,6 +14,7 @@ const deviceUpdateBodySchema = deviceCreateBodySchema.partial().refine((value) =
 });
 
 const devicesRouter = createCrudRouter({
+    audit: { noun: "dispositivo", describe: (row) => describeSubject(row.id, row.name) },
     notFoundMessage: "Dispositivo non trovato",
     createBodySchema: deviceCreateBodySchema,
     updateBodySchema: deviceUpdateBodySchema,

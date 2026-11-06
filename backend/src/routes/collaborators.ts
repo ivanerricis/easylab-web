@@ -1,3 +1,4 @@
+import { describeSubject } from "../middleware/auditContext";
 import { z } from "zod";
 import {
     createCollaborator,
@@ -51,6 +52,7 @@ const loadCollaboratorPrintContext = async (id: number) => {
 };
 
 const collaboratorsRouter = createCrudRouter({
+    audit: { noun: "collaboratore", describe: (row) => describeSubject(row.id, row.firstName, row.lastName) },
     notFoundMessage: "Collaboratore non trovato",
     createBodySchema: collaboratorCreateBodySchema,
     updateBodySchema: collaboratorUpdateBodySchema,

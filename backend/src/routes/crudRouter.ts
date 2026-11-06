@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import { z, type ZodType } from "zod";
 import { validate } from "./validation";
 import { maxPageSize } from "../db/queries/pagination";
+import { auditAs, setAuditSubject } from "../middleware/auditContext";
 
 export const idParamsSchema = z.object({
     id: z.coerce.number().int().positive(),
@@ -79,6 +80,12 @@ type CreateCrudRouterOptions<TRow, TCreate, TUpdate> = {
      * verrebbe catturato dal parametro.
      */
     extraRoutes?: (router: Router) => void;
+    /**
+     * Come il registro delle azioni racconta create/modifica/elimina di questa entità: il nome
+     * ("cliente") per l'etichetta, e come riconoscere la riga ("#7 Mario Rossi"), che dopo un
+     * eliminazione non esiste più da nessun'altra parte.
+     */
+    audit: { noun: string; describe: (row: TRow) => string };
 };
 
 export const createCrudRouter = <TRow, TCreate, TUpdate>({
@@ -87,6 +94,7 @@ export const createCrudRouter = <TRow, TCreate, TUpdate>({
     createBodySchema,
     updateBodySchema,
     extraRoutes,
+    audit,
 }: CreateCrudRouterOptions<TRow, TCreate, TUpdate>): Router => {
     const router = Router();
 
@@ -110,35 +118,48 @@ export const createCrudRouter = <TRow, TCreate, TUpdate>({
         res.json(rows[0]);
     });
 
-    router.post("/", validate({ body: createBodySchema }), async (req, res) => {
+    router.post("/", auditAs(`creato ${audit.noun}`), validate({ body: createBodySchema }), async (req, res) => {
         const created = await queries.create(req.body as TCreate);
 
+        setAuditSubject(res, audit.describe(created[0]));
         res.status(201).json(created[0]);
     });
 
-    router.put("/:id", validate({ params: idParamsSchema, body: updateBodySchema }), async (req, res) => {
-        const { id } = req.params as unknown as { id: number };
-        const updated = await queries.update(id, req.body as TUpdate);
+    router.put(
+        "/:id",
+        auditAs(`modificato ${audit.noun}`),
+        validate({ params: idParamsSchema, body: updateBodySchema }),
+        async (req, res) => {
+            const { id } = req.params as unknown as { id: number };
+            const updated = await queries.update(id, req.body as TUpdate);
 
-        if (updated.length === 0) {
-            res.status(404).json({ message: notFoundMessage });
-            return;
+            if (updated.length === 0) {
+                res.status(404).json({ message: notFoundMessage });
+                return;
+            }
+
+            setAuditSubject(res, audit.describe(updated[0]));
+            res.json(updated[0]);
         }
+    );
 
-        res.json(updated[0]);
-    });
+    router.delete(
+        "/:id",
+        auditAs(`eliminato ${audit.noun}`),
+        validate({ params: idParamsSchema }),
+        async (req, res) => {
+            const { id } = req.params as unknown as { id: number };
+            const deleted = await queries.remove(id);
 
-    router.delete("/:id", validate({ params: idParamsSchema }), async (req, res) => {
-        const { id } = req.params as unknown as { id: number };
-        const deleted = await queries.remove(id);
+            if (deleted.length === 0) {
+                res.status(404).json({ message: notFoundMessage });
+                return;
+            }
 
-        if (deleted.length === 0) {
-            res.status(404).json({ message: notFoundMessage });
-            return;
+            setAuditSubject(res, audit.describe(deleted[0]));
+            res.json(deleted[0]);
         }
-
-        res.json(deleted[0]);
-    });
+    );
 
     return router;
 };

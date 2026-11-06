@@ -47,6 +47,38 @@ describe("userActionLogger", () => {
         expect(line).not.toContain("error=");
     });
 
+    it("usa l'etichetta dichiarata dalla rotta e ci aggiunge il soggetto", async () => {
+        const res = createResponse(200, { auditAction: "eliminato cliente", auditSubject: "#7 Mario Rossi" });
+
+        userActionLogger(createRequest("DELETE", "/api/customers/7"), res, vi.fn() as NextFunction);
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=eliminato cliente #7 Mario Rossi |");
+    });
+
+    it("con l'etichetta della rotta ma senza soggetto (richiesta respinta) scrive solo l'etichetta", async () => {
+        const res = createResponse(400, { auditAction: "creato cliente", apiErrorMessage: "Dati non validi" });
+
+        userActionLogger(createRequest("POST", "/api/customers"), res, vi.fn() as NextFunction);
+        res.emit("finish");
+        await flushMicrotasks();
+
+        const line = vi.mocked(appendUserActionLog).mock.calls[0][0];
+        expect(line).toContain("action=creato cliente | status=400");
+        expect(line).not.toContain("/api/customers");
+    });
+
+    it("l'etichetta della rotta ha la precedenza su quella della tabella di percorsi", async () => {
+        const res = createResponse(200, { auditAction: "etichetta della rotta" });
+
+        userActionLogger(createRequest("POST", "/api/auth/logout"), res, vi.fn() as NextFunction);
+        res.emit("finish");
+        await flushMicrotasks();
+
+        expect(vi.mocked(appendUserActionLog).mock.calls[0][0]).toContain("action=etichetta della rotta |");
+    });
+
     it("aggiunge il messaggio d'errore quando lo status è >= 400", async () => {
         const res = createResponse(404, { apiErrorMessage: "Device not found" });
 

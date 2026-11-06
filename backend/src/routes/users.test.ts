@@ -79,7 +79,7 @@ describe("users router", () => {
     });
 
     it("rigenera la password di un utente", async () => {
-        vi.mocked(regeneratePassword).mockResolvedValue({ initialPassword: "xyz789" } as never);
+        vi.mocked(regeneratePassword).mockResolvedValue({ user, initialPassword: "xyz789" } as never);
 
         const response = await request(buildApp()).post("/api/users/2/regenerate-password");
 

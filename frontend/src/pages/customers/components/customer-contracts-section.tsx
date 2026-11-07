@@ -1,6 +1,5 @@
 import EntityTable from "@/components/entity-table";
 import FilterSelect from "@/components/filters/filter-select";
-import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
 import TablePagination from "@/components/table-pagination";
 import type { CustomerContractsList } from "@/hooks/useCustomerContracts";
@@ -49,11 +48,6 @@ export const CustomerContractsTable = ({ contracts }: { contracts: CustomerContr
                     emptyMessage="Nessun contratto associato a questo cliente."
                     renderRowActions={(row) => (
                         <>
-                            <OpenEntityButton
-                                size="icon-lg"
-                                to={entityPaths.contract(row.id)}
-                                aria-label={`Apri contratto ${row.id}`}
-                            />
                             <TableActionButton
                                 variant="default"
                                 size="icon-lg"

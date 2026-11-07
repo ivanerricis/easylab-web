@@ -262,7 +262,9 @@ describe("CustomerPage", () => {
         expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, status: "all" }));
         // Tabella e schede mobili mostrano la stessa riga: basta che ci sia.
         expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
-        expect(screen.getAllByRole("link", { name: "Apri contratto 21" })[0]).toHaveAttribute("href", "/contracts/21");
+        const contractRow = screen.getAllByRole("row").find((row) => within(row).queryByText("Server NAS") !== null);
+        fireEvent.keyDown(contractRow as HTMLElement, { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith("/contracts/21");
         // La colonna del cliente non c'è: nella sua scheda sarebbe sempre lo stesso nome.
         expect(screen.queryByRole("columnheader", { name: "Cliente" })).not.toBeInTheDocument();
         // L'intestazione stampa il resoconto dei contratti del cliente, subito e senza dialogo.

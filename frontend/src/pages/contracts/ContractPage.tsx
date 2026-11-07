@@ -7,7 +7,6 @@ import DetailStats, { DetailStatBadge } from "@/components/detail-stats";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import EntityTable from "@/components/entity-table";
-import OpenEntityButton from "@/components/open-entity-button";
 import RefreshButton from "@/components/refresh-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
@@ -309,13 +308,6 @@ const ContractPage = () => {
                                 emptyMessage="Nessun intervento collegato a questo contratto."
                                 loadError={interventions.error}
                                 onRetry={() => void reloadInterventions()}
-                                renderRowActions={(row) => (
-                                    <OpenEntityButton
-                                        size="icon-lg"
-                                        to={entityPaths.intervention(row.id)}
-                                        aria-label={`Apri intervento ${row.id}`}
-                                    />
-                                )}
                                 getRowStatusColor={(row) => interventionStatusColor[row.status]}
                                 onRowOpen={(row) => void navigate(entityPaths.intervention(row.id))}
                                 isInitialLoading={interventions.isInitialLoading}

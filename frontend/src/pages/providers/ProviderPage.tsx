@@ -5,7 +5,6 @@ import DetailStats from "@/components/detail-stats";
 import CreateProviderDialog, { type ProviderSubmitValues } from "@/components/dialogs/create/createProviderDialog";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import EntityTable from "@/components/entity-table";
-import OpenEntityButton from "@/components/open-entity-button";
 import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -168,13 +167,6 @@ const ProviderPage = () => {
                         })}
                         loadError={contractsLoadError}
                         onRetry={() => void reloadContracts()}
-                        renderRowActions={(row) => (
-                            <OpenEntityButton
-                                size="icon-lg"
-                                to={entityPaths.contract(row.id)}
-                                aria-label={`Apri contratto ${row.id}`}
-                            />
-                        )}
                         onRowOpen={(row) => void navigate(entityPaths.contract(row.id))}
                         isInitialLoading={areContractsInitialLoading}
                         isRefetching={areContractsRefetching}

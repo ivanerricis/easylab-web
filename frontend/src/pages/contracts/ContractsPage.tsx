@@ -4,7 +4,6 @@ import CreateEntityButton from "@/components/create-entity-button";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import EntityTable from "@/components/entity-table";
-import OpenEntityButton from "@/components/open-entity-button";
 import PageHeader from "@/components/page-header";
 import TableActionButton from "@/components/table-action-button";
 import TablePagination from "@/components/table-pagination";
@@ -187,11 +186,6 @@ const ContractsPage = () => {
                         })}
                         renderRowActions={(row) => (
                             <>
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.contract(row.id)}
-                                    aria-label={`Apri contratto ${row.id}`}
-                                />
                                 <TableActionButton
                                     variant="default"
                                     size="icon-lg"

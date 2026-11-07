@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -201,7 +201,17 @@ describe("ContractPage", () => {
         await waitFor(() => {
             expect(api.listInterventions).toHaveBeenCalledWith(expect.objectContaining({ contractId: 21 }));
         });
-        expect((await screen.findAllByRole("link", { name: "Apri intervento 9" })).length).toBeGreaterThan(0);
+        // La riga dell'intervento collegato (non quelle dello storico) si apre da sola con Invio.
+        await waitFor(() => {
+            const linkedRows = screen
+                .getAllByRole("row")
+                .filter(
+                    (row) => !(history as HTMLElement).contains(row) && within(row).queryAllByRole("cell").length > 0
+                );
+            expect(linkedRows.length).toBeGreaterThan(0);
+            fireEvent.keyDown(linkedRows[0], { key: "Enter" });
+            expect(navigate).toHaveBeenCalledWith("/interventions/9");
+        });
     });
 
     it("Stampa apre il PDF del contratto", async () => {
@@ -265,7 +275,9 @@ describe("ProvidersPage", () => {
         const table = await screen.findByRole("table");
         expect(await within(table).findByText("Rossi Informatica")).toBeInTheDocument();
         expect(within(table).getByText("info@rossi.it")).toBeInTheDocument();
-        expect(within(table).getByRole("link", { name: "Apri fornitore 8" })).toHaveAttribute("href", "/providers/8");
+        expect(within(table).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
+        fireEvent.keyDown(within(table).getAllByRole("row")[1], { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith("/providers/8");
     });
 });
 

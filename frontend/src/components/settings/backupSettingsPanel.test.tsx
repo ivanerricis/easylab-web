@@ -245,6 +245,8 @@ describe("BackupSettingsPanel: campi della pianificazione e del NAS", () => {
         await userEvent.click(screen.getByLabelText("Esegui dump in automatico"));
         change("Ogni quanti giorni", "3");
         change("Orario", "03:30");
+        // Il campo orario conferma quello che è scritto quando lo si lascia.
+        fireEvent.blur(screen.getByLabelText("Orario"));
         change("Numero di backup da mantenere", "7");
         await fillNasFields();
         await userEvent.click(screen.getByRole("button", { name: "Salva" }));

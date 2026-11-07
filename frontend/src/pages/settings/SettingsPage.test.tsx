@@ -73,13 +73,14 @@ describe("SettingsPage", () => {
      * Le sezioni sulla macchina (backup, log, SMTP, aggiornamenti...) il backend le riserva
      * all'amministratore: a un altro utente risponderebbero solo 403, quindi non si mostrano.
      */
-    it("a chi non è amministratore mostra solo tema, sicurezza ed esportazione", () => {
+    it("a chi non è amministratore mostra tema, sicurezza, esportazione e aggiornamenti", () => {
         renderPage("/settings", user);
 
         // L'esportazione CSV c'è per tutti: le rotte `export.csv` non sono riservate
         // all'amministratore, e prima del trasloco in Impostazioni il pulsante stava nelle
         // pagine Clienti e Report, che ogni utente apre.
-        expect(sectionButtons()).toEqual(["Tema", "Sicurezza", "Esportazione"]);
+        // Gli Aggiornamenti ci sono in sola lettura: solo le informazioni, senza i pulsanti.
+        expect(sectionButtons()).toEqual(["Tema", "Sicurezza", "Esportazione", "Aggiornamenti"]);
     });
 
     it("ignora nell'indirizzo una sezione che l'utente non può aprire", async () => {

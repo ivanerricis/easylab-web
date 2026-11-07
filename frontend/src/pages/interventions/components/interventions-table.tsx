@@ -1,8 +1,6 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import OpenEntityButton from "@/components/open-entity-button";
-import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import { interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
@@ -65,11 +63,6 @@ const InterventionsTable = ({
 }: InterventionsTableProps) => {
     const renderRowActions = (row: InterventionDto) => (
         <>
-            <OpenEntityButton
-                size="icon-lg"
-                to={entityPaths.intervention(row.id)}
-                aria-label={`Apri intervento ${row.id}`}
-            />
             <TableActionButton
                 variant="default"
                 size="icon-lg"

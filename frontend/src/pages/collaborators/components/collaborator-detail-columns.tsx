@@ -76,12 +76,6 @@ export const collaboratorReportColumns: CollaboratorReportColumn[] = [
         header: "Creato il",
         render: (row) => formatDateTime(row.createdAt),
     },
-    {
-        key: "actions",
-        header: "Azioni",
-        className: "text-right",
-        render: () => null,
-    },
 ];
 
 export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] = [
@@ -128,11 +122,5 @@ export const collaboratorInterventionColumns: CollaboratorInterventionColumn[] =
         key: "createdAt",
         header: "Creato il",
         render: (row) => formatDateTime(row.createdAt),
-    },
-    {
-        key: "actions",
-        header: "Azioni",
-        className: "text-right",
-        render: () => null,
     },
 ];

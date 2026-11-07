@@ -3,7 +3,7 @@ import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro, formatYesNo } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
-import { formatReportStatus } from "@/lib/reports";
+import { formatReportStatus, paymentMethodLabels } from "@/lib/reports";
 
 // Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
 // di questa entità.
@@ -64,6 +64,14 @@ export const reportColumns: ReportColumn[] = [
         header: "Prezzo totale",
         cardCollapsed: true,
         render: (row) => formatEuro(row.totalPrice),
+    },
+    {
+        // Come si è pagato (stesse diciture del dialog e della scheda del report), o semplicemente
+        // "No": sotto l'intestazione "Pagato" "Non pagato" ripeterebbe la parola e allarga la colonna.
+        key: "paymentMethod",
+        header: "Pagato",
+        cardCollapsed: true,
+        render: (row) => (row.paymentMethod === "non_paid" ? "No" : paymentMethodLabels[row.paymentMethod]),
     },
     {
         // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga

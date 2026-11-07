@@ -77,12 +77,6 @@ describe("colonne degli interventi del collaboratore", () => {
 
         expect(cell()).toHaveTextContent("In lavorazione");
     });
-
-    it("la colonna Azioni è vuota: i pulsanti li aggiunge la pagina", () => {
-        renderCell(collaboratorInterventionColumns, "actions", intervention);
-
-        expect(cell()).toBeEmptyDOMElement();
-    });
 });
 
 describe("colonne dei report del collaboratore", () => {

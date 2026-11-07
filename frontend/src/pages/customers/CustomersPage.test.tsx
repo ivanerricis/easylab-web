@@ -171,7 +171,10 @@ describe("CustomersPage", () => {
     it("apre la scheda del cliente", async () => {
         await renderPage();
 
-        expect(within(table()).getByRole("link", { name: "Apri cliente 3" })).toHaveAttribute("href", "/clients/3");
+        // Niente più pulsante "Apri": la riga si apre con Invio (e col doppio clic).
+        expect(within(table()).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
+        fireEvent.keyDown(within(table()).getAllByRole("row")[1], { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/clients\/\d+$/));
     });
 
     /** L'esportazione è passata in Impostazioni → Esportazione: qui non deve ricomparire. */

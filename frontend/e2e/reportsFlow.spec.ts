@@ -198,6 +198,13 @@ const seedReports = (): MockReport[] =>
     });
 
 /**
+ * La riga di un report nella tabella, riconosciuta dall'ID. Non c'è più il pulsante "Apri": la riga
+ * si apre con il doppio click (qui sul bordo della cella ID, dove non c'è un link).
+ */
+const reportRow = (page: Page, id: number) =>
+    page.getByRole("row").filter({ has: page.getByRole("cell", { name: String(id), exact: true }) });
+
+/**
  * Il contenitore che fa scorrere la lista (su desktop quello della tabella, ma lo si cerca
  * risalendo invece di presumerlo: vedi `getListScrollContainers`), portato in fondo. Restituisce
  * quanti livelli sopra il contenitore della tabella sta, per ritrovarlo dopo che la lista è
@@ -273,7 +280,7 @@ test("crea un report con un cliente nuovo, scegliendo dispositivo e difetto dai 
     await expect(dialog).toBeHidden();
     await expect(page.getByText("Report #57 creato")).toBeVisible();
     // La lista si è ricaricata e il report nuovo c'è.
-    await expect(page.getByRole("link", { name: "Apri report 57" })).toBeVisible();
+    await expect(reportRow(page, 57)).toBeVisible();
 
     expect(api.calls("POST /api/customers")).toEqual([
         expect.objectContaining({ firstName: "Giulia", lastName: "Verdi", phoneNumber: "333 1234567" }),
@@ -305,13 +312,13 @@ test("la lista filtrata si ritrova tornando dal dettaglio, e modifica ed elimina
     await page.goto("/reports?visibility=all");
     await page.getByRole("searchbox", { name: "Cerca report..." }).fill("rossi");
     await expect(page).toHaveURL(/[?&]q=rossi/);
-    await expect(page.getByRole("link", { name: "Apri report 51" })).toHaveCount(0);
+    await expect(reportRow(page, 51)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Vai alla pagina 2" }).click();
     await expect(page).toHaveURL(/[?&]page=2/);
     // Seconda pagina: dal 21 al 40, chiusi compresi (il 23 lo è).
-    await expect(page.getByRole("link", { name: "Apri report 23" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Apri report 20" })).toHaveCount(0);
+    await expect(reportRow(page, 23)).toBeVisible();
+    await expect(reportRow(page, 20)).toHaveCount(0);
     const listUrl = page.url();
 
     // In fondo alla pagina, e si apre l'ultimo report.
@@ -319,7 +326,7 @@ test("la lista filtrata si ritrova tornando dal dettaglio, e modifica ed elimina
     expect(scrolled.top).toBeGreaterThan(0);
     // Il salvataggio della posizione aspetta un frame: si lascia passare prima di uscire.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.getByRole("link", { name: "Apri report 40" }).click();
+    await reportRow(page, 40).dblclick({ position: { x: 5, y: 5 } });
 
     await expect(page).toHaveURL(/\/reports\/40$/);
     await expect(page.getByText("Mario Rossi 40").first()).toBeVisible();
@@ -328,11 +335,11 @@ test("la lista filtrata si ritrova tornando dal dettaglio, e modifica ed elimina
     await page.goBack();
     await expect(page).toHaveURL(listUrl);
     await expect(page.getByRole("searchbox", { name: "Cerca report..." })).toHaveValue("rossi");
-    await expect(page.getByRole("link", { name: "Apri report 40" })).toBeVisible();
+    await expect(reportRow(page, 40)).toBeVisible();
     await expect.poll(() => listScrollTop(page, scrolled.depth)).toBe(scrolled.top);
 
     // Modifica dalla scheda.
-    await page.getByRole("link", { name: "Apri report 40" }).click();
+    await reportRow(page, 40).dblclick({ position: { x: 5, y: 5 } });
     await expect(page).toHaveURL(/\/reports\/40$/);
     await page.getByRole("button", { name: "Modifica report" }).click();
     const editDialog = page.getByRole("dialog", { name: "Modifica report #40" });
@@ -361,10 +368,10 @@ test("la lista filtrata si ritrova tornando dal dettaglio, e modifica ed elimina
     await expect(page).toHaveURL(listUrl);
     await expect(page.getByText("Report eliminato con successo")).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "Cerca report..." })).toHaveValue("rossi");
-    await expect(page.getByRole("link", { name: "Apri report 39" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Apri report 40" })).toHaveCount(0);
+    await expect(reportRow(page, 39)).toBeVisible();
+    await expect(reportRow(page, 40)).toHaveCount(0);
     // Il 41 scivola dalla terza pagina alla seconda.
-    await expect(page.getByRole("link", { name: "Apri report 41" })).toBeVisible();
+    await expect(reportRow(page, 41)).toBeVisible();
     expect(api.calls("DELETE /api/reports/40")).toHaveLength(1);
     expect(backend.reports.some((report) => report.id === 40)).toBe(false);
     expect(api.unhandled).toEqual([]);

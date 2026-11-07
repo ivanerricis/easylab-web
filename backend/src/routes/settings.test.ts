@@ -178,6 +178,16 @@ describe("settings router: permessi", () => {
         expect(response.body).toEqual({ state: "idle", phase: null, build: null });
     });
 
+    it("/update-info è leggibile da chi non è amministratore ma senza commit, errori e log", async () => {
+        const response = await request(buildApp(false)).get("/api/settings/update-info");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ state: "idle" });
+        expect(response.body).not.toHaveProperty("log");
+        expect(response.body).not.toHaveProperty("lastError");
+        expect(response.body).not.toHaveProperty("currentCommit");
+    });
+
     it("restituisce lo stato del sistema all'amministratore", async () => {
         const response = await request(buildApp(true)).get("/api/settings/system");
 

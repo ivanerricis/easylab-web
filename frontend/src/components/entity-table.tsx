@@ -64,7 +64,8 @@ type EntityTableProps<TRow> = {
      */
     loadError?: string | null;
     onRetry?: () => void;
-    renderRowActions: (row: TRow) => ReactNode;
+    /** I pulsanti di riga, nella colonna `actions`. Facoltativi: la riga si apre da sé (`onRowOpen`). */
+    renderRowActions?: (row: TRow) => ReactNode;
     /**
      * Colora la riga in base allo stato (`data-status-color`, interpretato da index.css
      * insieme all'intensità scelta in Impostazioni > Tema). Quando è presente, la cella
@@ -76,9 +77,8 @@ type EntityTableProps<TRow> = {
      */
     getRowStatusColor?: (row: TRow) => string;
     /**
-     * Doppio click sulla riga per aprire la scheda. Solo desktop: su mobile le righe
-     * diventano schede e il doppio click non è un gesto disponibile, quindi lì resta il
-     * pulsante "Apri" tra le azioni (che comunque rimane anche su desktop).
+     * Apre la scheda della riga: doppio click su desktop, Invio con la riga a fuoco, tap sulla
+     * scheda su mobile. Non c'è più un pulsante "Apri" tra le azioni.
      */
     onRowOpen?: (row: TRow) => void;
     /**
@@ -146,7 +146,7 @@ type EntityTableRowProps<TRow> = {
     isResizable: boolean;
     getRowStatusColor?: (row: TRow) => string;
     onRowOpen?: (row: TRow) => void;
-    renderRowActions: (row: TRow) => ReactNode;
+    renderRowActions?: (row: TRow) => ReactNode;
 };
 
 /**
@@ -203,7 +203,7 @@ const EntityTableRowImpl = <TRow,>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const statusColor = useMemo(() => getRowStatusColor?.(row), [row]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const actionsNode = useMemo(() => renderRowActions(row), [row]);
+    const actionsNode = useMemo(() => renderRowActions?.(row), [row]);
 
     // I punti interattivi della riga (link, pulsanti, la cella delle azioni) gestiscono già da
     // sé il proprio doppio click: qui basta ignorarlo invece di fermarlo con `stopPropagation`
@@ -222,11 +222,27 @@ const EntityTableRowImpl = <TRow,>({
           }
         : undefined;
 
+    // Senza più il pulsante "Apri" la riga è l'unico punto d'ingresso: da tastiera ci si arriva
+    // con Tab e si apre con Invio. Solo se il focus è sulla riga stessa, non su un suo pulsante.
+    const handleRowKeyDown = onRowOpen
+        ? (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+              if (event.key === "Enter" && event.target === event.currentTarget) {
+                  onRowOpen(row);
+              }
+          }
+        : undefined;
+
     return (
         <TableRow
             data-status-color={statusColor}
-            className={onRowOpen ? "cursor-pointer select-none" : undefined}
+            className={
+                onRowOpen
+                    ? "cursor-pointer select-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    : undefined
+            }
+            tabIndex={onRowOpen ? 0 : undefined}
             onDoubleClick={handleRowDoubleClick}
+            onKeyDown={handleRowKeyDown}
         >
             {columns.map((column) => (
                 <TableCell
@@ -502,6 +518,7 @@ const EntityTable = <TRow,>({
                 getRowKey={getRowKey}
                 getStatusColor={getRowStatusColor}
                 renderActions={renderRowActions}
+                onRowOpen={onRowOpen}
                 emptyMessage={emptyMessage}
                 loadError={loadError}
                 onRetry={onRetry}

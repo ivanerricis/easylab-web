@@ -64,6 +64,8 @@ type EntityCardListProps<T> = {
     /** Colore di stato della scheda: "red" | "yellow" | "green", come `getRowStatusColor`. */
     getStatusColor?: (row: T) => string | undefined;
     renderActions?: (row: T) => ReactNode;
+    /** Apre la scheda della riga con un tap sulla card (su mobile non c'è il doppio click). */
+    onRowOpen?: (row: T) => void;
     emptyMessage: string;
     /**
      * Il messaggio dell'ultimo caricamento fallito (`error` di `usePaginatedRows`): senza righe,
@@ -96,6 +98,7 @@ type EntityCardProps<T> = {
     showIdAboveTitle: boolean;
     statusColor?: string;
     renderActions?: (row: T) => ReactNode;
+    onRowOpen?: (row: T) => void;
 };
 
 /**
@@ -133,6 +136,7 @@ const EntityCardImpl = <T,>({
     showIdAboveTitle,
     statusColor,
     renderActions,
+    onRowOpen,
 }: EntityCardProps<T>) => {
     const status = isStatusColor(statusColor) ? statusStyles[statusColor] : null;
     // Ricalcolate solo quando `row` cambia, come `actionsNode` in `EntityTableRowImpl`: vedi il
@@ -164,8 +168,22 @@ const EntityCardImpl = <T,>({
         return idColumn ? `#${String(idColumn.render(row))}` : null;
     };
 
+    // Il tap apre la scheda, ma non se cade su un punto interattivo (link, pulsanti): lo gestiscono
+    // da sé. Stessa regola del doppio click della riga in `EntityTable`.
+    const handleOpen = onRowOpen
+        ? (event: React.MouseEvent<HTMLElement>) => {
+              const target = event.target;
+
+              if (target instanceof HTMLElement && target.closest("a, button, input, [role=button]")) {
+                  return;
+              }
+
+              onRowOpen(row);
+          }
+        : undefined;
+
     return (
-        <article className={cardClassName}>
+        <article className={cn(cardClassName, onRowOpen && "cursor-pointer active:bg-muted/40")} onClick={handleOpen}>
             {status ? (
                 <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", status.stripe)} />
             ) : null}
@@ -285,6 +303,7 @@ const EntityCardList = <T,>({
     getRowKey,
     getStatusColor,
     renderActions,
+    onRowOpen,
     emptyMessage,
     loadError,
     onRetry,
@@ -355,6 +374,7 @@ const EntityCardList = <T,>({
                         showIdAboveTitle={showIdAboveTitle}
                         statusColor={getStatusColor?.(row)}
                         renderActions={renderActions}
+                        onRowOpen={onRowOpen}
                     />
                 );
             })}

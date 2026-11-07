@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -318,19 +318,15 @@ describe("elenchi di collaboratori e tecnici", () => {
             page([{ id: 50, firstName: "Paolo", lastName: "Neri", phoneNumber: null, vatNumber: null, ...timestamps }])
         );
 
-        // "Apri" è un link (si apre anche in un'altra scheda); il doppio clic naviga.
+        // Niente pulsante "Apri": il doppio clic e Invio sulla riga navigano.
         const { unmount } = renderWithProviders(<CollaboratorsPage />);
-        expect(
-            await within(screen.getByRole("table")).findByRole("link", { name: "Apri collaboratore 40" })
-        ).toHaveAttribute("href", "/collaborators/40");
-        await userEvent.dblClick(within(screen.getByRole("table")).getByText("Luca"));
+        await userEvent.dblClick(await within(screen.getByRole("table")).findByText("Luca"));
         expect(navigate).toHaveBeenCalledWith("/collaborators/40");
         unmount();
 
         renderWithProviders(<TechniciansPage />);
-        expect(await within(screen.getByRole("table")).findByRole("link", { name: "Apri tecnico 50" })).toHaveAttribute(
-            "href",
-            "/technicians/50"
-        );
+        await within(screen.getByRole("table")).findByText("Paolo");
+        fireEvent.keyDown(within(screen.getByRole("table")).getAllByRole("row")[1], { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith("/technicians/50");
     });
 });

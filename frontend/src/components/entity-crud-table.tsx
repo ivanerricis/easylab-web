@@ -1,5 +1,4 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
-import OpenEntityButton from "@/components/open-entity-button";
 import TableActionButton from "@/components/table-action-button";
 import { Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -71,13 +70,6 @@ const EntityCrudTable = <TRow extends { id: number }>({
 
     const renderRowActions = (row: TRow) => (
         <>
-            {getOpenPath ? (
-                <OpenEntityButton
-                    size="icon-lg"
-                    to={getOpenPath(row.id)}
-                    aria-label={`Apri ${entityLabel} ${row.id}`}
-                />
-            ) : null}
             {isRowLocked?.(row) ? null : (
                 <>
                     <TableActionButton

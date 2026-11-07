@@ -18,7 +18,6 @@ import { ListFilter, Pencil } from "lucide-react";
 import type { ReportDto } from "@/types/dtos";
 import type { ReportVisibilityFilter } from "../reports/components/types";
 import { useNavigate, useParams } from "react-router-dom";
-import OpenEntityButton from "@/components/open-entity-button";
 import { useGoBack } from "@/hooks/useGoBack";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
@@ -223,11 +222,6 @@ const TechnicianPage = () => {
                         onRetry={() => void reloadReports()}
                         renderRowActions={(row) => (
                             <>
-                                <OpenEntityButton
-                                    size="icon-lg"
-                                    to={entityPaths.report(row.id)}
-                                    aria-label={`Apri report ${row.id}`}
-                                />
                                 <TableActionButton
                                     variant="default"
                                     size="icon-lg"

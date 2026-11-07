@@ -19,8 +19,10 @@ import {
     checkForUpdates,
     getApiErrorMessage,
     getBackupSettings,
+    getUpdateInfo,
     getUpdateStatus,
     runUpdateNow,
+    type UpdateInfoDto,
     type UpdateStatusDto,
 } from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -33,9 +35,13 @@ const UPDATE_MAX_ATTEMPTS = 120; // ~6 minutes
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const UpdateSettingsPanel = () => {
+/**
+ * `readOnly`: per chi non è amministratore. Solo le informazioni (versione, date), senza i pulsanti
+ * per verificare e aggiornare, né l'ultimo errore: le rotte che servono sono dell'amministratore.
+ */
+const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
     const { setBusy } = useBusyGuard();
-    const [status, setStatus] = useState<UpdateStatusDto | null>(null);
+    const [status, setStatus] = useState<(UpdateInfoDto & Partial<UpdateStatusDto>) | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -55,7 +61,7 @@ const UpdateSettingsPanel = () => {
         setIsLoading(true);
 
         try {
-            const result = await getUpdateStatus();
+            const result = readOnly ? await getUpdateInfo() : await getUpdateStatus();
             if (!cancelledRef.current) {
                 setStatus(result);
             }
@@ -236,20 +242,27 @@ const UpdateSettingsPanel = () => {
             <SettingsCard
                 title="Stato aggiornamenti"
                 action={
-                    <>
-                        <Button type="button" variant="outline" disabled={isBusy} onClick={() => void handleCheck()}>
-                            <RefreshCw className={cn("size-4", isChecking && "animate-spin")} />
-                            {isChecking ? "Verifica in corso..." : "Verifica aggiornamenti"}
-                        </Button>
-                        <Button
-                            type="button"
-                            disabled={isBusy || !status?.updateAvailable}
-                            onClick={() => void handleOpenConfirm()}
-                        >
-                            <Download className="size-4" />
-                            {isUpdating ? "Aggiornamento in corso..." : "Aggiorna adesso"}
-                        </Button>
-                    </>
+                    readOnly ? undefined : (
+                        <>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isBusy}
+                                onClick={() => void handleCheck()}
+                            >
+                                <RefreshCw className={cn("size-4", isChecking && "animate-spin")} />
+                                {isChecking ? "Verifica in corso..." : "Verifica aggiornamenti"}
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={isBusy || !status?.updateAvailable}
+                                onClick={() => void handleOpenConfirm()}
+                            >
+                                <Download className="size-4" />
+                                {isUpdating ? "Aggiornamento in corso..." : "Aggiorna adesso"}
+                            </Button>
+                        </>
+                    )
                 }
             >
                 {isLoading && !status ? (
@@ -287,7 +300,7 @@ const UpdateSettingsPanel = () => {
                             </p>
                         ) : null}
 
-                        {status?.lastError ? (
+                        {!readOnly && status?.lastError ? (
                             <SettingsErrorNote label="Ultimo errore" message={status.lastError} />
                         ) : null}
                     </>

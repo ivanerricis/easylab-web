@@ -4,7 +4,7 @@ import FormField from "@/components/form-field";
 import FormSection, { tintedSectionClassName } from "@/components/dialogs/form-section";
 import PaidStatusSelector from "@/components/paid-status-selector";
 import ToInvoiceSelector from "@/components/to-invoice-selector";
-import { Input } from "@/components/ui/input";
+import TimeField from "@/components/time-field";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -148,11 +148,13 @@ const InterventionTimeFields = ({ values, errors, onChange }: FieldsProps) => (
                 required={isCompletedInterventionStatus(values.status)}
                 error={errors[field]}
             >
-                <Input
-                    {...fieldProps(field, { error: errors[field] })}
-                    type="time"
+                <TimeField
+                    id={field}
+                    {...fieldErrorAria(field, errors[field])}
                     value={values[field]}
-                    onChange={(event) => onChange({ [field]: event.target.value })}
+                    // La fine propone orari dopo l'inizio, con la durata accanto.
+                    after={field === "endTime" && values.startTime ? values.startTime : undefined}
+                    onValueChange={(time) => onChange({ [field]: time })}
                 />
             </FormField>
         ))}

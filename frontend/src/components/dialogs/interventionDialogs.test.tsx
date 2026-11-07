@@ -41,9 +41,11 @@ const chooseOption = async (label: string | RegExp, option: string) => {
     await userEvent.click(await screen.findByRole("option", { name: option }));
 };
 
-/** I campi orario sono `type="time"`: si impostano direttamente, come fa il selettore nativo. */
+/** I campi orario sono `TimeField`: si scrive l'orario e si esce dal campo, che lo conferma. */
 const setTime = (label: RegExp, value: string) => {
-    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    const field = screen.getByLabelText(label);
+    fireEvent.change(field, { target: { value } });
+    fireEvent.blur(field);
 };
 
 /** Il riquadro tinto di destra: stato, prezzo, pagamento e fatturazione (vedi `InterventionProgressSection`). */

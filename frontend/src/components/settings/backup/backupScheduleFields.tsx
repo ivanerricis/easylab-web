@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import TimeField from "@/components/time-field";
 import FormField, { FieldError } from "@/components/form-field";
 import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { SettingsField, SettingsFieldRow, SettingsGroup } from "@/components/settings/settingsUi";
@@ -64,12 +65,14 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                         labelSize="sm"
                         groupControlAndError
                     >
-                        <Input
-                            {...fieldProps("runAt", { error: errors.runAt })}
-                            type="time"
+                        <TimeField
+                            id="runAt"
+                            {...fieldErrorAria("runAt", errors.runAt)}
                             disabled={!formValues.autoEnabled}
                             value={formValues.runAt}
-                            onChange={(event) => changeFormValues({ runAt: event.target.value })}
+                            // Un backup non ha bisogno del quarto d'ora: mezz'ore, scrivibile a mano.
+                            step={30}
+                            onValueChange={(runAt) => changeFormValues({ runAt })}
                         />
                     </FormField>
                 </SettingsField>

@@ -66,11 +66,12 @@ export const reportColumns: ReportColumn[] = [
         render: (row) => formatEuro(row.totalPrice),
     },
     {
-        // Come si è pagato, o "Non pagato": la stessa dicitura del dialog e della scheda del report.
+        // Come si è pagato (stesse diciture del dialog e della scheda del report), o semplicemente
+        // "No": sotto l'intestazione "Pagato" "Non pagato" ripeterebbe la parola e allarga la colonna.
         key: "paymentMethod",
         header: "Pagato",
         cardCollapsed: true,
-        render: (row) => paymentMethodLabels[row.paymentMethod],
+        render: (row) => (row.paymentMethod === "non_paid" ? "No" : paymentMethodLabels[row.paymentMethod]),
     },
     {
         // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga

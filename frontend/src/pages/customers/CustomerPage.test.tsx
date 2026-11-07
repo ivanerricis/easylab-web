@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -219,10 +219,11 @@ describe("CustomerPage", () => {
     it("apre il report dalla riga", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
-        expect(await within(screen.getByRole("table")).findByRole("link", { name: "Apri report 5" })).toHaveAttribute(
-            "href",
-            "/reports/5"
-        );
+        const table = screen.getByRole("table");
+        await within(table).findByText("5");
+        expect(within(table).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
+        fireEvent.keyDown(within(table).getAllByRole("row")[1], { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/reports\/\d+$/));
     });
 
     it("mostra 'non trovato' con un id non valido", async () => {

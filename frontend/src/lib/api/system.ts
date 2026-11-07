@@ -25,6 +25,20 @@ export type UpdateStatusDto = {
 /** Lo stato nudo, leggibile da qualunque utente autenticato: vedi hooks/useUpdateWatcher.ts. */
 export type UpdateStateDto = Pick<UpdateStatusDto, "state" | "phase" | "build">;
 
+/** Le informazioni sugli aggiornamenti per chi non è amministratore: niente commit, errore e log. */
+export type UpdateInfoDto = Pick<
+    UpdateStatusDto,
+    | "state"
+    | "currentVersion"
+    | "remoteVersion"
+    | "updateAvailable"
+    | "lastCheckedAt"
+    | "lastUpdateAt"
+    | "lastUpdateStatus"
+>;
+
+export const getUpdateInfo = async () => (await api.get<UpdateInfoDto>("/settings/update-info")).data;
+
 export const getUpdateStatus = async () => (await api.get<UpdateStatusDto>("/settings/update")).data;
 
 export const getUpdateState = async () => (await api.get<UpdateStateDto>("/settings/update-state")).data;

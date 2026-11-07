@@ -3,6 +3,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatDate, formatDateISO } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
+import { useState } from "react";
 import { it as italianLocale } from "react-day-picker/locale";
 
 type Props = {
@@ -40,11 +41,12 @@ const DatePickerField = ({
     placeholder = "Seleziona data",
     className,
 }: Props) => {
+    const [open, setOpen] = useState(false);
     const selectedDate = parseDateValue(value);
     const label = selectedDate ? formatDate(selectedDate) : placeholder;
 
     return (
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
                     id={id}
@@ -85,6 +87,8 @@ const DatePickerField = ({
                     onSelect={(date) => {
                         if (date) {
                             onValueChange(formatDateISO(date));
+                            // Scelta la data il calendario si richiude da solo.
+                            setOpen(false);
                         }
                     }}
                     className="rounded-md border"

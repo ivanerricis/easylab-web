@@ -162,15 +162,7 @@ const isSettingsSectionKey = (value: string | null): value is SettingsSectionKey
 // tutti, credenziali NAS e SMTP, aggiornamento dello stack), non preferenze personali.
 // Qui le sezioni corrispondenti vengono nascoste, perché a un non-admin risponderebbero
 // solo 403. Al di fuori dell'amministratore resta il tema, che è una scelta di chi guarda.
-const adminOnlySections = new Set<SettingsSectionKey>([
-    "users",
-    "company",
-    "email",
-    "backup",
-    "system",
-    "update",
-    "logs",
-]);
+const adminOnlySections = new Set<SettingsSectionKey>(["users", "company", "email", "backup", "system", "logs"]);
 
 /** Dove si voleva andare quando è comparsa la domanda "Modifiche non salvate". */
 type PendingLeave = { type: "section"; section: SettingsSectionKey } | { type: "link"; to: string };
@@ -248,7 +240,7 @@ const SettingsPage = () => {
         export: <ExportSettingsSection />,
         backup: <BackupSettingsPanel onDirtyChange={setIsSectionDirty} />,
         system: <SystemSettingsPanel />,
-        update: <UpdateSettingsPanel />,
+        update: <UpdateSettingsPanel readOnly={!user?.isAdmin} />,
         logs: <LogsSettingsPanel />,
     };
 

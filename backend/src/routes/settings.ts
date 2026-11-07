@@ -211,6 +211,15 @@ settingsRouter.get("/update-state", async (_req, res) => {
     res.json({ state, phase, build });
 });
 
+// Le informazioni sugli aggiornamenti per chi non è amministratore (Impostazioni > Aggiornamenti,
+// in sola lettura): versione installata e disponibile, date delle ultime verifica e aggiornamento.
+// Niente hash dei commit, messaggio d'errore e log: restano su /update, riservato all'amministratore.
+settingsRouter.get("/update-info", async (_req, res) => {
+    const { state, currentVersion, remoteVersion, updateAvailable, lastCheckedAt, lastUpdateAt, lastUpdateStatus } =
+        await getUpdateStatus();
+    res.json({ state, currentVersion, remoteVersion, updateAvailable, lastCheckedAt, lastUpdateAt, lastUpdateStatus });
+});
+
 /**
  * Tutto il resto delle impostazioni è riservato all'amministratore.
  *

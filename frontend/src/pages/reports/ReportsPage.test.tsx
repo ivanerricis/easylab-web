@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -501,7 +501,10 @@ describe("ReportsPage", () => {
     it("apre la scheda e stampa dalla riga", async () => {
         await renderPage();
 
-        expect(within(table()).getByRole("link", { name: "Apri report 2" })).toHaveAttribute("href", "/reports/2");
+        // Niente più pulsante "Apri": la riga si apre con Invio (e col doppio clic).
+        expect(within(table()).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
+        fireEvent.keyDown(within(table()).getAllByRole("row")[1], { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/reports\/\d+$/));
         await userEvent.click(within(table()).getByRole("button", { name: "Stampa report 1" }));
 
         expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/1/print");

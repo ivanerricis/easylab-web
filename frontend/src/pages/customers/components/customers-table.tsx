@@ -1,8 +1,6 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import OpenEntityButton from "@/components/open-entity-button";
-import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import type { CustomerDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
@@ -52,7 +50,6 @@ const CustomersTable = ({
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
         <>
-            <OpenEntityButton size="icon-lg" to={entityPaths.customer(row.id)} aria-label={`Apri cliente ${row.id}`} />
             <TableActionButton
                 variant="default"
                 size="icon-lg"

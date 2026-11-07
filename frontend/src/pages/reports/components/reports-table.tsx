@@ -1,8 +1,6 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import OpenEntityButton from "@/components/open-entity-button";
-import { entityPaths } from "@/lib/entityPaths";
 import TableActionButton from "@/components/table-action-button";
 import type { ReportDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
@@ -63,7 +61,6 @@ const ReportsTable = ({
 }: ReportsTableProps) => {
     const renderRowActions = (row: ReportDto) => (
         <>
-            <OpenEntityButton size="icon-lg" to={entityPaths.report(row.id)} aria-label={`Apri report ${row.id}`} />
             <TableActionButton
                 variant="default"
                 size="icon-lg"

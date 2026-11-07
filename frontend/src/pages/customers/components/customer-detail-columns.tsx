@@ -52,12 +52,6 @@ export const customerReportColumns: EntityColumn<ReportDto>[] = [
         header: "Creato il",
         render: (row) => formatDateTime(row.createdAt),
     },
-    {
-        key: "actions",
-        header: "Azioni",
-        className: "text-right",
-        render: () => null,
-    },
 ];
 
 export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
@@ -99,11 +93,5 @@ export const customerInterventionColumns: EntityColumn<InterventionDto>[] = [
         key: "createdAt",
         header: "Creato il",
         render: (row) => formatDateTime(row.createdAt),
-    },
-    {
-        key: "actions",
-        header: "Azioni",
-        className: "text-right",
-        render: () => null,
     },
 ];

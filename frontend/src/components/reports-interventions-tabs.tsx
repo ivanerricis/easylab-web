@@ -1,10 +1,8 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
 import FilterSelect from "@/components/filters/filter-select";
-import OpenEntityButton from "@/components/open-entity-button";
 import TablePagination from "@/components/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ReportsAndInterventionsLists } from "@/hooks/useReportsAndInterventionsOf";
-import { entityPaths } from "@/lib/entityPaths";
 import { interventionStatusColor, interventionStatusOptions } from "@/lib/interventions";
 import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
@@ -96,13 +94,6 @@ const ReportsInterventionsTabs = ({
                         rows={reports.rows}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun report associato a questo ${ownerNoun}.`}
-                        renderRowActions={(row) => (
-                            <OpenEntityButton
-                                size="icon-lg"
-                                to={entityPaths.report(row.id)}
-                                aria-label={`Apri report ${row.id}`}
-                            />
-                        )}
                         getRowStatusColor={(row) => reportStatusColor(row.closed)}
                         onRowOpen={(row) => onOpenReport(row.id)}
                         isInitialLoading={reports.isInitialLoading}
@@ -131,13 +122,6 @@ const ReportsInterventionsTabs = ({
                         rows={interventions.rows}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun intervento associato a questo ${ownerNoun}.`}
-                        renderRowActions={(row) => (
-                            <OpenEntityButton
-                                size="icon-lg"
-                                to={entityPaths.intervention(row.id)}
-                                aria-label={`Apri intervento ${row.id}`}
-                            />
-                        )}
                         getRowStatusColor={(row) => interventionStatusColor[row.status]}
                         onRowOpen={(row) => onOpenIntervention(row.id)}
                         isInitialLoading={interventions.isInitialLoading}

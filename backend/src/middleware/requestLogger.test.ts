@@ -110,7 +110,7 @@ describe("requestLogger", () => {
 
     it("riporta sigla, utente ed esito d'errore, e la sigla è la stessa di res.locals", () => {
         const res = createResponse(500);
-        res.locals.apiErrorMessage = "relation  \"x\" does not exist";
+        res.locals.apiErrorMessage = 'relation  "x" does not exist';
         const req = { ...createRequest("GET", "/api/devices"), user: { username: "Ivan" } } as Request;
 
         requestLogger(req, res, vi.fn() as NextFunction);

@@ -23,7 +23,12 @@ const createResponse = () => {
 
 const run = (error: unknown) => {
     const res = createResponse();
-    errorHandler(error, { method: "GET", originalUrl: "/api/devices?page=2" } as Request, res, (() => {}) as NextFunction);
+    errorHandler(
+        error,
+        { method: "GET", originalUrl: "/api/devices?page=2" } as Request,
+        res,
+        (() => {}) as NextFunction
+    );
     return res;
 };
 
@@ -178,7 +183,12 @@ describe("errorHandler", () => {
         res.locals.requestId = "a1b2c3d4";
         const error = new Error("boom");
 
-        errorHandler(error, { method: "GET", originalUrl: "/api/devices?page=2" } as Request, res, (() => {}) as NextFunction);
+        errorHandler(
+            error,
+            { method: "GET", originalUrl: "/api/devices?page=2" } as Request,
+            res,
+            (() => {}) as NextFunction
+        );
 
         expect(console.error).toHaveBeenCalledWith("[req=a1b2c3d4] GET /api/devices", error);
     });

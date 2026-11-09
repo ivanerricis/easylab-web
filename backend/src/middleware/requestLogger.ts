@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 
 /**
@@ -20,6 +21,14 @@ const ignoredPaths = ["/api/health", "/api/settings/update-state"];
 
 const slowRequestThresholdMs = 1000;
 
+/**
+ * Sigla breve della richiesta, in `res.locals.requestId` e nell'header `X-Request-Id`. Compare
+ * nella riga di questo log e davanti allo stack di un 500 (errorHandler): senza, con più
+ * richieste insieme non si capisce a quale riga appartiene uno stack.
+ */
+export const readRequestId = (response: Response): string =>
+    typeof response.locals.requestId === "string" ? response.locals.requestId : "-";
+
 export const requestLogger = (request: Request, response: Response, next: NextFunction) => {
     const path = request.originalUrl.split("?")[0];
 
@@ -28,15 +37,26 @@ export const requestLogger = (request: Request, response: Response, next: NextFu
         return;
     }
 
+    const requestId = randomBytes(4).toString("hex");
+    response.locals.requestId = requestId;
+    response.setHeader("X-Request-Id", requestId);
+
     const startedAt = process.hrtime.bigint();
 
     response.once("finish", () => {
         const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
         const status = response.statusCode;
         const slowMark = durationMs >= slowRequestThresholdMs ? " | slow=true" : "";
+        // Stessa sanificazione di userActionLogger: il separatore del formato è ` | `.
+        const user = (request.user?.username ?? "").replace(/\|/g, "/").replace(/\s+/g, " ").trim() || "-";
+        const message =
+            typeof response.locals.apiErrorMessage === "string"
+                ? response.locals.apiErrorMessage.replace(/\s+/g, " ").trim()
+                : "";
+        const errorPart = status >= 400 ? ` | error=${message || `HTTP ${status}`}` : "";
         const line =
-            `${new Date().toISOString()} | method=${request.method} | path=${path} | ` +
-            `status=${status} | duration=${durationMs.toFixed(1)}ms${slowMark}`;
+            `${new Date().toISOString()} | req=${requestId} | method=${request.method} | path=${path} | ` +
+            `user=${user} | status=${status} | duration=${durationMs.toFixed(1)}ms${slowMark}${errorPart}`;
 
         if (status >= 500) {
             console.error(line);

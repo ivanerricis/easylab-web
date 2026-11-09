@@ -8,6 +8,8 @@ import { requestLogger } from "./requestLogger";
 const createResponse = (statusCode: number) => {
     const emitter = new EventEmitter() as unknown as Response & EventEmitter;
     (emitter as unknown as { statusCode: number }).statusCode = statusCode;
+    (emitter as unknown as { locals: Record<string, unknown> }).locals = {};
+    (emitter as unknown as { setHeader: () => void }).setHeader = () => {};
     return emitter;
 };
 
@@ -104,5 +106,30 @@ describe("requestLogger", () => {
 
         expect(vi.mocked(console.log).mock.calls[0][0]).not.toContain("slow=true");
         hrtime.mockRestore();
+    });
+
+    it("riporta sigla, utente ed esito d'errore, e la sigla è la stessa di res.locals", () => {
+        const res = createResponse(500);
+        res.locals.apiErrorMessage = "relation  \"x\" does not exist";
+        const req = { ...createRequest("GET", "/api/devices"), user: { username: "Ivan" } } as Request;
+
+        requestLogger(req, res, vi.fn() as NextFunction);
+        res.emit("finish");
+
+        const line = vi.mocked(console.error).mock.calls[0][0] as string;
+        expect(line).toContain(`req=${res.locals.requestId} |`);
+        expect(line).toContain("user=Ivan");
+        expect(line).toContain('error=relation "x" does not exist');
+    });
+
+    it("senza utente scrive user=- e per una risposta riuscita non aggiunge error=", () => {
+        const res = createResponse(200);
+
+        requestLogger(createRequest("GET", "/api/devices"), res, vi.fn() as NextFunction);
+        res.emit("finish");
+
+        const line = vi.mocked(console.log).mock.calls[0][0] as string;
+        expect(line).toContain("user=-");
+        expect(line).not.toContain("error=");
     });
 });

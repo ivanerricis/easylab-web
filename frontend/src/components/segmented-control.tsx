@@ -32,7 +32,7 @@ const SegmentedControl = <TValue extends string>({
         id={id}
         role="radiogroup"
         aria-label={rest["aria-label"]}
-        className={cn("inline-grid auto-cols-fr grid-flow-col gap-0.5 rounded-lg border bg-muted p-0.5", className)}
+        className={cn("inline-grid auto-cols-fr grid-flow-col items-stretch", className)}
     >
         {options.map((option, index) => {
             const isSelected = option.value === value;
@@ -69,10 +69,11 @@ const SegmentedControl = <TValue extends string>({
                         )?.focus();
                     }}
                     className={cn(
-                        "rounded-md px-4 py-1.5 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed",
-                        isSelected
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        // Lo stesso disegno dei tab dell'app (`ui/tabs.tsx`): bottoni uniti con il bordo, e la
+                        // scelta in colore principale, quello che si imposta in Impostazioni.
+                        "inline-flex cursor-pointer items-center justify-center rounded-none border border-border bg-card px-4 py-2 text-base font-medium whitespace-nowrap text-foreground transition-colors not-first:-ml-px first:rounded-l-md last:rounded-r-md hover:bg-muted focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60",
+                        isSelected &&
+                            "border-primary bg-primary text-primary-foreground hover:bg-primary disabled:opacity-100"
                     )}
                 >
                     {option.label}

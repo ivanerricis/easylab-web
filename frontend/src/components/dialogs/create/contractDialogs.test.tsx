@@ -185,7 +185,7 @@ describe("CreateContractDialog", () => {
 
         expect(screen.queryByRole("combobox", { name: /^Periodo di fatturazione/ })).not.toBeInTheDocument();
 
-        await chooseOption("Tipo", "Noleggio");
+        await userEvent.click(screen.getByRole("radio", { name: "Noleggio" }));
         expect(screen.getByRole("combobox", { name: /^Periodo di fatturazione/ })).toHaveTextContent("3 mesi");
 
         await fillParties();
@@ -203,6 +203,72 @@ describe("CreateContractDialog", () => {
         });
     });
 
+    it("mostra quando scade e che documento ne uscirà", async () => {
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
+
+        expect(screen.getByText(/^Scade il/)).toHaveTextContent(/\d{2}\/\d{2}\/\d{4}/);
+        expect(screen.getByText("Contratto")).toBeInTheDocument();
+
+        await chooseOption("Stato", "Bozza");
+        expect(screen.getByText("Preventivo (bozza)")).toBeInTheDocument();
+    });
+
+    describe("su telefono, a passi", () => {
+        const desktopWidth = window.innerWidth;
+
+        beforeEach(() => {
+            window.innerWidth = 390;
+            return () => {
+                window.innerWidth = desktopWidth;
+            };
+        });
+
+        it("procede un passo alla volta, controlla il passo e chiude con il riepilogo", async () => {
+            const onSubmit = vi.fn();
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.queryByRole("combobox", { name: "Stato" })).not.toBeInTheDocument();
+
+            // "Avanti" controlla solo i campi del primo passo.
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(await screen.findByText("Seleziona un cliente")).toBeInTheDocument();
+            expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
+
+            await fillParties();
+            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByText("Passo 2 di 4:")).toBeInTheDocument();
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            expect(await screen.findByText("Passo 3 di 4:")).toBeInTheDocument();
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            // L'ultimo passo riassume quello che si sta per salvare, e "Salva" sta solo lì.
+            expect(await screen.findByText("Passo 4 di 4:")).toBeInTheDocument();
+            expect(screen.getByText("Server NAS", { exact: false })).toBeInTheDocument();
+            expect(screen.getByText("Mario Rossi - 333")).toBeInTheDocument();
+            await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ customerId: 30, providerId: 8 }));
+            });
+        });
+
+        it("«Indietro» torna al passo prima senza perdere quello che c'è", async () => {
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
+
+            await fillParties();
+            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            await screen.findByText("Passo 2 di 4:");
+            await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+
+            expect(await screen.findByText("Passo 1 di 4:")).toBeInTheDocument();
+            expect(screen.getByLabelText(/^Dispositivo/)).toHaveValue("Server NAS");
+        });
+    });
+
     it("offre solo le ore del pacchetto e le azzera cambiando pacchetto", async () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
 
@@ -216,7 +282,7 @@ describe("CreateContractDialog", () => {
         await chooseOption("Pacchetto", "Full time");
         expect(screen.queryByRole("combobox", { name: /^Ore al mese/ })).not.toBeInTheDocument();
 
-        await chooseOption("Tipo", "Noleggio");
+        await userEvent.click(screen.getByRole("radio", { name: "Noleggio" }));
         expect(screen.queryByRole("combobox", { name: "Pacchetto" })).not.toBeInTheDocument();
     });
 
@@ -235,7 +301,8 @@ describe("CreateContractDialog", () => {
             expect(onSubmit).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: "assistance",
-                    termMonths: 6, billingMonths: null,
+                    termMonths: 6,
+                    billingMonths: null,
                     device: "Server NAS",
                     customerId: 30,
                     providerId: 8,
@@ -337,13 +404,13 @@ describe("CreateContractDialog", () => {
         });
 
         it("se la creazione fallisce il dialogo annidato resta aperto e il campo non cambia", async () => {
-            createCustomer.mockRejectedValue(new Error("Telefono gi� in uso"));
+            createCustomer.mockRejectedValue(new Error("Telefono già in uso"));
             renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
 
             const dialog = await fillNewCustomer();
 
             await waitFor(() => {
-                expect(toastError).toHaveBeenCalledWith("Telefono gi� in uso");
+                expect(toastError).toHaveBeenCalledWith("Telefono già in uso");
             });
             expect(dialog).toBeInTheDocument();
             expect(screen.getByLabelText(/^Cliente/)).toHaveValue("");
@@ -356,7 +423,8 @@ describe("CreateContractDialog", () => {
             type: "assistance",
             status: "active",
             effectiveStatus: "active",
-            termMonths: 12, billingMonths: null,
+            termMonths: 12,
+            billingMonths: null,
             device: "Server NAS",
             note: null,
             startDate: "2026-06-01",
@@ -381,7 +449,8 @@ describe("CreateContractDialog", () => {
         );
 
         expect(await screen.findByRole("dialog", { name: "Modifica contratto #21" })).toBeInTheDocument();
-        expect(screen.getByRole("combobox", { name: "Tipo" })).toBeDisabled();
+        expect(screen.getByRole("radio", { name: "Assistenza" })).toBeChecked();
+        expect(screen.getByRole("radio", { name: "Noleggio" })).toBeDisabled();
         expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi");
         expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Completa");
         await waitFor(() => {

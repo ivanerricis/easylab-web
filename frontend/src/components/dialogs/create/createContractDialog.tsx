@@ -1,9 +1,10 @@
 import CustomDialog from "@/components/dialogs/customDialog";
+import StepProgress from "@/components/dialogs/step-progress";
 import DatePickerField from "@/components/date-picker-field";
 import FormField from "@/components/form-field";
-import FormSection from "@/components/dialogs/form-section";
 import InputWithAdd from "@/components/inputWithAdd";
 import MonthsField from "@/components/months-field";
+import SegmentedControl from "@/components/segmented-control";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateProviderDialog from "@/components/dialogs/create/createProviderDialog";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { createCustomer, createProvider, getApiErrorMessage, listCustomers, listProviders } from "@/lib/api";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
     assistanceTypeOptions,
+    contractEndDate,
     contractStatusOptions,
     contractTypeOptions,
+    formatAssistanceType,
+    formatBillingPeriod,
     formatHours,
     packageHours,
 } from "@/lib/contracts";
@@ -26,6 +31,7 @@ import {
     toContractSubmitValues,
     validateContractForm,
     type ContractFieldErrors,
+    type ContractFormField,
     type ContractFormState,
 } from "@/lib/contractForm";
 import { resolveCustomerId } from "@/lib/customerLookup";
@@ -33,9 +39,10 @@ import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { getTodayDateString } from "@/lib/interventions";
 import { toProviderPayload } from "@/lib/providers";
+import { formatDate } from "@/lib/utils";
 import type { AssistanceType, ContractDto, ContractStatus, ContractType, CustomerDto } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /** I valori che questo dialogo consegna a chi lo apre, con cliente e fornitore già risolti in id. */
@@ -108,6 +115,17 @@ const CreateContractDialog = ({
     const [isCreateProviderDialogOpen, setIsCreateProviderDialogOpen] = useState(false);
     const isDirty = hasFormChanged(formValues, initialFormValues);
     const isEdit = mode === "edit";
+    // Sotto `sm` il modulo diventa a passi, come il report e l'intervento; da `sm` in su è una colonna sola.
+    const isStepped = useIsMobile(640);
+    const [step, setStep] = useState(0);
+    const pendingFocusRef = useRef<ContractFormField | null>(null);
+    const contractSteps: { title: string; fields: readonly ContractFormField[] }[] = [
+        { title: "Parti", fields: ["customer", "provider", "device"] },
+        { title: "Condizioni", fields: ["termMonths", "billingMonths", "startDate"] },
+        { title: formValues.type === "assistance" ? "Pacchetto" : "Note", fields: ["includedHours"] },
+        { title: "Riepilogo", fields: [] },
+    ];
+    const isLastStep = !isStepped || step === contractSteps.length - 1;
 
     useEffect(() => {
         if (!open) {
@@ -123,6 +141,7 @@ const CreateContractDialog = ({
                   );
 
             setErrors({});
+            setStep(0);
             setFormValues(nextFormValues);
             setInitialFormValues(nextFormValues);
             setCustomerIdByOption(
@@ -204,6 +223,30 @@ const CreateContractDialog = ({
         return matches[0].id;
     };
 
+    /** I campi di un passo, per controllare solo quelli quando si preme "Avanti" (vedi `contractSteps`). */
+    const stepOfField = (field: ContractFormField) => contractSteps.findIndex((item) => item.fields.includes(field));
+
+    // Il campo da mettere a fuoco quando il passo che lo contiene sarà montato: con un errore in un
+    // passo precedente, "Salva" torna lì, e il campo esiste solo dopo il render.
+    const focusField = (field: ContractFormField) => {
+        const fieldStep = stepOfField(field);
+
+        if (isStepped && fieldStep !== step) {
+            pendingFocusRef.current = field;
+            setStep(fieldStep);
+            return;
+        }
+
+        document.getElementById(field)?.focus();
+    };
+
+    useEffect(() => {
+        if (pendingFocusRef.current) {
+            document.getElementById(pendingFocusRef.current)?.focus();
+            pendingFocusRef.current = null;
+        }
+    }, [step]);
+
     const handleConfirm = async () => {
         if (isSubmitting) {
             return;
@@ -211,6 +254,24 @@ const CreateContractDialog = ({
 
         // Tutti gli errori in un colpo solo, ciascuno accanto al proprio campo.
         const nextErrors: ContractFieldErrors = validateContractForm(formValues);
+
+        // A metà del percorso a passi si controllano solo i campi del passo visibile: segnalare come
+        // sbagliato un campo che non si è ancora visto non servirebbe a niente.
+        if (!isLastStep) {
+            const stepErrors: ContractFieldErrors = {};
+
+            for (const field of contractSteps[step].fields) {
+                stepErrors[field] = nextErrors[field];
+            }
+
+            if (reportFieldErrors(stepErrors, contractFieldOrder, setErrors, focusField)) {
+                return;
+            }
+
+            setStep(step + 1);
+            return;
+        }
+
         let customerId: number | null = null;
         let providerId: number | null = null;
 
@@ -234,7 +295,11 @@ const CreateContractDialog = ({
             }
         }
 
-        if (reportFieldErrors(nextErrors, contractFieldOrder, setErrors) || customerId == null || providerId == null) {
+        if (
+            reportFieldErrors(nextErrors, contractFieldOrder, setErrors, focusField) ||
+            customerId == null ||
+            providerId == null
+        ) {
             return;
         }
 
@@ -251,7 +316,295 @@ const CreateContractDialog = ({
     };
 
     const isAssistance = formValues.type === "assistance";
+    const isDraft = formValues.status === "draft";
     const hoursOptions = packageHours[formValues.assistanceType].filter((hours): hours is number => hours != null);
+    const endDate = contractEndDate(formValues.startDate, Number(formValues.termMonths));
+    const documentLabel = isDraft ? "Preventivo" : "Contratto";
+
+    // I campi sono gli stessi a tutte le larghezze: cambia solo come si dispongono. Da `sm` in su
+    // stanno tutti in una colonna (il tipo per primo, che decide cosa compare dopo); sotto `sm` si
+    // procede a passi, come il report e l'intervento, con un riepilogo da rileggere prima di salvare.
+    const typeField = (
+        <FormField id="type" label="Tipo" className="gap-1">
+            {/* Il tipo non si cambia dopo la creazione: il server lo rifiuta, e i dati del pacchetto di
+            un'assistenza non avrebbero dove andare in un noleggio. */}
+            <SegmentedControl
+                id="type"
+                aria-label="Tipo"
+                value={formValues.type}
+                options={contractTypeOptions}
+                disabled={isEdit}
+                onChange={(type) => handleChange({ type })}
+                className="w-full"
+            />
+            {isEdit ? <p className="text-xs text-muted-foreground">Il tipo non si cambia dopo la creazione.</p> : null}
+        </FormField>
+    );
+
+    const customerField = (
+        <FormField id="customer" label="Cliente" className="gap-1" required error={errors.customer}>
+            <div className="flex">
+                <InputWithAdd
+                    id="customer"
+                    {...fieldErrorAria("customer", errors.customer)}
+                    placeholder="Cliente"
+                    inputClassName="rounded-r-none"
+                    value={formValues.customer}
+                    onSearch={searchCustomers}
+                    isSelectedOption={customerIdByOption[formValues.customer] != null}
+                    onChange={(customer) => handleChange({ customer })}
+                    required
+                />
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-lg"
+                            className="rounded-l-none border-l-0!"
+                            onClick={() => setIsCreateCustomerDialogOpen(true)}
+                            aria-label="Crea nuovo cliente"
+                        >
+                            <Plus className="size-5" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Crea nuovo cliente</TooltipContent>
+                </Tooltip>
+            </div>
+        </FormField>
+    );
+
+    const providerField = (
+        <FormField id="provider" label="Fornitore" className="gap-1" required error={errors.provider}>
+            <div className="flex">
+                <InputWithAdd
+                    id="provider"
+                    {...fieldErrorAria("provider", errors.provider)}
+                    placeholder="Fornitore"
+                    inputClassName="rounded-r-none"
+                    value={formValues.provider}
+                    onSearch={searchProviders}
+                    isSelectedOption={providerIdByOption[formValues.provider] != null}
+                    onChange={(provider) => handleChange({ provider })}
+                    required
+                />
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-lg"
+                            className="rounded-l-none border-l-0!"
+                            onClick={() => setIsCreateProviderDialogOpen(true)}
+                            aria-label="Crea nuovo fornitore"
+                        >
+                            <Plus className="size-5" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Crea nuovo fornitore</TooltipContent>
+                </Tooltip>
+            </div>
+        </FormField>
+    );
+
+    const deviceField = (
+        <FormField id="device" label="Dispositivo" className="gap-1" required error={errors.device}>
+            <Input
+                {...fieldProps("device", { error: errors.device, required: true })}
+                autoComplete="off"
+                placeholder="Es. Server HP ProLiant"
+                value={formValues.device}
+                onChange={(event) => handleChange({ device: event.target.value })}
+            />
+        </FormField>
+    );
+
+    const assistanceFields = isAssistance ? (
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+            <FormField id="assistanceType" label="Pacchetto" className="gap-1">
+                <Select
+                    value={formValues.assistanceType}
+                    onValueChange={(value) => handleAssistanceTypeChange(value as AssistanceType)}
+                >
+                    <SelectTrigger id="assistanceType" className="w-full">
+                        <SelectValue placeholder="Seleziona pacchetto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {assistanceTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </FormField>
+
+            {/* Il full time ha ore illimitate: non c'è niente da scegliere. */}
+            {formValues.assistanceType === "full_time" ? null : (
+                <FormField
+                    id="includedHours"
+                    label="Ore al mese"
+                    className="gap-1"
+                    required
+                    error={errors.includedHours}
+                >
+                    <Select
+                        value={formValues.includedHours}
+                        // Radix può richiamare `onValueChange("")` quando valore e voci cambiano insieme (apertura in
+                        // modifica): un valore vuoto non è una scelta e cancellerebbe quello del contratto.
+                        onValueChange={(includedHours) => includedHours && handleChange({ includedHours })}
+                    >
+                        <SelectTrigger
+                            id="includedHours"
+                            {...fieldErrorAria("includedHours", errors.includedHours)}
+                            className="w-full"
+                        >
+                            <SelectValue placeholder="Seleziona ore" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {hoursOptions.map((hours) => (
+                                <SelectItem key={hours} value={String(hours)}>
+                                    {formatHours(hours)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </FormField>
+            )}
+        </div>
+    ) : null;
+
+    const startDateField = (
+        <FormField id="startDate" label="Data inizio" className="gap-1" required error={errors.startDate}>
+            <DatePickerField
+                id="startDate"
+                {...fieldErrorAria("startDate", errors.startDate)}
+                value={formValues.startDate}
+                onValueChange={(startDate) => handleChange({ startDate })}
+            />
+        </FormField>
+    );
+
+    const statusField = (
+        <FormField id="status" label="Stato" className="gap-1">
+            <Select
+                value={formValues.status}
+                onValueChange={(status) => handleChange({ status: status as ContractStatus })}
+            >
+                <SelectTrigger id="status" className="w-full">
+                    <SelectValue placeholder="Seleziona stato" />
+                </SelectTrigger>
+                <SelectContent>
+                    {contractStatusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </FormField>
+    );
+
+    const termField = (
+        <MonthsField
+            id="termMonths"
+            label="Durata"
+            className="gap-1"
+            value={formValues.termMonths}
+            onChange={(termMonths) => handleChange({ termMonths })}
+            error={errors.termMonths}
+        />
+    );
+
+    const billingField =
+        formValues.type === "rental" ? (
+            <MonthsField
+                id="billingMonths"
+                label="Periodo di fatturazione"
+                className="gap-1"
+                value={formValues.billingMonths}
+                onChange={(billingMonths) => handleChange({ billingMonths })}
+                error={errors.billingMonths}
+            />
+        ) : null;
+
+    const noteField = (
+        <FormField id="note" label="Note" className="gap-1">
+            <Textarea
+                id="note"
+                className="resize-none"
+                rows={3}
+                placeholder="Annotazioni libere sul contratto"
+                value={formValues.note}
+                onChange={(event) => handleChange({ note: event.target.value })}
+            />
+        </FormField>
+    );
+
+    /** La fine e il tipo di documento che ne uscirà, mentre si compila: prima non si vedevano fino al salvataggio. */
+    const periodSummary = (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-3 py-2 text-base">
+            <span>
+                Scade il <strong className="font-semibold">{endDate ? formatDate(endDate) : "-"}</strong>
+            </span>
+            <span className="text-muted-foreground">{isDraft ? "Preventivo (bozza)" : "Contratto"}</span>
+        </div>
+    );
+
+    const draftHint = (
+        <p className="text-sm text-muted-foreground">
+            {isDraft
+                ? "Da bozza il PDF è un preventivo: passa a Attivo quando il cliente accetta."
+                : "Il PDF è un contratto. Con stato Bozza diventa un preventivo."}
+        </p>
+    );
+
+    /** L'ultimo passo su telefono: tutto quello che si sta per salvare, da rileggere. */
+    const summaryRows: { label: string; value: string }[] = [
+        {
+            label: "Documento",
+            value: `${documentLabel} · ${contractStatusOptions.find((o) => o.value === formValues.status)?.label ?? ""}`,
+        },
+        { label: "Cliente", value: formValues.customer || "-" },
+        { label: "Fornitore", value: formValues.provider || "-" },
+        {
+            label: "Tipo e dispositivo",
+            value: `${contractTypeOptions.find((o) => o.value === formValues.type)?.label ?? ""} · ${formValues.device.trim() || "-"}`,
+        },
+        {
+            label: "Periodo",
+            value: endDate ? `${formatDate(formValues.startDate)} → ${formatDate(endDate)}` : "-",
+        },
+        ...(formValues.type === "rental"
+            ? [{ label: "Fatturazione", value: formatBillingPeriod(Number(formValues.billingMonths)) }]
+            : []),
+        ...(isAssistance
+            ? [
+                  {
+                      label: "Pacchetto",
+                      value:
+                          formValues.assistanceType === "full_time"
+                              ? `${formatAssistanceType(formValues.assistanceType)}, ore illimitate`
+                              : `${formatAssistanceType(formValues.assistanceType)}, ${formatHours(Number(formValues.includedHours))} al mese`,
+                  },
+              ]
+            : []),
+        { label: "Note", value: formValues.note.trim() || "-" },
+    ];
+
+    const summary = (
+        <div className="grid gap-3">
+            <dl className="grid gap-3">
+                {summaryRows.map((row) => (
+                    <div key={row.label} className="grid gap-0.5 border-b pb-2 last:border-b-0">
+                        <dt className="text-sm text-muted-foreground">{row.label}</dt>
+                        <dd className="text-base font-medium break-words">{row.value}</dd>
+                    </div>
+                ))}
+            </dl>
+            {draftHint}
+        </div>
+    );
 
     return (
         <>
@@ -265,270 +618,72 @@ const CreateContractDialog = ({
                         ? "Aggiorna i dati del contratto e conferma per salvare."
                         : "Inserisci i dati del contratto e conferma per salvare."
                 }
-                contentClassName="sm:max-w-2xl"
-                confirmLabel={isSubmitting ? "Salvataggio..." : "Salva"}
-                confirmIcon={Save}
-                cancelLabel="Annulla"
-                onCancel={() => onOpenChange(false)}
+                // Sotto `sm`, dove si procede a passi, il dialogo è ancorato in alto e ha un'altezza fissa
+                // (come l'intervento): i campi scorrono dentro e i pulsanti restano fermi in fondo.
+                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-xl"
+                confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
+                confirmIcon={isLastStep ? Save : undefined}
+                cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
+                onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting}
                 confirmDisabled={isSubmitting}
                 content={
                     // Niente scroll proprio, né un'altezza massima calcolata a mano: a scorrere è il
                     // corpo di `CustomDialog`, l'unico, dentro un dialogo alto al massimo lo schermo.
-                    // Il `calc(100dvh - 15rem)` di prima presumeva intestazione e pulsanti alti
-                    // 15rem, e sul telefono dava un secondo scroll dentro il primo.
-                    <div className="grid content-start gap-4">
-                        <FormSection title="Anagrafica">
-                            {/* Cliente e fornitore uno sotto l'altro: i nomi lunghi non vengono tagliati. */}
-                            <div className="grid items-start gap-4">
-                                <FormField
-                                    id="customer"
-                                    label="Cliente"
-                                    className="gap-1"
-                                    required
-                                    error={errors.customer}
-                                >
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="customer"
-                                            {...fieldErrorAria("customer", errors.customer)}
-                                            placeholder="Cliente"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.customer}
-                                            onSearch={searchCustomers}
-                                            isSelectedOption={customerIdByOption[formValues.customer] != null}
-                                            onChange={(customer) => handleChange({ customer })}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon-lg"
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateCustomerDialogOpen(true)}
-                                                    aria-label="Crea nuovo cliente"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo cliente</TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </FormField>
-
-                                <FormField
-                                    id="provider"
-                                    label="Fornitore"
-                                    className="gap-1"
-                                    required
-                                    error={errors.provider}
-                                >
-                                    <div className="flex">
-                                        <InputWithAdd
-                                            id="provider"
-                                            {...fieldErrorAria("provider", errors.provider)}
-                                            placeholder="Fornitore"
-                                            inputClassName="rounded-r-none"
-                                            value={formValues.provider}
-                                            onSearch={searchProviders}
-                                            isSelectedOption={providerIdByOption[formValues.provider] != null}
-                                            onChange={(provider) => handleChange({ provider })}
-                                            required
-                                        />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon-lg"
-                                                    className="rounded-l-none border-l-0!"
-                                                    onClick={() => setIsCreateProviderDialogOpen(true)}
-                                                    aria-label="Crea nuovo fornitore"
-                                                >
-                                                    <Plus className="size-5" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Crea nuovo fornitore</TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </FormField>
-                            </div>
-                        </FormSection>
-
-                        <FormSection title="Contratto">
-                            <div className="grid items-start gap-4 sm:grid-cols-2">
-                                <FormField id="type" label="Tipo" className="gap-1">
-                                    {/* Il tipo non si cambia dopo la creazione: il server lo rifiuta, e i dati
-                                    del pacchetto di un'assistenza non avrebbero dove andare in un noleggio. */}
-                                    <Select
-                                        value={formValues.type}
-                                        disabled={isEdit}
-                                        onValueChange={(type) => handleChange({ type: type as ContractType })}
-                                    >
-                                        <SelectTrigger id="type" className="w-full">
-                                            <SelectValue placeholder="Seleziona tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {contractTypeOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormField>
-
-                                <FormField id="status" label="Stato" className="gap-1">
-                                    <Select
-                                        value={formValues.status}
-                                        onValueChange={(status) => handleChange({ status: status as ContractStatus })}
-                                    >
-                                        <SelectTrigger id="status" className="w-full">
-                                            <SelectValue placeholder="Seleziona stato" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {contractStatusOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormField>
-
-                                <MonthsField
-                                    id="termMonths"
-                                    label="Durata"
-                                    className="gap-1"
-                                    value={formValues.termMonths}
-                                    onChange={(termMonths) => handleChange({ termMonths })}
-                                    error={errors.termMonths}
-                                />
-
-                                {formValues.type === "rental" ? (
-                                    <MonthsField
-                                        id="billingMonths"
-                                        label="Periodo di fatturazione"
-                                        className="gap-1"
-                                        value={formValues.billingMonths}
-                                        onChange={(billingMonths) => handleChange({ billingMonths })}
-                                        error={errors.billingMonths}
-                                    />
+                    <div className="grid content-start gap-4 max-sm:min-h-0 max-sm:flex-1">
+                        {isStepped ? (
+                            <>
+                                <StepProgress steps={contractSteps.map((item) => item.title)} current={step} />
+                                {step === 0 ? (
+                                    <>
+                                        {typeField}
+                                        {customerField}
+                                        {providerField}
+                                        {deviceField}
+                                    </>
                                 ) : null}
-
-                                <FormField
-                                    id="startDate"
-                                    label="Data inizio"
-                                    className="gap-1"
-                                    required
-                                    error={errors.startDate}
-                                >
-                                    <DatePickerField
-                                        id="startDate"
-                                        {...fieldErrorAria("startDate", errors.startDate)}
-                                        value={formValues.startDate}
-                                        onValueChange={(startDate) => handleChange({ startDate })}
-                                    />
-                                </FormField>
-
-                                <FormField
-                                    id="device"
-                                    label="Dispositivo"
-                                    className="gap-1 sm:col-span-2"
-                                    required
-                                    error={errors.device}
-                                >
-                                    <Input
-                                        {...fieldProps("device", { error: errors.device, required: true })}
-                                        autoComplete="off"
-                                        placeholder="Es. Server HP ProLiant"
-                                        value={formValues.device}
-                                        onChange={(event) => handleChange({ device: event.target.value })}
-                                    />
-                                </FormField>
-
-                                <FormField id="note" label="Note" className="gap-1 sm:col-span-2">
-                                    <Textarea
-                                        id="note"
-                                        className="resize-none"
-                                        rows={3}
-                                        placeholder="Annotazioni libere sul contratto"
-                                        value={formValues.note}
-                                        onChange={(event) => handleChange({ note: event.target.value })}
-                                    />
-                                </FormField>
-                            </div>
-                        </FormSection>
-
-                        {isAssistance ? (
-                            <FormSection title="Pacchetto assistenza">
+                                {step === 1 ? (
+                                    <>
+                                        {termField}
+                                        {billingField}
+                                        {startDateField}
+                                        {statusField}
+                                        {periodSummary}
+                                    </>
+                                ) : null}
+                                {step === 2 ? (
+                                    <>
+                                        {assistanceFields}
+                                        {noteField}
+                                    </>
+                                ) : null}
+                                {step === 3 ? summary : null}
+                            </>
+                        ) : (
+                            <>
+                                {typeField}
+                                {customerField}
+                                {providerField}
+                                {deviceField}
+                                {assistanceFields}
                                 <div className="grid items-start gap-4 sm:grid-cols-2">
-                                    <FormField id="assistanceType" label="Pacchetto" className="gap-1">
-                                        <Select
-                                            value={formValues.assistanceType}
-                                            onValueChange={(value) =>
-                                                handleAssistanceTypeChange(value as AssistanceType)
-                                            }
-                                        >
-                                            <SelectTrigger id="assistanceType" className="w-full">
-                                                <SelectValue placeholder="Seleziona pacchetto" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {assistanceTypeOptions.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
-
-                                    {/* Il full time ha ore illimitate: non c'è niente da scegliere. */}
-                                    {formValues.assistanceType === "full_time" ? null : (
-                                        <FormField
-                                            id="includedHours"
-                                            label="Ore al mese"
-                                            className="gap-1"
-                                            required
-                                            error={errors.includedHours}
-                                        >
-                                            <Select
-                                                value={formValues.includedHours}
-                                                // Radix può richiamare `onValueChange("")` quando valore e voci cambiano insieme (apertura in
-                                                // modifica): un valore vuoto non è una scelta e cancellerebbe quello del contratto.
-                                                onValueChange={(includedHours) =>
-                                                    includedHours && handleChange({ includedHours })
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    id="includedHours"
-                                                    {...fieldErrorAria("includedHours", errors.includedHours)}
-                                                    className="w-full"
-                                                >
-                                                    <SelectValue placeholder="Seleziona ore" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {hoursOptions.map((hours) => (
-                                                        <SelectItem key={hours} value={String(hours)}>
-                                                            {formatHours(hours)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </FormField>
-                                    )}
+                                    {startDateField}
+                                    {statusField}
                                 </div>
-                            </FormSection>
-                        ) : null}
+                                {termField}
+                                {billingField}
+                                {periodSummary}
+                                {noteField}
+                                {draftHint}
+                            </>
+                        )}
                     </div>
                 }
             />
 
-            {/* Il cliente o il fornitore appena creato � gi� risolto: lo si registra con la stessa etichetta
-            dei suggerimenti (`formatInitialCustomer`), cos� vale come scelto dall'elenco e al
+            {/* Il cliente o il fornitore appena creato è già risolto: lo si registra con la stessa etichetta
+            dei suggerimenti (`formatInitialCustomer`), così vale come scelto dall'elenco e al
             salvataggio non serve nessuna ricerca. */}
             <CreateCustomerDialog
                 open={isCreateCustomerDialogOpen}

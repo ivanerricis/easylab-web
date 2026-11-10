@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ContractDto } from "@/types/dtos";
 import {
+    contractEndDate,
     contractStatusColor,
     formatContractPackage,
     formatHours,
@@ -132,6 +133,27 @@ describe("perché nessun contratto si collega", () => {
         );
 
         expect(message).toContain("fuori dal periodo dei contratti");
+    });
+});
+
+describe("data di fine", () => {
+    it("somma i mesi con l'aritmetica di Postgres", () => {
+        expect(contractEndDate("2026-11-05", 6)).toBe("2027-05-05");
+        expect(contractEndDate("2026-10-01", 12)).toBe("2027-10-01");
+        expect(contractEndDate("2026-01-15", 18)).toBe("2027-07-15");
+    });
+
+    it("porta al giorno più vicino se il mese di arrivo è più corto", () => {
+        expect(contractEndDate("2026-01-31", 1)).toBe("2026-02-28");
+        expect(contractEndDate("2026-01-31", 3)).toBe("2026-04-30");
+        expect(contractEndDate("2024-01-31", 1)).toBe("2024-02-29");
+    });
+
+    it("è null con una data o dei mesi non validi", () => {
+        expect(contractEndDate("", 6)).toBeNull();
+        expect(contractEndDate("2026-11-05", 0)).toBeNull();
+        expect(contractEndDate("2026-11-05", 121)).toBeNull();
+        expect(contractEndDate("2026-11-05", Number.NaN)).toBeNull();
     });
 });
 

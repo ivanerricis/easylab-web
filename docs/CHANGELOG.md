@@ -28,6 +28,7 @@ data porta alla voce da qui.
 - [2026-11-10 — Sidebar più stretta](changelog/2026-11.md#2026-11-10-sidebar-piu-stretta)
 - [2026-11-10 — Schede: anagrafica alta come i dettagli](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli)
 - [2026-11-10 — Errori dei campi: un'etichetta sul bordo, senza spostare il modulo](changelog/2026-11.md#2026-11-10-errori-dei-campi-unetichetta-sul-bordo-senza-spostare-il-modulo)
+- [2026-11-10 — Dialog del contratto: una colonna su desktop, a passi su telefono](changelog/2026-11.md#2026-11-10-dialog-del-contratto-una-colonna-su-desktop-a-passi-su-telefono)
 - [2026-11-10 — Durata libera e periodo di fatturazione dei noleggi](changelog/2026-11.md#2026-11-10-durata-libera-e-periodo-di-fatturazione-dei-noleggi)
 - [2026-11-10 — Logo del fornitore e intestazione dei PDF dei contratti](changelog/2026-11.md#2026-11-10-logo-del-fornitore-e-intestazione-dei-pdf-dei-contratti)
 - [2026-11-10 — Schede: anagrafica alta come i dettagli, contratto con cliente e fornitore in colonna](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli-contratto-con-cliente-e-fornitore-in-colonna)

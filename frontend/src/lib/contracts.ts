@@ -72,6 +72,25 @@ export const formatContractType = (value: ContractType) =>
 export const formatContractStatus = (value: ContractEffectiveStatus) =>
     contractEffectiveStatusOptions.find((option) => option.value === value)?.label ?? value;
 
+/**
+ * La data di fine di un contratto ("AAAA-MM-GG"): l'inizio più i mesi di durata, con l'aritmetica di
+ * Postgres (il 31 gennaio + 1 mese = 28 febbraio), la stessa con cui il server la calcola. `null`
+ * se la data o i mesi non sono validi: serve al modulo, che la mostra prima del salvataggio.
+ */
+export const contractEndDate = (startDate: string, months: number): string | null => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate);
+
+    if (!match || !Number.isInteger(months) || months < 1 || months > maxContractMonths) {
+        return null;
+    }
+
+    const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    const lastDayOfTargetMonth = new Date(Date.UTC(year, month - 1 + months + 1, 0)).getUTCDate();
+    const end = new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDayOfTargetMonth)));
+
+    return end.toISOString().slice(0, 10);
+};
+
 export const formatContractTerm = (months: number) => (months === 1 ? "1 mese" : `${months} mesi`);
 
 /** Il periodo di fatturazione di un noleggio: "ogni mese", "ogni 3 mesi". */

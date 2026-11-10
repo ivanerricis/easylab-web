@@ -97,7 +97,7 @@ const BackupScheduleFields = ({ panel }: { panel: BackupPanel }) => {
                 />
             </FormField>
 
-            <div className="grid gap-2">
+            <div className="relative grid gap-2">
                 {/* Senza email configurata l'avviso non si può accendere, ma deve potersi spegnere:
                     se era stato salvato acceso e poi l'invio email è stato disattivato, la casella
                     restava spuntata e bloccata, e il salvataggio rifiutato per un errore che non

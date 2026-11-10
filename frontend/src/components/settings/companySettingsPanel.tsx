@@ -211,7 +211,7 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
                                     {/* Controllo ed errore in un blocco solo: `SettingsField` è una
                                         griglia a due righe condivise con il campo accanto, e un
                                         terzo figlio finirebbe sovrapposto al controllo. */}
-                                    <div>
+                                    <div className="relative">
                                         <Input
                                             {...fieldProps("companyName", {
                                                 error: errors.companyName,
@@ -274,7 +274,7 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
                                         Fuso orario
                                         <RequiredMark />
                                     </Label>
-                                    <div>
+                                    <div className="relative">
                                         <TimeZoneField
                                             id="companyTimeZone"
                                             value={formValues.timeZone}
@@ -382,7 +382,7 @@ const CompanySettingsPanel = ({ onDirtyChange }: Props) => {
                         </SettingsGroup>
 
                         <SettingsGroup title="Sostituisci logo">
-                            <div className="grid gap-2">
+                            <div className="relative grid gap-2">
                                 <SettingsFileInput
                                     id="logoUpload"
                                     label="Carica nuovo logo"

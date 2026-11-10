@@ -132,7 +132,7 @@ const ReportBodySkeleton = () => (
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
             <RowsSectionSkeleton rows={4} />
-            <RowsSectionSkeleton rows={2} className="self-start" />
+            <RowsSectionSkeleton rows={2} />
         </div>
     </>
 );
@@ -140,7 +140,7 @@ const ReportBodySkeleton = () => (
 /** Le sezioni della scheda intervento: anagrafica corta e "Dettagli" lunga, affiancate da `xl`. */
 const InterventionBodySkeleton = () => (
     <div className="grid gap-4 xl:grid-cols-2">
-        <RowsSectionSkeleton rows={3} className="self-start" />
+        <RowsSectionSkeleton rows={3} />
         <RowsSectionSkeleton rows={8} />
     </div>
 );

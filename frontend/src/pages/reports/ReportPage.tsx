@@ -200,7 +200,7 @@ const ReportPage = () => {
 
                     {/* Un tecnico solo per report: prima era una tabella bordata di una riga dentro la
                     card, un'altra scatola; ora due voci come il resto della scheda. */}
-                    <DetailSection title="Tecnici associati" className="self-start">
+                    <DetailSection title="Tecnici associati">
                         {!hasTechnician ? (
                             <p className="text-muted-foreground">Nessun tecnico associato a questo report.</p>
                         ) : (

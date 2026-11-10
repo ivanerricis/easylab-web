@@ -50,6 +50,15 @@ export const RequiredMark = () => (
  * Il solo messaggio d'errore, da mettere sotto un controllo nei form che hanno già la propria
  * impaginazione di etichette: l'accesso, le Impostazioni di azienda ed email, le caselle di
  * spunta con l'etichetta accanto invece che sopra.
+ *
+ * Il messaggio è un'etichetta a cavallo del bordo inferiore del controllo, fuori dal flusso: prima
+ * era un paragrafo che spingeva giù tutto il resto, e correggendo un campo il modulo intero
+ * risaliva di una riga. Così niente si sposta, e a metà sta dentro il controllo (dove c'è
+ * margine sotto il testo) e a metà nello spazio vuoto prima del campo dopo, senza coprirne
+ * l'etichetta. Si posiziona
+ * rispetto al contenitore del campo, che quindi deve essere `relative` (`FormField` lo è; chi usa
+ * `FieldError` da solo lo mette sul proprio blocco). Sfondo pieno, come le tendine: il fumetto sta
+ * sopra l'etichetta del campo dopo e non deve lasciarla trasparire.
  */
 export const FieldError = ({ id, error }: { id: string; error?: string }) => {
     if (!error) {
@@ -57,7 +66,11 @@ export const FieldError = ({ id, error }: { id: string; error?: string }) => {
     }
 
     return (
-        <p id={fieldErrorId(id)} role="alert" className="mt-1 text-sm font-medium text-destructive">
+        <p
+            id={fieldErrorId(id)}
+            role="alert"
+            className="absolute top-full left-2 z-1 w-fit max-w-[calc(100%-1rem)] -translate-y-1/3 rounded-md border border-destructive/40 bg-card px-2 py-0.5 text-xs leading-4 font-medium text-destructive-text shadow-sm"
+        >
             {error}
         </p>
     );
@@ -94,13 +107,13 @@ const FormField = ({
     const fieldError = <FieldError id={id} error={error} />;
 
     return (
-        <div className={cn("grid", className)}>
+        <div className={cn("relative grid", className)}>
             <Label htmlFor={id} className={labelSize === "lg" ? "text-lg" : undefined}>
                 {label}
                 {required ? <RequiredMark /> : null}
             </Label>
             {groupControlAndError ? (
-                <div>
+                <div className="relative">
                     {children}
                     {fieldError}
                 </div>

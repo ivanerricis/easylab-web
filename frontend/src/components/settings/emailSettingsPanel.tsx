@@ -262,7 +262,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                         {/* Controllo ed errore in un blocco solo: `SettingsField` è
                                             una griglia a due righe condivise con il campo accanto, e
                                             un terzo figlio finirebbe sovrapposto al controllo. */}
-                                        <div>
+                                        <div className="relative">
                                             <Input
                                                 {...fieldProps("emailHost", {
                                                     error: errors.emailHost,
@@ -281,7 +281,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
 
                                     <SettingsField>
                                         <Label htmlFor="emailPort">Porta</Label>
-                                        <div>
+                                        <div className="relative">
                                             <Input
                                                 {...fieldProps("emailPort", { error: errors.emailPort })}
                                                 type="number"
@@ -318,7 +318,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                             Utente
                                             {isRequired ? <RequiredMark /> : null}
                                         </Label>
-                                        <div>
+                                        <div className="relative">
                                             <Input
                                                 {...fieldProps("emailUsername", {
                                                     error: errors.emailUsername,
@@ -341,7 +341,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                             Password
                                             {isRequired && !passwordSet ? <RequiredMark /> : null}
                                         </Label>
-                                        <div>
+                                        <div className="relative">
                                             <div className="relative">
                                                 <Input
                                                     {...fieldProps("emailPassword", {
@@ -408,7 +408,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                                             Email mittente
                                             {isRequired ? <RequiredMark /> : null}
                                         </Label>
-                                        <div>
+                                        <div className="relative">
                                             <Input
                                                 {...fieldProps("emailFromAddress", {
                                                     error: errors.emailFromAddress,
@@ -437,7 +437,7 @@ const EmailSettingsPanel = ({ onDirtyChange }: Props) => {
                             <SettingsFieldRow>
                                 <SettingsField>
                                     <Label htmlFor="emailAlertAddress">Email per gli avvisi tecnici</Label>
-                                    <div>
+                                    <div className="relative">
                                         <Input
                                             {...fieldProps("emailAlertAddress", { error: errors.emailAlertAddress })}
                                             type="email"

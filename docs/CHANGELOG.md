@@ -24,6 +24,9 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-10 — Sidebar più stretta](changelog/2026-11.md#2026-11-10-sidebar-piu-stretta)
+- [2026-11-10 — Schede: anagrafica alta come i dettagli](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli)
+- [2026-11-10 — Errori dei campi: un'etichetta sul bordo, senza spostare il modulo](changelog/2026-11.md#2026-11-10-errori-dei-campi-unetichetta-sul-bordo-senza-spostare-il-modulo)
 - [2026-11-09 — Log del server: sigla di richiesta, utente ed errore sulla riga](changelog/2026-11.md#2026-11-09-log-del-server-sigla-di-richiesta-utente-ed-errore-sulla-riga)
 - [2026-11-07 — Campo orario a tendina con completamento](changelog/2026-11.md#2026-11-07-campo-orario-a-tendina-con-completamento)
 - [2026-11-07 — Fix dalla lista Bugs: righe che si aprono da sole, Pagato nei report, Aggiornamenti in sola lettura](changelog/2026-11.md#2026-11-07-fix-dalla-lista-bugs-righe-che-si-aprono-da-sole-pagato-nei-report-aggiornamenti-in-sola-lettura)

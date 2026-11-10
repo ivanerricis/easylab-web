@@ -187,7 +187,7 @@ const InterventionPage = () => {
                 />
 
                 <div className="grid gap-4 xl:grid-cols-2">
-                    <DetailSection title="Anagrafica" className="self-start">
+                    <DetailSection title="Anagrafica">
                         {/* A righe come la scheda report: etichetta a sinistra, valore a destra. */}
                         <DetailGrid layout="rows">
                             <DetailItem label="Cliente" value={intervention.customerName ?? "Cliente sconosciuto"} />

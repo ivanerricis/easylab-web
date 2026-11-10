@@ -37,9 +37,12 @@ edit_uri: edit/main/docs/
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.highlight
+  - pymdownx.keys
   - pymdownx.tabbed:
       alternate_style: true
   - toc:
@@ -47,16 +50,33 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Deploy e configurazione server: DEPLOY.md
-  - Backup, restore e migrazione: BACKUP.md
-  - Sicurezza account e accesso: OPERATIONS.md
-  - Changelog:
-      - Indice: CHANGELOG.md
-      - Novembre 2026: changelog/2026-11.md
-      - Ottobre 2026: changelog/2026-10.md
-      - "Settembre 2026, 21-30": changelog/2026-09-21-30.md
-      - "Settembre 2026, 11-20": changelog/2026-09-11-20.md
-      - "Settembre 2026, 1-10": changelog/2026-09-01-10.md
-      - Agosto 2026: changelog/2026-08.md
-      - Luglio 2026: changelog/2026-07.md
-  - Backlog: BACKLOG.md
+  - Guida all'uso:
+      - Introduzione: guida/index.md
+      - Primo accesso: guida/primo-accesso.md
+      - Muoversi nell'app: guida/muoversi.md
+      - Elenchi e filtri: guida/elenchi.md
+      - Dashboard e calendario: guida/dashboard.md
+      - Report: guida/riparazioni.md
+      - Interventi: guida/interventi.md
+      - Clienti: guida/clienti.md
+      - Dispositivi e difetti: guida/dispositivi-difetti.md
+      - Collaboratori e tecnici esterni: guida/collaboratori-tecnici.md
+      - Cerca ovunque: guida/ricerca.md
+      - Stampe ed email: guida/stampe-email.md
+      - Impostazioni: guida/impostazioni.md
+      - Domande frequenti: guida/faq.md
+  - Documentazione tecnica:
+      - Panoramica: tecnica.md
+      - Deploy e configurazione server: DEPLOY.md
+      - Backup, restore e migrazione: BACKUP.md
+      - Sicurezza account e accesso: OPERATIONS.md
+      - Changelog:
+          - Indice: CHANGELOG.md
+          - Novembre 2026: changelog/2026-11.md
+          - Ottobre 2026: changelog/2026-10.md
+          - "Settembre 2026, 21-30": changelog/2026-09-21-30.md
+          - "Settembre 2026, 11-20": changelog/2026-09-11-20.md
+          - "Settembre 2026, 1-10": changelog/2026-09-01-10.md
+          - Agosto 2026: changelog/2026-08.md
+          - Luglio 2026: changelog/2026-07.md
+      - Backlog: BACKLOG.md

@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-10 — Guida all'uso per gli utenti](changelog/2026-11.md#2026-11-10-guida-alluso-per-gli-utenti)
 - [2026-11-10 — Sidebar più stretta](changelog/2026-11.md#2026-11-10-sidebar-piu-stretta)
 - [2026-11-10 — Schede: anagrafica alta come i dettagli](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli)
 - [2026-11-10 — Errori dei campi: un'etichetta sul bordo, senza spostare il modulo](changelog/2026-11.md#2026-11-10-errori-dei-campi-unetichetta-sul-bordo-senza-spostare-il-modulo)

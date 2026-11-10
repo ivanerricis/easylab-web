@@ -85,10 +85,11 @@ describe("MainSidebar", () => {
         });
     });
 
-    it("la documentazione si apre in un'altra scheda", () => {
+    it("la documentazione si apre in un'altra scheda, sulla guida all'uso", () => {
         renderSidebar("/dashboard");
 
         const docs = screen.getByRole("link", { name: "Documentazione" });
+        expect(docs).toHaveAttribute("href", "https://ivanerricis.github.io/easylab-web/guida/");
         expect(docs).toHaveAttribute("target", "_blank");
         expect(docs).toHaveAttribute("rel", "noopener noreferrer");
     });

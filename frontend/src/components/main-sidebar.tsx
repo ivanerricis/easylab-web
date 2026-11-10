@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
-const DOCS_URL = "https://ivanerricis.github.io/easylab-web/";
+// La guida per chi usa l'app, non la home del sito: la parte tecnica (server, backup) è per gli amministratori.
+const DOCS_URL = "https://ivanerricis.github.io/easylab-web/guida/";
 
 type SidebarItem = {
     label: string;

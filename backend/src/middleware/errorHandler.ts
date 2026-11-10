@@ -1,5 +1,6 @@
 import express from "express";
 import { ApiError } from "../services/apiError";
+import { readRequestId } from "./requestLogger";
 
 type PgError = {
     code?: string;
@@ -132,7 +133,7 @@ const MULTER_MESSAGES: Record<string, { message: string; status: number }> = {
 
 export const errorHandler = (
     error: unknown,
-    _req: express.Request,
+    req: express.Request,
     res: express.Response,
     _next: express.NextFunction
 ) => {
@@ -188,7 +189,9 @@ export const errorHandler = (
     // Il dettaglio Postgres (nomi di tabelle/colonne, frammenti di valori) resta
     // nei log lato server, mentre al client va un messaggio generico: su un errore
     // non gestito non sappiamo cosa contenga `detail`, quindi non è mostrabile.
-    console.error(error);
+    // La sigla e il percorso davanti allo stack: la riga del requestLogger dice utente e durata
+    // della stessa richiesta, e senza questo legame lo stack resterebbe anonimo.
+    console.error(`[req=${readRequestId(res)}] ${req.method} ${req.originalUrl.split("?")[0]}`, error);
     res.locals.apiErrorMessage = detail ?? message ?? GENERIC_ERROR_MESSAGE;
     res.status(500).json({ message: GENERIC_ERROR_MESSAGE });
 };

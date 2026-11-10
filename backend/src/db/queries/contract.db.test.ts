@@ -45,11 +45,13 @@ const shiftToday = async (interval: string, zone = timeZone) => {
 
 describe("contratti: data di fine e stato effettivo", () => {
     it.each([
-        ["months_3", "2026-01-31", "2026-04-30"],
-        ["months_6", "2026-03-15", "2026-09-15"],
-        ["months_12", "2026-10-01", "2027-10-01"],
-    ] as const)("il termine %s da %s finisce il %s", async (term, startDate, endDate) => {
-        const contract = await insertContract({ term, startDate });
+        [3, "2026-01-31", "2026-04-30"],
+        [6, "2026-03-15", "2026-09-15"],
+        [12, "2026-10-01", "2027-10-01"],
+        // Una durata scritta a mano, fuori dai valori proposti.
+        [18, "2026-01-15", "2027-07-15"],
+    ] as const)("la durata di %s mesi da %s finisce il %s", async (termMonths, startDate, endDate) => {
+        const contract = await insertContract({ termMonths, startDate });
 
         const [row] = await getContractById(contract.id, timeZone);
 
@@ -57,7 +59,7 @@ describe("contratti: data di fine e stato effettivo", () => {
     });
 
     it("un contratto attivo con la fine passata risulta scaduto, ma resta attivo nel database", async () => {
-        const expired = await insertContract({ status: "active", term: "months_3", startDate: "2020-01-01" });
+        const expired = await insertContract({ status: "active", termMonths: 3, startDate: "2020-01-01" });
 
         const [row] = await getContractById(expired.id, timeZone);
 
@@ -68,12 +70,12 @@ describe("contratti: data di fine e stato effettivo", () => {
     it("il giorno di fine stesso il contratto è già scaduto, il giorno prima no", async () => {
         const endsToday = await insertContract({
             status: "active",
-            term: "months_3",
+            termMonths: 3,
             startDate: await shiftToday("-3 months"),
         });
         const endsTomorrow = await insertContract({
             status: "active",
-            term: "months_3",
+            termMonths: 3,
             startDate: await shiftToday("-3 months + 1 day"),
         });
 
@@ -97,7 +99,7 @@ describe("contratti: data di fine e stato effettivo", () => {
         // finisce "oggi" nel fuso più a oriente è scaduto lì, ma non lo è ancora nell'altro.
         const contract = await insertContract({
             status: "active",
-            term: "months_12",
+            termMonths: 12,
             startDate: await shiftToday("-12 months", "Pacific/Kiritimati"),
         });
 
@@ -111,10 +113,10 @@ describe("contratti: data di fine e stato effettivo", () => {
 
 describe("listContracts: filtri", () => {
     it("filtra per stato effettivo: expired, active, draft, cancelled", async () => {
-        const expired = await insertContract({ status: "active", term: "months_3", startDate: "2020-01-01" });
+        const expired = await insertContract({ status: "active", termMonths: 3, startDate: "2020-01-01" });
         const active = await insertContract({
             status: "active",
-            term: "months_12",
+            termMonths: 12,
             startDate: await shiftToday("-1 day"),
         });
         const draft = await insertContract({ status: "draft" });
@@ -218,8 +220,8 @@ describe("listContracts: ordinamento", () => {
 
     it("per data di fine, che dipende anche dal termine", async () => {
         // Inizio più tardi ma termine breve: finisce prima di quello iniziato a gennaio per un anno.
-        const long = await insertContract({ startDate: "2026-01-01", term: "months_12" });
-        const short = await insertContract({ startDate: "2026-06-01", term: "months_3" });
+        const long = await insertContract({ startDate: "2026-01-01", termMonths: 12 });
+        const short = await insertContract({ startDate: "2026-06-01", termMonths: 3 });
 
         expect(await findIds({ sortBy: "endDate", sortOrder: "asc" })).toEqual([short.id, long.id]);
     });
@@ -281,7 +283,7 @@ describe("createContract / updateContractById", () => {
         const created = await createContract(
             {
                 type: "assistance",
-                term: "months_6",
+                termMonths: 6,
                 device: "NAS",
                 startDate: "2026-10-01",
                 customerId: customer.id,
@@ -302,7 +304,7 @@ describe("createContract / updateContractById", () => {
             createContract(
                 {
                     type: "assistance",
-                    term: "months_6",
+                    termMonths: 6,
                     device: "NAS",
                     startDate: "2026-10-01",
                     customerId: customer.id,

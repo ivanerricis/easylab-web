@@ -15,11 +15,11 @@ import {
     assistanceTypes,
     contractStatuses,
     contractStoredStatuses,
-    contractTerms,
+    contractTermMonthsRange,
     contractTypes,
     type AssistanceType,
 } from "../db/schema";
-import { getAppTimeZone, getLabConfig } from "../config/lab";
+import { getAppTimeZone } from "../config/lab";
 import { currentMonthKey } from "../db/queries/timeZone";
 import { getCustomerById } from "../db/queries/customer";
 import { getProviderById } from "../db/queries/provider";
@@ -28,7 +28,13 @@ import {
     getContractHoursSummary,
     recheckAssistanceHours,
 } from "../services/assistanceHours";
-import { formatAssistanceType, formatContractTerm, formatHours, formatMonthLabel } from "../services/contractLabels";
+import {
+    formatAssistanceType,
+    formatBillingPeriod,
+    formatContractTerm,
+    formatHours,
+    formatMonthLabel,
+} from "../services/contractLabels";
 import { createContractPdfBuffer, type ContractPrintData } from "../services/contractPdf";
 import { formatInterventionType } from "../services/interventionLabels";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
@@ -80,10 +86,14 @@ const assistanceBodySchema = z
     })
     .strict();
 
+const monthsSchema = z.coerce.number().int().min(contractTermMonthsRange.min).max(contractTermMonthsRange.max);
+
 const contractBodyShape = {
     type: z.enum(contractTypes),
     status: z.enum(contractStoredStatuses).optional(),
-    term: z.enum(contractTerms),
+    termMonths: monthsSchema,
+    // Solo per il noleggio (lo impone `superRefine`); stessa scala della durata.
+    billingMonths: monthsSchema.optional(),
     device: z.string().trim().min(1).max(255),
     note: z.string().trim().max(4000).nullable().optional(),
     startDate: z.string().regex(dateRegex).refine(isRealDay, { message: "La data di inizio non è valida" }),
@@ -102,6 +112,22 @@ const contractCreateBodySchema = z
                 code: "custom",
                 path: ["assistance"],
                 message: "I dati di assistenza sono obbligatori per un contratto di assistenza",
+            });
+        }
+
+        if (value.type === "rental" && value.billingMonths === undefined) {
+            context.addIssue({
+                code: "custom",
+                path: ["billingMonths"],
+                message: "Il periodo di fatturazione è obbligatorio per un noleggio",
+            });
+        }
+
+        if (value.type === "assistance" && value.billingMonths !== undefined) {
+            context.addIssue({
+                code: "custom",
+                path: ["billingMonths"],
+                message: "Solo un noleggio ha un periodo di fatturazione",
             });
         }
 
@@ -169,10 +195,9 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
     }
 
     const kind = contract.effectiveStatus === "draft" ? "quote" : "contract";
-    const [[customer], [provider], lab, hoursSummary] = await Promise.all([
+    const [[customer], [provider], hoursSummary] = await Promise.all([
         getCustomerById(contract.customerId),
         getProviderById(contract.providerId),
-        getLabConfig(),
         contract.assistanceType
             ? getContractHoursSummary(id, contract.includedHours, currentMonthKey(timeZone))
             : Promise.resolve(null),
@@ -184,10 +209,6 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
         id: contract.id,
         kind,
         status: contract.effectiveStatus,
-        labName: lab.labName,
-        labEmail: lab.labEmail,
-        labAddress: lab.labAddress,
-        labPhone: lab.labPhone,
         issuedAtLabel: formatDateLabel(new Date(), timeZone),
         customerName: contract.customerName ?? "",
         customerPhone: customer.phoneNumber
@@ -196,12 +217,14 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
         customerEmail: customer.email?.trim() || null,
         customerCity: customer.city?.trim() || null,
         providerName: provider.providerName,
+        providerLogoDataUrl: provider.logoDataUrl,
         providerContact: providerContact || null,
         providerEmail: provider.email,
         providerPhone: formatPhoneLabel(provider.phoneNumber),
         type: contract.type,
         device: contract.device,
-        termLabel: formatContractTerm(contract.term),
+        termLabel: formatContractTerm(contract.termMonths),
+        billingLabel: contract.billingMonths ? formatBillingPeriod(contract.billingMonths) : null,
         // Date "solo giorno" (YYYY-MM-DD): niente fuso, quindi `formatDayLabel`. La data di fine è
         // quella della pagina del contratto, senza sottrazioni.
         startDateLabel: formatDayLabel(contract.startDate),
@@ -308,6 +331,11 @@ contractsRouter.put(
 
         if (data.type !== undefined && data.type !== current.type) {
             res.status(400).json({ message: "Il tipo di contratto non si può cambiare" });
+            return;
+        }
+
+        if (data.billingMonths !== undefined && current.type !== "rental") {
+            res.status(400).json({ message: "Solo un noleggio ha un periodo di fatturazione" });
             return;
         }
 

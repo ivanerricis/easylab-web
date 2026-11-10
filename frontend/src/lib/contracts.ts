@@ -4,7 +4,6 @@ import type {
     ContractDto,
     ContractEffectiveStatus,
     ContractStatus,
-    ContractTerm,
     ContractType,
     InterventionType,
 } from "@/types/dtos";
@@ -28,11 +27,11 @@ export const contractEffectiveStatusOptions: { value: ContractEffectiveStatus; l
     { value: "expired", label: "Scaduto" },
 ];
 
-export const contractTermOptions: { value: ContractTerm; label: string; months: number }[] = [
-    { value: "months_3", label: "3 mesi", months: 3 },
-    { value: "months_6", label: "6 mesi", months: 6 },
-    { value: "months_12", label: "12 mesi", months: 12 },
-];
+/** Le durate proposte dal modulo (durata e fatturazione): scorciatoie, si può scrivere anche un altro numero di mesi. */
+export const monthsPresets = [3, 6, 12, 24] as const;
+
+/** Il tetto dei mesi che il server accetta per durata e fatturazione. */
+export const maxContractMonths = 120;
 
 export const assistanceTypeOptions: { value: AssistanceType; label: string }[] = [
     { value: "remote", label: "Remota" },
@@ -73,8 +72,10 @@ export const formatContractType = (value: ContractType) =>
 export const formatContractStatus = (value: ContractEffectiveStatus) =>
     contractEffectiveStatusOptions.find((option) => option.value === value)?.label ?? value;
 
-export const formatContractTerm = (value: ContractTerm) =>
-    contractTermOptions.find((option) => option.value === value)?.label ?? value;
+export const formatContractTerm = (months: number) => (months === 1 ? "1 mese" : `${months} mesi`);
+
+/** Il periodo di fatturazione di un noleggio: "ogni mese", "ogni 3 mesi". */
+export const formatBillingPeriod = (months: number) => (months === 1 ? "ogni mese" : `ogni ${months} mesi`);
 
 export const formatAssistanceType = (value: AssistanceType) =>
     assistanceTypeOptions.find((option) => option.value === value)?.label ?? value;

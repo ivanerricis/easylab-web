@@ -20,6 +20,7 @@ import {
     contractStatusColor,
     formatAssistanceType,
     formatContractStatus,
+    formatBillingPeriod,
     formatContractTerm,
     formatContractType,
     formatHours,
@@ -184,14 +185,14 @@ const ContractPage = () => {
                             ),
                         },
                         { label: "Tipo", value: formatContractType(contract.type) },
-                        { label: "Durata", value: formatContractTerm(contract.term) },
+                        { label: "Durata", value: formatContractTerm(contract.termMonths) },
                         { label: "Data inizio", value: formatDate(contract.startDate) },
                         { label: "Data fine", value: formatDate(contract.endDate) },
                     ]}
                 />
 
                 <div className="grid gap-4 xl:grid-cols-2">
-                    <DetailSection title="Anagrafica" className="self-start">
+                    <DetailSection title="Anagrafica">
                         <DetailGrid layout="rows">
                             <DetailItem
                                 label="Cliente"
@@ -229,6 +230,9 @@ const ContractPage = () => {
                                         }
                                     />
                                 </>
+                            ) : null}
+                            {contract.billingMonths != null ? (
+                                <DetailItem label="Fatturazione" value={formatBillingPeriod(contract.billingMonths)} />
                             ) : null}
                             <DetailItem label="Note" value={contract.note ?? "-"} longText />
                             <DetailItem label="Creato il" value={formatDateTime(contract.createdAt)} />

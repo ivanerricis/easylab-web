@@ -251,16 +251,17 @@ cls("provider", "Provider", C0, 800, [
     "+ last_name: text",
     "+ email: text UQ [1]",
     "+ phone_number: text UQ [1]",
+    "+ logo_data_url: text  {PNG/JPEG per i PDF}",
     "+ created_at: datetime [1]",
     "+ updated_at: datetime",
 ], color=NEW)
 enum("cstatus", "ContractStatus", C0, 1040, ["draft", "active", "cancelled", "/expired  (derivato)"])
-enum("cterm", "ContractTerm", C0, 1210, ["months_3", "months_6", "months_12"])
 cls("contract", "Contract", C1, 800, [
     "+ id: int PK",
     "+ type: ContractType [1]",
     "+ status: ContractStatus [1]",
-    "+ term: ContractTerm [1]",
+    "+ term_months: int [1]  {da 1 a 120}",
+    "+ billing_months: int [0..1]  {solo noleggio, da 1 a 120}",
     "+ device: text [1]",
     "+ note: text",
     "+ start_date: date [1]",
@@ -271,7 +272,7 @@ cls("contract", "Contract", C1, 800, [
     "+ customer_id: int FK [1]",
     "+ provider_id: int FK [1]",
 ], color=NEW)
-cls("rental", "Rental", C1, 1160, ["{nessuna tabella: contract.type = rental}"], color=NEW)
+cls("rental", "Rental", C1, 1160, ["{nessuna tabella: contract.type = rental}", "{la fatturazione sta in contract.billing_months}"], color=NEW)
 enum("ctype", "ContractType", C1, 1250, ["assistance", "rental"])
 cls("assistance", "Assistance", C2, 1160, [
     "+ contract_id: int PK FK [1]",
@@ -311,7 +312,7 @@ note = (
     "Se le ore tornano sotto soglia la riga si cancella (riarmo).&lt;br&gt;"
     "full_time: nessun avviso.&lt;br&gt;&lt;br&gt;"
     "&lt;b&gt;Contratto&lt;/b&gt;&lt;br&gt;"
-    "/end_date = start_date + term&lt;br&gt;"
+    "/end_date = start_date + term_months&lt;br&gt;"
     "{expired derivato: active e oggi ≥ end_date, non salvato}&lt;br&gt;"
     "{intervention.customer_id = contract.customer_id}&lt;br&gt;"
     "{intervention.type compatibile con assistance_type}&lt;br&gt;"
@@ -388,12 +389,12 @@ edge("customer", "bottom", "contract", "top", mid("customer"), "1", "0..*")
 edge("provider", "right", "contract", "left", 900, "1", "0..*")
 edge("assistance", "top", "intervention", "bottom", C2 + 225, "0..1", "0..*", style=GREEN)
 edge("rental", "top", "contract", "bottom", mid("rental"), style=GENERALIZATION)
-gen_y = 1120
+gen_y = 1138
 edge("assistance", "top", "contract", "bottom", mid("assistance"), style=GENERALIZATION,
      tgt_at=mid("contract"), pts=[(mid("assistance"), gen_y), (mid("contract"), gen_y)])
 cells.append(
     f'<mxCell id="{nid("l")}" value="{{complete, disjoint}}" style="text;html=1;align=left;fontSize=11;'
-    f'fontStyle=2;" vertex="1" parent="1"><mxGeometry x="{mid("contract") + 12}" y="{gen_y - 30}" width="140" height="20" as="geometry"/></mxCell>'
+    f'fontStyle=2;" vertex="1" parent="1"><mxGeometry x="{mid("contract") + 12}" y="{gen_y + 1}" width="140" height="20" as="geometry"/></mxCell>'
 )
 edge("assistance", "bottom", "alert", "top", mid("assistance"), "1", "0..*", style=COMPOSITION)
 ax, ay = anchor("assistance", "right", 1190)

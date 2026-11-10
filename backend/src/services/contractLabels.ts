@@ -1,4 +1,4 @@
-import type { AssistanceType, ContractStatus, ContractTerm, ContractType } from "../db/schema";
+import type { AssistanceType, ContractStatus, ContractType } from "../db/schema";
 
 /**
  * Le etichette italiane di tipo, stato, durata e pacchetto di un contratto, per il PDF.
@@ -18,12 +18,6 @@ const contractStatusLabels: Record<ContractStatus, string> = {
     expired: "Scaduto",
 };
 
-const contractTermLabels: Record<ContractTerm, string> = {
-    months_3: "3 mesi",
-    months_6: "6 mesi",
-    months_12: "12 mesi",
-};
-
 const assistanceTypeLabels: Record<AssistanceType, string> = {
     remote: "Remota",
     on_site: "In sede o in laboratorio",
@@ -35,7 +29,10 @@ export const formatContractType = (value: ContractType) => contractTypeLabels[va
 
 export const formatContractStatus = (value: ContractStatus) => contractStatusLabels[value] ?? value;
 
-export const formatContractTerm = (value: ContractTerm) => contractTermLabels[value] ?? value;
+export const formatContractTerm = (months: number) => (months === 1 ? "1 mese" : `${months} mesi`);
+
+/** Il periodo di fatturazione di un noleggio: "ogni mese", "ogni 3 mesi". */
+export const formatBillingPeriod = (months: number) => (months === 1 ? "ogni mese" : `ogni ${months} mesi`);
 
 export const formatAssistanceType = (value: AssistanceType) => assistanceTypeLabels[value] ?? value;
 

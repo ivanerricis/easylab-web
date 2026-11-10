@@ -155,7 +155,8 @@ export const insertContract = async (values: Partial<NewContract> = {}) => {
         .insert(contractTable)
         .values({
             type: "rental",
-            term: "months_12",
+            termMonths: 12,
+            billingMonths: values.type === undefined || values.type === "rental" ? 3 : null,
             device: `Dispositivo contratto ${next()}`,
             startDate: "2026-01-01",
             customerId: values.customerId ?? (await insertCustomer()).id,

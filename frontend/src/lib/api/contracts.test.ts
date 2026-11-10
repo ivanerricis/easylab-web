@@ -78,7 +78,8 @@ describe("contratti", () => {
         const del = vi.spyOn(api, "delete").mockResolvedValue({ data: raw });
         const payload = {
             type: "rental" as const,
-            term: "months_3" as const,
+            termMonths: 3,
+            billingMonths: 3,
             device: "PC",
             startDate: "2026-10-05",
             customerId: 3,

@@ -14,6 +14,7 @@ export const toProviderPayload = (values: ProviderSubmitValues) => ({
     lastName: trimOrNull(values.lastName),
     email: values.email.trim(),
     phoneNumber: values.phoneNumber.trim(),
+    logoDataUrl: values.logoDataUrl,
 });
 
 /** Il referente del fornitore ("Nome Cognome"), o `-` se non è indicato. */

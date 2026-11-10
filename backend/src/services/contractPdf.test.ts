@@ -31,22 +31,20 @@ const buildContract = (overrides: Partial<ContractPrintData> = {}): ContractPrin
     id: 7,
     kind: "contract",
     status: "active",
-    labName: "Laboratorio Rossi",
-    labEmail: "info@rossi.it",
-    labAddress: "Via Roma 1",
-    labPhone: "0123456789",
     issuedAtLabel: "3 nov 2026",
     customerName: "Mario Bianchi",
     customerPhone: "333123456",
     customerEmail: "mario@bianchi.it",
     customerCity: "Torino",
     providerName: "Acme Srl",
+    providerLogoDataUrl: null,
     providerContact: "Luca Neri",
     providerEmail: "info@acme.it",
     providerPhone: "011222333",
     type: "assistance",
     device: "Server NAS",
     termLabel: "12 mesi",
+    billingLabel: null,
     startDateLabel: "1 ott 2026",
     endDateLabel: "1 ott 2027",
     note: null,
@@ -81,14 +79,21 @@ const signatureLabels = (doc: Doc) => {
 };
 
 describe("createContractPdfBuffer", () => {
-    it("carica il logo e risolve nel buffer prodotto da pdfmake", async () => {
-        loadLogoDataUrl.mockResolvedValue("data:image/png;base64,AAA=");
+    it("risolve nel buffer prodotto da pdfmake, con il logo del fornitore e non quello del laboratorio", async () => {
+        const logo = "data:image/png;base64,AAA=";
+        const doc = await captureDoc(buildContract({ providerLogoDataUrl: logo }));
 
-        const result = await createContractPdfBuffer(buildContract());
-
-        expect(result).toBe(fakeBuffer);
-        expect(loadLogoDataUrl).toHaveBeenCalledTimes(1);
         expect(createPdf).toHaveBeenCalledTimes(1);
+        expect(loadLogoDataUrl).not.toHaveBeenCalled();
+        expect(JSON.stringify(doc.content)).toContain(logo);
+    });
+
+    it("l'intestazione ha i dati del fornitore, senza indirizzo", async () => {
+        const text = allText(await captureDoc(buildContract({ providerLogoDataUrl: null })));
+
+        expect(text).toContain("Acme Srl");
+        expect(text).toContain("info@acme.it");
+        expect(text).not.toContain("Via Roma");
     });
 
     it("passa una definizione A4 con gli stili condivisi", async () => {

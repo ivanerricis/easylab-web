@@ -26,7 +26,8 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     type: "assistance",
     status: "active",
     effectiveStatus: "active",
-    term: "months_6",
+    termMonths: 6,
+    billingMonths: null,
     device: "NAS",
     note: null,
     startDate: "2026-09-01",
@@ -208,7 +209,7 @@ describe("modulo del contratto", () => {
         expect(toContractCreatePayload(values)).toEqual({
             type: "assistance",
             status: "active",
-            term: "months_12",
+            termMonths: 12,
             device: "NAS",
             note: null,
             startDate: "2026-10-05",
@@ -218,6 +219,26 @@ describe("modulo del contratto", () => {
         });
         // Il tipo non si cambia: in modifica non viaggia.
         expect(toContractUpdatePayload(values)).not.toHaveProperty("type");
+    });
+
+    it("valida la durata e, per il noleggio, il periodo di fatturazione", () => {
+        expect(validateContractForm({ ...filled, termMonths: "" }).termMonths).toBeDefined();
+        expect(validateContractForm({ ...filled, termMonths: "0" }).termMonths).toBeDefined();
+        expect(validateContractForm({ ...filled, termMonths: "121" }).termMonths).toBeDefined();
+        expect(validateContractForm({ ...filled, termMonths: "1.5" }).termMonths).toBeDefined();
+        expect(validateContractForm({ ...filled, termMonths: "18" })).toEqual({});
+        // La fatturazione conta solo per il noleggio.
+        expect(validateContractForm({ ...filled, billingMonths: "" })).toEqual({});
+        expect(validateContractForm({ ...filled, type: "rental", billingMonths: "" }).billingMonths).toBeDefined();
+        expect(validateContractForm({ ...filled, type: "rental", billingMonths: "2" })).toEqual({});
+    });
+
+    it("manda il periodo di fatturazione solo per il noleggio", () => {
+        const rental = toContractSubmitValues({ ...filled, type: "rental", billingMonths: "2" }, 3, 8);
+
+        expect(rental.billingMonths).toBe(2);
+        expect(toContractCreatePayload(rental)).toMatchObject({ type: "rental", billingMonths: 2 });
+        expect(toContractCreatePayload(toContractSubmitValues(filled, 3, 8))).not.toHaveProperty("billingMonths");
     });
 
     it("manda ore null al full time e nessun pacchetto al noleggio", () => {

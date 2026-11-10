@@ -59,7 +59,8 @@ const flatRow = {
     type: "assistance",
     status: "active",
     effectiveStatus: "active",
-    term: "months_12",
+    termMonths: 12,
+    billingMonths: null,
     device: "Server NAS",
     note: null,
     startDate: "2026-10-01",
@@ -79,7 +80,8 @@ const dto = {
     type: "assistance",
     status: "active",
     effectiveStatus: "active",
-    term: "months_12",
+    termMonths: 12,
+    billingMonths: null,
     device: "Server NAS",
     note: null,
     startDate: "2026-10-01",
@@ -93,11 +95,11 @@ const dto = {
     updated_at: null,
 };
 
-const rentalRow = { ...flatRow, id: 8, type: "rental", assistanceType: null, includedHours: null };
+const rentalRow = { ...flatRow, id: 8, type: "rental", billingMonths: 3, assistanceType: null, includedHours: null };
 
 const assistanceBody = {
     type: "assistance",
-    term: "months_12",
+    termMonths: 12,
     device: "Server NAS",
     startDate: "2026-10-01",
     customerId: 3,
@@ -220,6 +222,7 @@ describe("contracts router", () => {
             lastName: "Neri",
             email: "info@acme.it",
             phoneNumber: "011222333",
+            logoDataUrl: "data:image/png;base64,AAA=",
         };
         const pdfBuffer = Buffer.from("%PDF-finto");
 
@@ -265,7 +268,8 @@ describe("contracts router", () => {
                 id: 7,
                 kind: "contract",
                 status: "active",
-                labName: "Laboratorio Rossi",
+                providerLogoDataUrl: "data:image/png;base64,AAA=",
+                billingLabel: null,
                 customerName: "Mario Rossi",
                 customerPhone: "333123456",
                 customerEmail: "mario@rossi.it",
@@ -311,7 +315,12 @@ describe("contracts router", () => {
 
             expect(response.status).toBe(200);
             expect(getContractHoursSummary).not.toHaveBeenCalled();
-            expect(printedData()).toMatchObject({ type: "rental", assistance: null, monthlyHours: [] });
+            expect(printedData()).toMatchObject({
+                type: "rental",
+                billingLabel: "ogni 3 mesi",
+                assistance: null,
+                monthlyHours: [],
+            });
         });
 
         it("senza ore registrate il riepilogo è omesso e il full time mostra ore illimitate", async () => {
@@ -354,7 +363,7 @@ describe("contracts router", () => {
             expect(createContract).toHaveBeenCalledWith(
                 {
                     type: "assistance",
-                    term: "months_12",
+                    termMonths: 12,
                     device: "Server NAS",
                     startDate: "2026-10-01",
                     customerId: 3,
@@ -367,12 +376,25 @@ describe("contracts router", () => {
         it("crea un noleggio senza dati di assistenza", async () => {
             vi.mocked(createContract).mockResolvedValue({ id: 8 } as never);
             vi.mocked(getContractById).mockResolvedValue([rentalRow] as never);
-            const { assistance: _assistance, ...rentalBody } = { ...assistanceBody, type: "rental" };
+            const { assistance: _assistance, ...rentalBody } = { ...assistanceBody, type: "rental", billingMonths: 3 };
 
             const response = await request(buildApp()).post("/api/contracts").send(rentalBody);
 
             expect(response.status).toBe(201);
-            expect(createContract).toHaveBeenCalledWith(expect.objectContaining({ type: "rental" }), undefined);
+            expect(createContract).toHaveBeenCalledWith(
+                expect.objectContaining({ type: "rental", billingMonths: 3 }),
+                undefined
+            );
+        });
+
+        it("rifiuta un noleggio senza periodo di fatturazione", async () => {
+            const { assistance: _assistance, ...rentalBody } = { ...assistanceBody, type: "rental" };
+
+            const response = await request(buildApp()).post("/api/contracts").send(rentalBody);
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toBe("Il periodo di fatturazione è obbligatorio per un noleggio");
+            expect(createContract).not.toHaveBeenCalled();
         });
 
         it("tempo pieno: le ore sono NULL anche se omesse", async () => {
@@ -403,7 +425,7 @@ describe("contracts router", () => {
         it("rifiuta un noleggio con dati di assistenza", async () => {
             const response = await request(buildApp())
                 .post("/api/contracts")
-                .send({ ...assistanceBody, type: "rental" });
+                .send({ ...assistanceBody, type: "rental", billingMonths: 3 });
 
             expect(response.status).toBe(400);
             expect(response.body.message).toBe("Solo un contratto di assistenza ha dati di assistenza");
@@ -428,7 +450,10 @@ describe("contracts router", () => {
 
         it.each([
             ["una data inesistente", { startDate: "2026-02-31" }],
-            ["un termine sconosciuto", { term: "months_9" }],
+            ["una durata a zero mesi", { termMonths: 0 }],
+            ["una durata oltre i 120 mesi", { termMonths: 121 }],
+            ["una durata non intera", { termMonths: 1.5 }],
+            ["un periodo di fatturazione su un'assistenza", { billingMonths: 3 }],
             ["lo stato scaduto", { status: "expired" }],
             ["un dispositivo vuoto", { device: " " }],
             ["un campo sconosciuto", { price: 1 }],
@@ -527,6 +552,15 @@ describe("contracts router", () => {
             const response = await request(buildApp())
                 .put("/api/contracts/8")
                 .send({ assistance: { includedHours: 10 } });
+
+            expect(response.status).toBe(400);
+            expect(updateContractById).not.toHaveBeenCalled();
+        });
+
+        it("rifiuta il periodo di fatturazione su un'assistenza", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+
+            const response = await request(buildApp()).put("/api/contracts/7").send({ billingMonths: 3 });
 
             expect(response.status).toBe(400);
             expect(updateContractById).not.toHaveBeenCalled();

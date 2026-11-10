@@ -1,18 +1,14 @@
-import type {
-    AssistanceType,
-    ContractDto,
-    ContractEffectiveStatus,
-    ContractStatus,
-    ContractTerm,
-    ContractType,
-} from "@/types/dtos";
+import type { AssistanceType, ContractDto, ContractEffectiveStatus, ContractStatus, ContractType } from "@/types/dtos";
 import { api, createEntityApi } from "./client";
 import type { EntityListParams } from "./client";
 
 export type ContractCreateInput = {
     type: ContractType;
     status?: ContractStatus;
-    term: ContractTerm;
+    /** Mesi di durata, da 1 a 120. */
+    termMonths: number;
+    /** Ogni quanti mesi si fattura: obbligatorio per il noleggio, vietato per l'assistenza. */
+    billingMonths?: number;
     device: string;
     note?: string | null;
     /** "AAAA-MM-GG"; la fine la calcola il server dalla durata. */

@@ -24,22 +24,22 @@ export type ContractPrintData = {
     kind: ContractDocumentKind;
     /** Lo stato effettivo (compreso `expired`). */
     status: ContractStatus;
-    labName: string;
-    labEmail: string;
-    labAddress: string;
-    labPhone: string;
     issuedAtLabel: string;
     customerName: string;
     customerPhone: string | null;
     customerEmail: string | null;
     customerCity: string | null;
     providerName: string;
+    /** Il logo del fornitore (data URL), nell'intestazione; `null` per i fornitori nati senza. */
+    providerLogoDataUrl: string | null;
     providerContact: string | null;
     providerEmail: string;
     providerPhone: string;
     type: ContractType;
     device: string;
     termLabel: string;
+    /** "ogni 3 mesi": solo per i noleggi; `null` per l'assistenza. */
+    billingLabel: string | null;
     startDateLabel: string;
     endDateLabel: string;
     note: string | null;
@@ -66,9 +66,12 @@ const buildHeader = (contract: ContractPrintData, logoDataUrl: string | null) =>
                 {
                     width: "*",
                     stack: [
-                        { text: contract.labName, style: "brandName" },
+                        // L'intestazione appartiene al fornitore: nome, referente, email e telefono, senza indirizzo.
+                        { text: contract.providerName, style: "brandName" },
                         {
-                            text: `${contract.labAddress}\n${contract.labEmail}\n${contract.labPhone}`,
+                            text: [contract.providerContact, contract.providerEmail, contract.providerPhone]
+                                .filter(Boolean)
+                                .join("\n"),
                             style: "brandInfo",
                         },
                     ],
@@ -177,6 +180,7 @@ const buildContractDataSection = (contract: ContractPrintData) => {
                           contract.termLabel
                       )
                     : dualFieldRow("Stato", formatContractStatus(contract.status), "Durata", contract.termLabel),
+                ...(contract.billingLabel ? [singleValueRow("Fatturazione", contract.billingLabel)] : []),
                 ...(isQuote
                     ? []
                     : [
@@ -319,7 +323,7 @@ const buildSignatureSection = (contract: ContractPrintData) => {
 };
 
 export const createContractPdfBuffer = async (contract: ContractPrintData) => {
-    const logoDataUrl = await loadLogoDataUrl();
+    const logoDataUrl = contract.providerLogoDataUrl;
     const banner = buildStatusBanner(contract);
     const assistanceSection = buildAssistanceSection(contract);
     const hoursSection = buildHoursSection(contract);

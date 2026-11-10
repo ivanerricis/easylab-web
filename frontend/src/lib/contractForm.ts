@@ -1,8 +1,8 @@
 import type { ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import type { ContractCreateInput, ContractUpdateInput } from "@/lib/api";
-import { packageHours } from "@/lib/contracts";
+import { maxContractMonths, packageHours } from "@/lib/contracts";
 import { trimOrNull } from "@/lib/utils";
-import type { AssistanceType, ContractStatus, ContractTerm, ContractType } from "@/types/dtos";
+import type { AssistanceType, ContractStatus, ContractType } from "@/types/dtos";
 
 /**
  * I campi del contratto come li tiene il modulo (testo, come arrivano dai controlli). I clienti e i
@@ -11,7 +11,10 @@ import type { AssistanceType, ContractStatus, ContractTerm, ContractType } from 
 export type ContractFormState = {
     type: ContractType;
     status: ContractStatus;
-    term: ContractTerm;
+    /** I mesi come testo ("12"): lo scrive anche a mano chi non vuole una scorciatoia. */
+    termMonths: string;
+    /** Come `termMonths`, per il periodo di fatturazione del noleggio (ignorato per l'assistenza). */
+    billingMonths: string;
     device: string;
     note: string;
     startDate: string;
@@ -22,12 +25,27 @@ export type ContractFormState = {
     includedHours: string;
 };
 
-export type ContractFormField = "customer" | "provider" | "device" | "startDate" | "includedHours";
+export type ContractFormField =
+    "customer" | "provider" | "device" | "startDate" | "termMonths" | "billingMonths" | "includedHours";
 
 export type ContractFieldErrors = Partial<Record<ContractFormField, string>>;
 
 /** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
-export const contractFieldOrder = ["customer", "provider", "startDate", "device", "includedHours"] as const;
+export const contractFieldOrder = [
+    "customer",
+    "provider",
+    "startDate",
+    "termMonths",
+    "billingMonths",
+    "device",
+    "includedHours",
+] as const;
+
+/** Mesi interi da 1 a `maxContractMonths`, scritti come testo. */
+const isValidMonths = (value: string) =>
+    /^[0-9]+$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= maxContractMonths;
+
+const monthsError = `Indica un numero di mesi da 1 a ${maxContractMonths}`;
 
 /** Le ore con cui parte un pacchetto appena scelto: la prima fra quelle ammesse, nessuna per il full time. */
 export const defaultIncludedHours = (assistanceType: AssistanceType) => {
@@ -39,7 +57,8 @@ export const defaultIncludedHours = (assistanceType: AssistanceType) => {
 export const emptyContractFormState = (startDate: string, customer = ""): ContractFormState => ({
     type: "assistance",
     status: "active",
-    term: "months_12",
+    termMonths: "12",
+    billingMonths: "3",
     device: "",
     note: "",
     startDate,
@@ -69,6 +88,14 @@ export const validateContractForm = (values: ContractFormState): ContractFieldEr
         errors.startDate = "Seleziona la data di inizio";
     }
 
+    if (!isValidMonths(values.termMonths)) {
+        errors.termMonths = monthsError;
+    }
+
+    if (values.type === "rental" && !isValidMonths(values.billingMonths)) {
+        errors.billingMonths = monthsError;
+    }
+
     if (values.device.trim() === "") {
         errors.device = "Indica il dispositivo";
     }
@@ -92,7 +119,8 @@ export const toContractSubmitValues = (
 ): ContractSubmitValues => ({
     type: values.type,
     status: values.status,
-    term: values.term,
+    termMonths: Number(values.termMonths),
+    billingMonths: values.type === "rental" ? Number(values.billingMonths) : null,
     device: values.device.trim(),
     note: trimOrNull(values.note),
     startDate: values.startDate,
@@ -110,7 +138,9 @@ export const toContractSubmitValues = (
 /** I campi comuni a creazione e modifica: tutto tranne il tipo, che non si cambia. */
 const toContractBody = (values: ContractSubmitValues) => ({
     status: values.status,
-    term: values.term,
+    termMonths: values.termMonths,
+    // Il periodo di fatturazione solo per il noleggio: il server lo vieta all'assistenza.
+    ...(values.billingMonths != null ? { billingMonths: values.billingMonths } : {}),
     device: values.device,
     note: values.note,
     startDate: values.startDate,

@@ -183,7 +183,7 @@ const InterventionBodySkeleton = () => (
 const ContractBodySkeleton = () => (
     <>
         <div className="grid gap-4 xl:grid-cols-2">
-            <RowsSectionSkeleton rows={3} className="self-start" />
+            <RowsSectionSkeleton rows={3} />
             <RowsSectionSkeleton rows={5} />
         </div>
         <DetailSection title={<SectionTitleSkeleton />} titleAs="div">

@@ -363,14 +363,12 @@ export const contractStoredStatuses = ["draft", "active", "cancelled"] as const;
  * della lettura (vedi `db/queries/contract.ts`), così nessun cron deve riscrivere lo stato.
  */
 export const contractStatuses = [...contractStoredStatuses, "expired"] as const;
-export const contractTerms = ["months_3", "months_6", "months_12"] as const;
 export type ContractType = (typeof contractTypes)[number];
 export type ContractStoredStatus = (typeof contractStoredStatuses)[number];
 export type ContractStatus = (typeof contractStatuses)[number];
-export type ContractTerm = (typeof contractTerms)[number];
 
-/** Durata in mesi di ogni termine: da qui la data di fine (`start_date + N mesi`). */
-export const contractTermMonths: Record<ContractTerm, number> = { months_3: 3, months_6: 6, months_12: 12 };
+/** Durata del contratto, in mesi interi: da qui la data di fine (`start_date + N mesi`). */
+export const contractTermMonthsRange = { min: 1, max: 120 } as const;
 
 export const assistanceTypes = ["remote", "on_site", "complete", "full_time"] as const;
 export type AssistanceType = (typeof assistanceTypes)[number];
@@ -400,6 +398,11 @@ export const providerTable = pgTable(
         lastName: varchar("last_name", { length: 255 }),
         email: varchar("email", { length: 255 }).notNull().unique(),
         phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(),
+        /**
+         * Il logo che compare nei PDF dei contratti, come data URL (PNG o JPEG, ridotto dal browser).
+         * Obbligatorio per chi lo crea ora, ma NULL per i fornitori nati prima: il PDF allora lo omette.
+         */
+        logoDataUrl: text("logo_data_url"),
         ...timestamps,
     },
     (table) => [
@@ -418,7 +421,10 @@ export const contractTable = pgTable(
         type: varchar("type", { length: 20 }).$type<ContractType>().notNull(),
         // Solo lo stato salvato: `expired` si deriva in lettura, vedi `contractStatuses`.
         status: varchar("status", { length: 20 }).$type<ContractStoredStatus>().notNull().default("draft"),
-        term: varchar("term", { length: 20 }).$type<ContractTerm>().notNull(),
+        /** Mesi di durata, a scelta libera fra `contractTermMonthsRange`; i valori proposti (3, 6, 12, 24) sono solo scorciatoie. */
+        termMonths: integer("term_months").notNull(),
+        /** Ogni quanti mesi si fattura: solo per il noleggio (NULL per l'assistenza), stessa scala della durata. */
+        billingMonths: integer("billing_months"),
         /** Testo libero, di proposito non una chiave verso `device`: è il bene coperto dal contratto. */
         device: varchar("device", { length: 255 }).notNull(),
         note: text("note"),
@@ -445,7 +451,12 @@ export const contractTable = pgTable(
         unique("contract_customer_id_id_unique").on(table.customerId, table.id),
         check("contract_type_check", sql`${table.type} IN ('assistance', 'rental')`),
         check("contract_status_check", sql`${table.status} IN ('draft', 'active', 'cancelled')`),
-        check("contract_term_check", sql`${table.term} IN ('months_3', 'months_6', 'months_12')`),
+        check("contract_term_months_check", sql`${table.termMonths} BETWEEN 1 AND 120`),
+        // Il periodo di fatturazione c'è se e solo se il contratto è un noleggio.
+        check(
+            "contract_billing_months_check",
+            sql`(${table.type} = 'rental') = (${table.billingMonths} IS NOT NULL) AND (${table.billingMonths} IS NULL OR ${table.billingMonths} BETWEEN 1 AND 120)`
+        ),
     ]
 );
 

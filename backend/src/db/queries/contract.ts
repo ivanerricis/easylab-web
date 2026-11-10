@@ -4,8 +4,6 @@ import { db } from "../index";
 import {
     assistanceTable,
     contractTable,
-    contractTermMonths,
-    contractTerms,
     customerTable,
     interventionTable,
     providerTable,
@@ -47,11 +45,7 @@ type ListContractsParams = {
  *   salvato che invecchia. "Oggi" è il giorno del laboratorio, non quello del server.
  */
 export const contractDerivedColumns = (timeZone: string) => {
-    const termMonths = sql`CASE ${contractTable.term} ${sql.join(
-        contractTerms.map((term) => sql`WHEN ${term} THEN ${contractTermMonths[term]}::int`),
-        sql` `
-    )} END`;
-    const endDate = sql<string>`(${contractTable.startDate} + ${termMonths} * interval '1 month')::date`;
+    const endDate = sql<string>`(${contractTable.startDate} + ${contractTable.termMonths} * interval '1 month')::date`;
     const effectiveStatus = sql<ContractStatus>`CASE WHEN ${contractTable.status} = 'active' AND ${endDate} <= ${currentLocalDay(timeZone)}::date THEN 'expired' ELSE ${contractTable.status} END`;
 
     return { endDate, effectiveStatus };
@@ -104,7 +98,8 @@ const selectContracts = (timeZone: string) => {
             type: contractTable.type,
             status: contractTable.status,
             effectiveStatus,
-            term: contractTable.term,
+            termMonths: contractTable.termMonths,
+            billingMonths: contractTable.billingMonths,
             device: contractTable.device,
             note: contractTable.note,
             startDate: contractTable.startDate,

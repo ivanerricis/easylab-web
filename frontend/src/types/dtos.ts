@@ -108,6 +108,8 @@ export type ProviderDto = {
     lastName: string | null;
     email: string;
     phoneNumber: string;
+    /** Il logo dei PDF dei contratti (data URL); `null` per i fornitori nati prima che fosse richiesto. */
+    logoDataUrl: string | null;
     createdAt: string;
     updatedAt: string | null;
 };
@@ -119,8 +121,6 @@ export type ContractStatus = "draft" | "active" | "cancelled";
 
 /** Lo stato "reale": un contratto `active` oltre la fine è `expired`, calcolato dal server. */
 export type ContractEffectiveStatus = ContractStatus | "expired";
-
-export type ContractTerm = "months_3" | "months_6" | "months_12";
 
 export type AssistanceType = "remote" | "on_site" | "complete" | "full_time";
 
@@ -149,7 +149,10 @@ export type ContractDto = {
     type: ContractType;
     status: ContractStatus;
     effectiveStatus: ContractEffectiveStatus;
-    term: ContractTerm;
+    /** Durata in mesi, da 1 a 120. */
+    termMonths: number;
+    /** Ogni quanti mesi si fattura: solo per il noleggio. */
+    billingMonths: number | null;
     device: string;
     note: string | null;
     startDate: string;

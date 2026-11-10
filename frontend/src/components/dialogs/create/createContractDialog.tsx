@@ -3,6 +3,7 @@ import DatePickerField from "@/components/date-picker-field";
 import FormField from "@/components/form-field";
 import FormSection from "@/components/dialogs/form-section";
 import InputWithAdd from "@/components/inputWithAdd";
+import MonthsField from "@/components/months-field";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateProviderDialog from "@/components/dialogs/create/createProviderDialog";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import { createCustomer, createProvider, getApiErrorMessage, listCustomers, list
 import {
     assistanceTypeOptions,
     contractStatusOptions,
-    contractTermOptions,
     contractTypeOptions,
     formatHours,
     packageHours,
@@ -33,14 +33,7 @@ import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { getTodayDateString } from "@/lib/interventions";
 import { toProviderPayload } from "@/lib/providers";
-import type {
-    AssistanceType,
-    ContractDto,
-    ContractStatus,
-    ContractTerm,
-    ContractType,
-    CustomerDto,
-} from "@/types/dtos";
+import type { AssistanceType, ContractDto, ContractStatus, ContractType, CustomerDto } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -49,7 +42,9 @@ import { toast } from "sonner";
 export type ContractSubmitValues = {
     type: ContractType;
     status: ContractStatus;
-    term: ContractTerm;
+    termMonths: number;
+    /** Solo per il noleggio: ogni quanti mesi si fattura; `null` per l'assistenza. */
+    billingMonths: number | null;
     device: string;
     note: string | null;
     startDate: string;
@@ -80,7 +75,8 @@ const toFormState = (contract: ContractDto): ContractFormState => {
     return {
         type: contract.type,
         status: contract.status,
-        term: contract.term,
+        termMonths: String(contract.termMonths),
+        billingMonths: contract.billingMonths != null ? String(contract.billingMonths) : "3",
         device: contract.device,
         note: contract.note ?? "",
         startDate: contract.startDate,
@@ -284,7 +280,8 @@ const CreateContractDialog = ({
                     // 15rem, e sul telefono dava un secondo scroll dentro il primo.
                     <div className="grid content-start gap-4">
                         <FormSection title="Anagrafica">
-                            <div className="grid items-start gap-4 sm:grid-cols-2">
+                            {/* Cliente e fornitore uno sotto l'altro: i nomi lunghi non vengono tagliati. */}
+                            <div className="grid items-start gap-4">
                                 <FormField
                                     id="customer"
                                     label="Cliente"
@@ -402,23 +399,25 @@ const CreateContractDialog = ({
                                     </Select>
                                 </FormField>
 
-                                <FormField id="term" label="Durata" className="gap-1">
-                                    <Select
-                                        value={formValues.term}
-                                        onValueChange={(term) => handleChange({ term: term as ContractTerm })}
-                                    >
-                                        <SelectTrigger id="term" className="w-full">
-                                            <SelectValue placeholder="Seleziona durata" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {contractTermOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormField>
+                                <MonthsField
+                                    id="termMonths"
+                                    label="Durata"
+                                    className="gap-1"
+                                    value={formValues.termMonths}
+                                    onChange={(termMonths) => handleChange({ termMonths })}
+                                    error={errors.termMonths}
+                                />
+
+                                {formValues.type === "rental" ? (
+                                    <MonthsField
+                                        id="billingMonths"
+                                        label="Periodo di fatturazione"
+                                        className="gap-1"
+                                        value={formValues.billingMonths}
+                                        onChange={(billingMonths) => handleChange({ billingMonths })}
+                                        error={errors.billingMonths}
+                                    />
+                                ) : null}
 
                                 <FormField
                                     id="startDate"

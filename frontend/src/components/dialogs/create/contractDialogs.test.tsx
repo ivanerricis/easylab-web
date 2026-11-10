@@ -20,6 +20,11 @@ vi.mock("@/lib/api", async () => {
     };
 });
 
+// jsdom non ha un canvas: la riduzione del logo si prova a parte, qui basta che consegni un data URL.
+vi.mock("@/lib/logoImage", () => ({
+    logoFileToDataUrl: () => Promise.resolve("data:image/png;base64,AAA="),
+}));
+
 vi.mock("sonner", () => ({
     toast: {
         error: (...args: unknown[]) => toastError(...args),
@@ -43,6 +48,13 @@ const chooseOption = async (label: string | RegExp, option: string | RegExp) => 
 };
 
 const save = () => userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+/** Sceglie il logo del fornitore: l'input dei file è nascosto, dietro il pulsante. */
+const chooseLogo = async (container: HTMLElement) => {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+
+    await userEvent.upload(input as HTMLInputElement, new File(["x"], "logo.png", { type: "image/png" }));
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -73,6 +85,7 @@ describe("CreateProviderDialog", () => {
             "Il nome del fornitore non può essere vuoto",
             "L'email non può essere vuota",
             "Il telefono non può essere vuoto",
+            "Il logo è obbligatorio",
         ]);
         expect(screen.getByLabelText(/^Nome fornitore/)).toHaveFocus();
         expect(onSubmit).not.toHaveBeenCalled();
@@ -80,16 +93,22 @@ describe("CreateProviderDialog", () => {
 
     it("rifiuta un'email non valida e consegna i valori compilati", async () => {
         const onSubmit = vi.fn();
-        renderWithProviders(<CreateProviderDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+        const { baseElement } = renderWithProviders(
+            <CreateProviderDialog open onOpenChange={() => {}} onSubmit={onSubmit} />
+        );
 
         await userEvent.type(screen.getByLabelText(/^Nome fornitore/), "Rossi Informatica");
         await userEvent.type(screen.getByLabelText(/^Email/), "non-valida");
         await userEvent.type(screen.getByLabelText(/^Telefono/), "081 123");
         await save();
-        expect(screen.getByRole("alert")).toHaveTextContent("Indirizzo email non valido");
+        expect(screen.getByText("Indirizzo email non valido")).toBeInTheDocument();
 
         await userEvent.clear(screen.getByLabelText(/^Email/));
         await userEvent.type(screen.getByLabelText(/^Email/), "info@rossi.it");
+        await save();
+        expect(await screen.findByText("Il logo è obbligatorio")).toBeInTheDocument();
+
+        await chooseLogo(baseElement);
         await save();
 
         await waitFor(() => {
@@ -99,6 +118,7 @@ describe("CreateProviderDialog", () => {
                 lastName: "",
                 email: "info@rossi.it",
                 phoneNumber: "081 123",
+                logoDataUrl: "data:image/png;base64,AAA=",
             });
         });
         expect(toastSuccess).toHaveBeenCalledWith("Fornitore creato con successo");
@@ -125,6 +145,62 @@ describe("CreateContractDialog", () => {
             "Indica il dispositivo",
         ]);
         expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("la durata si sceglie fra quelle proposte o si scrive a mano", async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        await fillParties();
+        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+        await chooseOption("Durata", /^Altro/);
+
+        const months = screen.getByRole("spinbutton", { name: /^Durata/ });
+        await userEvent.clear(months);
+        await userEvent.type(months, "18");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ termMonths: 18, billingMonths: null }));
+        });
+    });
+
+    it("la durata a mano deve essere un numero di mesi da 1 a 120", async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        await fillParties();
+        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+        await chooseOption("Durata", /^Altro/);
+        await userEvent.clear(screen.getByRole("spinbutton", { name: /^Durata/ }));
+        await save();
+
+        expect(await screen.findByText("Indica un numero di mesi da 1 a 120")).toBeInTheDocument();
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("il noleggio ha il periodo di fatturazione, di 3 mesi se non si cambia", async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        expect(screen.queryByRole("combobox", { name: /^Periodo di fatturazione/ })).not.toBeInTheDocument();
+
+        await chooseOption("Tipo", "Noleggio");
+        expect(screen.getByRole("combobox", { name: /^Periodo di fatturazione/ })).toHaveTextContent("3 mesi");
+
+        await fillParties();
+        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Notebook");
+        await chooseOption(/^Periodo di fatturazione/, /^Altro/);
+        const billing = screen.getByRole("spinbutton", { name: /^Periodo di fatturazione/ });
+        await userEvent.clear(billing);
+        await userEvent.type(billing, "2");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({ type: "rental", termMonths: 12, billingMonths: 2, assistance: null })
+            );
+        });
     });
 
     it("offre solo le ore del pacchetto e le azzera cambiando pacchetto", async () => {
@@ -159,7 +235,7 @@ describe("CreateContractDialog", () => {
             expect(onSubmit).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: "assistance",
-                    term: "months_6",
+                    termMonths: 6, billingMonths: null,
                     device: "Server NAS",
                     customerId: 30,
                     providerId: 8,
@@ -186,6 +262,7 @@ describe("CreateContractDialog", () => {
             await userEvent.type(within(dialog).getByLabelText(/^Nome fornitore/), "Verdi Reti");
             await userEvent.type(within(dialog).getByLabelText(/^Email/), "info@verdi.it");
             await userEvent.type(within(dialog).getByLabelText(/^Telefono/), "081 999");
+            await chooseLogo(dialog);
             await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
             return dialog;
         };
@@ -279,7 +356,7 @@ describe("CreateContractDialog", () => {
             type: "assistance",
             status: "active",
             effectiveStatus: "active",
-            term: "months_12",
+            termMonths: 12, billingMonths: null,
             device: "Server NAS",
             note: null,
             startDate: "2026-06-01",

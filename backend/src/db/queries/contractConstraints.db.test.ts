@@ -142,7 +142,7 @@ describe("disgiunzione fra le specializzazioni", () => {
         const contract = await insertAssistanceContract();
 
         const constraint = await violation(() =>
-            db.execute(sql`update contract set type = 'rental' where id = ${contract.id}`)
+            db.execute(sql`update contract set type = 'rental', billing_months = 3 where id = ${contract.id}`)
         );
 
         expect(constraint).toBe("assistance_contract_fk");
@@ -153,7 +153,19 @@ describe("valori ammessi di tipo, stato e termine", () => {
     it.each([
         ["tipo", { type: "altro" }, "contract_type_check"],
         ["stato", { status: "expired" }, "contract_status_check"],
-        ["termine", { term: "months_9" }, "contract_term_check"],
+        ["termine a zero mesi", { termMonths: 0 }, "contract_term_months_check"],
+        ["termine oltre 120 mesi", { termMonths: 121 }, "contract_term_months_check"],
+        [
+            "noleggio senza periodo di fatturazione",
+            { type: "rental", billingMonths: null },
+            "contract_billing_months_check",
+        ],
+        [
+            "assistenza con periodo di fatturazione",
+            { type: "assistance", billingMonths: 3 },
+            "contract_billing_months_check",
+        ],
+        ["fatturazione oltre 120 mesi", { type: "rental", billingMonths: 121 }, "contract_billing_months_check"],
     ])("rifiuta un %s sconosciuto", async (_label, values, expected) => {
         const constraint = await violation(() => insertContract(values as never));
 

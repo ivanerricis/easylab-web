@@ -37,7 +37,8 @@ const provider = {
     phoneNumber: "0212345678",
 };
 
-const validBody = { providerName: "Acme Srl", email: "info@acme.it", phoneNumber: "0212345678" };
+const logoDataUrl = "data:image/png;base64,iVBORw0KGgo=";
+const validBody = { providerName: "Acme Srl", email: "info@acme.it", phoneNumber: "0212345678", logoDataUrl };
 
 describe("providers router", () => {
     beforeEach(() => {
@@ -82,7 +83,10 @@ describe("providers router", () => {
 
     it.each([
         ["senza nome", { ...validBody, providerName: "  " }],
-        ["senza email", { providerName: "Acme", phoneNumber: "1" }],
+        ["senza email", { providerName: "Acme", phoneNumber: "1", logoDataUrl }],
+        ["senza logo", { providerName: "Acme", email: "info@acme.it", phoneNumber: "1" }],
+        ["con un logo che non è un'immagine", { ...validBody, logoDataUrl: "data:text/html;base64,AAAA" }],
+        ["con un logo troppo grande", { ...validBody, logoDataUrl: "data:image/png;base64," + "A".repeat(90_000) }],
         ["con email non valida", { ...validBody, email: "non-una-email" }],
         ["senza telefono", { providerName: "Acme", email: "a@b.it" }],
         ["con un campo sconosciuto", { ...validBody, vatNumber: "1" }],

@@ -22,9 +22,9 @@ describe("contractLabels", () => {
     });
 
     it("traduce la durata", () => {
-        expect(formatContractTerm("months_3")).toBe("3 mesi");
-        expect(formatContractTerm("months_6")).toBe("6 mesi");
-        expect(formatContractTerm("months_12")).toBe("12 mesi");
+        expect(formatContractTerm(1)).toBe("1 mese");
+        expect(formatContractTerm(3)).toBe("3 mesi");
+        expect(formatContractTerm(18)).toBe("18 mesi");
     });
 
     it("traduce il tipo di assistenza come la pagina", () => {

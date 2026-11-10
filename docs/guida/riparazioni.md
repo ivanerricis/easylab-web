@@ -40,7 +40,7 @@ Cliccando un report si apre la sua scheda.
 In alto vedi lo **stato** (Aperto o Chiuso), il **prezzo interno** (quello del laboratorio), il **prezzo dei tecnici** esterni, il **totale** e il **pagamento**. Sotto, le sezioni:
 
 - **Anagrafica**: cliente, telefono, collaboratore, dispositivo e difetto.
-- **Stato e gestione**: alimentatore, backup dati, **Avvisato** (il cliente è stato avvisato), **Ritirato**, e le date di creazione e di ultimo aggiornamento.
+- **Stato e gestione**: alimentatore, backup dati, **Avvisato** (il cliente è stato contattato, in qualunque modo) e **Ritirato** (il dispositivo è stato ritirato dal cliente), e le date di creazione e di ultimo aggiornamento.
 - **Dettagli intervento**: il problema riscontrato, la descrizione di cosa hai fatto, la password e le note.
 - **Tecnici associati**: l'eventuale tecnico esterno e quanto costa.
 
@@ -55,7 +55,7 @@ Premi **Modifica** (dalla scheda) o la **matita** nell'elenco. Si apre la finest
 Man mano che il lavoro va avanti la aggiorni:
 
 - scrivi nella **Descrizione intervento** cosa hai fatto;
-- spunta **Avvisato** quando hai chiamato il cliente, e **Ritirato** quando ha portato via il dispositivo;
+- spunta **Avvisato** quando hai contattato il cliente (per telefono o in qualunque altro modo), e **Ritirato** quando il cliente ha ritirato il dispositivo. Sono due spunte a sé: non chiudono il report da sole, che si chiude solo con **Report chiuso**;
 - se il lavoro è stato affidato a un tecnico esterno, scegli il **Tecnico** e scrivi il **Prezzo lavoro tecnico**;
 - scrivi il **Prezzo interno** e scegli il **pagamento**: **Non pagato**, **Contanti** o **Carta**;
 - quando tutto è finito, spunta **Report chiuso**.

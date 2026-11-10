@@ -23,13 +23,22 @@ Le schede in alto contano:
 | **Interventi programmati** | I lavori da fare. |
 | **Interventi in lavorazione** | I lavori iniziati e non ancora finiti. |
 | **Interventi completati** | I lavori finiti. |
-| **Incassi mese** | Gli incassi del mese (vedi sotto). |
+| **Incassi mese** | Il totale dei report chiusi del mese (vedi sotto). |
 
 **Ogni scheda è cliccabile**: ti porta all'elenco già filtrato. Per esempio, cliccando «Report aperti» vedi solo i report aperti.
 
 ### Gli incassi del mese
 
 La scheda **Incassi mese** nasconde la cifra (al suo posto ci sono dei puntini), così non si legge passando. Cliccala per aprire la finestra con l'importo del mese, l'**andamento degli ultimi 6 mesi** e, sotto la cifra, quanto resta **al netto dei tecnici esterni**. Le frecce ‹ e › cambiano il mese.
+
+Cosa viene contato:
+
+- solo i **report chiusi**: un report ancora aperto non entra nel totale;
+- per ogni report, il **prezzo interno** più il **compenso del tecnico esterno**, se c'è. «Al netto tecnici esterni» toglie quest'ultimo;
+- un report appartiene al mese in cui è stato **creato** (secondo il fuso orario del laboratorio), non a quello in cui è stato chiuso o pagato. Il metodo di pagamento non conta;
+- gli **interventi non sono compresi**, nemmeno quelli segnati come pagati.
+
+Se il mese precedente ha un totale, la finestra mostra anche la **variazione in percentuale**. Per il mese in corso il confronto è con lo **stesso numero di giorni** del mese prima (per esempio i primi 10 giorni).
 
 ![La finestra degli incassi](img/dashboard-incassi.png)
 

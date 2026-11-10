@@ -34,7 +34,7 @@ In alto trovi telefono, email, località e **Cliente dal** (la data di creazione
 
 I pulsanti in alto:
 
-- **Nuovo** crea un nuovo **report** o un nuovo **intervento** già intestato a quel cliente;
+- **Nuovo** apre la finestra per creare un **report** o un **intervento** con **quel cliente già selezionato**;
 - **Modifica** cambia i suoi dati;
 - **Stampa** crea il **resoconto** del cliente (vedi sotto);
 - **Elimina** cancella il cliente. Non si può se ha ancora report o interventi: prima vanno eliminati.

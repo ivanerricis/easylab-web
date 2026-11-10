@@ -90,14 +90,26 @@ Altre cose che trovi:
 
 ## Sistema
 
-*(Amministratore)* Lo **spazio su disco** del server (dati e backup) e la **dimensione del database**. Se il disco si riempie, l'app avvisa via email.
+*(Amministratore)* Una scheda **Spazio su disco** con l'occupazione del **disco del server** (dati e backup), con una barra e i GB usati sul totale, e la **dimensione del database**. In fondo c'è l'ora dell'**ultimo controllo**; il pulsante con le due frecce lo ripete. Se il disco sta per riempirsi, l'app avvisa via email all'indirizzo degli [avvisi tecnici](#email).
+
+![La sezione Sistema (i valori sono d'esempio)](img/settings-system.png)
 
 ## Aggiornamenti
 
-Mostra la **versione installata**, quando è stata fatta l'ultima verifica e se c'è un **aggiornamento disponibile**. L'amministratore può premere **Verifica aggiornamenti** e **Aggiorna adesso**: l'app ricostruisce e riavvia i servizi, quindi per qualche istante **non è raggiungibile**. Conviene aggiornare quando nessuno sta lavorando, e dopo un backup.
+Quattro riquadri: la **versione installata**, la data dell'**ultima verifica**, se c'è un **aggiornamento disponibile** (Sì o No) e la data dell'**ultimo aggiornamento**, con l'esito (**Riuscito**, oppure **Mai eseguito**). Tutti gli utenti li vedono; solo l'amministratore ha i pulsanti.
+
+![La sezione Aggiornamenti (i valori sono d'esempio)](img/settings-update.png)
+
+L'amministratore può premere **Verifica aggiornamenti** per controllare se esiste una versione nuova. Se c'è, **Aggiorna adesso** si attiva: l'app ricostruisce e riavvia i servizi, quindi per qualche istante **non è raggiungibile**. Conviene aggiornare quando nessuno sta lavorando, e dopo un backup.
 
 Se la sezione dice che il servizio di aggiornamento non è configurato, l'aggiornamento si fa dal server: vedi [Deploy e configurazione server](../DEPLOY.md#aggiornamento-applicazione).
 
 ## Log
 
-*(Amministratore)* Il **registro delle azioni**: chi ha fatto cosa e quando (accessi, creazioni, modifiche, eliminazioni), con data, indirizzo di rete, utente, azione, esito ed eventuale errore. Scegli il giorno dal menu, cerca nel testo, e con **Scarica log selezionato** salvi il file. **Conserva per … giorni** decide dopo quanto i vecchi registri vengono cancellati.
+*(Amministratore)* Il **registro delle azioni**: chi ha fatto cosa e quando. Ogni riga ha **data e ora**, **IP** (l'indirizzo di rete da cui è partita la richiesta), **utente**, **azione** (per esempio «creato report» o «tentativo di accesso»), **stato** ed eventuale **errore**: gli accessi falliti compaiono con lo stato in rosso e il motivo.
+
+![La sezione Log (i valori sono d'esempio)](img/settings-logs.png)
+
+- Il menu in alto a sinistra sceglie il **giorno** (ce n'è uno per giorno, con la dimensione del file); la casella **Cerca nel log…** filtra le righe.
+- **Scarica log selezionato** salva il file del giorno scelto.
+- **Conserva per … giorni** decide dopo quanto i registri vecchi vengono cancellati: cambia il numero e premi **Salva**.

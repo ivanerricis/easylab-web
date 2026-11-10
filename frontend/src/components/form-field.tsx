@@ -69,7 +69,7 @@ export const FieldError = ({ id, error }: { id: string; error?: string }) => {
         <p
             id={fieldErrorId(id)}
             role="alert"
-            className="absolute top-full left-2 z-20 w-fit max-w-[calc(100%-1rem)] -translate-y-1/3 rounded-md border border-destructive/40 bg-card px-2 py-0.5 text-xs leading-4 font-medium text-destructive-text shadow-sm"
+            className="absolute top-full left-2 z-1 w-fit max-w-[calc(100%-1rem)] -translate-y-1/3 rounded-md border border-destructive/40 bg-card px-2 py-0.5 text-xs leading-4 font-medium text-destructive-text shadow-sm"
         >
             {error}
         </p>

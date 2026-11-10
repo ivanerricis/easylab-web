@@ -307,12 +307,15 @@ const CustomDialog = ({
                         non li tagliava: restavano alla loro posizione dentro il corpo scorrevole e
                         allungavano lo scroll del dialogo stesso: da telefono, un dialogo con più di uno
                         schermo di campi e due menu a tendina in fondo scorreva per 365px di vuoto,
-                        con due scroll uno dentro l'altro. */}
+                        con due scroll uno dentro l'altro.
+                        `pb-4`: l'etichetta d'errore dell'ultimo campo esce di circa 10px dal suo
+                        bordo (è `absolute`, ma conta nello scorrimento): senza quello spazio il
+                        dialogo si metteva a scorrere, e il fondo sfumato la copriva. */}
                     <div className="relative flex min-h-0 flex-1 flex-col">
                         <div
                             ref={setBodyElement}
                             onScroll={updateScrollEdges}
-                            className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1"
+                            className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1 pb-4"
                         >
                             {content}
                         </div>

@@ -6,6 +6,9 @@ import { ensureCatchAllIssue } from "./services/issueCatalog";
 import { getCompanySettings } from "./services/companyManager";
 import { ensureDefaultAdmin, startSessionCleanupScheduler, stopSessionCleanupScheduler } from "./services/authManager";
 import { pool } from "./db";
+import { installConsoleFormat } from "./middleware/consoleFormat";
+
+installConsoleFormat();
 
 const server = app.listen(3000, "0.0.0.0", () => {
     // I dati azienda portano il fuso orario del laboratorio, e caricarli lo fa adottare al

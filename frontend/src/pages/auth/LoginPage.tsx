@@ -165,7 +165,7 @@ const LoginPage = () => {
                                 void handleCodeSubmit();
                             }}
                         >
-                            <div className="grid gap-2">
+                            <div className="relative grid gap-2">
                                 <Label htmlFor="loginCode">
                                     {isUsingRecoveryCode ? "Codice di recupero" : "Codice di verifica"}
                                 </Label>
@@ -271,7 +271,7 @@ const LoginPage = () => {
                             void handleCredentialsSubmit();
                         }}
                     >
-                        <div className="grid gap-2">
+                        <div className="relative grid gap-2">
                             <Label htmlFor="loginUsername">Nome utente</Label>
                             <Input
                                 {...fieldProps("loginUsername", { error: usernameError })}
@@ -293,7 +293,7 @@ const LoginPage = () => {
                             <FieldError id="loginUsername" error={usernameError} />
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="relative grid gap-2">
                             <Label htmlFor="loginPassword">Password</Label>
                             <div className="relative">
                                 <Input

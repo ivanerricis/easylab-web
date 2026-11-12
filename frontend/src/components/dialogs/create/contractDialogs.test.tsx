@@ -434,6 +434,7 @@ describe("CreateContractDialog", () => {
             providerId: 8,
             providerName: "Rossi Informatica",
             assistance: { assistanceType: "complete", includedHours: 100 },
+            signedContract: null,
             createdAt: "2026-06-01T00:00:00.000Z",
             updatedAt: null,
         };

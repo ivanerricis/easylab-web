@@ -270,6 +270,8 @@ export type SystemDiskDto = {
 export type SystemStatusDto = {
     disks: SystemDiskDto[];
     databaseSizeBytes: number | null;
+    /** I PDF dei contratti firmati, salvati sul disco del server (non nel database). */
+    signedContracts: { count: number; totalBytes: number } | null;
     checkedAt: string;
 };
 

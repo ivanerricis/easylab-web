@@ -7,6 +7,7 @@ import {
     customerTable,
     interventionTable,
     providerTable,
+    signedContractTable,
     type ContractStatus,
     type ContractType,
 } from "../schema";
@@ -110,13 +111,18 @@ const selectContracts = (timeZone: string) => {
             providerName: providerTable.providerName,
             assistanceType: assistanceTable.assistanceType,
             includedHours: assistanceTable.includedHours,
+            // Solo i dati del contratto firmato, mai il file: la rotta li ripiega in `signedContract`.
+            signedFileName: signedContractTable.fileName,
+            signedSizeBytes: signedContractTable.sizeBytes,
+            signedUploadedAt: signedContractTable.uploadedAt,
             created_at: contractTable.created_at,
             updated_at: contractTable.updated_at,
         })
         .from(contractTable)
         .innerJoin(customerTable, eq(customerTable.id, contractTable.customerId))
         .innerJoin(providerTable, eq(providerTable.id, contractTable.providerId))
-        .leftJoin(assistanceTable, eq(assistanceTable.contractId, contractTable.id));
+        .leftJoin(assistanceTable, eq(assistanceTable.contractId, contractTable.id))
+        .leftJoin(signedContractTable, eq(signedContractTable.contractId, contractTable.id));
 };
 
 export type ContractRow = Awaited<ReturnType<typeof getContractById>>[number];
@@ -165,7 +171,7 @@ export const listContracts = async ({
 
     // Il totale legge solo `contract`: cliente e fornitore sono chiavi NOT NULL con chiave
     // esterna e l'assistenza è una left join su una riga al massimo, quindi le join non
-    // cambiano il numero di righe. I filtri guardano solo `contract` (la ricerca per nome
+    // cambiano il numero di righe (lo stesso vale per il contratto firmato). I filtri guardano solo `contract` (la ricerca per nome
     // passa da una sottoquery sugli id, e lo stato effettivo dalle sue colonne).
     const [items, totalCountRows] = await Promise.all([
         baseQuery.limit(pageSize).offset((page - 1) * pageSize),
@@ -246,3 +252,36 @@ export const hasLinkedInterventions = async (contractId: number) => {
 
 /** La riga di assistenza e il contratto sono cancellati insieme (cascata sulla chiave composta). */
 export const deleteContractById = (id: number) => db.delete(contractTable).where(eq(contractTable.id, id)).returning();
+
+/** I dati del contratto firmato (il PDF sta su disco: `services/signedContractFiles.ts`). */
+export const getSignedContract = async (contractId: number) => {
+    const [row] = await db.select().from(signedContractTable).where(eq(signedContractTable.contractId, contractId));
+
+    return row;
+};
+
+/**
+ * Salva il contratto firmato, sostituendo quello che c'era: ce n'è al più uno per contratto.
+ * Se il contratto non esiste la chiave esterna lo rifiuta; la rotta lo controlla prima per
+ * rispondere 404.
+ */
+export const saveSignedContract = async (contractId: number, fileName: string, sizeBytes: number) => {
+    const values = { fileName, sizeBytes, uploadedAt: new Date() };
+    const [row] = await db
+        .insert(signedContractTable)
+        .values({ contractId, ...values })
+        .onConflictDoUpdate({ target: signedContractTable.contractId, set: values })
+        .returning({
+            fileName: signedContractTable.fileName,
+            sizeBytes: signedContractTable.sizeBytes,
+            uploadedAt: signedContractTable.uploadedAt,
+        });
+
+    return row;
+};
+
+export const deleteSignedContract = (contractId: number) =>
+    db
+        .delete(signedContractTable)
+        .where(eq(signedContractTable.contractId, contractId))
+        .returning({ contractId: signedContractTable.contractId });

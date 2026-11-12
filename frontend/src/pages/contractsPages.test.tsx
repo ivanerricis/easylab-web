@@ -16,6 +16,9 @@ const api = vi.hoisted(() => ({
     getProvider: vi.fn(),
     listInterventions: vi.fn(),
     deleteContract: vi.fn(),
+    uploadSignedContract: vi.fn(),
+    deleteSignedContract: vi.fn(),
+    sendContractEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -36,6 +39,8 @@ vi.mock("@/lib/api", async () => {
         deleteProvider: vi.fn(),
         listCustomers: vi.fn(),
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
+        getSignedContractUrl: (id: number) => `/api/contracts/${id}/signed-contract`,
+        signedContractMaxBytes: 15 * 1024 * 1024,
     };
 });
 
@@ -53,6 +58,7 @@ import ContractsPage from "./contracts/ContractsPage";
 import ProviderPage from "./providers/ProviderPage";
 import ProvidersPage from "./providers/ProvidersPage";
 import { renderWithProviders } from "@/test/render";
+import { toast } from "sonner";
 import type { ContractDto } from "@/types/dtos";
 
 const page = (items: unknown[]) => ({ items, totalItems: items.length, page: 1, pageSize: 10, totalPages: 1 });
@@ -73,6 +79,7 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     providerId: 8,
     providerName: "Rossi Informatica",
     assistance: { assistanceType: "remote", includedHours: 10 },
+    signedContract: null,
     createdAt: "2026-06-01T10:00:00.000Z",
     updatedAt: null,
     ...overrides,
@@ -252,6 +259,83 @@ describe("ContractPage", () => {
         expect(screen.queryByRole("heading", { name: "Ore del mese" })).not.toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "Interventi collegati" })).not.toBeInTheDocument();
         expect(api.listInterventions).not.toHaveBeenCalled();
+    });
+
+    describe("contratto firmato", () => {
+        const signedContract = {
+            fileName: "Contratto Rossi firmato.pdf",
+            sizeBytes: 250 * 1024,
+            uploadedAt: "2026-11-12T09:30:00.000Z",
+        };
+
+        it("senza firmato invita a caricarlo e non offre l'invio al cliente", async () => {
+            api.getContract.mockResolvedValue(contract());
+            await renderPage();
+
+            expect(screen.getByRole("heading", { name: "Contratto firmato" })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Carica PDF firmato" })).toBeInTheDocument();
+            expect(
+                screen.queryByRole("button", { name: "Invia il contratto firmato al cliente" })
+            ).not.toBeInTheDocument();
+        });
+
+        it("carica il PDF scelto e ricarica la scheda", async () => {
+            api.getContract.mockResolvedValueOnce(contract());
+            api.getContract.mockResolvedValue(contract({ signedContract }));
+            api.uploadSignedContract.mockResolvedValue(signedContract);
+            await renderPage();
+
+            const file = new File(["%PDF-1.7"], "firmato.pdf", { type: "application/pdf" });
+            await userEvent.upload(screen.getByLabelText("File del contratto firmato"), file);
+
+            await waitFor(() => expect(api.uploadSignedContract).toHaveBeenCalledWith(21, file));
+            expect(await screen.findByText("Contratto Rossi firmato.pdf")).toBeInTheDocument();
+            expect(toast.success).toHaveBeenCalledWith("Contratto firmato caricato");
+        });
+
+        it("rifiuta un file che non è un PDF senza chiamare il server", async () => {
+            api.getContract.mockResolvedValue(contract());
+            await renderPage();
+
+            const file = new File(["ciao"], "foto.jpg", { type: "image/jpeg" });
+            fireEvent.change(screen.getByLabelText("File del contratto firmato"), { target: { files: [file] } });
+
+            expect(toast.error).toHaveBeenCalledWith("Il contratto firmato deve essere un file PDF");
+            expect(api.uploadSignedContract).not.toHaveBeenCalled();
+        });
+
+        it("con il firmato mostra il file, lo apre e lo invia al cliente dopo la conferma", async () => {
+            api.getContract.mockResolvedValue(contract({ signedContract }));
+            api.sendContractEmail.mockResolvedValue({ message: "Contratto firmato inviato a mario@example.com" });
+            await renderPage();
+
+            expect(screen.getByText("Contratto Rossi firmato.pdf")).toBeInTheDocument();
+            expect(screen.getByText(/250\.0 KB/)).toBeInTheDocument();
+
+            await userEvent.click(screen.getByRole("button", { name: "Apri" }));
+            expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/signed-contract");
+
+            await userEvent.click(screen.getByRole("button", { name: "Invia il contratto firmato al cliente" }));
+            const dialog = screen.getByRole("dialog", { name: "Invia contratto firmato" });
+            await userEvent.click(within(dialog).getByRole("button", { name: "Invia" }));
+
+            await waitFor(() => expect(api.sendContractEmail).toHaveBeenCalledWith(21));
+            expect(toast.success).toHaveBeenCalledWith("Contratto firmato inviato a mario@example.com");
+        });
+
+        it("elimina il firmato dopo la conferma", async () => {
+            api.getContract.mockResolvedValueOnce(contract({ signedContract }));
+            api.getContract.mockResolvedValue(contract());
+            api.deleteSignedContract.mockResolvedValue({ message: "ok" });
+            await renderPage();
+
+            await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+            const dialog = screen.getByRole("dialog", { name: "Elimina contratto firmato" });
+            await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+            await waitFor(() => expect(api.deleteSignedContract).toHaveBeenCalledWith(21));
+            expect(await screen.findByRole("button", { name: "Carica PDF firmato" })).toBeInTheDocument();
+        });
     });
 });
 

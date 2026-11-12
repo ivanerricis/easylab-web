@@ -1,4 +1,11 @@
-import type { AssistanceType, ContractDto, ContractEffectiveStatus, ContractStatus, ContractType } from "@/types/dtos";
+import type {
+    AssistanceType,
+    ContractDto,
+    ContractEffectiveStatus,
+    ContractStatus,
+    ContractType,
+    SignedContractDto,
+} from "@/types/dtos";
 import { api, createEntityApi } from "./client";
 import type { EntityListParams } from "./client";
 
@@ -59,3 +66,24 @@ export const deleteContract = contractsApi.remove;
 
 /** Indirizzo del PDF: preventivo se il contratto è in bozza, contratto altrimenti (lo decide il server). */
 export const getContractPrintUrl = (id: number) => api.getUri({ url: `/contracts/${id}/print` });
+
+/** Dimensione massima del contratto firmato: la stessa del server (`signedContractMaxBytes`). */
+export const signedContractMaxBytes = 15 * 1024 * 1024;
+
+/** Indirizzo del contratto firmato caricato, da aprire in una nuova scheda. */
+export const getSignedContractUrl = (id: number) => api.getUri({ url: `/contracts/${id}/signed-contract` });
+
+/** Carica il contratto firmato (PDF), sostituendo quello che c'era. */
+export const uploadSignedContract = async (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return (await api.post<SignedContractDto>(`/contracts/${id}/signed-contract`, formData)).data;
+};
+
+export const deleteSignedContract = async (id: number) =>
+    (await api.delete<{ message: string }>(`/contracts/${id}/signed-contract`)).data;
+
+/** Manda al cliente il contratto firmato; il server risponde con l'indirizzo usato. */
+export const sendContractEmail = async (id: number) =>
+    (await api.post<{ message: string }>(`/contracts/${id}/send-email`)).data;

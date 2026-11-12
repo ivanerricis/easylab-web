@@ -255,7 +255,14 @@ cls("provider", "Provider", C0, 800, [
     "+ created_at: datetime [1]",
     "+ updated_at: datetime",
 ], color=NEW)
-enum("cstatus", "ContractStatus", C0, 1040, ["draft", "active", "cancelled", "/expired  (derivato)"])
+cls("signed", "SignedContract", C0, 1040, [
+    "+ contract_id: int PK FK [1]",
+    "+ file_name: text [1]",
+    "+ size_bytes: int [1]  {> 0, al massimo 15 MB}",
+    "+ uploaded_at: datetime [1]",
+    "{il PDF: data/signed-contracts/[contract_id].pdf}",
+], color=NEW)
+enum("cstatus", "ContractStatus", C0, 1210, ["draft", "active", "cancelled", "/expired  (derivato)"])
 cls("contract", "Contract", C1, 800, [
     "+ id: int PK",
     "+ type: ContractType [1]",
@@ -387,6 +394,7 @@ edge("collaborator", "bottom", "intervention", "top", mid("collaborator"), "1", 
 edge("customer", "right", "intervention", "left", 600, "1", "0..*")
 edge("customer", "bottom", "contract", "top", mid("customer"), "1", "0..*")
 edge("provider", "right", "contract", "left", 900, "1", "0..*")
+edge("contract", "left", "signed", "right", 1085, "1", "0..1", style=COMPOSITION)
 edge("assistance", "top", "intervention", "bottom", C2 + 225, "0..1", "0..*", style=GREEN)
 edge("rental", "top", "contract", "bottom", mid("rental"), style=GENERALIZATION)
 gen_y = 1138

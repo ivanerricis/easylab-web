@@ -165,6 +165,14 @@ export type ContractDto = {
     /** Solo da `GET /contracts/:id` e solo per l'assistenza: altrove assenti. */
     hours?: ContractHoursDto | null;
     monthlyHours?: ContractMonthlyHoursDto[];
+    /** Il contratto firmato caricato a mano (PDF), senza il file: null finché non c'è. */
+    signedContract: SignedContractDto | null;
     createdAt: string;
     updatedAt: string | null;
+};
+
+export type SignedContractDto = {
+    fileName: string;
+    sizeBytes: number;
+    uploadedAt: string;
 };

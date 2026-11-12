@@ -1,12 +1,16 @@
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { auditAs, describeSubject, setAuditSubject } from "../middleware/auditContext";
 import {
     createContract,
     deleteContractById,
+    deleteSignedContract,
     getContractById,
+    getSignedContract,
     hasLinkedInterventions,
     listContracts,
+    saveSignedContract,
     updateContractById,
     type ContractRow,
 } from "../db/queries/contract";
@@ -17,9 +21,10 @@ import {
     contractStoredStatuses,
     contractTermMonthsRange,
     contractTypes,
+    signedContractMaxBytes,
     type AssistanceType,
 } from "../db/schema";
-import { getAppTimeZone } from "../config/lab";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { currentMonthKey } from "../db/queries/timeZone";
 import { getCustomerById } from "../db/queries/customer";
 import { getProviderById } from "../db/queries/provider";
@@ -35,7 +40,16 @@ import {
     formatHours,
     formatMonthLabel,
 } from "../services/contractLabels";
+import { buildContractEmail, signedContractAttachmentName } from "../services/contractEmail";
 import { createContractPdfBuffer, type ContractPrintData } from "../services/contractPdf";
+import { sendEmail } from "../services/emailManager";
+import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
+import { loadPrintableLogo } from "../services/logoManager";
+import {
+    readSignedContractFile,
+    removeSignedContractFile,
+    stageSignedContractFile,
+} from "../services/signedContractFiles";
 import { formatInterventionType } from "../services/interventionLabels";
 import { formatDateLabel, formatDayLabel, formatPhoneLabel } from "./formatting";
 import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter";
@@ -44,6 +58,33 @@ import { validate } from "./validation";
 const contractsRouter = Router();
 
 const contractNotFoundMessage = "Contratto non trovato";
+const signedContractNotFoundMessage = "Il contratto firmato non è ancora stato caricato";
+const logoContentId = "logo-laboratorio";
+
+// In memoria, come il logo: dopo il controllo dei byte il file va in `data/signed-contracts/`.
+const signedContractUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: signedContractMaxBytes, files: 1 },
+});
+
+/**
+ * Un PDF si riconosce dai byte, non dal tipo dichiarato nell'upload (lo scrive chi carica). La
+ * specifica tollera qualche byte prima della firma `%PDF-`, quindi la si cerca nel primo KB.
+ */
+const isPdf = (content: Buffer) => content.subarray(0, 1024).includes("%PDF-");
+
+/**
+ * Il nome con cui mostrare il file: senza percorso e senza caratteri di controllo. Multer legge
+ * il nome come latin1, quindi si riconverte in UTF-8 per non rovinare le lettere accentate.
+ */
+export const cleanUploadedFileName = (originalName: string) => {
+    const decoded = Buffer.from(originalName, "latin1").toString("utf8");
+    const baseName = (decoded.includes("�") ? originalName : decoded).split(/[\\/]/).pop() ?? "";
+    // eslint-disable-next-line no-control-regex
+    const cleaned = baseName.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+
+    return (cleaned || "contratto-firmato.pdf").slice(0, 255);
+};
 const invalidPackageMessage = "Pacchetto di ore non valido per questo tipo di assistenza";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -155,10 +196,22 @@ const contractUpdateBodySchema = z
  * Il JSON della API per un contratto. Parte dalla riga piatta delle query e la ripiega in
  * `assistance`; un punto solo da estendere quando si aggiungeranno i campi derivati (le ore).
  */
-export const toContractDto = ({ assistanceType, includedHours, ...row }: ContractRow) => ({
+export const toContractDto = ({
+    assistanceType,
+    includedHours,
+    signedFileName,
+    signedSizeBytes,
+    signedUploadedAt,
+    ...row
+}: ContractRow) => ({
     ...row,
     customerName: row.customerName ?? "",
     assistance: assistanceType ? { assistanceType, includedHours } : null,
+    // Solo i dati del file: il PDF si scarica da `/:id/signed-contract`.
+    signedContract:
+        signedFileName !== null && signedSizeBytes !== null && signedUploadedAt !== null
+            ? { fileName: signedFileName, sizeBytes: signedSizeBytes, uploadedAt: signedUploadedAt }
+            : null,
 });
 
 contractsRouter.get("/", validate({ query: contractListQuerySchema }), async (req, res) => {
@@ -268,6 +321,158 @@ contractsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (r
     );
     res.send(pdfBuffer);
 });
+
+contractsRouter.get("/:id/signed-contract", validate({ params: idParamsSchema }), async (req, res) => {
+    const { id } = req.params as unknown as { id: number };
+    const content = (await getSignedContract(id)) ? await readSignedContractFile(id) : null;
+
+    if (!content) {
+        res.status(404).json({ message: signedContractNotFoundMessage });
+        return;
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename=contratto-firmato-${id}.pdf`);
+    res.send(content);
+});
+
+contractsRouter.post(
+    "/:id/signed-contract",
+    auditAs("caricato contratto firmato"),
+    validate({ params: idParamsSchema }),
+    signedContractUpload.single("file"),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+
+        if (!req.file) {
+            res.status(400).json({ message: "Nessun file caricato" });
+            return;
+        }
+
+        if (!isPdf(req.file.buffer)) {
+            res.status(400).json({ message: "Il contratto firmato deve essere un file PDF" });
+            return;
+        }
+
+        const [contract] = await getContractById(id, await getAppTimeZone());
+
+        if (!contract) {
+            res.status(404).json({ message: contractNotFoundMessage });
+            return;
+        }
+
+        // Prima il file accanto a quello definitivo, poi la riga: se la riga non si salva il file
+        // nuovo si butta e resta quello di prima; se si salva, il file prende il suo posto.
+        const staged = await stageSignedContractFile(id, req.file.buffer);
+        let saved: Awaited<ReturnType<typeof saveSignedContract>>;
+
+        try {
+            saved = await saveSignedContract(id, cleanUploadedFileName(req.file.originalname), req.file.size);
+        } catch (error) {
+            await staged.discard();
+            throw error;
+        }
+
+        await staged.commit();
+
+        setAuditSubject(res, describeSubject(id, contract.customerName));
+        res.status(201).json(saved);
+    }
+);
+
+contractsRouter.delete(
+    "/:id/signed-contract",
+    auditAs("eliminato contratto firmato"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+        const deleted = await deleteSignedContract(id);
+
+        if (deleted.length === 0) {
+            res.status(404).json({ message: signedContractNotFoundMessage });
+            return;
+        }
+
+        await removeSignedContractFile(id);
+        setAuditSubject(res, describeSubject(id));
+        res.json({ message: "Contratto firmato eliminato" });
+    }
+);
+
+/** Manda al cliente il contratto firmato caricato: senza firmato non si invia niente. */
+contractsRouter.post(
+    "/:id/send-email",
+    auditAs("inviato contratto firmato al cliente"),
+    validate({ params: idParamsSchema }),
+    async (req, res) => {
+        const { id } = req.params as unknown as { id: number };
+
+        // Lo stesso contatore delle email degli interventi: vedi services/emailSendRateLimit.ts.
+        if (!consumeEmailSendSlot(String(req.user?.id ?? "senza-utente"))) {
+            res.status(429).json({ message: "Troppe email inviate nell'ultima ora. Riprova più tardi." });
+            return;
+        }
+
+        const [contract] = await getContractById(id, await getAppTimeZone());
+
+        if (!contract) {
+            res.status(404).json({ message: contractNotFoundMessage });
+            return;
+        }
+
+        const [[customer], signed] = await Promise.all([getCustomerById(contract.customerId), getSignedContract(id)]);
+        const customerEmail = customer?.email?.trim();
+        const content = signed ? await readSignedContractFile(id) : null;
+
+        if (!content) {
+            res.status(400).json({ message: "Carica il contratto firmato prima di inviarlo al cliente" });
+            return;
+        }
+
+        if (!customerEmail) {
+            res.status(400).json({ message: "Il cliente non ha un indirizzo email configurato" });
+            return;
+        }
+
+        const [{ labName, labEmail, labAddress, labPhone }, logo] = await Promise.all([
+            getLabConfig(),
+            loadPrintableLogo(),
+        ]);
+        const email = buildContractEmail({
+            customerName: contract.customerName ?? "",
+            labName,
+            labEmail,
+            labAddress,
+            labPhone,
+            type: contract.type,
+            device: contract.device,
+            startDate: contract.startDate,
+            logoCid: logo ? logoContentId : null,
+        });
+
+        await sendEmail({
+            to: customerEmail,
+            // La risposta del cliente deve arrivare al laboratorio, come per gli interventi.
+            replyTo: labEmail.trim() || undefined,
+            subject: email.subject,
+            text: email.text,
+            html: email.html,
+            attachments: [
+                {
+                    filename: signedContractAttachmentName(contract.startDate),
+                    content,
+                    contentType: "application/pdf",
+                },
+                ...(logo
+                    ? [{ filename: "logo", content: logo.content, contentType: logo.contentType, cid: logoContentId }]
+                    : []),
+            ],
+        });
+
+        setAuditSubject(res, describeSubject(id, contract.customerName));
+        res.json({ message: `Contratto firmato inviato a ${customerEmail}` });
+    }
+);
 
 contractsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
@@ -409,6 +614,9 @@ contractsRouter.delete(
             res.status(404).json({ message: contractNotFoundMessage });
             return;
         }
+
+        // La riga del firmato se ne va in cascata con il contratto; il PDF su disco lo togliamo qui.
+        await removeSignedContractFile(id);
 
         setAuditSubject(res, describeSubject(deleted[0].id));
         res.json(deleted[0]);

@@ -11,6 +11,20 @@ vi.mock("../db/queries/contract", () => ({
     createContract: vi.fn(),
     updateContractById: vi.fn(),
     deleteContractById: vi.fn(),
+    getSignedContract: vi.fn(),
+    saveSignedContract: vi.fn(),
+    deleteSignedContract: vi.fn(),
+}));
+
+vi.mock("../services/emailManager", () => ({ sendEmail: vi.fn() }));
+vi.mock("../services/logoManager", () => ({ loadPrintableLogo: vi.fn() }));
+
+// I file su disco li coprono i test di `signedContractFiles`: qui conta l'ordine delle chiamate.
+const stagedFile = vi.hoisted(() => ({ commit: vi.fn(), discard: vi.fn() }));
+vi.mock("../services/signedContractFiles", () => ({
+    stageSignedContractFile: vi.fn(async () => stagedFile),
+    readSignedContractFile: vi.fn(),
+    removeSignedContractFile: vi.fn(),
 }));
 
 // Le ore (query sugli interventi e avvisi) sono coperte da `services/assistanceHours.db.test.ts`.
@@ -33,11 +47,22 @@ vi.mock("../config/lab", () => ({
 import {
     createContract,
     deleteContractById,
+    deleteSignedContract,
     getContractById,
+    getSignedContract,
     hasLinkedInterventions,
     listContracts,
+    saveSignedContract,
     updateContractById,
 } from "../db/queries/contract";
+import { sendEmail } from "../services/emailManager";
+import { consumeEmailSendSlot, emailSendMaxPerWindow, resetEmailSendRateLimit } from "../services/emailSendRateLimit";
+import { loadPrintableLogo } from "../services/logoManager";
+import {
+    readSignedContractFile,
+    removeSignedContractFile,
+    stageSignedContractFile,
+} from "../services/signedContractFiles";
 import { getCustomerById } from "../db/queries/customer";
 import { getProviderById } from "../db/queries/provider";
 import { getLabConfig } from "../config/lab";
@@ -71,6 +96,9 @@ const flatRow = {
     providerName: "Acme Srl",
     assistanceType: "on_site",
     includedHours: 20,
+    signedFileName: null,
+    signedSizeBytes: null,
+    signedUploadedAt: null,
     created_at: "2026-10-01T08:00:00.000Z",
     updated_at: null,
 };
@@ -91,6 +119,7 @@ const dto = {
     providerId: 2,
     providerName: "Acme Srl",
     assistance: { assistanceType: "on_site", includedHours: 20 },
+    signedContract: null,
     created_at: "2026-10-01T08:00:00.000Z",
     updated_at: null,
 };
@@ -622,7 +651,9 @@ describe("contracts router", () => {
             vi.mocked(deleteContractById).mockResolvedValueOnce([] as never);
 
             expect((await request(buildApp()).delete("/api/contracts/7")).status).toBe(200);
+            expect(removeSignedContractFile).toHaveBeenCalledWith(7);
             expect((await request(buildApp()).delete("/api/contracts/7")).status).toBe(404);
+            expect(removeSignedContractFile).toHaveBeenCalledTimes(1);
         });
 
         it("un contratto con interventi collegati risponde 400 con il messaggio italiano", async () => {
@@ -639,6 +670,237 @@ describe("contracts router", () => {
             expect(response.body.message).toBe(
                 "Impossibile eliminare il contratto: è ancora collegato a uno o più interventi."
             );
+        });
+    });
+
+    describe("contratto firmato", () => {
+        const pdfBytes = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF");
+        const signedRow = {
+            contractId: 7,
+            fileName: "firmato.pdf",
+            sizeBytes: pdfBytes.length,
+            uploadedAt: new Date("2026-11-12T09:00:00.000Z"),
+        };
+
+        it("il dettaglio riporta i dati del firmato, senza il file", async () => {
+            vi.mocked(getContractById).mockResolvedValue([
+                {
+                    ...flatRow,
+                    signedFileName: "firmato.pdf",
+                    signedSizeBytes: 1234,
+                    signedUploadedAt: "2026-11-12T09:00:00.000Z",
+                },
+            ] as never);
+            vi.mocked(getContractHoursSummary).mockResolvedValue(hoursSummary as never);
+
+            const response = await request(buildApp()).get("/api/contracts/7");
+
+            expect(response.body.signedContract).toEqual({
+                fileName: "firmato.pdf",
+                sizeBytes: 1234,
+                uploadedAt: "2026-11-12T09:00:00.000Z",
+            });
+            expect(response.body).not.toHaveProperty("signedFileName");
+        });
+
+        it("carica un PDF e risponde 201 con i suoi dati", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(saveSignedContract).mockResolvedValue({
+                fileName: "Contratto firmato.pdf",
+                sizeBytes: pdfBytes.length,
+                uploadedAt: signedRow.uploadedAt,
+            } as never);
+
+            const response = await request(buildApp())
+                .post("/api/contracts/7/signed-contract")
+                .attach("file", pdfBytes, { filename: "Contratto firmato.pdf", contentType: "application/pdf" });
+
+            expect(response.status).toBe(201);
+            expect(stageSignedContractFile).toHaveBeenCalledWith(7, pdfBytes);
+            expect(saveSignedContract).toHaveBeenCalledWith(7, "Contratto firmato.pdf", pdfBytes.length);
+            expect(stagedFile.commit).toHaveBeenCalled();
+            expect(stagedFile.discard).not.toHaveBeenCalled();
+        });
+
+        it("se la riga non si salva il file nuovo si butta e resta quello di prima", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(saveSignedContract).mockRejectedValue(new Error("connessione persa"));
+
+            const response = await request(buildApp())
+                .post("/api/contracts/7/signed-contract")
+                .attach("file", pdfBytes, { filename: "firmato.pdf", contentType: "application/pdf" });
+
+            expect(response.status).toBe(500);
+            expect(stagedFile.discard).toHaveBeenCalled();
+            expect(stagedFile.commit).not.toHaveBeenCalled();
+        });
+
+        it("riconosce il PDF dai byte: un file che non lo è viene rifiutato anche se si dichiara PDF", async () => {
+            const response = await request(buildApp())
+                .post("/api/contracts/7/signed-contract")
+                .attach("file", Buffer.from("non sono un pdf"), {
+                    filename: "finto.pdf",
+                    contentType: "application/pdf",
+                });
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toBe("Il contratto firmato deve essere un file PDF");
+            expect(stageSignedContractFile).not.toHaveBeenCalled();
+            expect(saveSignedContract).not.toHaveBeenCalled();
+        });
+
+        it("senza file risponde 400", async () => {
+            const response = await request(buildApp()).post("/api/contracts/7/signed-contract");
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toBe("Nessun file caricato");
+        });
+
+        it("su un contratto mancante risponde 404 senza salvare", async () => {
+            vi.mocked(getContractById).mockResolvedValue([] as never);
+
+            const response = await request(buildApp())
+                .post("/api/contracts/9/signed-contract")
+                .attach("file", pdfBytes, { filename: "firmato.pdf", contentType: "application/pdf" });
+
+            expect(response.status).toBe(404);
+            expect(saveSignedContract).not.toHaveBeenCalled();
+        });
+
+        it("un file oltre il limite risponde 413", async () => {
+            const tooBig = Buffer.concat([pdfBytes, Buffer.alloc(15 * 1024 * 1024)]);
+
+            const response = await request(buildApp())
+                .post("/api/contracts/7/signed-contract")
+                .attach("file", tooBig, { filename: "enorme.pdf", contentType: "application/pdf" });
+
+            expect(response.status).toBe(413);
+            expect(saveSignedContract).not.toHaveBeenCalled();
+        });
+
+        it("si scarica come PDF; senza firmato, o con il file sparito dal disco, risponde 404", async () => {
+            vi.mocked(getSignedContract).mockResolvedValueOnce(signedRow as never);
+            vi.mocked(readSignedContractFile).mockResolvedValueOnce(pdfBytes);
+            vi.mocked(getSignedContract).mockResolvedValueOnce(undefined as never);
+            vi.mocked(getSignedContract).mockResolvedValueOnce(signedRow as never);
+            vi.mocked(readSignedContractFile).mockResolvedValueOnce(null);
+
+            const found = await request(buildApp()).get("/api/contracts/7/signed-contract");
+            const missing = await request(buildApp()).get("/api/contracts/7/signed-contract");
+            const fileGone = await request(buildApp()).get("/api/contracts/7/signed-contract");
+
+            expect(found.status).toBe(200);
+            expect(found.headers["content-type"]).toBe("application/pdf");
+            expect(found.headers["content-disposition"]).toBe("inline; filename=contratto-firmato-7.pdf");
+            expect(Buffer.from(found.body).equals(pdfBytes)).toBe(true);
+            expect(missing.status).toBe(404);
+            expect(fileGone.status).toBe(404);
+        });
+
+        it("si elimina, e senza firmato risponde 404", async () => {
+            vi.mocked(deleteSignedContract).mockResolvedValueOnce([{ contractId: 7 }] as never);
+            vi.mocked(deleteSignedContract).mockResolvedValueOnce([] as never);
+
+            expect((await request(buildApp()).delete("/api/contracts/7/signed-contract")).status).toBe(200);
+            expect(removeSignedContractFile).toHaveBeenCalledWith(7);
+            expect((await request(buildApp()).delete("/api/contracts/7/signed-contract")).status).toBe(404);
+            expect(removeSignedContractFile).toHaveBeenCalledTimes(1);
+        });
+
+        describe("invio al cliente", () => {
+            const labConfig = {
+                labName: "Laboratorio EasyLab",
+                labEmail: "info@easylab.it",
+                labAddress: "Via Roma 1",
+                labPhone: "011 1234567",
+            };
+
+            beforeEach(() => {
+                resetEmailSendRateLimit();
+                vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+                vi.mocked(getCustomerById).mockResolvedValue([{ id: 3, email: " mario@example.com " }] as never);
+                vi.mocked(getSignedContract).mockResolvedValue(signedRow as never);
+                vi.mocked(readSignedContractFile).mockResolvedValue(pdfBytes);
+                vi.mocked(getLabConfig).mockResolvedValue(labConfig as never);
+                vi.mocked(loadPrintableLogo).mockResolvedValue(null as never);
+                vi.mocked(sendEmail).mockResolvedValue(undefined as never);
+            });
+
+            it("invia il firmato al cliente, con l'allegato chiamato sulla data di inizio", async () => {
+                const response = await request(buildApp()).post("/api/contracts/7/send-email");
+
+                expect(response.status).toBe(200);
+                expect(response.body.message).toBe("Contratto firmato inviato a mario@example.com");
+                expect(sendEmail).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        to: "mario@example.com",
+                        replyTo: "info@easylab.it",
+                        subject: "Contratto di assistenza firmato - Laboratorio EasyLab",
+                        attachments: [
+                            {
+                                filename: "contratto-firmato-2026-10-01.pdf",
+                                content: pdfBytes,
+                                contentType: "application/pdf",
+                            },
+                        ],
+                    })
+                );
+            });
+
+            it("allega il logo inline quando c'è", async () => {
+                vi.mocked(loadPrintableLogo).mockResolvedValue({
+                    content: Buffer.from("logo-bytes"),
+                    contentType: "image/png",
+                } as never);
+
+                await request(buildApp()).post("/api/contracts/7/send-email");
+
+                const { attachments, html } = vi.mocked(sendEmail).mock.calls[0][0] as {
+                    attachments: { cid?: string }[];
+                    html: string;
+                };
+                expect(attachments[1]).toMatchObject({ cid: "logo-laboratorio", contentType: "image/png" });
+                expect(html).toContain('src="cid:logo-laboratorio"');
+            });
+
+            it("senza firmato caricato risponde 400 e non invia", async () => {
+                vi.mocked(getSignedContract).mockResolvedValue(undefined as never);
+
+                const response = await request(buildApp()).post("/api/contracts/7/send-email");
+
+                expect(response.status).toBe(400);
+                expect(response.body.message).toBe("Carica il contratto firmato prima di inviarlo al cliente");
+                expect(sendEmail).not.toHaveBeenCalled();
+            });
+
+            it("senza email del cliente risponde 400 e non invia", async () => {
+                vi.mocked(getCustomerById).mockResolvedValue([{ id: 3, email: null }] as never);
+
+                const response = await request(buildApp()).post("/api/contracts/7/send-email");
+
+                expect(response.status).toBe(400);
+                expect(response.body.message).toBe("Il cliente non ha un indirizzo email configurato");
+                expect(sendEmail).not.toHaveBeenCalled();
+            });
+
+            it("su un contratto mancante risponde 404", async () => {
+                vi.mocked(getContractById).mockResolvedValue([] as never);
+
+                expect((await request(buildApp()).post("/api/contracts/9/send-email")).status).toBe(404);
+                expect(sendEmail).not.toHaveBeenCalled();
+            });
+
+            it("oltre il tetto orario risponde 429 senza caricare il contratto", async () => {
+                for (let sent = 0; sent < emailSendMaxPerWindow; sent += 1) {
+                    consumeEmailSendSlot("senza-utente");
+                }
+
+                const response = await request(buildApp()).post("/api/contracts/7/send-email");
+
+                expect(response.status).toBe(429);
+                expect(getContractById).not.toHaveBeenCalled();
+                expect(sendEmail).not.toHaveBeenCalled();
+            });
         });
     });
 });

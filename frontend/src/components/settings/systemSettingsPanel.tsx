@@ -90,7 +90,7 @@ const SystemSettingsPanel = () => {
         <SettingsSection>
             <SettingsCard
                 title="Spazio su disco"
-                description="Occupazione dei dischi del server e dimensione del database."
+                description="Occupazione dei dischi del server, dimensione del database e dei contratti firmati caricati."
                 action={<RefreshButton size="icon" onRefresh={loadStatus} label="Aggiorna stato del sistema" />}
             >
                 {isLoading ? (
@@ -113,6 +113,18 @@ const SystemSettingsPanel = () => {
                                     status.databaseSizeBytes == null
                                         ? "Non disponibile"
                                         : formatFileSize(status.databaseSizeBytes)
+                                }
+                            />
+                            <SettingsTile
+                                label="Contratti firmati"
+                                value={
+                                    status.signedContracts == null
+                                        ? "Non disponibile"
+                                        : `${formatFileSize(status.signedContracts.totalBytes)} · ${
+                                              status.signedContracts.count === 1
+                                                  ? "1 PDF"
+                                                  : `${status.signedContracts.count} PDF`
+                                          }`
                                 }
                             />
                         </SettingsTileGrid>

@@ -40,6 +40,7 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     assistance: { assistanceType: "remote", includedHours: 10 },
     createdAt: "2026-09-01T00:00:00.000Z",
     updatedAt: null,
+    signedContract: null,
     ...overrides,
 });
 

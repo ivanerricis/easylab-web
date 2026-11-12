@@ -497,6 +497,29 @@ export const assistanceTable = pgTable(
     ]
 );
 
+/** Dimensione massima del contratto firmato caricato: una scansione in PDF ci sta con margine. */
+export const signedContractMaxBytes = 15 * 1024 * 1024;
+
+/**
+ * Il contratto firmato dal cliente, caricato a mano come PDF: uno per contratto (la chiave
+ * primaria è anche la chiave esterna), sostituibile ed eliminabile. Qui ci sono solo i dati del
+ * file: il PDF sta in `data/signed-contracts/<contract_id>.pdf` (`services/signedContractFiles.ts`),
+ * per non far crescere il database con i documenti. La cartella è nei backup (`backupFiles.ts`).
+ */
+export const signedContractTable = pgTable(
+    "signed_contract",
+    {
+        contractId: integer("contract_id")
+            .primaryKey()
+            .references(() => contractTable.id, { onDelete: "cascade" }),
+        /** Il nome del file come l'ha caricato l'utente, solo per mostrarlo. */
+        fileName: varchar("file_name", { length: 255 }).notNull(),
+        sizeBytes: integer("size_bytes").notNull(),
+        uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+    },
+    (table) => [check("signed_contract_size_bytes_check", sql`${table.sizeBytes} > 0`)]
+);
+
 /**
  * Gli avvisi di ore già inviati, uno per contratto, mese e tipo: la chiave primaria è anche
  * ciò che impedisce di mandare due volte la stessa email.

@@ -13,6 +13,7 @@ Ogni backup produce un archivio `db-backup-YYYYMMDD-HHMMSS.tar.gz`, **cifrato** 
 | `data/backup-settings.json` | pianificazione, destinazione NAS, retention |
 | `data/company-settings.json` | dati azienda (nome, email, indirizzo, telefono) nell'intestazione dei PDF |
 | `data/logo/` | logo del laboratorio usato nei PDF |
+| `data/signed-contracts/` | i PDF dei contratti firmati caricati, uno per contratto (`<id>.pdf`); nel database ce n'è solo nome e dimensione |
 
 **Non** è incluso, di proposito:
 

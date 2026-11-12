@@ -10,9 +10,12 @@ import {
 import {
     createContract,
     deleteContractById,
+    deleteSignedContract,
     getContractById,
+    getSignedContract,
     hasLinkedInterventions,
     listContracts,
+    saveSignedContract,
     updateContractById,
 } from "./contract";
 import { currentLocalDay } from "./timeZone";
@@ -355,5 +358,64 @@ describe("hasLinkedInterventions", () => {
         expect(await hasLinkedInterventions(contract.id)).toBe(true);
         // Quello di un altro contratto non conta.
         expect(await hasLinkedInterventions(other.id)).toBe(false);
+    });
+});
+
+describe("contratto firmato", () => {
+    it("salva i dati del file e li mostra nel contratto", async () => {
+        const contract = await insertContract();
+
+        const saved = await saveSignedContract(contract.id, "firmato.pdf", 2048);
+
+        expect(saved).toMatchObject({ fileName: "firmato.pdf", sizeBytes: 2048 });
+        expect(await getSignedContract(contract.id)).toMatchObject({ contractId: contract.id, sizeBytes: 2048 });
+
+        const [row] = await getContractById(contract.id, timeZone);
+        expect(row).toMatchObject({ signedFileName: "firmato.pdf", signedSizeBytes: 2048 });
+    });
+
+    it("un nuovo caricamento sostituisce il precedente: ce n'è uno solo per contratto", async () => {
+        const contract = await insertContract();
+
+        await saveSignedContract(contract.id, "vecchio.pdf", 100);
+        await saveSignedContract(contract.id, "nuovo.pdf", 200);
+
+        expect(await getSignedContract(contract.id)).toMatchObject({ fileName: "nuovo.pdf", sizeBytes: 200 });
+
+        const { rows } = await pool.query("select count(*)::int as total from signed_contract");
+        expect(rows[0].total).toBe(1);
+    });
+
+    it("senza firmato i campi del contratto sono NULL, e la lista non si moltiplica", async () => {
+        const withSigned = await insertContract();
+        const without = await insertContract();
+        await saveSignedContract(withSigned.id, "firmato.pdf", 100);
+
+        const [row] = await getContractById(without.id, timeZone);
+        expect(row).toMatchObject({ signedFileName: null, signedSizeBytes: null, signedUploadedAt: null });
+
+        const result = await listContracts({ page: 1, pageSize: 10, timeZone });
+        expect(Array.isArray(result) ? result.length : result.totalItems).toBe(2);
+    });
+
+    it("si elimina, ed eliminando il contratto se ne va anche la riga del firmato", async () => {
+        const kept = await insertContract();
+        const removed = await insertContract();
+        await saveSignedContract(kept.id, "a.pdf", 100);
+        await saveSignedContract(removed.id, "b.pdf", 100);
+
+        expect(await deleteSignedContract(kept.id)).toHaveLength(1);
+        expect(await deleteSignedContract(kept.id)).toHaveLength(0);
+        expect(await getSignedContract(kept.id)).toBeUndefined();
+
+        await deleteContractById(removed.id);
+        expect(await getSignedContract(removed.id)).toBeUndefined();
+    });
+
+    it("rifiuta una dimensione nulla e un contratto che non esiste", async () => {
+        const contract = await insertContract();
+
+        await expect(saveSignedContract(contract.id, "vuoto.pdf", 0)).rejects.toThrow();
+        await expect(saveSignedContract(999, "x.pdf", 100)).rejects.toThrow();
     });
 });

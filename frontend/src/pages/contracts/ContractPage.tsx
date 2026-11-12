@@ -5,6 +5,7 @@ import { DetailHeader, DetailHeaderAction } from "@/components/detail-header";
 import DetailItem, { DetailGrid, DetailSection } from "@/components/detail-item";
 import DetailStats, { DetailStatBadge } from "@/components/detail-stats";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
+import CustomDialog from "@/components/dialogs/customDialog";
 import EntityDetailGate from "@/components/entity-detail-gate";
 import EntityTable from "@/components/entity-table";
 import RefreshButton from "@/components/refresh-button";
@@ -12,8 +13,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { usePendingAction } from "@/hooks/usePendingAction";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
-import { deleteContract, getContract, getContractPrintUrl, listInterventions, updateContract } from "@/lib/api";
+import {
+    deleteContract,
+    getContract,
+    getContractPrintUrl,
+    listInterventions,
+    sendContractEmail,
+    updateContract,
+} from "@/lib/api";
 import { toContractUpdatePayload } from "@/lib/contractForm";
 import {
     contractPrintName,
@@ -31,10 +40,11 @@ import { interventionStatusColor } from "@/lib/interventions";
 import { getMonthLabel } from "@/lib/monthKey";
 import { cn, formatDate, formatDateTime, openPrintWindow } from "@/lib/utils";
 import type { ContractDto, InterventionDto } from "@/types/dtos";
-import { Pencil, Printer } from "lucide-react";
+import { Mail, Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns } from "../customers/components/customer-detail-columns";
+import SignedContractSection from "./components/signed-contract-section";
 
 /** Le righe dello storico mensile, dal mese più recente: il server le manda in ordine non garantito. */
 const sortedMonthlyHours = (contract: ContractDto) =>
@@ -56,6 +66,12 @@ const ContractPage = () => {
     useDocumentTitle(contract ? `Contratto #${contract.id} - ${contract.customerName}` : "Contratto");
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const handleBack = useGoBack("/contracts");
+    // Si invia solo il contratto firmato: il pulsante c'è solo quando è stato caricato.
+    const emailAction = usePendingAction({
+        run: (contractToSend: number) => sendContractEmail(contractToSend),
+        successMessage: (_, result) => result.message,
+        errorMessage: "Impossibile inviare l'email",
+    });
 
     const contractId = contract?.id ?? null;
     const isAssistance = contract?.type === "assistance";
@@ -148,6 +164,16 @@ const ContractPage = () => {
                     aria-label={`Stampa ${contractPrintName(contract.effectiveStatus)}`}
                 />
 
+                {contract.signedContract ? (
+                    <DetailHeaderAction
+                        variant="outline"
+                        icon={Mail}
+                        text="Invia al cliente"
+                        onClick={() => emailAction.open(contract.id)}
+                        aria-label="Invia il contratto firmato al cliente"
+                    />
+                ) : null}
+
                 <DetailDeleteButton
                     label="Elimina contratto"
                     title="Elimina contratto"
@@ -158,6 +184,19 @@ const ContractPage = () => {
                     redirectTo="/contracts"
                 />
             </DetailHeader>
+
+            <CustomDialog
+                open={emailAction.isOpen}
+                onOpenChange={emailAction.onOpenChange}
+                title="Invia contratto firmato"
+                description={`Il contratto firmato verrà inviato via email a ${contract.customerName}, all'indirizzo della sua anagrafica.`}
+                confirmLabel="Invia"
+                confirmIcon={Mail}
+                cancelLabel="Annulla"
+                confirmDisabled={emailAction.isRunning}
+                onCancel={emailAction.close}
+                onConfirm={emailAction.confirm}
+            />
 
             {isEditDialogOpen ? (
                 <CreateContractDialog
@@ -243,6 +282,8 @@ const ContractPage = () => {
                         </DetailGrid>
                     </DetailSection>
                 </div>
+
+                <SignedContractSection contract={contract} onChanged={reload} />
 
                 {isAssistance ? (
                     <>

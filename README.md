@@ -1,5 +1,10 @@
 # easylab-web
 
+[![CI](https://github.com/ivanerricis/easylab-web/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ivanerricis/easylab-web/actions/workflows/ci.yml)
+[![Ultima release](https://img.shields.io/github/v/release/ivanerricis/easylab-web)](https://github.com/ivanerricis/easylab-web/releases)
+[![Copertura frontend](https://codecov.io/gh/ivanerricis/easylab-web/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/ivanerricis/easylab-web)
+[![Copertura backend](https://codecov.io/gh/ivanerricis/easylab-web/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/ivanerricis/easylab-web)
+
 Applicazione web per la gestione di un laboratorio di riparazione: anagrafica clienti e dispositivi, apertura e tracciamento degli interventi assegnati ai tecnici, segnalazione dei guasti riscontrati e generazione dei report/ricevute in PDF da consegnare al cliente.
 
 Stack:
@@ -14,6 +19,8 @@ Questo README copre solo l'avvio in sviluppo locale. La documentazione operativa
 - [Sicurezza account e accesso](docs/OPERATIONS.md) — 2FA, reset password
 - [Changelog](docs/CHANGELOG.md) — evoluzione tecnica del codice, cosa è cambiato e perché
 - [Backlog](docs/BACKLOG.md) — lavoro rimandato in attesa di essere ripreso
+- [Segnalare una vulnerabilità](SECURITY.md) — versioni supportate e come scrivere in privato
+- [Contribuire](CONTRIBUTING.md) — il codice è proprietario; flusso di lavoro per chi è stato invitato
 
 ## Prerequisiti
 
@@ -56,6 +63,7 @@ Frontend e backend hanno ciascuno la propria suite (Vitest). Si lanciano dall'ho
 cd frontend   # oppure: cd backend
 npm ci
 npm test              # tutta la suite, una volta
+npm run test:coverage # come npm test, con la copertura (lcov e riepilogo a video in coverage/)
 npm run test:watch    # solo frontend: rilancia i test a ogni modifica
 npm run lint
 npm run typecheck

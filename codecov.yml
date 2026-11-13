@@ -1,0 +1,24 @@
+# Configurazione di Codecov. La copertura informa, non blocca: nessuna PR viene fermata
+# da una percentuale, e Codecov non commenta le PR.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment: false
+
+# Frontend e backend caricano i loro lcov da job diversi: `carryforward` tiene l'ultimo
+# valore di un flag quando un caricamento manca, così la percentuale non crolla.
+flags:
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+  backend:
+    paths:
+      - backend/
+    carryforward: true

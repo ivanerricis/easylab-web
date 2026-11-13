@@ -58,5 +58,14 @@ export default defineConfig({
         // Un solo database per tutti: i file girano uno alla volta, altrimenti le TRUNCATE
         // di uno cancellerebbero i dati di un altro a metà test.
         fileParallelism: false,
+        // Copertura dei soli test sul database (`npm run test:db:coverage`): cartella a parte,
+        // per non sovrascrivere quella dei test normali. Codecov unisce i due lcov.
+        coverage: {
+            provider: "v8",
+            reportsDirectory: "coverage-db",
+            reporter: ["lcov", "text-summary"],
+            include: ["src/**"],
+            exclude: ["src/**/*.test.ts", "src/test/**", "src/**/*.d.ts"],
+        },
     },
 });

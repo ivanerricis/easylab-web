@@ -18,6 +18,7 @@ yarn-error.log*
 dist/
 build/
 coverage/
+coverage-db/
 backend/dist/
 frontend/dist/
 site/

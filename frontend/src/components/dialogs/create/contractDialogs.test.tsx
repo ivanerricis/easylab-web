@@ -6,6 +6,7 @@ const listCustomers = vi.fn();
 const listProviders = vi.fn();
 const createCustomer = vi.fn();
 const createProvider = vi.fn();
+const listContractPackages = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -17,6 +18,7 @@ vi.mock("@/lib/api", async () => {
         listProviders: (...args: unknown[]) => listProviders(...args),
         createCustomer: (...args: unknown[]) => createCustomer(...args),
         createProvider: (...args: unknown[]) => createProvider(...args),
+        listContractPackages: (...args: unknown[]) => listContractPackages(...args),
     };
 });
 
@@ -35,12 +37,81 @@ vi.mock("sonner", () => ({
 import CreateContractDialog from "./createContractDialog";
 import CreateProviderDialog from "./createProviderDialog";
 import { renderWithProviders } from "@/test/render";
-import type { ContractDto } from "@/types/dtos";
+import type { ContractDto, ContractPackageDto } from "@/types/dtos";
 
 // Moduli lunghi con menu di Radix e ricerca con debounce: vedi reportDialogs.test.tsx.
 vi.setConfig({ testTimeout: 20000 });
 
 const pageOf = (items: unknown[]) => ({ items, totalItems: items.length, page: 1, pageSize: 8, totalPages: 1 });
+
+const hardwareTypology = "Teleassistenza, on site e in laboratorio: hardware, software, formazione";
+
+/** Il listino come lo serve il backend, nel suo ordine. */
+const packagesList: ContractPackageDto[] = [
+    {
+        key: "remote_20",
+        name: "Assistenza Remota Pack 20",
+        includedHours: 20,
+        priceCents: 40000,
+        period: "month",
+        priority: 4,
+        typology: "Teleassistenza, solo software",
+    },
+    {
+        key: "remote_40",
+        name: "Assistenza Remota Pack 40",
+        includedHours: 40,
+        priceCents: 72000,
+        period: "month",
+        priority: 4,
+        typology: "Teleassistenza, solo software",
+    },
+    {
+        key: "ready_20",
+        name: "Pronti Via 20",
+        includedHours: 20,
+        priceCents: 50000,
+        period: "month",
+        priority: 3,
+        typology: hardwareTypology,
+    },
+    {
+        key: "ready_40",
+        name: "Pronti Via 40",
+        includedHours: 40,
+        priceCents: 90000,
+        period: "month",
+        priority: 3,
+        typology: hardwareTypology,
+    },
+    {
+        key: "ready_60",
+        name: "Pronti Via 60",
+        includedHours: 60,
+        priceCents: 123000,
+        period: "month",
+        priority: 3,
+        typology: hardwareTypology,
+    },
+    {
+        key: "support_base",
+        name: "Supporto Base",
+        includedHours: 80,
+        priceCents: 160000,
+        period: "contract",
+        priority: 2,
+        typology: hardwareTypology,
+    },
+    {
+        key: "support_plus",
+        name: "Supporto Plus",
+        includedHours: 150,
+        priceCents: 250000,
+        period: "contract",
+        priority: 1,
+        typology: hardwareTypology,
+    },
+];
 
 const chooseOption = async (label: string | RegExp, option: string | RegExp) => {
     await userEvent.click(screen.getByRole("combobox", { name: label }));
@@ -72,6 +143,7 @@ beforeEach(() => {
         ])
     );
     listProviders.mockResolvedValue(pageOf([{ id: 8, providerName: "Rossi Informatica" }]));
+    listContractPackages.mockResolvedValue(packagesList);
 });
 
 describe("CreateProviderDialog", () => {
@@ -269,31 +341,74 @@ describe("CreateContractDialog", () => {
         });
     });
 
-    it("offre solo le ore del pacchetto e le azzera cambiando pacchetto", async () => {
+    it("carica il listino dal server e lo offre nel menu Pacchetto, con i dettagli del selezionato", async () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
 
-        await userEvent.click(screen.getByRole("combobox", { name: /^Ore al mese/ }));
-        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["5 h", "10 h", "20 h"]);
-        await userEvent.keyboard("{Escape}");
+        await waitFor(() => {
+            expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Assistenza Remota Pack 20");
+        });
+        expect(listContractPackages).toHaveBeenCalledTimes(1);
+        // Il primo del listino è già scelto: ore, prezzo, priorità e tipologia stanno sotto il menu.
+        expect(screen.getByText(/^20 ore al mese · 400,00\s€ al mese \+ IVA$/)).toBeInTheDocument();
+        expect(screen.getByText("Priorità d'intervento: 4")).toBeInTheDocument();
+        expect(screen.getByText("Teleassistenza, solo software")).toBeInTheDocument();
 
-        await chooseOption("Pacchetto", "In sede o in laboratorio");
-        expect(screen.getByRole("combobox", { name: /^Ore al mese/ })).toHaveTextContent("10 h");
+        await userEvent.click(screen.getByRole("combobox", { name: "Pacchetto" }));
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(
+            packagesList.map((item) => item.name)
+        );
+        await userEvent.click(screen.getByRole("option", { name: "Supporto Plus" }));
 
-        await chooseOption("Pacchetto", "Full time");
-        expect(screen.queryByRole("combobox", { name: /^Ore al mese/ })).not.toBeInTheDocument();
+        expect(screen.getByText(/^150 ore in 12 mesi · 2\.500,00\s€ \+ IVA$/)).toBeInTheDocument();
+        expect(screen.getByText("Priorità d'intervento: 1 (massima)")).toBeInTheDocument();
 
         await userEvent.click(screen.getByRole("radio", { name: "Noleggio" }));
         expect(screen.queryByRole("combobox", { name: "Pacchetto" })).not.toBeInTheDocument();
     });
 
-    it("consegna cliente e fornitore come id, col pacchetto scelto", async () => {
+    it("se il listino non si carica lo dice e permette di riprovare", async () => {
+        listContractPackages.mockRejectedValueOnce(new Error("Server non raggiungibile"));
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
+
+        expect(await screen.findByText("Impossibile caricare i pacchetti.")).toBeInTheDocument();
+        expect(toastError).toHaveBeenCalledWith("Server non raggiungibile");
+
+        await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+
+        await waitFor(() => {
+            expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Assistenza Remota Pack 20");
+        });
+        expect(listContractPackages).toHaveBeenCalledTimes(2);
+    });
+
+    it("il Supporto porta la durata a 12 mesi e la blocca, un pacchetto mensile la sblocca", async () => {
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
+        await screen.findByText("Priorità d'intervento: 4");
+
+        await chooseOption("Durata", "6 mesi");
+        expect(screen.getByRole("combobox", { name: "Durata" })).toHaveTextContent("6 mesi");
+
+        await chooseOption("Pacchetto", "Supporto Base");
+
+        expect(screen.getByRole("combobox", { name: "Durata" })).toHaveTextContent("12 mesi");
+        expect(screen.getByRole("combobox", { name: "Durata" })).toBeDisabled();
+        expect(screen.getByText("Il Supporto dura sempre 12 mesi")).toBeInTheDocument();
+
+        await chooseOption("Pacchetto", "Pronti Via 40");
+
+        expect(screen.getByRole("combobox", { name: "Durata" })).toBeEnabled();
+        expect(screen.queryByText("Il Supporto dura sempre 12 mesi")).not.toBeInTheDocument();
+        await chooseOption("Durata", "3 mesi");
+        expect(screen.getByRole("combobox", { name: "Durata" })).toHaveTextContent("3 mesi");
+    });
+
+    it("consegna cliente e fornitore come id, col solo pacchetto scelto", async () => {
         const onSubmit = vi.fn();
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
         await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
-        await chooseOption("Pacchetto", "Remota");
-        await chooseOption(/^Ore al mese/, "20 h");
+        await chooseOption("Pacchetto", "Pronti Via 60");
         await chooseOption("Durata", "6 mesi");
         await save();
 
@@ -306,10 +421,47 @@ describe("CreateContractDialog", () => {
                     device: "Server NAS",
                     customerId: 30,
                     providerId: 8,
-                    assistance: { assistanceType: "remote", includedHours: 20 },
+                    assistance: { package: "ready_60" },
                 })
             );
         });
+    });
+
+    it("con il Supporto consegna 12 mesi", async () => {
+        const onSubmit = vi.fn();
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        await fillParties();
+        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+        await chooseOption("Durata", "3 mesi");
+        await chooseOption("Pacchetto", "Supporto Plus");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({ termMonths: 12, assistance: { package: "support_plus" } })
+            );
+        });
+    });
+
+    it("il rifiuto del server sulla durata compare sotto il campo, non in un toast", async () => {
+        const onSubmit = vi.fn().mockRejectedValue(
+            Object.assign(new Error("Request failed"), {
+                isAxiosError: true,
+                response: {
+                    status: 400,
+                    data: { message: "Il pacchetto Supporto dura sempre 12 mesi", field: "termMonths" },
+                },
+            })
+        );
+        renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+        await fillParties();
+        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
+        await save();
+
+        expect(await screen.findByText("Il pacchetto Supporto dura sempre 12 mesi")).toBeInTheDocument();
+        expect(toastError).not.toHaveBeenCalled();
     });
 
     describe("creazione al volo di cliente e fornitore", () => {
@@ -433,7 +585,15 @@ describe("CreateContractDialog", () => {
             customerName: "Mario Rossi",
             providerId: 8,
             providerName: "Rossi Informatica",
-            assistance: { assistanceType: "complete", includedHours: 100 },
+            assistance: {
+                package: "ready_40",
+                name: "Pronti Via 40",
+                includedHours: 40,
+                priceCents: 90000,
+                period: "month",
+                priority: 3,
+                typology: hardwareTypology,
+            },
             signedContract: null,
             createdAt: "2026-06-01T00:00:00.000Z",
             updatedAt: null,
@@ -453,9 +613,8 @@ describe("CreateContractDialog", () => {
         expect(screen.getByRole("radio", { name: "Assistenza" })).toBeChecked();
         expect(screen.getByRole("radio", { name: "Noleggio" })).toBeDisabled();
         expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi");
-        expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Completa");
         await waitFor(() => {
-            expect(screen.getByRole("combobox", { name: /^Ore al mese/ })).toHaveTextContent("100 h");
+            expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Pronti Via 40");
         });
 
         await userEvent.clear(screen.getByLabelText(/^Dispositivo/));

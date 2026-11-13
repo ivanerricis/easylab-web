@@ -35,13 +35,17 @@ const buildContract = (overrides: Partial<ContractPrintData> = {}): ContractPrin
     endDateLabel: "1 ott 2027",
     note: "Intervento entro 24 ore dalla chiamata",
     assistance: {
-        assistanceTypeLabel: "In sede o in laboratorio",
-        includedHoursLabel: "20 h al mese",
-        coveredInterventionTypes: ["Intervento in sede", "Intervento in laboratorio"],
+        period: "month",
+        packageName: "Pronti Via 20",
+        includedHoursLabel: "20 ore al mese",
+        priceLabel: "500,00 € al mese + IVA",
+        priorityLabel: "3",
+        typology: "Teleassistenza, on site e in laboratorio: hardware, software, formazione",
+        coveredInterventionTypes: ["Intervento da remoto", "Intervento in sede", "Intervento in laboratorio"],
     },
     monthlyHours: [
-        { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%" },
-        { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%" },
+        { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%", cumulativeLabel: null },
+        { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%", cumulativeLabel: null },
     ],
     ...overrides,
 });

@@ -5,6 +5,7 @@ import {
     deleteContract,
     getContract,
     getContractPrintUrl,
+    listContractPackages,
     listContracts,
     updateContract,
 } from "./contracts";
@@ -18,6 +19,25 @@ beforeEach(() => {
 });
 
 describe("contratti", () => {
+    it("legge il listino dei pacchetti dal server, con il segnale per annullare", async () => {
+        const packages = [
+            {
+                key: "remote_20",
+                name: "Assistenza Remota Pack 20",
+                includedHours: 20,
+                priceCents: 40000,
+                period: "month",
+                priority: 4,
+                typology: "Teleassistenza, solo software",
+            },
+        ];
+        const get = vi.spyOn(api, "get").mockResolvedValue({ data: packages });
+        const controller = new AbortController();
+
+        await expect(listContractPackages(controller.signal)).resolves.toEqual(packages);
+        expect(get).toHaveBeenCalledWith("/contracts/packages", expect.objectContaining({ signal: controller.signal }));
+    });
+
     it("costruisce l'indirizzo del PDF da stampare", () => {
         expect(getContractPrintUrl(7)).toContain("/contracts/7/print");
     });

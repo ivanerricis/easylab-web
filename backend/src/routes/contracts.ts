@@ -15,14 +15,11 @@ import {
     type ContractRow,
 } from "../db/queries/contract";
 import {
-    assistancePackageHours,
-    assistanceTypes,
     contractStatuses,
     contractStoredStatuses,
     contractTermMonthsRange,
     contractTypes,
     signedContractMaxBytes,
-    type AssistanceType,
 } from "../db/schema";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { currentMonthKey } from "../db/queries/timeZone";
@@ -31,14 +28,26 @@ import { getProviderById } from "../db/queries/provider";
 import {
     consumingInterventionTypes,
     getContractHoursSummary,
-    recheckAssistanceHours,
+    resetAssistanceAlerts,
 } from "../services/assistanceHours";
 import {
-    formatAssistanceType,
+    assistancePackageKeys,
+    assistancePackages,
+    getPackageInfo,
+    isContractPeriodPackage,
+    packageSnapshot,
+    supportTermMonths,
+    type AssistancePackage,
+} from "../services/assistancePackages";
+import {
     formatBillingPeriod,
     formatContractTerm,
     formatHours,
+    formatIncludedHours,
     formatMonthLabel,
+    formatPackageName,
+    formatPackagePrice,
+    formatPriority,
 } from "../services/contractLabels";
 import { buildContractEmail, signedContractAttachmentName } from "../services/contractEmail";
 import { createContractPdfBuffer, type ContractPrintData } from "../services/contractPdf";
@@ -85,7 +94,7 @@ export const cleanUploadedFileName = (originalName: string) => {
 
     return (cleaned || "contratto-firmato.pdf").slice(0, 255);
 };
-const invalidPackageMessage = "Pacchetto di ore non valido per questo tipo di assistenza";
+const supportTermMessage = "Il pacchetto Supporto dura sempre 12 mesi";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -108,24 +117,8 @@ const contractListQuerySchema = listQuerySchema.extend({
     providerId: z.coerce.number().int().positive().optional(),
 });
 
-/**
- * Ore incluse valide per il tipo di assistenza: la tabella `assistancePackageHours` di
- * `schema.ts`, la stessa che il CHECK `assistance_package_check` fa rispettare al database.
- * Qui serve a rispondere con un 400 chiaro invece di aspettare l'errore del vincolo.
- */
-const isValidPackage = (assistanceType: AssistanceType, includedHours: number | null) => {
-    const allowed = assistancePackageHours[assistanceType];
-
-    return allowed === null ? includedHours === null : includedHours !== null && allowed.includes(includedHours);
-};
-
-const assistanceBodySchema = z
-    .object({
-        assistanceType: z.enum(assistanceTypes),
-        // NULL per il tempo pieno (ore illimitate), un numero di ore per gli altri.
-        includedHours: z.number().int().positive().nullable().optional(),
-    })
-    .strict();
+// Solo la chiave: ore e prezzo li copia il server dal listino (`services/assistancePackages.ts`).
+const assistanceBodySchema = z.object({ package: z.enum(assistancePackageKeys) }).strict();
 
 const monthsSchema = z.coerce.number().int().min(contractTermMonthsRange.min).max(contractTermMonthsRange.max);
 
@@ -194,25 +187,47 @@ const contractUpdateBodySchema = z
 
 /**
  * Il JSON della API per un contratto. Parte dalla riga piatta delle query e la ripiega in
- * `assistance`; un punto solo da estendere quando si aggiungeranno i campi derivati (le ore).
+ * `assistance`, con nome, periodo, priorità e tipologia presi dal listino per chiave.
  */
 export const toContractDto = ({
-    assistanceType,
+    package: assistancePackage,
     includedHours,
+    priceCents,
     signedFileName,
     signedSizeBytes,
     signedUploadedAt,
     ...row
-}: ContractRow) => ({
-    ...row,
-    customerName: row.customerName ?? "",
-    assistance: assistanceType ? { assistanceType, includedHours } : null,
-    // Solo i dati del file: il PDF si scarica da `/:id/signed-contract`.
-    signedContract:
-        signedFileName !== null && signedSizeBytes !== null && signedUploadedAt !== null
-            ? { fileName: signedFileName, sizeBytes: signedSizeBytes, uploadedAt: signedUploadedAt }
-            : null,
-});
+}: ContractRow) => {
+    const info = assistancePackage ? getPackageInfo(assistancePackage) : null;
+
+    return {
+        ...row,
+        customerName: row.customerName ?? "",
+        assistance:
+            info && includedHours !== null && priceCents !== null
+                ? {
+                      package: info.key,
+                      name: info.name,
+                      includedHours,
+                      priceCents,
+                      period: info.period,
+                      priority: info.priority,
+                      typology: info.typology,
+                  }
+                : null,
+        // Solo i dati del file: il PDF si scarica da `/:id/signed-contract`.
+        signedContract:
+            signedFileName !== null && signedSizeBytes !== null && signedUploadedAt !== null
+                ? { fileName: signedFileName, sizeBytes: signedSizeBytes, uploadedAt: signedUploadedAt }
+                : null,
+    };
+};
+
+/** Il pacchetto di una riga contratto, se è un'assistenza con tutti i dati (ore e prezzo non nulli). */
+const assistanceOf = (contract: ContractRow) =>
+    contract.package && contract.includedHours !== null && contract.priceCents !== null
+        ? { package: contract.package, includedHours: contract.includedHours, priceCents: contract.priceCents }
+        : null;
 
 contractsRouter.get("/", validate({ query: contractListQuerySchema }), async (req, res) => {
     const query = req.query as unknown as z.infer<typeof contractListQuerySchema>;
@@ -234,6 +249,47 @@ contractsRouter.get("/", validate({ query: contractListQuerySchema }), async (re
     );
 });
 
+// Il listino per il modulo di creazione e modifica. Prima delle rotte `/:id`.
+contractsRouter.get("/packages", (_req, res) => {
+    res.json(
+        assistancePackages.map(({ key, name, includedHours, priceCents, period, priority, typology }) => ({
+            key,
+            name,
+            includedHours,
+            priceCents,
+            period,
+            priority,
+            typology,
+        }))
+    );
+});
+
+/**
+ * Le righe del riepilogo ore del PDF, dal mese più recente. Mensile: percentuale sulle ore del
+ * mese. Supporto: nessuna percentuale mensile, ma il totale cumulato fino a quel mese incluso.
+ */
+const buildPrintHours = (
+    monthlyHours: { month: string; usedHours: number }[],
+    pack: { package: AssistancePackage; includedHours: number }
+): ContractPrintData["monthlyHours"] => {
+    const perContract = isContractPeriodPackage(pack.package);
+    const cumulative = new Map<string, number>();
+    let running = 0;
+
+    // Dal più vecchio al più recente: il totale di un mese comprende quelli prima.
+    for (const entry of [...monthlyHours].sort((a, b) => a.month.localeCompare(b.month))) {
+        running = Math.round((running + entry.usedHours) * 100) / 100;
+        cumulative.set(entry.month, running);
+    }
+
+    return monthlyHours.map((entry) => ({
+        monthLabel: formatMonthLabel(entry.month),
+        usedHoursLabel: formatHours(entry.usedHours),
+        usageLabel: perContract ? null : `${Math.round((entry.usedHours / pack.includedHours) * 100)}%`,
+        cumulativeLabel: perContract ? formatHours(cumulative.get(entry.month) ?? 0) : null,
+    }));
+};
+
 /**
  * I dati del PDF di un contratto. Una bozza è un preventivo, ogni altro stato un contratto.
  * Il riepilogo ore c'è solo per un contratto di assistenza che abbia davvero ore registrate:
@@ -248,14 +304,14 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
     }
 
     const kind = contract.effectiveStatus === "draft" ? "quote" : "contract";
+    const pack = assistanceOf(contract);
     const [[customer], [provider], hoursSummary] = await Promise.all([
         getCustomerById(contract.customerId),
         getProviderById(contract.providerId),
-        contract.assistanceType
-            ? getContractHoursSummary(id, contract.includedHours, currentMonthKey(timeZone))
+        pack
+            ? getContractHoursSummary(id, pack.package, pack.includedHours, currentMonthKey(timeZone))
             : Promise.resolve(null),
     ]);
-    const { assistanceType, includedHours } = contract;
     const providerContact = [provider.firstName, provider.lastName].filter(Boolean).join(" ");
 
     return {
@@ -283,22 +339,20 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
         startDateLabel: formatDayLabel(contract.startDate),
         endDateLabel: formatDayLabel(contract.endDate),
         note: contract.note?.trim() || null,
-        assistance: assistanceType
+        assistance: pack
             ? {
-                  assistanceTypeLabel: formatAssistanceType(assistanceType),
-                  includedHoursLabel:
-                      includedHours === null ? "Ore illimitate" : `${formatHours(includedHours)} al mese`,
-                  coveredInterventionTypes: consumingInterventionTypes(assistanceType).map(formatInterventionType),
+                  period: getPackageInfo(pack.package).period,
+                  packageName: formatPackageName(pack.package),
+                  includedHoursLabel: formatIncludedHours(pack.includedHours, getPackageInfo(pack.package).period),
+                  priceLabel: formatPackagePrice(pack.priceCents, getPackageInfo(pack.package).period),
+                  priorityLabel: formatPriority(getPackageInfo(pack.package).priority),
+                  typology: getPackageInfo(pack.package).typology,
+                  coveredInterventionTypes: consumingInterventionTypes(pack.package).map(formatInterventionType),
               }
             : null,
         monthlyHours:
-            kind === "contract" && hoursSummary?.monthlyHours.some((entry) => entry.usedHours > 0)
-                ? hoursSummary.monthlyHours.map((entry) => ({
-                      monthLabel: formatMonthLabel(entry.month),
-                      usedHoursLabel: formatHours(entry.usedHours),
-                      usageLabel:
-                          includedHours === null ? "-" : `${Math.round((entry.usedHours / includedHours) * 100)}%`,
-                  }))
+            kind === "contract" && pack && hoursSummary?.monthlyHours.some((entry) => entry.usedHours > 0)
+                ? buildPrintHours(hoursSummary.monthlyHours, pack)
                 : [],
     };
 };
@@ -486,8 +540,9 @@ contractsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, re
 
     // Le ore servono solo al dettaglio (la lista non le calcola: sarebbe una query per riga) e
     // solo per l'assistenza; il noleggio ha `hours: null` e nessuno storico.
-    const hours = contract.assistanceType
-        ? await getContractHoursSummary(id, contract.includedHours, currentMonthKey(timeZone))
+    const pack = assistanceOf(contract);
+    const hours = pack
+        ? await getContractHoursSummary(id, pack.package, pack.includedHours, currentMonthKey(timeZone))
         : { hours: null, monthlyHours: [] };
 
     res.json({ ...toContractDto(contract), ...hours });
@@ -499,10 +554,10 @@ contractsRouter.post(
     validate({ body: contractCreateBodySchema }),
     async (req, res) => {
         const { assistance, ...data } = req.body as z.infer<typeof contractCreateBodySchema>;
-        const includedHours = assistance?.includedHours ?? null;
 
-        if (assistance && !isValidPackage(assistance.assistanceType, includedHours)) {
-            res.status(400).json({ message: invalidPackageMessage });
+        // Il Supporto dura sempre 12 mesi: l'unico vincolo fra pacchetto e durata.
+        if (assistance && isContractPeriodPackage(assistance.package) && data.termMonths !== supportTermMonths) {
+            res.status(400).json({ message: supportTermMessage, field: "termMonths" });
             return;
         }
 
@@ -510,7 +565,8 @@ contractsRouter.post(
         // specializzazione non è espressa in SQL, la garantisce questa chiamata.
         const created = await createContract(
             data,
-            assistance ? { assistanceType: assistance.assistanceType, includedHours } : undefined
+            // Ore e prezzo non arrivano dal client: le copia il server dal listino (snapshot).
+            assistance ? { package: assistance.package, ...packageSnapshot(assistance.package) } : undefined
         );
         const [contract] = await getContractById(created.id, await getAppTimeZone());
 
@@ -563,27 +619,21 @@ contractsRouter.put(
             return;
         }
 
-        // La riga risultante, come per gli interventi: il corpo è parziale, quindi il pacchetto
-        // si valida sull'unione con i dati attuali. Cambiando solo il tipo in `full_time` le
-        // ore diventano illimitate senza doverle azzerare a mano.
-        let assistanceChanges: { assistanceType?: AssistanceType; includedHours?: number | null } | undefined;
+        // Il Supporto dura sempre 12 mesi, sulla riga risultante: vale anche cambiando solo la durata
+        // di un contratto Supporto, o passando a Supporto con una durata attuale diversa.
+        const resultingPackage = (assistance?.package ?? current.package) as AssistancePackage | null;
+        const resultingTerm = data.termMonths ?? current.termMonths;
 
-        if (assistance && Object.keys(assistance).length > 0) {
-            const assistanceType = assistance.assistanceType ?? (current.assistanceType as AssistanceType);
-            const includedHours =
-                assistance.includedHours !== undefined
-                    ? assistance.includedHours
-                    : assistance.assistanceType === "full_time"
-                      ? null
-                      : current.includedHours;
-
-            if (!isValidPackage(assistanceType, includedHours)) {
-                res.status(400).json({ message: invalidPackageMessage });
-                return;
-            }
-
-            assistanceChanges = { assistanceType, includedHours };
+        if (resultingPackage && isContractPeriodPackage(resultingPackage) && resultingTerm !== supportTermMonths) {
+            res.status(400).json({ message: supportTermMessage, field: "termMonths" });
+            return;
         }
+
+        // Cambiando pacchetto, ore e prezzo si copiano di nuovo dal listino (il client non li manda).
+        // Lo stesso pacchetto ripetuto non cambia niente: non si riscrive lo snapshot di un firmato.
+        const newPackage = assistance?.package;
+        const packageChanged = newPackage !== undefined && newPackage !== current.package;
+        const assistanceChanges = packageChanged ? { package: newPackage, ...packageSnapshot(newPackage) } : undefined;
 
         // `type` è già uguale a quello attuale (controllo qui sopra): non si riscrive.
         const { type: _type, ...changes } = data;
@@ -591,10 +641,16 @@ contractsRouter.put(
         await updateContractById(id, changes, assistanceChanges);
         const [updated] = await getContractById(id, timeZone);
 
-        // Il pacchetto può essere cambiato: più ore possono far rientrare il mese corrente sotto una
-        // soglia (e riarmare l'avviso), meno ore possono farne scattare una.
-        if (assistanceChanges) {
-            await recheckAssistanceHours([{ contractId: id, month: currentMonthKey(timeZone) }]);
+        // Con un altro pacchetto le soglie sono altre: via tutti gli avvisi, poi si ricontrolla. Anche
+        // lo spostamento della data di inizio di un Supporto cambia la chiave fissa dei suoi avvisi.
+        const supportStartMoved =
+            resultingPackage !== null &&
+            isContractPeriodPackage(resultingPackage) &&
+            data.startDate !== undefined &&
+            data.startDate !== current.startDate;
+
+        if (packageChanged || supportStartMoved) {
+            await resetAssistanceAlerts(id, currentMonthKey(timeZone));
         }
 
         setAuditSubject(res, describeSubject(updated.id));

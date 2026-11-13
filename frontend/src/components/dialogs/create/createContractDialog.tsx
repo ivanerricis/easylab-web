@@ -12,21 +12,28 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { createCustomer, createProvider, getApiErrorMessage, listCustomers, listProviders } from "@/lib/api";
+import {
+    createCustomer,
+    createProvider,
+    getApiErrorField,
+    getApiErrorMessage,
+    listContractPackages,
+    listCustomers,
+    listProviders,
+} from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
-    assistanceTypeOptions,
     contractEndDate,
     contractStatusOptions,
     contractTypeOptions,
-    formatAssistanceType,
     formatBillingPeriod,
-    formatHours,
-    packageHours,
+    formatPackageHours,
+    formatPackagePrice,
+    formatPackagePriority,
+    supportTermMonths,
 } from "@/lib/contracts";
 import {
     contractFieldOrder,
-    defaultIncludedHours,
     emptyContractFormState,
     toContractSubmitValues,
     validateContractForm,
@@ -40,7 +47,14 @@ import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@
 import { getTodayDateString } from "@/lib/interventions";
 import { toProviderPayload } from "@/lib/providers";
 import { formatDate } from "@/lib/utils";
-import type { AssistanceType, ContractDto, ContractStatus, ContractType, CustomerDto } from "@/types/dtos";
+import type {
+    AssistancePackage,
+    ContractDto,
+    ContractPackageDto,
+    ContractStatus,
+    ContractType,
+    CustomerDto,
+} from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -57,8 +71,8 @@ export type ContractSubmitValues = {
     startDate: string;
     customerId: number;
     providerId: number;
-    /** Solo per l'assistenza; `includedHours` è `null` per il full time. */
-    assistance: { assistanceType: AssistanceType; includedHours: number | null } | null;
+    /** Solo per l'assistenza: ore e prezzo li copia il server dal listino. */
+    assistance: { package: AssistancePackage } | null;
 };
 
 type Props = {
@@ -76,23 +90,18 @@ const formatInitialCustomer = (customer: CustomerDto) =>
     formatCustomerOption(customer.firstName, customer.lastName, customer.phoneNumber, customer.phoneNumberSecondary);
 
 /** Dal contratto ai campi del modulo: l'inverso di `toContractSubmitValues`. */
-const toFormState = (contract: ContractDto): ContractFormState => {
-    const assistanceType = contract.assistance?.assistanceType ?? "remote";
-
-    return {
-        type: contract.type,
-        status: contract.status,
-        termMonths: String(contract.termMonths),
-        billingMonths: contract.billingMonths != null ? String(contract.billingMonths) : "3",
-        device: contract.device,
-        note: contract.note ?? "",
-        startDate: contract.startDate,
-        customer: contract.customerName,
-        provider: contract.providerName,
-        assistanceType,
-        includedHours: contract.assistance?.includedHours != null ? String(contract.assistance.includedHours) : "",
-    };
-};
+const toFormState = (contract: ContractDto): ContractFormState => ({
+    type: contract.type,
+    status: contract.status,
+    termMonths: String(contract.termMonths),
+    billingMonths: contract.billingMonths != null ? String(contract.billingMonths) : "3",
+    device: contract.device,
+    note: contract.note ?? "",
+    startDate: contract.startDate,
+    customer: contract.customerName,
+    provider: contract.providerName,
+    package: contract.assistance?.package ?? emptyContractFormState("").package,
+});
 
 const CreateContractDialog = ({
     open,
@@ -106,6 +115,10 @@ const CreateContractDialog = ({
     const [initialFormValues, setInitialFormValues] = useState(formValues);
     const [errors, setErrors] = useState<ContractFieldErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Il listino dei pacchetti arriva dal server all'apertura: `packagesAttempt` serve a riprovare.
+    const [packages, setPackages] = useState<ContractPackageDto[]>([]);
+    const [packagesStatus, setPackagesStatus] = useState<"loading" | "ready" | "error">("loading");
+    const [packagesAttempt, setPackagesAttempt] = useState(0);
     // Etichetta della casella -> id, per i valori scelti dai suggerimenti (e per quelli di partenza):
     // vedi lo stesso meccanismo in `CreateInterventionDialog`.
     const [customerIdByOption, setCustomerIdByOption] = useState<Record<string, number>>({});
@@ -122,7 +135,7 @@ const CreateContractDialog = ({
     const contractSteps: { title: string; fields: readonly ContractFormField[] }[] = [
         { title: "Parti", fields: ["customer", "provider", "device"] },
         { title: "Condizioni", fields: ["termMonths", "billingMonths", "startDate"] },
-        { title: formValues.type === "assistance" ? "Pacchetto" : "Note", fields: ["includedHours"] },
+        { title: formValues.type === "assistance" ? "Pacchetto" : "Note", fields: ["package"] },
         { title: "Riepilogo", fields: [] },
     ];
     const isLastStep = !isStepped || step === contractSteps.length - 1;
@@ -155,6 +168,32 @@ const CreateContractDialog = ({
         });
     }, [open, initialValues, initialCustomer]);
 
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        const controller = new AbortController();
+
+        startTransition(() => setPackagesStatus("loading"));
+
+        listContractPackages(controller.signal)
+            .then((items) => {
+                setPackages(items);
+                setPackagesStatus("ready");
+            })
+            .catch((error) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setPackagesStatus("error");
+                toast.error(getApiErrorMessage(error, "Impossibile caricare i pacchetti di assistenza"));
+            });
+
+        return () => controller.abort();
+    }, [open, packagesAttempt]);
+
     /** Applica i campi cambiati e toglie l'errore a quelli toccati. */
     const handleChange = (patch: Partial<ContractFormState>) => {
         setFormValues((prev) => ({ ...prev, ...patch }));
@@ -167,9 +206,17 @@ const CreateContractDialog = ({
         });
     };
 
-    /** Cambiando pacchetto le ore tornano alla prima ammessa: quelle di prima possono non valere più. */
-    const handleAssistanceTypeChange = (assistanceType: AssistanceType) =>
-        handleChange({ assistanceType, includedHours: defaultIncludedHours(assistanceType) });
+    const selectedPackage = packages.find((item) => item.key === formValues.package) ?? null;
+    // Il Supporto dura sempre 12 mesi: si imposta e si blocca la durata (tornando a un pacchetto mensile si sblocca).
+    const isSupportPackage = formValues.type === "assistance" && selectedPackage?.period === "contract";
+
+    const handlePackageChange = (key: AssistancePackage) =>
+        handleChange({
+            package: key,
+            ...(packages.find((item) => item.key === key)?.period === "contract"
+                ? { termMonths: String(supportTermMonths) }
+                : {}),
+        });
 
     const searchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
         const customers = await listCustomers({ pageSize: 8, search: query || undefined, signal });
@@ -253,7 +300,7 @@ const CreateContractDialog = ({
         }
 
         // Tutti gli errori in un colpo solo, ciascuno accanto al proprio campo.
-        const nextErrors: ContractFieldErrors = validateContractForm(formValues);
+        const nextErrors: ContractFieldErrors = validateContractForm(formValues, { isSupportPackage });
 
         // A metà del percorso a passi si controllano solo i campi del passo visibile: segnalare come
         // sbagliato un campo che non si è ancora visto non servirebbe a niente.
@@ -309,7 +356,17 @@ const CreateContractDialog = ({
             onOpenChange(false);
             toast.success(isEdit ? "Contratto aggiornato con successo" : "Contratto creato con successo");
         } catch (error) {
-            toast.error(getApiErrorMessage(error, "Impossibile salvare il contratto"));
+            // Il rifiuto della durata (il Supporto vuole 12 mesi) sta sotto il suo campo, non in un toast.
+            if (getApiErrorField(error) === "termMonths") {
+                reportFieldErrors(
+                    { termMonths: getApiErrorMessage(error, "Durata non valida") },
+                    contractFieldOrder,
+                    setErrors,
+                    focusField
+                );
+            } else {
+                toast.error(getApiErrorMessage(error, "Impossibile salvare il contratto"));
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -317,7 +374,6 @@ const CreateContractDialog = ({
 
     const isAssistance = formValues.type === "assistance";
     const isDraft = formValues.status === "draft";
-    const hoursOptions = packageHours[formValues.assistanceType].filter((hours): hours is number => hours != null);
     const endDate = contractEndDate(formValues.startDate, Number(formValues.termMonths));
     const documentLabel = isDraft ? "Preventivo" : "Contratto";
 
@@ -420,58 +476,55 @@ const CreateContractDialog = ({
     );
 
     const assistanceFields = isAssistance ? (
-        <div className="grid items-start gap-4 sm:grid-cols-2">
-            <FormField id="assistanceType" label="Pacchetto" className="gap-1">
+        <FormField
+            id="package"
+            label="Pacchetto"
+            className="gap-1"
+            error={errors.package}
+            description={
+                selectedPackage ? (
+                    <span className="grid gap-0.5">
+                        <span>
+                            {formatPackageHours(selectedPackage)} · {formatPackagePrice(selectedPackage)}
+                        </span>
+                        <span>Priorità d&apos;intervento: {formatPackagePriority(selectedPackage.priority)}</span>
+                        <span>{selectedPackage.typology}</span>
+                    </span>
+                ) : packagesStatus === "loading" ? (
+                    "Caricamento dei pacchetti..."
+                ) : null
+            }
+        >
+            {packagesStatus === "error" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-destructive">Impossibile caricare i pacchetti.</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setPackagesAttempt((n) => n + 1)}>
+                        Riprova
+                    </Button>
+                </div>
+            ) : (
                 <Select
-                    value={formValues.assistanceType}
-                    onValueChange={(value) => handleAssistanceTypeChange(value as AssistanceType)}
+                    value={selectedPackage ? formValues.package : ""}
+                    // Radix può richiamare `onValueChange("")` quando valore e voci cambiano insieme (apertura in
+                    // modifica, listino appena arrivato): un valore vuoto non è una scelta.
+                    onValueChange={(value) => value && handlePackageChange(value as AssistancePackage)}
+                    disabled={packagesStatus === "loading"}
                 >
-                    <SelectTrigger id="assistanceType" className="w-full">
-                        <SelectValue placeholder="Seleziona pacchetto" />
+                    <SelectTrigger id="package" {...fieldErrorAria("package", errors.package)} className="w-full">
+                        <SelectValue
+                            placeholder={packagesStatus === "loading" ? "Caricamento..." : "Seleziona pacchetto"}
+                        />
                     </SelectTrigger>
                     <SelectContent>
-                        {assistanceTypeOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                                {option.label}
+                        {packages.map((item) => (
+                            <SelectItem key={item.key} value={item.key}>
+                                {item.name}
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
-            </FormField>
-
-            {/* Il full time ha ore illimitate: non c'è niente da scegliere. */}
-            {formValues.assistanceType === "full_time" ? null : (
-                <FormField
-                    id="includedHours"
-                    label="Ore al mese"
-                    className="gap-1"
-                    required
-                    error={errors.includedHours}
-                >
-                    <Select
-                        value={formValues.includedHours}
-                        // Radix può richiamare `onValueChange("")` quando valore e voci cambiano insieme (apertura in
-                        // modifica): un valore vuoto non è una scelta e cancellerebbe quello del contratto.
-                        onValueChange={(includedHours) => includedHours && handleChange({ includedHours })}
-                    >
-                        <SelectTrigger
-                            id="includedHours"
-                            {...fieldErrorAria("includedHours", errors.includedHours)}
-                            className="w-full"
-                        >
-                            <SelectValue placeholder="Seleziona ore" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {hoursOptions.map((hours) => (
-                                <SelectItem key={hours} value={String(hours)}>
-                                    {formatHours(hours)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </FormField>
             )}
-        </div>
+        </FormField>
     ) : null;
 
     const startDateField = (
@@ -513,6 +566,8 @@ const CreateContractDialog = ({
             value={formValues.termMonths}
             onChange={(termMonths) => handleChange({ termMonths })}
             error={errors.termMonths}
+            disabled={isSupportPackage}
+            description={isSupportPackage ? "Il Supporto dura sempre 12 mesi" : undefined}
         />
     );
 
@@ -582,11 +637,18 @@ const CreateContractDialog = ({
             ? [
                   {
                       label: "Pacchetto",
-                      value:
-                          formValues.assistanceType === "full_time"
-                              ? `${formatAssistanceType(formValues.assistanceType)}, ore illimitate`
-                              : `${formatAssistanceType(formValues.assistanceType)}, ${formatHours(Number(formValues.includedHours))} al mese`,
+                      value: selectedPackage
+                          ? `${selectedPackage.name}, ${formatPackageHours(selectedPackage)}, ${formatPackagePrice(selectedPackage)}`
+                          : "-",
                   },
+                  ...(selectedPackage
+                      ? [
+                            {
+                                label: "Priorità d'intervento",
+                                value: formatPackagePriority(selectedPackage.priority),
+                            },
+                        ]
+                      : []),
               ]
             : []),
         { label: "Note", value: formValues.note.trim() || "-" },
@@ -627,7 +689,11 @@ const CreateContractDialog = ({
                 onCancel={() => (isStepped && step > 0 ? setStep(step - 1) : onOpenChange(false))}
                 onConfirm={() => void handleConfirm()}
                 cancelDisabled={isSubmitting}
-                confirmDisabled={isSubmitting}
+                // Senza listino un contratto di assistenza partirebbe col pacchetto predefinito senza
+                // che nessuno l'abbia scelto: si salva solo quando i pacchetti sono arrivati.
+                confirmDisabled={
+                    isSubmitting || (isLastStep && formValues.type === "assistance" && packagesStatus !== "ready")
+                }
                 content={
                     // Niente scroll proprio, né un'altezza massima calcolata a mano: a scorrere è il
                     // corpo di `CustomDialog`, l'unico, dentro un dialogo alto al massimo lo schermo.

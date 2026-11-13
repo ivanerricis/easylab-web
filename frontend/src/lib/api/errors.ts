@@ -65,3 +65,17 @@ export const isFieldRejection = (error: unknown) => {
     const status = getApiErrorStatus(error);
     return status === 400 || status === 429;
 };
+
+/**
+ * Il campo a cui si riferisce un errore del server (`{ message, field }`), quando lo dice: serve a
+ * mettere il messaggio sotto il campo giusto invece che in un toast.
+ */
+export const getApiErrorField = (error: unknown): string | null => {
+    if (axios.isAxiosError<{ field?: unknown }>(error)) {
+        const field = error.response?.data?.field;
+
+        return typeof field === "string" && field !== "" ? field : null;
+    }
+
+    return null;
+};

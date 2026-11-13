@@ -38,17 +38,26 @@ import { recordNotification } from "./notificationManager";
 import {
     checkAssistanceThresholds,
     consumingInterventionTypes,
+    getContractHoursSummary,
     getMonthlyHours,
     getUsedHours,
     recheckAssistanceHours,
+    resetAssistanceAlerts,
 } from "./assistanceHours";
+import { packageSnapshot, type AssistancePackage } from "./assistancePackages";
 
 type Contract = Awaited<ReturnType<typeof insertAssistanceContract>>;
 
-/** Un intervento collegato al contratto: completato e da remoto, di `hours` ore intere, salvo diversa richiesta. */
+/** Il pacchetto con ore e prezzo del listino, come li copia la rotta. */
+const pack = (key: AssistancePackage) => ({ package: key, ...packageSnapshot(key) });
+
+/**
+ * Un intervento collegato al contratto: completato e da remoto, di `hours` ore intere (fino a 23,
+ * dalla mezzanotte), salvo diversa richiesta.
+ */
 const addIntervention = async (contract: Contract, values: Partial<NewIntervention> & { hours?: number } = {}) => {
     const { hours = 1, ...rest } = values;
-    const endHour = String(9 + hours).padStart(2, "0");
+    const endHour = String(hours).padStart(2, "0");
 
     return insertIntervention({
         customerId: contract.customerId,
@@ -57,7 +66,7 @@ const addIntervention = async (contract: Contract, values: Partial<NewInterventi
         type: "remote",
         status: "completed",
         interventionDate: "2026-10-10",
-        startTime: "09:00",
+        startTime: "00:00",
         endTime: `${endHour}:00`,
         ...rest,
     });
@@ -88,10 +97,12 @@ beforeEach(() => {
 
 describe("consumingInterventionTypes", () => {
     it("ogni pacchetto consuma i suoi tipi e la consegna di materiale mai", () => {
-        expect(consumingInterventionTypes("remote")).toEqual(["remote"]);
-        expect(consumingInterventionTypes("on_site")).toEqual(["customer_site", "lab"]);
-        expect(consumingInterventionTypes("complete")).toEqual(["remote", "customer_site", "lab"]);
-        expect(consumingInterventionTypes("full_time")).toEqual(["remote", "customer_site", "lab"]);
+        expect(consumingInterventionTypes("remote_20")).toEqual(["remote"]);
+        expect(consumingInterventionTypes("remote_40")).toEqual(["remote"]);
+
+        for (const key of ["ready_20", "ready_40", "ready_60", "support_base", "support_plus"] as const) {
+            expect(consumingInterventionTypes(key)).toEqual(["remote", "customer_site", "lab"]);
+        }
     });
 });
 
@@ -147,8 +158,8 @@ describe("getUsedHours", () => {
         expect(await getUsedHours(contract.id, "2026-10")).toBe(1);
     });
 
-    it("il pacchetto da remoto consuma solo gli interventi da remoto", async () => {
-        const contract = await createContract({ assistanceType: "remote", includedHours: 10 });
+    it("il pacchetto remoto consuma solo gli interventi da remoto", async () => {
+        const contract = await createContract(pack("remote_20"));
 
         await addIntervention(contract, { type: "remote" });
         await addIntervention(contract, { type: "customer_site", problem: "x" });
@@ -157,22 +168,9 @@ describe("getUsedHours", () => {
         expect(await getUsedHours(contract.id, "2026-10")).toBe(1);
     });
 
-    it("il pacchetto in sede consuma intervento in sede e laboratorio, non il remoto", async () => {
-        const contract = await createContract({ assistanceType: "on_site", includedHours: 10 });
-
-        await addIntervention(contract, { type: "customer_site" });
-        await addIntervention(contract, { type: "lab" });
-        await addIntervention(contract, { type: "remote" });
-
-        expect(await getUsedHours(contract.id, "2026-10")).toBe(2);
-    });
-
-    it("il pacchetto completo e il tempo pieno consumano remoto, in sede e laboratorio, mai la consegna", async () => {
-        for (const assistance of [
-            { assistanceType: "complete", includedHours: 100 },
-            { assistanceType: "full_time", includedHours: null },
-        ] as const) {
-            const contract = await createContract(assistance);
+    it("Pronti Via e Supporto consumano remoto, in sede e laboratorio, mai la consegna", async () => {
+        for (const key of ["ready_20", "ready_60", "support_base", "support_plus"] as const) {
+            const contract = await createContract(pack(key));
 
             await addIntervention(contract, { type: "remote" });
             await addIntervention(contract, { type: "customer_site" });
@@ -181,6 +179,19 @@ describe("getUsedHours", () => {
 
             expect(await getUsedHours(contract.id, "2026-10")).toBe(3);
         }
+    });
+
+    it("un pacchetto Supporto somma tutto il contratto, qualunque sia il mese chiesto", async () => {
+        const contract = await createContract(pack("support_base"));
+
+        await addIntervention(contract, { interventionDate: "2026-02-10", hours: 5 });
+        await addIntervention(contract, { interventionDate: "2026-07-31", hours: 3 });
+        await addIntervention(contract, { interventionDate: "2026-12-01", hours: 2 });
+        // Non conta: non completato.
+        await addIntervention(contract, { interventionDate: "2026-08-01", status: "scheduled" });
+
+        expect(await getUsedHours(contract.id, "2026-10")).toBe(10);
+        expect(await getUsedHours(contract.id, "2026-02")).toBe(10);
     });
 
     it("per un contratto di noleggio (o inesistente) è zero", async () => {
@@ -224,7 +235,7 @@ describe("checkAssistanceThresholds", () => {
     it("sotto l'80% non scrive e non avvisa nessuno", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 7 });
+        await addIntervention(contract, { hours: 14 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(await alertRows(contract.id)).toHaveLength(0);
@@ -232,12 +243,9 @@ describe("checkAssistanceThresholds", () => {
     });
 
     it("all'80% manda l'avviso al fornitore, con i dati del contratto", async () => {
-        const contract = await createContract(
-            { assistanceType: "remote", includedHours: 10 },
-            { device: "Server NAS" }
-        );
+        const contract = await createContract(pack("remote_20"), { device: "Server NAS" });
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(await alertRows(contract.id)).toMatchObject([{ kind: "warning", month: "2026-10-01" }]);
@@ -249,9 +257,9 @@ describe("checkAssistanceThresholds", () => {
 
         expect(mail.to).toBe(provider.email);
         expect(mail.subject).toMatch(/^Ore di assistenza quasi esaurite a ottobre 2026 - Cliente/);
-        expect(mail.text).toContain("assistenza da remoto da 10 ore al mese");
+        expect(mail.text).toContain("Assistenza Remota Pack 20 da 20 ore al mese");
         expect(mail.text).toContain("Server NAS");
-        expect(mail.text).toContain("8 ore su 10");
+        expect(mail.text).toContain("16 ore su 20");
         expect(mail.text).toContain("EasyLab");
         expect(recordNotification).not.toHaveBeenCalled();
     });
@@ -259,7 +267,7 @@ describe("checkAssistanceThresholds", () => {
     it("al 100% manda l'avviso di esaurimento", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 10 });
+        await addIntervention(contract, { hours: 20 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(sendEmail).toHaveBeenCalledTimes(1);
@@ -270,7 +278,7 @@ describe("checkAssistanceThresholds", () => {
     it("un salto oltre il 100% scrive entrambe le righe ma manda solo l'email di esaurimento", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 12 });
+        await addIntervention(contract, { hours: 22 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         const kinds = (await alertRows(contract.id)).map((row) => row.kind).sort();
@@ -283,13 +291,13 @@ describe("checkAssistanceThresholds", () => {
     it("prima l'80% e poi il 100%: due email, e una chiamata ripetuta non ne manda altre", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         await checkAssistanceThresholds(contract.id, "2026-10");
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(sendEmail).toHaveBeenCalledTimes(1);
 
-        await addIntervention(contract, { hours: 2, interventionDate: "2026-10-20" });
+        await addIntervention(contract, { hours: 4, interventionDate: "2026-10-20" });
         await checkAssistanceThresholds(contract.id, "2026-10");
         await checkAssistanceThresholds(contract.id, "2026-10");
 
@@ -302,9 +310,9 @@ describe("checkAssistanceThresholds", () => {
     it("il mese dopo si riparte: gli avvisi di ottobre non coprono novembre", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8, interventionDate: "2026-10-10" });
+        await addIntervention(contract, { hours: 16, interventionDate: "2026-10-10" });
         await checkAssistanceThresholds(contract.id, "2026-10");
-        await addIntervention(contract, { hours: 8, interventionDate: "2026-11-10" });
+        await addIntervention(contract, { hours: 16, interventionDate: "2026-11-10" });
         await checkAssistanceThresholds(contract.id, "2026-11");
 
         expect(sendEmail).toHaveBeenCalledTimes(2);
@@ -315,7 +323,7 @@ describe("checkAssistanceThresholds", () => {
     it("con due controlli in parallelo oltre l'80% l'avviso parte una volta sola", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         // Più chiamate insieme: si verificano quando due interventi si completano nello stesso istante.
         await Promise.all([
             checkAssistanceThresholds(contract.id, "2026-10"),
@@ -330,7 +338,7 @@ describe("checkAssistanceThresholds", () => {
     it("con due controlli in parallelo oltre il 100% parte una sola email di esaurimento", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 11 });
+        await addIntervention(contract, { hours: 21 });
         await Promise.all([
             checkAssistanceThresholds(contract.id, "2026-10"),
             checkAssistanceThresholds(contract.id, "2026-10"),
@@ -342,7 +350,7 @@ describe("checkAssistanceThresholds", () => {
 
     it("se le ore scendono sotto la soglia l'avviso si riarma e può scattare di nuovo", async () => {
         const contract = await createContract();
-        const intervention = await addIntervention(contract, { hours: 8 });
+        const intervention = await addIntervention(contract, { hours: 16 });
 
         await checkAssistanceThresholds(contract.id, "2026-10");
         expect(await alertRows(contract.id)).toHaveLength(1);
@@ -368,8 +376,8 @@ describe("checkAssistanceThresholds", () => {
     it("tornando sotto il 100% ma restando sopra l'80% si riarma solo l'esaurimento", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
-        const second = await addIntervention(contract, { hours: 3, interventionDate: "2026-10-12" });
+        await addIntervention(contract, { hours: 16 });
+        const second = await addIntervention(contract, { hours: 6, interventionDate: "2026-10-12" });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         await db.delete(interventionTable).where(eq(interventionTable.id, second.id));
@@ -377,7 +385,7 @@ describe("checkAssistanceThresholds", () => {
 
         expect((await alertRows(contract.id)).map((row) => row.kind)).toEqual(["warning"]);
 
-        await addIntervention(contract, { hours: 3, interventionDate: "2026-10-13" });
+        await addIntervention(contract, { hours: 6, interventionDate: "2026-10-13" });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         // La prima volta una sola email (salto), la seconda di nuovo "esaurito"; "quasi" mai ripetuto.
@@ -386,33 +394,104 @@ describe("checkAssistanceThresholds", () => {
     });
 
     it("aumentando il pacchetto l'avviso si riarma", async () => {
-        const contract = await createContract({ assistanceType: "remote", includedHours: 10 });
+        const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         await checkAssistanceThresholds(contract.id, "2026-10");
         expect(sendEmail).toHaveBeenCalledTimes(1);
 
-        await db.update(assistanceTable).set({ includedHours: 20 }).where(eq(assistanceTable.contractId, contract.id));
+        await db.update(assistanceTable).set({ includedHours: 40 }).where(eq(assistanceTable.contractId, contract.id));
         await checkAssistanceThresholds(contract.id, "2026-10");
         expect(await alertRows(contract.id)).toHaveLength(0);
 
         // Tornando a un pacchetto più piccolo la soglia è di nuovo raggiunta, e l'avviso riparte.
-        await db.update(assistanceTable).set({ includedHours: 10 }).where(eq(assistanceTable.contractId, contract.id));
+        await db.update(assistanceTable).set({ includedHours: 20 }).where(eq(assistanceTable.contractId, contract.id));
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(sendEmail).toHaveBeenCalledTimes(2);
     });
 
-    it("il tempo pieno non ha soglie: nessuna riga e nessuna email", async () => {
-        const contract = await createContract({ assistanceType: "full_time", includedHours: null });
+    it("un Supporto conta tutto il contratto e avvisa una volta sola, con la chiave fissa dell'inizio", async () => {
+        const contract = await createContract(pack("support_base"));
 
-        await addIntervention(contract, { hours: 8 });
-        await addIntervention(contract, { hours: 8, interventionDate: "2026-10-11" });
+        // 66 ore su 80 (82%), in tre mesi diversi: sopra l'80% solo sommando tutto il contratto.
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-08-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-09-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-10-10" });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
+        // La chiave è il primo giorno del mese di start_date (la fixture parte il 2026-01-01).
+        expect(await alertRows(contract.id)).toMatchObject([{ kind: "warning", month: "2026-01-01" }]);
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+
+        const mail = vi.mocked(sendEmail).mock.calls[0][0];
+
+        expect(mail.subject).toMatch(/^Ore di assistenza quasi esaurite nel contratto - Cliente/);
+        expect(mail.text).toContain("Supporto Base da 80 ore in 12 mesi");
+        expect(mail.text).toContain("Sulle ore del contratto sono state usate 66 ore su 80");
+        expect(mail.text).not.toContain("ottobre");
+    });
+
+    it("un Supporto ignora il mese dell'intervento: un secondo mese non fa scattare un secondo avviso", async () => {
+        const contract = await createContract(pack("support_base"));
+
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-08-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-09-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-10-10" });
+        await checkAssistanceThresholds(contract.id, "2026-10");
+        // Un altro intervento, di un altro mese, ancora sotto il 100%: stessa soglia, nessuna email nuova.
+        await addIntervention(contract, { hours: 1, interventionDate: "2026-11-05" });
+        await checkAssistanceThresholds(contract.id, "2026-11");
+        await recheckAssistanceHours([
+            { contractId: contract.id, month: "2026-10" },
+            { contractId: contract.id, month: "2026-12" },
+        ]);
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect((await alertRows(contract.id)).map((row) => row.month)).toEqual(["2026-01-01"]);
+    });
+
+    it("un Supporto esaurito avvisa una volta con la chiave fissa, anche in app", async () => {
+        vi.mocked(isEmailConfigured).mockResolvedValue(false);
+        const contract = await createContract(pack("support_base"));
+
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-08-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-09-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-10-10" });
+        await addIntervention(contract, { hours: 22, interventionDate: "2026-11-10" });
+        await checkAssistanceThresholds(contract.id, "2026-11");
+        await checkAssistanceThresholds(contract.id, "2026-12");
+
+        expect(recordNotification).toHaveBeenCalledTimes(1);
+        expect(recordNotification).toHaveBeenCalledWith(
+            expect.objectContaining({
+                dedupeKey: `contract-hours-${contract.id}-2026-01-exhausted`,
+                message: expect.stringContaining("ore del contratto"),
+            })
+        );
+        expect((await alertRows(contract.id)).map((row) => row.kind).sort()).toEqual(["exhausted", "warning"]);
+    });
+
+    it("cambiare pacchetto toglie tutti gli avvisi e li ricalcola con le nuove ore", async () => {
+        const contract = await createContract();
+
+        await addIntervention(contract, { hours: 22 });
+        await checkAssistanceThresholds(contract.id, "2026-10");
+        expect((await alertRows(contract.id)).map((row) => row.kind).sort()).toEqual(["exhausted", "warning"]);
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+
+        // Pronti Via 60: 22 ore su 60 sono sotto ogni soglia.
+        await db.update(assistanceTable).set(pack("ready_60")).where(eq(assistanceTable.contractId, contract.id));
+        await resetAssistanceAlerts(contract.id, "2026-10");
+
         expect(await alertRows(contract.id)).toHaveLength(0);
-        expect(sendEmail).not.toHaveBeenCalled();
-        expect(recordNotification).not.toHaveBeenCalled();
+
+        // Tornando a 20 ore le soglie sono di nuovo raggiunte e l'avviso riparte.
+        await db.update(assistanceTable).set(pack("ready_20")).where(eq(assistanceTable.contractId, contract.id));
+        await resetAssistanceAlerts(contract.id, "2026-10");
+
+        expect(await alertRows(contract.id)).toHaveLength(2);
+        expect(sendEmail).toHaveBeenCalledTimes(2);
     });
 
     it("un contratto di noleggio o inesistente non fa nulla", async () => {
@@ -426,7 +505,7 @@ describe("checkAssistanceThresholds", () => {
         vi.mocked(sendEmail).mockRejectedValue(new Error("SMTP spento"));
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(recordNotification).toHaveBeenCalledTimes(1);
@@ -446,7 +525,7 @@ describe("checkAssistanceThresholds", () => {
         vi.mocked(isEmailConfigured).mockResolvedValue(false);
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 10 });
+        await addIntervention(contract, { hours: 20 });
         await checkAssistanceThresholds(contract.id, "2026-10");
 
         expect(sendEmail).not.toHaveBeenCalled();
@@ -463,7 +542,7 @@ describe("recheckAssistanceHours", () => {
     it("controlla una volta sola ogni coppia contratto-mese e ignora quelle senza contratto", async () => {
         const contract = await createContract();
 
-        await addIntervention(contract, { hours: 8 });
+        await addIntervention(contract, { hours: 16 });
         await recheckAssistanceHours([
             { contractId: contract.id, month: "2026-10" },
             { contractId: contract.id, month: "2026-10" },
@@ -483,12 +562,55 @@ describe("recheckAssistanceHours", () => {
 
     it("riarma anche con l'intervento tolto (stesso passaggio che fa la rotta DELETE)", async () => {
         const contract = await createContract();
-        const intervention = await addIntervention(contract, { hours: 9 });
+        const intervention = await addIntervention(contract, { hours: 18 });
 
         await recheckAssistanceHours([{ contractId: contract.id, month: "2026-10" }]);
         await db.delete(interventionTable).where(eq(interventionTable.id, intervention.id));
         await recheckAssistanceHours([{ contractId: contract.id, month: "2026-10" }]);
 
         expect(await alertRows(contract.id)).toHaveLength(0);
+    });
+});
+
+describe("getContractHoursSummary", () => {
+    it("un pacchetto mensile conta il mese corrente", async () => {
+        const contract = await createContract();
+
+        await addIntervention(contract, { interventionDate: "2026-09-10", hours: 3 });
+        await addIntervention(contract, { interventionDate: "2026-10-10", hours: 4 });
+
+        const { hours, monthlyHours } = await getContractHoursSummary(contract.id, "ready_20", 20, "2026-10");
+
+        expect(hours).toEqual({
+            period: "month",
+            month: "2026-10",
+            usedHours: 4,
+            includedHours: 20,
+            remainingHours: 16,
+        });
+        expect(monthlyHours).toEqual([
+            { month: "2026-10", usedHours: 4 },
+            { month: "2026-09", usedHours: 3 },
+        ]);
+    });
+
+    it("un Supporto somma tutto il contratto, senza mese, e le ore rimaste possono essere negative", async () => {
+        const contract = await createContract(pack("support_base"));
+
+        await addIntervention(contract, { interventionDate: "2026-03-10", hours: 22 });
+        await addIntervention(contract, { interventionDate: "2026-06-10", hours: 22 });
+        await addIntervention(contract, { interventionDate: "2026-09-10", hours: 22 });
+        await addIntervention(contract, { interventionDate: "2026-10-10", hours: 22 });
+
+        const { hours, monthlyHours } = await getContractHoursSummary(contract.id, "support_base", 80, "2026-10");
+
+        expect(hours).toEqual({
+            period: "contract",
+            month: null,
+            usedHours: 88,
+            includedHours: 80,
+            remainingHours: -8,
+        });
+        expect(monthlyHours.map((entry) => entry.month)).toEqual(["2026-10", "2026-09", "2026-06", "2026-03"]);
     });
 });

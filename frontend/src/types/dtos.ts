@@ -122,21 +122,41 @@ export type ContractStatus = "draft" | "active" | "cancelled";
 /** Lo stato "reale": un contratto `active` oltre la fine è `expired`, calcolato dal server. */
 export type ContractEffectiveStatus = ContractStatus | "expired";
 
-export type AssistanceType = "remote" | "on_site" | "complete" | "full_time";
+/** Le chiavi del listino dei pacchetti di assistenza (il listino lo serve `GET /contracts/packages`). */
+export type AssistancePackage =
+    "remote_20" | "remote_40" | "ready_20" | "ready_40" | "ready_60" | "support_base" | "support_plus";
 
-export type ContractAssistanceDto = {
-    assistanceType: AssistanceType;
-    /** `null` per il pacchetto full time: ore illimitate. */
-    includedHours: number | null;
+/** `month`: le ore valgono per mese di calendario; `contract`: per tutta la durata (12 mesi). */
+export type AssistancePeriod = "month" | "contract";
+
+/** Una voce del listino, come la serve il backend. Il prezzo è IVA esclusa, in centesimi. */
+export type ContractPackageDto = {
+    key: AssistancePackage;
+    name: string;
+    includedHours: number;
+    /** Al mese per `month`, unico per tutto il contratto per `contract`. */
+    priceCents: number;
+    period: AssistancePeriod;
+    /** 1 = la più alta. */
+    priority: number;
+    typology: string;
 };
 
-/** Le ore del mese corrente di un contratto di assistenza. */
+/** Il pacchetto di un contratto: ore e prezzo sono la copia fatta alla scelta del pacchetto. */
+export type ContractAssistanceDto = Omit<ContractPackageDto, "key"> & {
+    package: AssistancePackage;
+};
+
+/** Le ore di un contratto di assistenza: del mese corrente o, per il Supporto, di tutto il contratto. */
 export type ContractHoursDto = {
-    /** "AAAA-MM". */
-    month: string;
+    period: AssistancePeriod;
+    /** "AAAA-MM"; `null` per il periodo `contract`. */
+    month: string | null;
+    /** Nel mese, o sul totale del contratto per il periodo `contract`. */
     usedHours: number;
-    includedHours: number | null;
-    remainingHours: number | null;
+    includedHours: number;
+    /** Negativo se si è oltre il pacchetto. */
+    remainingHours: number;
 };
 
 export type ContractMonthlyHoursDto = {

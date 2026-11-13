@@ -49,9 +49,13 @@ const buildContract = (overrides: Partial<ContractPrintData> = {}): ContractPrin
     endDateLabel: "1 ott 2027",
     note: null,
     assistance: {
-        assistanceTypeLabel: "In sede o in laboratorio",
-        includedHoursLabel: "20 h al mese",
-        coveredInterventionTypes: ["Intervento in sede", "Intervento in laboratorio"],
+        period: "month",
+        packageName: "Pronti Via 20",
+        includedHoursLabel: "20 ore al mese",
+        priceLabel: "500,00 € al mese + IVA",
+        priorityLabel: "3",
+        typology: "Teleassistenza, on site e in laboratorio: hardware, software, formazione",
+        coveredInterventionTypes: ["Intervento da remoto", "Intervento in sede", "Intervento in laboratorio"],
     },
     monthlyHours: [],
     ...overrides,
@@ -167,7 +171,14 @@ describe("createContractPdfBuffer", () => {
                     buildContract({
                         kind: "quote",
                         status: "draft",
-                        monthlyHours: [{ monthLabel: "ottobre 2026", usedHoursLabel: "3 h", usageLabel: "15%" }],
+                        monthlyHours: [
+                            {
+                                monthLabel: "ottobre 2026",
+                                usedHoursLabel: "3 h",
+                                usageLabel: "15%",
+                                cumulativeLabel: null,
+                            },
+                        ],
                     })
                 )
             );
@@ -192,14 +203,41 @@ describe("createContractPdfBuffer", () => {
     });
 
     describe("pacchetto di assistenza", () => {
-        it("compare per l'assistenza con tipo, ore e interventi coperti", async () => {
+        it("compare per l'assistenza con pacchetto, ore, prezzo, priorità, tipologia e interventi coperti", async () => {
             const text = allText(await captureDoc(buildContract()));
 
             expect(text).toContain("PACCHETTO DI ASSISTENZA");
-            expect(text).toContain("In sede o in laboratorio");
-            expect(text).toContain("20 h al mese");
-            expect(text).toContain("Intervento in sede, Intervento in laboratorio");
+            expect(text).toContain("Pronti Via 20");
+            expect(text).toContain("20 ore al mese");
+            expect(text).toContain("500,00 € al mese + IVA");
+            expect(text).toContain("Priorità d'intervento");
+            expect(text).toContain("Teleassistenza, on site e in laboratorio: hardware, software, formazione");
+            expect(text).toContain("Intervento da remoto, Intervento in sede, Intervento in laboratorio");
             expect(text).toContain("Le ore valgono per mese di calendario e non si riportano al mese successivo");
+        });
+
+        it("per il Supporto dice ore in 12 mesi, prezzo unico e ore su tutto il contratto", async () => {
+            const text = allText(
+                await captureDoc(
+                    buildContract({
+                        assistance: {
+                            ...buildContract().assistance!,
+                            period: "contract",
+                            packageName: "Supporto Plus",
+                            includedHoursLabel: "150 ore in 12 mesi",
+                            priceLabel: "2.500,00 € + IVA",
+                            priorityLabel: "1 (massima)",
+                        },
+                    })
+                )
+            );
+
+            expect(text).toContain("Supporto Plus");
+            expect(text).toContain("150 ore in 12 mesi");
+            expect(text).toContain("2.500,00 € + IVA");
+            expect(text).toContain("1 (massima)");
+            expect(text).toContain("Le ore valgono per tutta la durata del contratto (12 mesi)");
+            expect(text).not.toContain("non si riportano al mese successivo");
         });
 
         it("non compare per il noleggio", async () => {
@@ -221,8 +259,18 @@ describe("createContractPdfBuffer", () => {
             const doc = await captureDoc(
                 buildContract({
                     monthlyHours: [
-                        { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%" },
-                        { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%" },
+                        {
+                            monthLabel: "ottobre 2026",
+                            usedHoursLabel: "12,5 h",
+                            usageLabel: "63%",
+                            cumulativeLabel: null,
+                        },
+                        {
+                            monthLabel: "settembre 2026",
+                            usedHoursLabel: "3 h",
+                            usageLabel: "15%",
+                            cumulativeLabel: null,
+                        },
                     ],
                 })
             );
@@ -238,6 +286,43 @@ describe("createContractPdfBuffer", () => {
             expect(text).toContain("ottobre 2026");
             expect(text).toContain("12,5 h");
             expect(text).toContain("63%");
+        });
+
+        it("per il Supporto mostra ore del mese e totale cumulato, senza percentuale mensile", async () => {
+            const doc = await captureDoc(
+                buildContract({
+                    assistance: {
+                        ...buildContract().assistance!,
+                        period: "contract",
+                        includedHoursLabel: "80 ore in 12 mesi",
+                    },
+                    monthlyHours: [
+                        {
+                            monthLabel: "ottobre 2026",
+                            usedHoursLabel: "12,5 h",
+                            usageLabel: null,
+                            cumulativeLabel: "15,5 h",
+                        },
+                        {
+                            monthLabel: "settembre 2026",
+                            usedHoursLabel: "3 h",
+                            usageLabel: null,
+                            cumulativeLabel: "3 h",
+                        },
+                    ],
+                })
+            );
+            const table = doc.content.find((block) => JSON.stringify(block).includes("RIEPILOGO ORE")) as {
+                table: { headerRows: number };
+            };
+            const text = JSON.stringify(table);
+
+            expect(table.table.headerRows).toBe(2);
+            expect(text).toContain("Ore usate nel mese");
+            expect(text).toContain("Totale ore usate");
+            expect(text).toContain("15,5 h");
+            expect(text).not.toContain("Utilizzo");
+            expect(text).not.toContain("%");
         });
     });
 

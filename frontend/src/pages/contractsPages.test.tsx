@@ -34,6 +34,7 @@ vi.mock("@/lib/api", async () => {
         ...forwarded,
         createContract: vi.fn(),
         updateContract: vi.fn(),
+        listContractPackages: vi.fn().mockResolvedValue([]),
         createProvider: vi.fn(),
         updateProvider: vi.fn(),
         deleteProvider: vi.fn(),
@@ -59,9 +60,29 @@ import ProviderPage from "./providers/ProviderPage";
 import ProvidersPage from "./providers/ProvidersPage";
 import { renderWithProviders } from "@/test/render";
 import { toast } from "sonner";
-import type { ContractDto } from "@/types/dtos";
+import type { ContractAssistanceDto, ContractDto } from "@/types/dtos";
 
 const page = (items: unknown[]) => ({ items, totalItems: items.length, page: 1, pageSize: 10, totalPages: 1 });
+
+const remote20: ContractAssistanceDto = {
+    package: "remote_20",
+    name: "Assistenza Remota Pack 20",
+    includedHours: 20,
+    priceCents: 40000,
+    period: "month",
+    priority: 4,
+    typology: "Teleassistenza, solo software",
+};
+
+const supportBase: ContractAssistanceDto = {
+    package: "support_base",
+    name: "Supporto Base",
+    includedHours: 80,
+    priceCents: 160000,
+    period: "contract",
+    priority: 2,
+    typology: "Teleassistenza, on site e in laboratorio: hardware, software, formazione",
+};
 
 const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     id: 21,
@@ -78,7 +99,7 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     customerName: "Mario Rossi",
     providerId: 8,
     providerName: "Rossi Informatica",
-    assistance: { assistanceType: "remote", includedHours: 10 },
+    assistance: remote20,
     signedContract: null,
     createdAt: "2026-06-01T10:00:00.000Z",
     updatedAt: null,
@@ -100,7 +121,7 @@ describe("ContractsPage", () => {
 
         const table = await screen.findByRole("table");
         expect(await within(table).findByText("Server NAS")).toBeInTheDocument();
-        expect(within(table).getAllByText("Remota - 10 h/mese")).toHaveLength(2);
+        expect(within(table).getAllByText("Assistenza Remota Pack 20")).toHaveLength(2);
         expect(within(table).getByText("Scaduto")).toBeInTheDocument();
         expect(within(table).getByText("Attivo")).toBeInTheDocument();
         for (const header of ["Cliente", "Fornitore", "Tipo", "Pacchetto", "Dispositivo", "Inizio", "Fine", "Stato"]) {
@@ -170,10 +191,10 @@ describe("ContractPage", () => {
     it("mostra i dati, la barra delle ore, lo storico e gli interventi collegati", async () => {
         api.getContract.mockResolvedValue(
             contract({
-                hours: { month: "2026-10", usedHours: 12, includedHours: 10, remainingHours: -2 },
+                hours: { period: "month", month: "2026-10", usedHours: 24, includedHours: 20, remainingHours: -4 },
                 monthlyHours: [
                     { month: "2026-09", usedHours: 4 },
-                    { month: "2026-10", usedHours: 12 },
+                    { month: "2026-10", usedHours: 24 },
                 ],
             })
         );
@@ -199,12 +220,13 @@ describe("ContractPage", () => {
         expect(screen.getByText("Rinnovo automatico")).toBeInTheDocument();
         // Oltre il pacchetto: la barra è piena e l'eccesso scritto.
         expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
-        expect(screen.getByRole("alert")).toHaveTextContent("Superate di 2 h");
+        expect(screen.getByRole("alert")).toHaveTextContent("Superate di 4 h");
         // Lo storico va dal mese più recente.
         const history = screen.getByRole("heading", { name: "Storico mensile" }).closest("[data-slot=card]");
         const rows = within(history as HTMLElement).getAllByRole("row");
         expect(rows[1]).toHaveTextContent(/ottobre 2026/i);
         expect(rows[1]).toHaveTextContent("120%");
+        expect(rows[2]).toHaveTextContent("20%");
         expect(rows[2]).toHaveTextContent(/settembre 2026/i);
         await waitFor(() => {
             expect(api.listInterventions).toHaveBeenCalledWith(expect.objectContaining({ contractId: 21 }));
@@ -238,18 +260,54 @@ describe("ContractPage", () => {
         expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
     });
 
-    it("per il full time scrive Ore illimitate", async () => {
+    it("mostra pacchetto, ore, prezzo, priorità e tipologia", async () => {
+        api.getContract.mockResolvedValue(contract());
+        await renderPage();
+
+        const details = screen.getByRole("heading", { name: "Dettagli" }).closest("[data-slot=card]") as HTMLElement;
+        expect(within(details).getByText("Assistenza Remota Pack 20")).toBeInTheDocument();
+        expect(within(details).getByText("20 ore al mese")).toBeInTheDocument();
+        expect(within(details).getByText(/^400,00\s€ al mese \+ IVA$/)).toBeInTheDocument();
+        expect(within(details).getByText("4")).toBeInTheDocument();
+        expect(within(details).getByText("Teleassistenza, solo software")).toBeInTheDocument();
+    });
+
+    it("per il Supporto mostra le ore del contratto e lo storico con il totale progressivo", async () => {
         api.getContract.mockResolvedValue(
             contract({
-                assistance: { assistanceType: "full_time", includedHours: null },
-                hours: { month: "2026-10", usedHours: 30, includedHours: null, remainingHours: null },
-                monthlyHours: [],
+                termMonths: 12,
+                assistance: supportBase,
+                hours: { period: "contract", month: null, usedHours: 30, includedHours: 80, remainingHours: 50 },
+                monthlyHours: [
+                    { month: "2026-08", usedHours: 10 },
+                    { month: "2026-10", usedHours: 12 },
+                    { month: "2026-09", usedHours: 8 },
+                ],
             })
         );
         await renderPage();
 
-        expect(screen.getAllByText("Ore illimitate").length).toBeGreaterThan(0);
-        expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+        const details = screen.getByRole("heading", { name: "Dettagli" }).closest("[data-slot=card]") as HTMLElement;
+        expect(within(details).getByText("80 ore in 12 mesi")).toBeInTheDocument();
+        expect(within(details).getByText(/^1\.600,00\s€ \+ IVA$/)).toBeInTheDocument();
+        expect(within(details).getByText("2")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Ore del contratto" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Ore del mese" })).not.toBeInTheDocument();
+        expect(screen.getByText("30 h di 80 h (38%)")).toBeInTheDocument();
+
+        const history = screen.getByRole("heading", { name: "Storico mensile" }).closest("[data-slot=card]");
+        const headers = within(history as HTMLElement)
+            .getAllByRole("columnheader")
+            .map((header) => header.textContent);
+        expect(headers).toEqual(["Mese", "Ore usate nel mese", "Totale progressivo"]);
+        // Dal mese più recente; il totale parte dal più vecchio.
+        const rows = within(history as HTMLElement).getAllByRole("row");
+        expect(rows[1]).toHaveTextContent(/ottobre 2026/i);
+        expect(rows[1]).toHaveTextContent("12 h");
+        expect(rows[1]).toHaveTextContent("30 h");
+        expect(rows[2]).toHaveTextContent("18 h");
+        expect(rows[3]).toHaveTextContent("10 h");
+        expect(rows[1]).not.toHaveTextContent("%");
     });
 
     it("un noleggio non ha ore né interventi", async () => {

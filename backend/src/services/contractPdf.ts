@@ -10,8 +10,15 @@ import {
     wrapPdfDocument,
     type CustomerSummaryHeaderData,
 } from "./pdf/shared";
-import type { AssistanceType, ContractStatus, ContractType } from "../db/schema";
-import { formatAssistanceType, formatContractStatus, formatContractType, formatHours } from "./contractLabels";
+import type { ContractStatus, ContractType } from "../db/schema";
+import { getPackageInfo, type AssistancePackage, type AssistancePeriod } from "./assistancePackages";
+import {
+    formatContractStatus,
+    formatContractType,
+    formatIncludedHours,
+    formatPackageName,
+    formatPackagePrice,
+} from "./contractLabels";
 
 /**
  * "Preventivo" è un contratto in bozza: non ancora accettato dal cliente. Ogni altro stato
@@ -45,13 +52,27 @@ export type ContractPrintData = {
     note: string | null;
     /** Solo per i contratti di assistenza. */
     assistance: {
-        assistanceTypeLabel: string;
-        /** "10 h al mese" oppure "Ore illimitate". */
+        period: AssistancePeriod;
+        packageName: string;
+        /** "20 ore al mese" oppure "80 ore in 12 mesi". */
         includedHoursLabel: string;
+        /** "400,00 € al mese + IVA" oppure "1.600,00 € + IVA". */
+        priceLabel: string;
+        /** "1 (massima)", "2", ... */
+        priorityLabel: string;
+        typology: string;
         coveredInterventionTypes: string[];
     } | null;
-    /** Vuoto = la sezione del riepilogo ore non compare. */
-    monthlyHours: { monthLabel: string; usedHoursLabel: string; usageLabel: string }[];
+    /**
+     * Vuoto = la sezione del riepilogo ore non compare. Mensile: `usageLabel` è la percentuale del
+     * mese. Supporto: `usageLabel` è null e `cumulativeLabel` il totale ore fino a quel mese.
+     */
+    monthlyHours: {
+        monthLabel: string;
+        usedHoursLabel: string;
+        usageLabel: string | null;
+        cumulativeLabel: string | null;
+    }[];
 };
 
 const brandColor = "#2A75B9";
@@ -173,22 +194,12 @@ const buildContractDataSection = (contract: ContractPrintData) => {
                 dualFieldRow("Codice", `#${contract.id}`, "Tipo", formatContractType(contract.type)),
                 singleValueRow("Dispositivo", contract.device),
                 isQuote
-                    ? dualFieldRow(
-                          "Decorrenza",
-                          contract.startDateLabel,
-                          "Durata",
-                          contract.termLabel
-                      )
+                    ? dualFieldRow("Decorrenza", contract.startDateLabel, "Durata", contract.termLabel)
                     : dualFieldRow("Stato", formatContractStatus(contract.status), "Durata", contract.termLabel),
                 ...(contract.billingLabel ? [singleValueRow("Fatturazione", contract.billingLabel)] : []),
                 ...(isQuote
                     ? []
-                    : [
-                          singleValueRow(
-                              "Validità",
-                              `dal ${contract.startDateLabel} al ${contract.endDateLabel}`
-                          ),
-                      ]),
+                    : [singleValueRow("Validità", `dal ${contract.startDateLabel} al ${contract.endDateLabel}`)]),
             ],
         },
         layout: tableLayout,
@@ -201,18 +212,24 @@ const buildAssistanceSection = (contract: ContractPrintData) => {
         return null;
     }
 
-    const { assistanceTypeLabel, includedHoursLabel, coveredInterventionTypes } = contract.assistance;
+    const { period, packageName, includedHoursLabel, priceLabel, priorityLabel, typology, coveredInterventionTypes } =
+        contract.assistance;
 
     return {
         table: {
             widths: [labelColumnWidth, "*", labelColumnWidth, "*"],
             body: [
                 sectionBarRow("PACCHETTO DI ASSISTENZA", 4),
-                dualFieldRow("Assistenza", assistanceTypeLabel, "Ore incluse", includedHoursLabel),
+                dualFieldRow("Pacchetto", packageName, "Ore incluse", includedHoursLabel),
+                dualFieldRow("Prezzo", priceLabel, "Priorità d'intervento", priorityLabel),
+                singleValueRow("Tipologia", typology),
                 singleValueRow("Copre", coveredInterventionTypes.join(", ") || "-"),
                 [
                     {
-                        text: "Le ore valgono per mese di calendario e non si riportano al mese successivo",
+                        text:
+                            period === "contract"
+                                ? "Le ore valgono per tutta la durata del contratto (12 mesi)"
+                                : "Le ore valgono per mese di calendario e non si riportano al mese successivo",
                         style: "fineprint",
                         colSpan: 4,
                     },
@@ -235,6 +252,33 @@ const buildHoursSection = (contract: ContractPrintData) => {
 
     const includedLabel = contract.assistance?.includedHoursLabel ?? "-";
 
+    // Supporto: ore sull'intero contratto, quindi niente percentuale mensile ma il totale cumulato.
+    if (contract.assistance?.period === "contract") {
+        return {
+            table: {
+                headerRows: 2,
+                widths: ["*", 110, 110, 100],
+                body: [
+                    sectionBarRow("RIEPILOGO ORE", 4),
+                    [
+                        { text: "Mese", style: "summaryHeader" },
+                        { text: "Ore usate nel mese", style: "summaryHeader", alignment: "right" },
+                        { text: "Totale ore usate", style: "summaryHeader", alignment: "right" },
+                        { text: "Ore incluse", style: "summaryHeader", alignment: "right" },
+                    ],
+                    ...contract.monthlyHours.map((entry) => [
+                        { text: entry.monthLabel },
+                        { text: entry.usedHoursLabel, alignment: "right" },
+                        { text: entry.cumulativeLabel ?? "-", alignment: "right" },
+                        { text: includedLabel, alignment: "right" },
+                    ]),
+                ],
+            },
+            layout: tableLayout,
+            margin: [0, 0, 0, 8],
+        };
+    }
+
     return {
         table: {
             // Barra di sezione + intestazione colonne: si ripetono a ogni pagina.
@@ -252,7 +296,7 @@ const buildHoursSection = (contract: ContractPrintData) => {
                     { text: entry.monthLabel },
                     { text: entry.usedHoursLabel, alignment: "right" },
                     { text: includedLabel, alignment: "right" },
-                    { text: entry.usageLabel, alignment: "right" },
+                    { text: entry.usageLabel ?? "-", alignment: "right" },
                 ]),
             ],
         },
@@ -358,8 +402,8 @@ export type CustomerContractSummaryItem = {
     status: ContractStatus;
     providerName: string;
     device: string;
-    /** Solo per i contratti di assistenza; `includedHours` null = ore illimitate. */
-    assistance: { assistanceType: AssistanceType; includedHours: number | null } | null;
+    /** Solo per i contratti di assistenza. */
+    assistance: { package: AssistancePackage; includedHours: number; priceCents: number } | null;
     startDateLabel: string;
     /** La data di fine esclusiva, come la mostra la pagina ("Data fine"). */
     endDateLabel: string;
@@ -367,11 +411,11 @@ export type CustomerContractSummaryItem = {
 
 export type CustomerContractsPrintData = CustomerSummaryHeaderData & {
     contractCount: number;
-    /** Gi� nell'ordine di stampa: dal pi� recente. */
+    /** Già nell'ordine di stampa: dal più recente. */
     contracts: CustomerContractSummaryItem[];
 };
 
-// Una bozza � un preventivo: lo si dice, perch� nell'elenco non c'� altro a distinguerla.
+// Una bozza è un preventivo: lo si dice, perché nell'elenco non c'è altro a distinguerla.
 const formatSummaryStatus = (status: ContractStatus) =>
     status === "draft" ? `${formatContractStatus(status)} (preventivo)` : formatContractStatus(status);
 
@@ -380,10 +424,9 @@ const formatPackage = (assistance: CustomerContractSummaryItem["assistance"]) =>
         return "-";
     }
 
-    const hours =
-        assistance.includedHours === null ? "ore illimitate" : `${formatHours(assistance.includedHours)}/mese`;
+    const { period } = getPackageInfo(assistance.package);
 
-    return `${formatAssistanceType(assistance.assistanceType)} - ${hours}`;
+    return `${formatPackageName(assistance.package)} - ${formatIncludedHours(assistance.includedHours, period)} - ${formatPackagePrice(assistance.priceCents, period)}`;
 };
 
 const statusSummaryOrder: [ContractStatus, string, string][] = [

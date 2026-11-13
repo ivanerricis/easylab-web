@@ -37,7 +37,7 @@ const buildItem = (overrides: Partial<CustomerContractSummaryItem> = {}): Custom
     status: "active",
     providerName: "Acme Srl",
     device: "Server NAS",
-    assistance: { assistanceType: "on_site", includedHours: 10 },
+    assistance: { package: "ready_20", includedHours: 20, priceCents: 50000 },
     startDateLabel: "1 ott 2026",
     endDateLabel: "1 ott 2027",
     ...overrides,
@@ -107,7 +107,7 @@ describe("createCustomerContractsPdfBuffer", () => {
             "Attivo",
             "Acme Srl",
             "Server NAS",
-            "In sede o in laboratorio - 10 h/mese",
+            "Pronti Via 20 - 20 ore al mese - 500,00 € al mese + IVA",
             "1 ott 2026",
             "1 ott 2027",
         ]);
@@ -115,17 +115,17 @@ describe("createCustomerContractsPdfBuffer", () => {
         expect(rows[1][5]).toBe("-");
     });
 
-    it("etichetta come preventivo la bozza e dice ore illimitate per il full time", async () => {
+    it("etichetta come preventivo la bozza e scrive il Supporto con le ore su 12 mesi e il prezzo unico", async () => {
         const doc = await capture(
             buildData([
                 buildItem({ id: 2, status: "draft" }),
-                buildItem({ id: 1, assistance: { assistanceType: "full_time", includedHours: null } }),
+                buildItem({ id: 1, assistance: { package: "support_base", includedHours: 80, priceCents: 160000 } }),
             ])
         );
         const rows = dataRows(doc);
 
         expect(rows[0][2]).toBe("Bozza (preventivo)");
-        expect(rows[1][5]).toBe("Full time - ore illimitate");
+        expect(rows[1][5]).toBe("Supporto Base - 80 ore in 12 mesi - 1.600,00 € + IVA");
     });
 
     it("riassume i contratti per stato, solo quelli presenti", async () => {

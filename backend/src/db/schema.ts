@@ -351,7 +351,7 @@ export const notificationTable = pgTable(
 
 /**
  * Contratti fra un cliente del laboratorio e un fornitore. Due specializzazioni disgiunte e
- * totali: `assistance` (pacchetti di ore al mese) e `rental` (noleggio, senza dati propri per
+ * totali: `assistance` (pacchetti di ore) e `rental` (noleggio, senza dati propri per
  * ora). Come per `reportPaymentMethods`, le liste dei valori vivono qui una volta sola, con il
  * tipo della colonna: rotte, query e frontend le leggono da qui.
  */
@@ -370,21 +370,21 @@ export type ContractStatus = (typeof contractStatuses)[number];
 /** Durata del contratto, in mesi interi: da qui la data di fine (`start_date + N mesi`). */
 export const contractTermMonthsRange = { min: 1, max: 120 } as const;
 
-export const assistanceTypes = ["remote", "on_site", "complete", "full_time"] as const;
-export type AssistanceType = (typeof assistanceTypes)[number];
-
 /**
- * I pacchetti ammessi (ore al mese, senza riporto) per ogni tipo di assistenza; `null` = ore
- * illimitate (`included_hours` NULL). Ripete a mano il CHECK `assistance_package_check`: la
- * rotta lo usa per rispondere con un 400 chiaro prima di arrivare al database, e il frontend
- * ne specchia la tabella. Se cambia uno, cambia anche l'altro (e serve una migration).
+ * Le chiavi dei pacchetti di assistenza; nome, ore, prezzo e il resto stanno nel listino
+ * `services/assistancePackages.ts`, che è l'unica fonte. Il CHECK `assistance_package_check`
+ * ripete solo questa lista di chiavi.
  */
-export const assistancePackageHours: Record<AssistanceType, readonly number[] | null> = {
-    remote: [5, 10, 20],
-    on_site: [10, 20, 30],
-    complete: [100],
-    full_time: null,
-};
+export const assistancePackageKeys = [
+    "remote_20",
+    "remote_40",
+    "ready_20",
+    "ready_40",
+    "ready_60",
+    "support_base",
+    "support_plus",
+] as const;
+export type AssistancePackage = (typeof assistancePackageKeys)[number];
 
 export const assistanceAlertKinds = ["warning", "exhausted"] as const;
 export type AssistanceAlertKind = (typeof assistanceAlertKinds)[number];
@@ -473,9 +473,15 @@ export const assistanceTable = pgTable(
     {
         contractId: integer("contract_id").primaryKey(),
         contractType: varchar("contract_type", { length: 20 }).notNull().default("assistance"),
-        assistanceType: varchar("assistance_type", { length: 20 }).$type<AssistanceType>().notNull(),
-        /** Ore per mese di calendario, senza riporto; NULL = illimitate (`full_time`). */
-        includedHours: integer("included_hours"),
+        package: varchar("package", { length: 20 }).$type<AssistancePackage>().notNull(),
+        /**
+         * Ore del pacchetto (al mese, senza riporto, o per tutto il contratto per i Supporto) e
+         * prezzo IVA esclusa in centesimi: una copia (snapshot) del listino presa alla creazione e a
+         * ogni cambio di pacchetto, la scrive il server. Nessun CHECK le lega al pacchetto, così un
+         * listino futuro non rende invalidi i contratti già firmati.
+         */
+        includedHours: integer("included_hours").notNull(),
+        priceCents: integer("price_cents").notNull(),
         ...timestamps,
     },
     (table) => [
@@ -485,15 +491,12 @@ export const assistanceTable = pgTable(
             foreignColumns: [contractTable.id, contractTable.type],
         }).onDelete("cascade"),
         check("assistance_contract_type_check", sql`${table.contractType} = 'assistance'`),
-        // `IS NOT NULL` esplicito: con ore NULL il confronto `IN` darebbe NULL, e un CHECK che
-        // vale NULL passa. Così remote/on_site/complete senza ore vengono respinti.
         check(
             "assistance_package_check",
-            sql`(${table.assistanceType} = 'remote' AND ${table.includedHours} IS NOT NULL AND ${table.includedHours} IN (5, 10, 20))
-                OR (${table.assistanceType} = 'on_site' AND ${table.includedHours} IS NOT NULL AND ${table.includedHours} IN (10, 20, 30))
-                OR (${table.assistanceType} = 'complete' AND ${table.includedHours} IS NOT NULL AND ${table.includedHours} = 100)
-                OR (${table.assistanceType} = 'full_time' AND ${table.includedHours} IS NULL)`
+            sql`${table.package} IN ('remote_20', 'remote_40', 'ready_20', 'ready_40', 'ready_60', 'support_base', 'support_plus')`
         ),
+        check("assistance_included_hours_check", sql`${table.includedHours} > 0`),
+        check("assistance_price_cents_check", sql`${table.priceCents} > 0`),
     ]
 );
 

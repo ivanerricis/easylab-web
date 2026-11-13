@@ -1,7 +1,8 @@
 import type {
-    AssistanceType,
+    AssistancePackage,
     ContractDto,
     ContractEffectiveStatus,
+    ContractPackageDto,
     ContractStatus,
     ContractType,
     SignedContractDto,
@@ -22,8 +23,11 @@ export type ContractCreateInput = {
     startDate: string;
     customerId: number;
     providerId: number;
-    /** Obbligatorio se e solo se il contratto è di assistenza. */
-    assistance?: { assistanceType: AssistanceType; includedHours: number | null };
+    /**
+     * Obbligatorio se e solo se il contratto è di assistenza. Ore e prezzo li copia il server dal
+     * listino; i pacchetti Supporto vogliono `termMonths` a 12.
+     */
+    assistance?: { package: AssistancePackage };
 };
 
 /** Il tipo di un contratto esistente non si cambia: il server lo rifiuta. */
@@ -63,6 +67,10 @@ export const getContract = contractsApi.get;
 export const createContract = contractsApi.create;
 export const updateContract = contractsApi.update;
 export const deleteContract = contractsApi.remove;
+
+/** Il listino dei pacchetti di assistenza (ore, prezzo, priorità, tipologia), nell'ordine del listino. */
+export const listContractPackages = async (signal?: AbortSignal) =>
+    (await api.get<ContractPackageDto[]>("/contracts/packages", { signal })).data;
 
 /** Indirizzo del PDF: preventivo se il contratto è in bozza, contratto altrimenti (lo decide il server). */
 export const getContractPrintUrl = (id: number) => api.getUri({ url: `/contracts/${id}/print` });

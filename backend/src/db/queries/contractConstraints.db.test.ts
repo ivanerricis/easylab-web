@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { db } from "../index";
-import { assistanceHoursAlertTable, assistanceTable, assistancePackageHours, assistanceTypes } from "../schema";
+import { db, pool } from "../index";
+import { assistanceHoursAlertTable, assistanceTable, assistancePackageKeys } from "../schema";
 import {
     insertAssistanceContract,
     insertContract,
@@ -32,75 +32,132 @@ const violation = async (action: () => Promise<unknown>) => {
     return constraintOf(error);
 };
 
-describe("assistance_package_check", () => {
-    const allowed: [string, number | null][] = [
-        ["remote", 5],
-        ["remote", 10],
-        ["remote", 20],
-        ["on_site", 10],
-        ["on_site", 20],
-        ["on_site", 30],
-        ["complete", 100],
-        ["full_time", null],
-    ];
+const codeOf = (error: unknown): string | undefined => {
+    const candidate = error as { code?: string; cause?: { code?: string } };
 
-    it.each(allowed)("accetta %s con %s ore", async (assistanceType, includedHours) => {
+    return candidate.code ?? candidate.cause?.code;
+};
+
+describe("assistance_package_check", () => {
+    it.each(assistancePackageKeys)("accetta il pacchetto %s", async (key) => {
         const contract = await insertContract({ type: "assistance" });
 
         await expect(
             db.insert(assistanceTable).values({
                 contractId: contract.id,
-                assistanceType: assistanceType as never,
-                includedHours,
+                package: key,
+                includedHours: 20,
+                priceCents: 40000,
             })
         ).resolves.toBeDefined();
     });
 
-    it.each([
-        ["remote", 30],
-        ["remote", 100],
-        ["remote", null],
-        ["on_site", 5],
-        ["on_site", null],
-        ["complete", 10],
-        ["complete", null],
-        ["full_time", 100],
-        ["full_time", 0],
-        ["sconosciuto", 10],
-    ])("rifiuta %s con %s ore", async (assistanceType, includedHours) => {
+    it.each(["remote", "on_site", "complete", "full_time", "sconosciuto", "remote_30"])(
+        "rifiuta la chiave %s",
+        async (key) => {
+            const contract = await insertContract({ type: "assistance" });
+
+            const constraint = await violation(() =>
+                db.insert(assistanceTable).values({
+                    contractId: contract.id,
+                    package: key as never,
+                    includedHours: 20,
+                    priceCents: 40000,
+                })
+            );
+
+            expect(constraint).toBe("assistance_package_check");
+        }
+    );
+
+    it("un aggiornamento a una chiave fuori listino è rifiutato come l'inserimento", async () => {
+        const contract = await insertAssistanceContract();
+
+        const constraint = await violation(() =>
+            db
+                .update(assistanceTable)
+                .set({ package: "full_time" as never })
+                .where(eq(assistanceTable.contractId, contract.id))
+        );
+
+        expect(constraint).toBe("assistance_package_check");
+    });
+
+    it("la lista TypeScript delle chiavi coincide con quella accettata dal database", async () => {
+        const { rows } = await pool.query(
+            "select pg_get_constraintdef(oid) as definition from pg_constraint where conname = 'assistance_package_check'"
+        );
+
+        for (const key of assistancePackageKeys) {
+            expect(rows[0].definition).toContain(`'${key}'`);
+        }
+
+        expect(rows[0].definition.match(/'[a-z_0-9]+'::character varying/g)).toHaveLength(assistancePackageKeys.length);
+    });
+});
+
+describe("ore e prezzo del pacchetto", () => {
+    it("sono uno snapshot: nessun CHECK le lega al pacchetto, quindi ore e prezzo diversi dal listino sono accettati", async () => {
+        const contract = await insertContract({ type: "assistance" });
+
+        await expect(
+            db.insert(assistanceTable).values({
+                contractId: contract.id,
+                package: "remote_20",
+                includedHours: 35,
+                priceCents: 12345,
+            })
+        ).resolves.toBeDefined();
+    });
+
+    it.each([0, -5])("le ore %s sono rifiutate", async (hours) => {
         const contract = await insertContract({ type: "assistance" });
 
         const constraint = await violation(() =>
             db.insert(assistanceTable).values({
                 contractId: contract.id,
-                assistanceType: assistanceType as never,
-                includedHours,
+                package: "ready_20",
+                includedHours: hours,
+                priceCents: 50000,
             })
         );
 
-        expect(constraint).toBe("assistance_package_check");
+        expect(constraint).toBe("assistance_included_hours_check");
     });
 
-    it("la tabella esportata in TypeScript coincide con quella accettata dal database", async () => {
-        const fromTable = assistanceTypes.flatMap((assistanceType): [string, number | null][] => {
-            const hours = assistancePackageHours[assistanceType];
-
-            return hours === null
-                ? [[assistanceType, null]]
-                : hours.map((value): [string, number] => [assistanceType, value]);
-        });
-
-        expect(fromTable).toEqual(allowed);
-    });
-
-    it("un aggiornamento fuori pacchetto è rifiutato come l'inserimento", async () => {
-        const contract = await insertAssistanceContract({}, { assistanceType: "remote", includedHours: 5 });
+    it.each([0, -1])("il prezzo %s è rifiutato", async (priceCents) => {
+        const contract = await insertContract({ type: "assistance" });
 
         const constraint = await violation(() =>
-            db.update(assistanceTable).set({ includedHours: 30 }).where(eq(assistanceTable.contractId, contract.id))
+            db.insert(assistanceTable).values({
+                contractId: contract.id,
+                package: "ready_20",
+                includedHours: 20,
+                priceCents,
+            })
         );
 
-        expect(constraint).toBe("assistance_package_check");
+        expect(constraint).toBe("assistance_price_cents_check");
+    });
+
+    it("ore e prezzo sono obbligatori (niente più ore illimitate)", async () => {
+        const contract = await insertContract({ type: "assistance" });
+
+        for (const missing of [
+            { includedHours: null, priceCents: 50000 },
+            { includedHours: 20, priceCents: null },
+        ]) {
+            const caught = await db
+                .insert(assistanceTable)
+                .values({ contractId: contract.id, package: "ready_20", ...missing } as never)
+                .then(
+                    () => undefined,
+                    (error: unknown) => error
+                );
+
+            // Un NOT NULL non ha un nome di vincolo da confrontare: si guarda il codice SQLSTATE.
+            expect(codeOf(caught)).toBe("23502");
+        }
     });
 });
 
@@ -109,7 +166,9 @@ describe("disgiunzione fra le specializzazioni", () => {
         const rental = await insertContract({ type: "rental" });
 
         const constraint = await violation(() =>
-            db.insert(assistanceTable).values({ contractId: rental.id, assistanceType: "remote", includedHours: 5 })
+            db
+                .insert(assistanceTable)
+                .values({ contractId: rental.id, package: "remote_20", includedHours: 20, priceCents: 40000 })
         );
 
         expect(constraint).toBe("assistance_contract_fk");
@@ -122,8 +181,9 @@ describe("disgiunzione fra le specializzazioni", () => {
             db.insert(assistanceTable).values({
                 contractId: rental.id,
                 contractType: "rental",
-                assistanceType: "remote",
-                includedHours: 5,
+                package: "remote_20",
+                includedHours: 20,
+                priceCents: 40000,
             })
         );
 
@@ -132,7 +192,9 @@ describe("disgiunzione fra le specializzazioni", () => {
 
     it("una riga di assistenza senza contratto è rifiutata", async () => {
         const constraint = await violation(() =>
-            db.insert(assistanceTable).values({ contractId: 999, assistanceType: "remote", includedHours: 5 })
+            db
+                .insert(assistanceTable)
+                .values({ contractId: 999, package: "remote_20", includedHours: 20, priceCents: 40000 })
         );
 
         expect(constraint).toBe("assistance_contract_fk");

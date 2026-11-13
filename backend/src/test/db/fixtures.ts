@@ -167,15 +167,15 @@ export const insertContract = async (values: Partial<NewContract> = {}) => {
     return row;
 };
 
-/** Un contratto di assistenza con la sua riga, come li crea la rotta: predefinito 10 ore da remoto. */
+/** Un contratto di assistenza con la sua riga, come li crea la rotta: predefinito Pronti Via 20 (20 ore, 500,00 euro). */
 export const insertAssistanceContract = async (
     values: Partial<NewContract> = {},
-    assistance: Partial<Pick<NewAssistance, "assistanceType" | "includedHours">> = {}
+    assistance: Partial<Pick<NewAssistance, "package" | "includedHours" | "priceCents">> = {}
 ) => {
     const contract = await insertContract({ ...values, type: "assistance" });
     const [assistanceRow] = await db
         .insert(assistanceTable)
-        .values({ assistanceType: "remote", includedHours: 10, ...assistance, contractId: contract.id })
+        .values({ package: "ready_20", includedHours: 20, priceCents: 50000, ...assistance, contractId: contract.id })
         .returning();
     return { ...contract, assistance: assistanceRow };
 };

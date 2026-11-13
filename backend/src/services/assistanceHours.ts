@@ -1,41 +1,50 @@
 import {
     deleteAlerts,
+    deleteAllAlerts,
     getAlertContext,
     getAssistancePackage,
     insertAlertIfMissing,
     sumUsedHours,
     sumUsedHoursByMonth,
+    sumUsedHoursTotal,
 } from "../db/queries/assistanceHours";
-import type { AssistanceAlertKind, AssistanceType, InterventionType } from "../db/schema";
+import type { AssistanceAlertKind, InterventionType } from "../db/schema";
 import { getLabConfig } from "../config/lab";
+import { getPackageInfo, type AssistancePackage, type AssistancePeriod } from "./assistancePackages";
 import { isEmailConfigured, sendEmail } from "./emailManager";
 import { recordNotification } from "./notificationManager";
 
 /**
- * Le ore dei pacchetti di assistenza: quante ne sono state usate in un mese e gli avvisi al
- * fornitore all'80% e al 100%. Il mese è quello di calendario di `intervention_date`, senza
- * riporto: il primo del mese si riparte da zero (e gli avvisi del mese nuovo sono nuovi).
+ * Le ore dei pacchetti di assistenza: quante ne sono state usate e gli avvisi al fornitore
+ * all'80% e al 100%. I pacchetti con periodo `month` contano il mese di calendario di
+ * `intervention_date`, senza riporto: il primo del mese si riparte da zero (e gli avvisi del
+ * mese nuovo sono nuovi). I pacchetti Supporto (periodo `contract`) contano tutti gli interventi
+ * del contratto, con un solo avviso per soglia in tutta la durata.
  */
 
 /**
- * Quali tipi di intervento consuma ogni pacchetto: l'unica tabella, da cui dipendono sia il
- * conteggio sia la validazione del collegamento. La consegna di materiale non consuma mai.
+ * Quali tipi di intervento consuma un pacchetto (dal listino): da qui dipendono sia il conteggio
+ * sia la validazione del collegamento. La consegna di materiale non consuma mai.
  */
-const consumingTypesByAssistance: Record<AssistanceType, readonly InterventionType[]> = {
-    remote: ["remote"],
-    on_site: ["customer_site", "lab"],
-    complete: ["remote", "customer_site", "lab"],
-    full_time: ["remote", "customer_site", "lab"],
-};
+export const consumingInterventionTypes = (pack: AssistancePackage): readonly InterventionType[] =>
+    getPackageInfo(pack).coveredInterventionTypes;
 
-export const consumingInterventionTypes = (assistanceType: AssistanceType): readonly InterventionType[] =>
-    consumingTypesByAssistance[assistanceType];
-
-/** Le ore usate in un mese (`YYYY-MM`) da un contratto di assistenza; 0 per ogni altro contratto. */
+/**
+ * Le ore usate da un contratto di assistenza: nel mese (`YYYY-MM`) per i pacchetti mensili, in
+ * tutto il contratto per i Supporto (il mese è ignorato); 0 per ogni altro contratto.
+ */
 export const getUsedHours = async (contractId: number, month: string) => {
     const assistance = await getAssistancePackage(contractId);
 
-    return assistance ? sumUsedHours(contractId, consumingInterventionTypes(assistance.assistanceType), month) : 0;
+    if (!assistance) {
+        return 0;
+    }
+
+    const types = consumingInterventionTypes(assistance.package);
+
+    return getPackageInfo(assistance.package).period === "contract"
+        ? sumUsedHoursTotal(contractId, types)
+        : sumUsedHours(contractId, types, month);
 };
 
 export type MonthlyHours = { month: string; usedHours: number };
@@ -51,7 +60,7 @@ export const getMonthlyHours = async (contractId: number, currentMonth: string):
         return [];
     }
 
-    const months = await sumUsedHoursByMonth(contractId, consumingInterventionTypes(assistance.assistanceType));
+    const months = await sumUsedHoursByMonth(contractId, consumingInterventionTypes(assistance.package));
 
     if (!months.some((entry) => entry.month === currentMonth)) {
         months.push({ month: currentMonth, usedHours: 0 });
@@ -77,13 +86,6 @@ const reachedKinds = (usedHours: number, includedHours: number): AssistanceAlert
     return kinds;
 };
 
-const packageLabels: Record<AssistanceType, string> = {
-    remote: "assistenza da remoto",
-    on_site: "assistenza in sede",
-    complete: "assistenza completa",
-    full_time: "assistenza a tempo pieno",
-};
-
 // Per esteso ("ottobre 2026"): sta dentro una frase. Il mese non ha fuso, come i giorni.
 const monthFormatter = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" });
 const formatMonth = (month: string) => monthFormatter.format(new Date(`${month}-01T00:00:00Z`));
@@ -97,23 +99,31 @@ const buildAlertContent = (input: {
     customerName: string;
     device: string;
     contractId: number;
-    assistanceType: AssistanceType;
+    package: AssistancePackage;
     month: string;
     usedHours: number;
     includedHours: number;
 }): AlertContent => {
+    const { name, period } = getPackageInfo(input.package);
+    const perContract = period === "contract";
     const monthLabel = formatMonth(input.month);
     const used = formatHours(input.usedHours);
     const included = formatHours(input.includedHours);
-    const pack = `${packageLabels[input.assistanceType]} da ${included} ore al mese`;
+    const pack = `${name} da ${included} ore ${perContract ? "in 12 mesi" : "al mese"}`;
     const exhausted = input.kind === "exhausted";
+    // Il Supporto conta sull'intero contratto: niente mese nei testi.
+    const when = perContract ? "nel contratto" : `a ${monthLabel}`;
 
     const subject = exhausted
-        ? `Ore di assistenza esaurite a ${monthLabel} - ${input.customerName}`
-        : `Ore di assistenza quasi esaurite a ${monthLabel} - ${input.customerName}`;
-    const outcome = exhausted
-        ? `Il pacchetto di ${monthLabel} è esaurito: sono state usate ${used} ore su ${included}. Gli interventi successivi in questo mese superano le ore incluse.`
-        : `Nel mese di ${monthLabel} sono state usate ${used} ore su ${included}, oltre l'${warningPercent}% di quelle incluse.`;
+        ? `Ore di assistenza esaurite ${when} - ${input.customerName}`
+        : `Ore di assistenza quasi esaurite ${when} - ${input.customerName}`;
+    const outcome = perContract
+        ? exhausted
+            ? `Le ore del contratto sono esaurite: sono state usate ${used} ore su ${included}. Gli interventi successivi superano le ore incluse.`
+            : `Sulle ore del contratto sono state usate ${used} ore su ${included}, oltre l'${warningPercent}% di quelle incluse.`
+        : exhausted
+          ? `Il pacchetto di ${monthLabel} è esaurito: sono state usate ${used} ore su ${included}. Gli interventi successivi in questo mese superano le ore incluse.`
+          : `Nel mese di ${monthLabel} sono state usate ${used} ore su ${included}, oltre l'${warningPercent}% di quelle incluse.`;
     const text = [
         "Buongiorno,",
         `le scriviamo a proposito del contratto di ${pack} di ${input.customerName}, per ${input.device}.`,
@@ -127,20 +137,20 @@ const buildAlertContent = (input: {
         title: exhausted
             ? `Ore di assistenza esaurite: ${input.customerName}`
             : `Ore di assistenza all'${warningPercent}%: ${input.customerName}`,
-        message: `Contratto n. ${input.contractId} (${input.device}), ${monthLabel}: usate ${used} ore su ${included}.`,
+        message: `Contratto n. ${input.contractId} (${input.device}), ${perContract ? "ore del contratto" : monthLabel}: usate ${used} ore su ${included}.`,
     };
 };
 
 /**
  * Avvisa il fornitore; se l'email non è configurata o l'invio fallisce, l'avviso resta in app
- * come notifica (stessa chiave = un solo avviso per contratto, mese e soglia). Non lancia mai:
+ * come notifica (stessa chiave = un solo avviso per contratto, periodo e soglia). Non lancia mai:
  * una notifica non riuscita non deve far fallire l'intervento che l'ha provocata. Sono email di
  * sistema, quindi non passano dal limite orario degli invii manuali (`emailSendRateLimit`).
  */
 const notifyThreshold = async (input: {
     kind: AssistanceAlertKind;
     contractId: number;
-    assistanceType: AssistanceType;
+    package: AssistancePackage;
     month: string;
     usedHours: number;
     includedHours: number;
@@ -193,17 +203,27 @@ const notifyThreshold = async (input: {
  * - le soglie non più raggiunte perdono la riga, così potranno scattare di nuovo.
  *
  * Un salto oltre il 100% inserisce entrambe le righe ma avvisa solo "esaurito": dire prima
- * "quasi esaurito" e subito dopo "esaurito" sarebbe rumore. Il tempo pieno non ha soglie.
+ * "quasi esaurito" e subito dopo "esaurito" sarebbe rumore.
+ *
+ * Per i pacchetti Supporto il periodo è uno solo per tutto il contratto: `requestedMonth` (quello
+ * dell'intervento, passato dai chiamanti) si ignora e si usa il primo giorno del mese di
+ * `start_date`, sia come chiave dell'avviso sia nella chiave della notifica, altrimenti
+ * l'avviso scatterebbe di nuovo ogni mese.
  */
-export const checkAssistanceThresholds = async (contractId: number, month: string) => {
+export const checkAssistanceThresholds = async (contractId: number, requestedMonth: string) => {
     const assistance = await getAssistancePackage(contractId);
 
-    if (!assistance || assistance.includedHours === null) {
+    if (!assistance) {
         return;
     }
 
     const { includedHours } = assistance;
-    const usedHours = await sumUsedHours(contractId, consumingInterventionTypes(assistance.assistanceType), month);
+    const types = consumingInterventionTypes(assistance.package);
+    const perContract = getPackageInfo(assistance.package).period === "contract";
+    const month = perContract ? assistance.startDate.slice(0, 7) : requestedMonth;
+    const usedHours = perContract
+        ? await sumUsedHoursTotal(contractId, types)
+        : await sumUsedHours(contractId, types, month);
     const reached = reachedKinds(usedHours, includedHours);
 
     await deleteAlerts(
@@ -231,7 +251,7 @@ export const checkAssistanceThresholds = async (contractId: number, month: strin
         await notifyThreshold({
             kind: toNotify,
             contractId,
-            assistanceType: assistance.assistanceType,
+            package: assistance.package,
             month,
             usedHours,
             includedHours,
@@ -265,27 +285,54 @@ export const recheckAssistanceHours = async (targets: AssistanceHoursTarget[]) =
     }
 };
 
-export type ContractHours = {
-    month: string;
-    usedHours: number;
-    includedHours: number | null;
-    /** NULL per il tempo pieno, negativo se si è oltre il pacchetto. */
-    remainingHours: number | null;
+/**
+ * Al cambio di pacchetto le soglie sono altre (ore diverse, a volte un altro periodo): si tolgono
+ * tutti gli avvisi del contratto e si ricalcolano da zero. Non lancia mai, come
+ * `recheckAssistanceHours`.
+ */
+export const resetAssistanceAlerts = async (contractId: number, currentMonth: string) => {
+    try {
+        await deleteAllAlerts(contractId);
+    } catch (error) {
+        console.error("Impossibile azzerare gli avvisi delle ore di assistenza:", error);
+        return;
+    }
+
+    await recheckAssistanceHours([{ contractId, month: currentMonth }]);
 };
 
-/** Il riquadro "ore" della pagina del contratto e il suo storico, per il mese corrente indicato. */
+export type ContractHours = {
+    period: AssistancePeriod;
+    /** `YYYY-MM` per il periodo mensile, `null` per i pacchetti Supporto (tutto il contratto). */
+    month: string | null;
+    usedHours: number;
+    includedHours: number;
+    /** Negativo se si è oltre il pacchetto. */
+    remainingHours: number;
+};
+
+/**
+ * Il riquadro "ore" della pagina del contratto e il suo storico mensile. Per i pacchetti mensili
+ * le ore usate sono quelle del mese corrente indicato; per i Supporto, la somma su tutto il contratto.
+ */
 export const getContractHoursSummary = async (
     contractId: number,
-    includedHours: number | null,
+    pack: AssistancePackage,
+    includedHours: number,
     currentMonth: string
 ) => {
+    const { period } = getPackageInfo(pack);
     const monthlyHours = await getMonthlyHours(contractId, currentMonth);
-    const usedHours = monthlyHours.find((entry) => entry.month === currentMonth)?.usedHours ?? 0;
+    const usedHours =
+        period === "contract"
+            ? await sumUsedHoursTotal(contractId, consumingInterventionTypes(pack))
+            : (monthlyHours.find((entry) => entry.month === currentMonth)?.usedHours ?? 0);
     const hours: ContractHours = {
-        month: currentMonth,
+        period,
+        month: period === "contract" ? null : currentMonth,
         usedHours,
         includedHours,
-        remainingHours: includedHours === null ? null : Math.round((includedHours - usedHours) * 100) / 100,
+        remainingHours: Math.round((includedHours - usedHours) * 100) / 100,
     };
 
     return { hours, monthlyHours };

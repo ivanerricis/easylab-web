@@ -261,7 +261,7 @@ describe("listContracts: la riga", () => {
         const provider = await insertProvider({ providerName: "Acme Srl" });
         const assistance = await insertAssistanceContract(
             { customerId: customer.id, providerId: provider.id },
-            { assistanceType: "on_site", includedHours: 20 }
+            { package: "ready_40", includedHours: 40, priceCents: 90000 }
         );
         const rental = await insertContract();
 
@@ -271,10 +271,11 @@ describe("listContracts: la riga", () => {
         expect(assistanceRow).toMatchObject({
             customerName: "Mario Rossi",
             providerName: "Acme Srl",
-            assistanceType: "on_site",
-            includedHours: 20,
+            package: "ready_40",
+            includedHours: 40,
+            priceCents: 90000,
         });
-        expect(rentalRow).toMatchObject({ assistanceType: null, includedHours: null });
+        expect(rentalRow).toMatchObject({ package: null, includedHours: null, priceCents: null });
     });
 });
 
@@ -292,11 +293,11 @@ describe("createContract / updateContractById", () => {
                 customerId: customer.id,
                 providerId: provider.id,
             },
-            { assistanceType: "complete", includedHours: 100 }
+            { package: "ready_60", includedHours: 60, priceCents: 123000 }
         );
         const [row] = await getContractById(created.id, timeZone);
 
-        expect(row).toMatchObject({ status: "draft", assistanceType: "complete", includedHours: 100 });
+        expect(row).toMatchObject({ status: "draft", package: "ready_60", includedHours: 60, priceCents: 123000 });
     });
 
     it("se la riga di assistenza è rifiutata il contratto non resta (rollback)", async () => {
@@ -313,21 +314,21 @@ describe("createContract / updateContractById", () => {
                     customerId: customer.id,
                     providerId: provider.id,
                 },
-                { assistanceType: "remote", includedHours: 100 }
+                { package: "remote_20", includedHours: 0, priceCents: 40000 }
             )
-        ).rejects.toMatchObject({ cause: { constraint: "assistance_package_check" } });
+        ).rejects.toMatchObject({ cause: { constraint: "assistance_included_hours_check" } });
 
         const { rows } = await pool.query("select count(*)::int as total from contract");
         expect(rows[0].total).toBe(0);
     });
 
     it("aggiorna anche solo l'assistenza, e valorizza updated_at del contratto", async () => {
-        const contract = await insertAssistanceContract({}, { assistanceType: "remote", includedHours: 5 });
+        const contract = await insertAssistanceContract({}, { package: "remote_20", includedHours: 20 });
 
-        await updateContractById(contract.id, {}, { includedHours: 20 });
+        await updateContractById(contract.id, {}, { package: "ready_60", includedHours: 60, priceCents: 123000 });
         const [row] = await getContractById(contract.id, timeZone);
 
-        expect(row.includedHours).toBe(20);
+        expect(row).toMatchObject({ package: "ready_60", includedHours: 60, priceCents: 123000 });
         expect(row.updated_at).not.toBeNull();
     });
 

@@ -403,7 +403,7 @@ describe("customers router", () => {
             expect(listContracts).not.toHaveBeenCalled();
         });
 
-        it("genera il PDF con i contratti dal più recente, stato effettivo e date", async () => {
+        it("genera il PDF con i contratti dal piÃ¹ recente, stato effettivo e date", async () => {
             vi.mocked(getCustomerById).mockResolvedValue([customer] as never);
             vi.mocked(listContracts).mockResolvedValue([
                 {
@@ -413,8 +413,9 @@ describe("customers router", () => {
                     effectiveStatus: "expired",
                     providerName: "Acme Srl",
                     device: "NAS",
-                    assistanceType: "on_site",
-                    includedHours: 10,
+                    package: "ready_20",
+                    includedHours: 20,
+                    priceCents: 50000,
                     startDate: "2025-10-01",
                     endDate: "2026-04-01",
                 },
@@ -425,8 +426,9 @@ describe("customers router", () => {
                     effectiveStatus: "draft",
                     providerName: "Beta Spa",
                     device: "Notebook",
-                    assistanceType: null,
+                    package: null,
                     includedHours: null,
+                    priceCents: null,
                     startDate: "2026-10-01",
                     endDate: "2027-04-01",
                 },
@@ -449,7 +451,7 @@ describe("customers router", () => {
                             id: 2,
                             // Lo stato effettivo, non quello salvato.
                             status: "expired",
-                            assistance: { assistanceType: "on_site", includedHours: 10 },
+                            assistance: { package: "ready_20", includedHours: 20, priceCents: 50000 },
                             startDateLabel: expect.stringContaining("2025"),
                             endDateLabel: expect.stringContaining("2026"),
                         }),

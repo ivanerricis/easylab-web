@@ -1,8 +1,8 @@
 import type { ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import type { ContractCreateInput, ContractUpdateInput } from "@/lib/api";
-import { maxContractMonths, packageHours } from "@/lib/contracts";
+import { defaultAssistancePackage, maxContractMonths, supportTermMonths } from "@/lib/contracts";
 import { trimOrNull } from "@/lib/utils";
-import type { AssistanceType, ContractStatus, ContractType } from "@/types/dtos";
+import type { AssistancePackage, ContractStatus, ContractType } from "@/types/dtos";
 
 /**
  * I campi del contratto come li tiene il modulo (testo, come arrivano dai controlli). I clienti e i
@@ -20,13 +20,12 @@ export type ContractFormState = {
     startDate: string;
     customer: string;
     provider: string;
-    assistanceType: AssistanceType;
-    /** Le ore incluse come testo ("10"); vuoto per il full time, che non ne ha. */
-    includedHours: string;
+    /** La chiave del pacchetto del listino; ore e prezzo le copia il server. */
+    package: AssistancePackage;
 };
 
 export type ContractFormField =
-    "customer" | "provider" | "device" | "startDate" | "termMonths" | "billingMonths" | "includedHours";
+    "customer" | "provider" | "device" | "startDate" | "termMonths" | "billingMonths" | "package";
 
 export type ContractFieldErrors = Partial<Record<ContractFormField, string>>;
 
@@ -38,7 +37,7 @@ export const contractFieldOrder = [
     "termMonths",
     "billingMonths",
     "device",
-    "includedHours",
+    "package",
 ] as const;
 
 /** Mesi interi da 1 a `maxContractMonths`, scritti come testo. */
@@ -47,12 +46,8 @@ const isValidMonths = (value: string) =>
 
 const monthsError = `Indica un numero di mesi da 1 a ${maxContractMonths}`;
 
-/** Le ore con cui parte un pacchetto appena scelto: la prima fra quelle ammesse, nessuna per il full time. */
-export const defaultIncludedHours = (assistanceType: AssistanceType) => {
-    const [first] = packageHours[assistanceType];
-
-    return first == null ? "" : String(first);
-};
+/** Un pacchetto Supporto dura sempre 12 mesi: il server lo impone, il modulo lo anticipa. */
+export const isSupportTermValid = (termMonths: string) => Number(termMonths) === supportTermMonths;
 
 export const emptyContractFormState = (startDate: string, customer = ""): ContractFormState => ({
     type: "assistance",
@@ -64,16 +59,18 @@ export const emptyContractFormState = (startDate: string, customer = ""): Contra
     startDate,
     customer,
     provider: "",
-    assistanceType: "remote",
-    includedHours: defaultIncludedHours("remote"),
+    package: defaultAssistancePackage,
 });
 
 /**
  * Gli errori dei campi del contratto, ciascuno accanto al proprio. Cliente e fornitore li controlla
- * il dialogo, perché richiedono di risolvere il nome in un id. Per l'assistenza le ore devono
- * essere una di quelle del pacchetto: il menu non ne offre altre, ma il server le riapplica comunque.
+ * il dialogo, perché richiedono di risolvere il nome in un id. Il Supporto, che dura sempre
+ * 12 mesi, lo sa solo il listino: `isSupportPackage` dice se il pacchetto scelto lo è.
  */
-export const validateContractForm = (values: ContractFormState): ContractFieldErrors => {
+export const validateContractForm = (
+    values: ContractFormState,
+    { isSupportPackage = false }: { isSupportPackage?: boolean } = {}
+): ContractFieldErrors => {
     const errors: ContractFieldErrors = {};
 
     if (values.customer.trim() === "") {
@@ -90,6 +87,8 @@ export const validateContractForm = (values: ContractFormState): ContractFieldEr
 
     if (!isValidMonths(values.termMonths)) {
         errors.termMonths = monthsError;
+    } else if (values.type === "assistance" && isSupportPackage && !isSupportTermValid(values.termMonths)) {
+        errors.termMonths = "Il pacchetto Supporto dura sempre 12 mesi";
     }
 
     if (values.type === "rental" && !isValidMonths(values.billingMonths)) {
@@ -98,14 +97,6 @@ export const validateContractForm = (values: ContractFormState): ContractFieldEr
 
     if (values.device.trim() === "") {
         errors.device = "Indica il dispositivo";
-    }
-
-    if (values.type === "assistance" && values.assistanceType !== "full_time") {
-        const allowed = packageHours[values.assistanceType].map(String);
-
-        if (!allowed.includes(values.includedHours)) {
-            errors.includedHours = "Seleziona le ore incluse nel pacchetto";
-        }
     }
 
     return errors;
@@ -126,13 +117,7 @@ export const toContractSubmitValues = (
     startDate: values.startDate,
     customerId,
     providerId,
-    assistance:
-        values.type === "assistance"
-            ? {
-                  assistanceType: values.assistanceType,
-                  includedHours: values.assistanceType === "full_time" ? null : Number(values.includedHours),
-              }
-            : null,
+    assistance: values.type === "assistance" ? { package: values.package } : null,
 });
 
 /** I campi comuni a creazione e modifica: tutto tranne il tipo, che non si cambia. */

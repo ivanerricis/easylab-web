@@ -109,8 +109,9 @@ const selectContracts = (timeZone: string) => {
             customerName: personName(customerTable.firstName, customerTable.lastName),
             providerId: contractTable.providerId,
             providerName: providerTable.providerName,
-            assistanceType: assistanceTable.assistanceType,
+            package: assistanceTable.package,
             includedHours: assistanceTable.includedHours,
+            priceCents: assistanceTable.priceCents,
             // Solo i dati del contratto firmato, mai il file: la rotta li ripiega in `signedContract`.
             signedFileName: signedContractTable.fileName,
             signedSizeBytes: signedContractTable.sizeBytes,
@@ -197,7 +198,7 @@ export const getContractById = (id: number, timeZone: string) =>
  */
 export const createContract = (
     data: NewContract,
-    assistance?: Pick<NewAssistance, "assistanceType" | "includedHours">
+    assistance?: Pick<NewAssistance, "package" | "includedHours" | "priceCents">
 ) =>
     db.transaction(async (tx) => {
         const [contract] = await tx.insert(contractTable).values(data).returning();
@@ -217,7 +218,7 @@ export const createContract = (
 export const updateContractById = (
     id: number,
     data: UpdateContract,
-    assistance?: Partial<Pick<NewAssistance, "assistanceType" | "includedHours">>
+    assistance?: Partial<Pick<NewAssistance, "package" | "includedHours" | "priceCents">>
 ) =>
     db.transaction(async (tx) => {
         const [contract] = await tx

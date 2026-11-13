@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
     listCustomers: vi.fn(),
     listContracts: vi.fn(),
     createContract: vi.fn(),
+    listContractPackages: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -38,6 +39,7 @@ vi.mock("@/lib/api", async () => {
         listCustomers: (...args: unknown[]) => api.listCustomers(...args),
         listContracts: (...args: unknown[]) => api.listContracts(...args),
         createContract: (...args: unknown[]) => api.createContract(...args),
+        listContractPackages: (...args: unknown[]) => api.listContractPackages(...args),
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
         getCustomerContractsPrintUrl: (id: number) => `/api/customers/${id}/contracts/print`,
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
@@ -73,6 +75,7 @@ beforeEach(() => {
     api.listIssues.mockResolvedValue([]);
     api.listCollaborators.mockResolvedValue([]);
     api.listCustomers.mockResolvedValue(page([]));
+    api.listContractPackages.mockResolvedValue([]);
     api.listContracts.mockResolvedValue(
         page([
             {
@@ -90,7 +93,15 @@ beforeEach(() => {
                 customerName: "Mario Rossi",
                 providerId: 8,
                 providerName: "Rossi Informatica",
-                assistance: { assistanceType: "remote", includedHours: 10 },
+                assistance: {
+                    package: "remote_20",
+                    name: "Assistenza Remota Pack 20",
+                    includedHours: 20,
+                    priceCents: 40000,
+                    period: "month",
+                    priority: 4,
+                    typology: "Teleassistenza, solo software",
+                },
                 createdAt: "2026-06-01T10:00:00.000Z",
                 updatedAt: null,
             },

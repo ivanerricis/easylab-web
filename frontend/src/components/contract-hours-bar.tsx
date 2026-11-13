@@ -1,13 +1,15 @@
+import type { AssistancePeriod } from "@/types/dtos";
 import { formatHours, hoursUsageLevel, hoursUsagePercent, type HoursUsageLevel } from "@/lib/contracts";
 import { getMonthLabel } from "@/lib/monthKey";
 import { cn } from "@/lib/utils";
 
 type ContractHoursBarProps = {
-    /** Il mese a cui si riferiscono le ore, "AAAA-MM". */
-    month: string;
+    /** `month`: le ore del mese; `contract`: quelle di tutto il contratto (il Supporto). */
+    period: AssistancePeriod;
+    /** Il mese a cui si riferiscono le ore, "AAAA-MM"; `null` per il periodo `contract`. */
+    month: string | null;
     usedHours: number;
-    /** `null` per il full time: ore illimitate, niente barra. */
-    includedHours: number | null;
+    includedHours: number;
     className?: string;
 };
 
@@ -28,27 +30,28 @@ const textClassName: Record<HoursUsageLevel, string> = {
 };
 
 /**
- * Le ore consumate nel mese rispetto a quelle del pacchetto, nella scheda del contratto.
+ * Le ore consumate rispetto a quelle del pacchetto, nella scheda del contratto.
  *
- * Le ore valgono per mese di calendario e non si riportano: la barra riparte da zero il primo del
- * mese. Oltre il 100% la barra resta piena (non può uscire dal suo contenitore) e la quantità in
- * eccesso si dice a parole, in rosso: una barra piena e basta non distinguerebbe "esattamente
- * 10 ore su 10" da "15 ore su 10". Per il full time non c'è un tetto da raggiungere, quindi niente
- * barra: solo "Ore illimitate" e quante se ne sono usate.
+ * Nei pacchetti mensili le ore valgono per mese di calendario e non si riportano: la barra riparte
+ * da zero il primo del mese. Nel Supporto valgono per tutto il contratto e la barra le conta dal
+ * primo giorno. Oltre il 100% la barra resta piena (non può uscire dal suo contenitore) e la
+ * quantità in eccesso si dice a parole, in rosso: una barra piena e basta non distinguerebbe
+ * "esattamente 10 ore su 10" da "15 ore su 10".
  */
-const ContractHoursBar = ({ month, usedHours, includedHours, className }: ContractHoursBarProps) => {
+const ContractHoursBar = ({ period, month, usedHours, includedHours, className }: ContractHoursBarProps) => {
     const percent = hoursUsagePercent(usedHours, includedHours);
     const level = hoursUsageLevel(percent);
-    const monthLabel = getMonthLabel(month);
+    const monthLabel = period === "month" && month ? getMonthLabel(month) : null;
+    const label = monthLabel ? `Ore di ${monthLabel}` : "Ore del contratto";
+    const ariaLabel = monthLabel ? `Ore consumate a ${monthLabel}` : "Ore consumate nel contratto";
 
-    if (includedHours == null || percent == null) {
+    if (percent == null) {
         return (
             <div className={cn("grid gap-1", className)}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <span className="text-sm text-muted-foreground">Ore di {monthLabel}</span>
-                    <span className="text-sm font-medium">Ore illimitate</span>
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                    <span className="text-sm font-medium">{formatHours(usedHours)} usate</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Utilizzate nel mese: {formatHours(usedHours)}</p>
             </div>
         );
     }
@@ -59,7 +62,7 @@ const ContractHoursBar = ({ month, usedHours, includedHours, className }: Contra
     return (
         <div className={cn("grid gap-2", className)}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="text-sm text-muted-foreground">Ore di {monthLabel}</span>
+                <span className="text-sm text-muted-foreground">{label}</span>
                 <span className={cn("text-sm font-semibold", textClassName[level])}>
                     {formatHours(usedHours)} di {formatHours(includedHours)} ({roundedPercent}%)
                 </span>
@@ -67,7 +70,7 @@ const ContractHoursBar = ({ month, usedHours, includedHours, className }: Contra
 
             <div
                 role="progressbar"
-                aria-label={`Ore consumate a ${monthLabel}`}
+                aria-label={ariaLabel}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.min(roundedPercent, 100)}

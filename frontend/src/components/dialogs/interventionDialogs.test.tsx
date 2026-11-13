@@ -515,7 +515,7 @@ describe("EditInterventionDialog", () => {
 
 /** Il menu "Contratto di assistenza": offre solo i contratti validi per cliente, data e tipo. */
 describe("contratto di assistenza negli interventi", () => {
-    const contract = (id: number, assistanceType: string, overrides: Record<string, unknown> = {}) => ({
+    const contract = (id: number, pack: "remote_20" | "ready_20", overrides: Record<string, unknown> = {}) => ({
         id,
         type: "assistance",
         status: "active",
@@ -530,7 +530,26 @@ describe("contratto di assistenza negli interventi", () => {
         customerName: "Mario Rossi",
         providerId: 8,
         providerName: "Rossi Informatica",
-        assistance: { assistanceType, includedHours: assistanceType === "full_time" ? null : 10 },
+        assistance:
+            pack === "remote_20"
+                ? {
+                      package: pack,
+                      name: "Assistenza Remota Pack 20",
+                      includedHours: 20,
+                      priceCents: 40000,
+                      period: "month",
+                      priority: 4,
+                      typology: "Teleassistenza, solo software",
+                  }
+                : {
+                      package: pack,
+                      name: "Pronti Via 20",
+                      includedHours: 20,
+                      priceCents: 50000,
+                      period: "month",
+                      priority: 3,
+                      typology: "Teleassistenza, on site e in laboratorio",
+                  },
         createdAt: "2026-09-01T00:00:00.000Z",
         updatedAt: null,
         ...overrides,
@@ -540,7 +559,11 @@ describe("contratto di assistenza negli interventi", () => {
 
     beforeEach(() => {
         listContracts.mockResolvedValue(
-            pageOf([contract(1, "remote"), contract(2, "on_site"), contract(3, "remote", { startDate: "2026-11-01" })])
+            pageOf([
+                contract(1, "remote_20"),
+                contract(2, "ready_20"),
+                contract(3, "remote_20", { startDate: "2026-11-01" }),
+            ])
         );
     });
 
@@ -565,17 +588,24 @@ describe("contratto di assistenza negli interventi", () => {
             );
         });
         await userEvent.click(await screen.findByRole("combobox", { name: "Contratto di assistenza" }));
-        // Il #2 è "in sede o in laboratorio": non consuma ore da remoto. Il #3 inizia dopo la data.
-        expect(screen.getByRole("option", { name: /#1 Remota/ })).toBeInTheDocument();
-        expect(screen.queryByRole("option", { name: /#2/ })).not.toBeInTheDocument();
+        // Da remoto valgono sia l'assistenza remota (#1) sia Pronti Via (#2). Il #3 inizia dopo la data.
+        expect(screen.getByRole("option", { name: /#1 Assistenza Remota/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /#2 Pronti Via/ })).toBeInTheDocument();
         expect(screen.queryByRole("option", { name: /#3/ })).not.toBeInTheDocument();
+        await userEvent.keyboard("{Escape}");
+
+        // In laboratorio l'assistenza remota non consuma ore: resta solo Pronti Via.
+        await chooseOption("Tipo intervento", "Intervento in laboratorio");
+        await userEvent.click(await screen.findByRole("combobox", { name: "Contratto di assistenza" }));
+        expect(screen.queryByRole("option", { name: /#1/ })).not.toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /#2 Pronti Via/ })).toBeInTheDocument();
     });
 
     it("un intervento in laboratorio vede il pacchetto in sede e lo invia come contractId", async () => {
         const onSubmit = await renderCreate();
         await chooseOption("Tipo intervento", "Intervento in laboratorio");
         await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
-        await chooseOption("Contratto di assistenza", /#2 In sede/);
+        await chooseOption("Contratto di assistenza", /#2 Pronti Via/);
         await save();
 
         await waitFor(() => {
@@ -585,29 +615,34 @@ describe("contratto di assistenza negli interventi", () => {
 
     it("toglie il contratto scelto quando il tipo non lo consuma più e prende l'unico rimasto", async () => {
         const onSubmit = await renderCreate();
-        await chooseOption("Tipo intervento", "Intervento in laboratorio");
-        await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
-        await chooseOption("Contratto di assistenza", /#2 In sede/);
-
-        // Da remoto il #2 non vale più; l'unico valido è il #1, che si sceglie da solo.
         await chooseOption("Tipo intervento", "Intervento da remoto");
+        await userEvent.type(screen.getByLabelText(/^Problema/), "Non si accende");
+        await chooseOption("Contratto di assistenza", /#1 Assistenza Remota/);
+
+        // In laboratorio il #1 non vale più; l'unico valido è il #2, che si sceglie da solo.
+        await chooseOption("Tipo intervento", "Intervento in laboratorio");
         await waitFor(() => {
-            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#1 Remota");
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent(
+                "#2 Pronti Via"
+            );
         });
         await save();
 
         await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "remote", contractId: 1 }));
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ type: "lab", contractId: 2 }));
         });
     });
 
     it("con un solo contratto valido lo sceglie già, e non lo ripropone se si sceglie nessuno", async () => {
+        listContracts.mockResolvedValue(pageOf([contract(1, "remote_20")]));
         const onSubmit = await renderCreate();
         await chooseOption("Tipo intervento", "Intervento da remoto");
         await userEvent.type(screen.getByLabelText(/^Problema/), "Rete");
 
         await waitFor(() => {
-            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#1 Remota");
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent(
+                "#1 Assistenza Remota"
+            );
         });
 
         await chooseOption("Contratto di assistenza", "Nessun contratto");
@@ -620,15 +655,15 @@ describe("contratto di assistenza negli interventi", () => {
     });
 
     it("con più contratti validi non ne sceglie nessuno", async () => {
-        listContracts.mockResolvedValue(pageOf([contract(1, "remote"), contract(4, "remote")]));
+        listContracts.mockResolvedValue(pageOf([contract(1, "remote_20"), contract(4, "remote_20")]));
         await renderCreate();
         await chooseOption("Tipo intervento", "Intervento da remoto");
 
         const select = await screen.findByRole("combobox", { name: "Contratto di assistenza" });
         expect(select).toHaveTextContent("Nessun contratto");
         await userEvent.click(select);
-        expect(screen.getByRole("option", { name: /#1 Remota/ })).toBeInTheDocument();
-        expect(screen.getByRole("option", { name: /#4 Remota/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /#1 Assistenza Remota/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /#4 Assistenza Remota/ })).toBeInTheDocument();
     });
 
     it("senza contratti validi il menu non c'è", async () => {
@@ -643,7 +678,7 @@ describe("contratto di assistenza negli interventi", () => {
     });
 
     it("in modifica tiene il contratto già collegato anche se scaduto e non lo rimanda se non cambia", async () => {
-        getContract.mockResolvedValue(contract(5, "remote", { effectiveStatus: "expired", endDate: "2026-12-01" }));
+        getContract.mockResolvedValue(contract(5, "remote_20", { effectiveStatus: "expired", endDate: "2026-12-01" }));
         listContracts.mockResolvedValue(pageOf([]));
         getIntervention.mockResolvedValue({
             id: 9,
@@ -677,7 +712,9 @@ describe("contratto di assistenza negli interventi", () => {
         await screen.findByLabelText(/^Problema/);
 
         await waitFor(() => {
-            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#5 Remota");
+            expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent(
+                "#5 Assistenza Remota"
+            );
         });
         await save();
 
@@ -731,7 +768,7 @@ describe("contratto di assistenza negli interventi", () => {
     });
 
     it("se il cliente ha contratti ma nessuno copre la data, spiega perché non c'è il menu", async () => {
-        listContracts.mockResolvedValue(pageOf([contract(3, "remote", { startDate: "2026-11-05" })]));
+        listContracts.mockResolvedValue(pageOf([contract(3, "remote_20", { startDate: "2026-11-05" })]));
         await renderCreate();
         await chooseOption("Tipo intervento", "Intervento da remoto");
 

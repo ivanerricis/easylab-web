@@ -862,7 +862,7 @@ describe("interventions router", () => {
     });
 
     describe("collegamento a un contratto di assistenza", () => {
-        // Un contratto da 5 ore da remoto del cliente 1, valido per tutto il 2026.
+        // Un contratto Assistenza Remota Pack 20 del cliente 1, valido per tutto il 2026.
         const contract = {
             id: 5,
             type: "assistance",
@@ -870,7 +870,7 @@ describe("interventions router", () => {
             effectiveStatus: "active",
             startDate: "2026-01-01",
             endDate: "2027-01-01",
-            assistanceType: "remote",
+            package: "remote_20",
         };
 
         const linkedBody = {
@@ -922,7 +922,7 @@ describe("interventions router", () => {
             ["il contratto non esiste", undefined, {}, "Il contratto selezionato non esiste"],
             [
                 "il contratto non è di assistenza",
-                { ...contract, type: "rental", assistanceType: null },
+                { ...contract, type: "rental", package: null },
                 {},
                 "Si può collegare solo un contratto di assistenza",
             ],
@@ -957,14 +957,14 @@ describe("interventions router", () => {
                 "La data dell'intervento non rientra nel periodo del contratto",
             ],
             [
-                "il pacchetto da remoto non consuma gli interventi in sede",
+                "il pacchetto remoto non consuma gli interventi in sede",
                 contract,
                 { type: "customer_site" },
                 "Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato",
             ],
             [
                 "la consegna di materiale non consuma mai",
-                { ...contract, assistanceType: "complete" },
+                { ...contract, package: "ready_60" },
                 { type: "material_delivery" },
                 "Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato",
             ],
@@ -981,17 +981,20 @@ describe("interventions router", () => {
             expect(recheckAssistanceHours).not.toHaveBeenCalled();
         });
 
-        it("il pacchetto in sede accetta sia l'intervento in sede sia quello in laboratorio", async () => {
-            vi.mocked(getContractById).mockResolvedValue([{ ...contract, assistanceType: "on_site" }] as never);
+        it.each(["ready_20", "support_plus"])(
+            "il pacchetto %s accetta remoto, intervento in sede e in laboratorio",
+            async (key) => {
+                vi.mocked(getContractById).mockResolvedValue([{ ...contract, package: key }] as never);
 
-            for (const type of ["customer_site", "lab"]) {
-                const response = await request(buildApp())
-                    .post("/api/interventions")
-                    .send({ ...linkedBody, type });
+                for (const type of ["remote", "customer_site", "lab"]) {
+                    const response = await request(buildApp())
+                        .post("/api/interventions")
+                        .send({ ...linkedBody, type });
 
-                expect(response.status).toBe(201);
+                    expect(response.status).toBe(201);
+                }
             }
-        });
+        );
 
         it("PUT valida la riga risultante: spostare la data fuori dal contratto è un 400", async () => {
             vi.mocked(getInterventionById).mockResolvedValue([linkedStored] as never);

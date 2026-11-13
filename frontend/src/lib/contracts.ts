@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/utils";
 import type {
-    AssistanceType,
+    AssistancePackage,
+    AssistancePeriod,
     ContractDto,
     ContractEffectiveStatus,
     ContractStatus,
@@ -33,38 +34,29 @@ export const monthsPresets = [3, 6, 12, 24] as const;
 /** Il tetto dei mesi che il server accetta per durata e fatturazione. */
 export const maxContractMonths = 120;
 
-export const assistanceTypeOptions: { value: AssistanceType; label: string }[] = [
-    { value: "remote", label: "Remota" },
-    { value: "on_site", label: "In sede o in laboratorio" },
-    { value: "complete", label: "Completa" },
-    { value: "full_time", label: "Full time" },
-];
+/** La durata fissa, in mesi, dei pacchetti Supporto: il server rifiuta qualunque altra. */
+export const supportTermMonths = 12;
+
+/** Il pacchetto con cui parte un contratto di assistenza nuovo: il primo del listino. */
+export const defaultAssistancePackage: AssistancePackage = "remote_20";
 
 /**
- * Le ore mensili che ogni pacchetto può includere: lo specchio della tabella del backend, che le
- * riapplica. `null` è "illimitate" (full time) e per quel pacchetto non c'è niente da scegliere.
- * Le ore valgono per mese di calendario e non si riportano al mese dopo.
+ * I tipi di intervento che consumano le ore di un pacchetto (lo specchio del listino del backend,
+ * che li riapplica): l'assistenza remota solo gli interventi da remoto, gli altri anche quelli dal
+ * cliente e in laboratorio. La consegna di materiale non ne consuma mai: non è assistenza.
  */
-export const packageHours: Record<AssistanceType, readonly (number | null)[]> = {
-    remote: [5, 10, 20],
-    on_site: [10, 20, 30],
-    complete: [100],
-    full_time: [null],
+const consumedInterventionTypes: Record<AssistancePackage, readonly InterventionType[]> = {
+    remote_20: ["remote"],
+    remote_40: ["remote"],
+    ready_20: ["remote", "customer_site", "lab"],
+    ready_40: ["remote", "customer_site", "lab"],
+    ready_60: ["remote", "customer_site", "lab"],
+    support_base: ["remote", "customer_site", "lab"],
+    support_plus: ["remote", "customer_site", "lab"],
 };
 
-/**
- * I tipi di intervento che consumano le ore di un pacchetto. La consegna di materiale non ne
- * consuma mai, qualunque pacchetto sia: non è assistenza.
- */
-const consumedInterventionTypes: Record<AssistanceType, readonly InterventionType[]> = {
-    remote: ["remote"],
-    on_site: ["customer_site", "lab"],
-    complete: ["remote", "customer_site", "lab"],
-    full_time: ["remote", "customer_site", "lab"],
-};
-
-export const interventionTypesForAssistance = (type: AssistanceType): readonly InterventionType[] =>
-    consumedInterventionTypes[type];
+export const interventionTypesForAssistance = (pack: AssistancePackage): readonly InterventionType[] =>
+    consumedInterventionTypes[pack];
 
 export const formatContractType = (value: ContractType) =>
     contractTypeOptions.find((option) => option.value === value)?.label ?? value;
@@ -96,23 +88,36 @@ export const formatContractTerm = (months: number) => (months === 1 ? "1 mese" :
 /** Il periodo di fatturazione di un noleggio: "ogni mese", "ogni 3 mesi". */
 export const formatBillingPeriod = (months: number) => (months === 1 ? "ogni mese" : `ogni ${months} mesi`);
 
-export const formatAssistanceType = (value: AssistanceType) =>
-    assistanceTypeOptions.find((option) => option.value === value)?.label ?? value;
-
 /** Le ore all'italiana: "3,5 h", senza decimali inutili ("10 h") e con al massimo due cifre. */
 export const formatHours = (hours: number) => `${hours.toLocaleString("it-IT", { maximumFractionDigits: 2 })} h`;
 
-/** Il pacchetto di un contratto in una frase: "Remota - 10 h/mese", "Full time - ore illimitate". */
-export const formatContractPackage = (contract: Pick<ContractDto, "type" | "assistance">) => {
-    if (!contract.assistance) {
-        return "-";
-    }
+// Con il solo stile "currency" i numeri a quattro cifre escono senza punto ("1600,00"): qui il
+// punto delle migliaia serve sempre, perché "1.600,00 €" è il prezzo del listino.
+const priceFormatter = new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: "always",
+} as unknown as Intl.NumberFormatOptions);
 
-    const { assistanceType, includedHours } = contract.assistance;
-    const hours = includedHours == null ? "ore illimitate" : `${formatHours(includedHours)}/mese`;
+type PackageTerms = { priceCents: number; period: AssistancePeriod; includedHours: number };
 
-    return `${formatAssistanceType(assistanceType)} - ${hours}`;
-};
+/** Il prezzo IVA esclusa: "400,00 € al mese + IVA" per i pacchetti mensili, "1.600,00 € + IVA" per il Supporto. */
+export const formatPackagePrice = ({ priceCents, period }: Pick<PackageTerms, "priceCents" | "period">) =>
+    `${priceFormatter.format(priceCents / 100)}${period === "month" ? " al mese" : ""} + IVA`;
+
+/** Le ore incluse con il loro periodo: "20 ore al mese", "80 ore in 12 mesi". */
+export const formatPackageHours = ({ includedHours, period }: Pick<PackageTerms, "includedHours" | "period">) =>
+    `${includedHours.toLocaleString("it-IT", { maximumFractionDigits: 2 })} ore ${
+        period === "month" ? "al mese" : `in ${supportTermMonths} mesi`
+    }`;
+
+/** La priorità d'intervento: la 1 è la più alta ("1 (massima)"), le altre solo il numero. */
+export const formatPackagePriority = (priority: number) => (priority === 1 ? "1 (massima)" : String(priority));
+
+/** Il pacchetto di un contratto: il nome del listino, "-" se non è un contratto di assistenza. */
+export const formatContractPackage = (contract: Pick<ContractDto, "assistance">) => contract.assistance?.name ?? "-";
 
 /**
  * Il colore dello stato di un contratto, per il badge e per la colonna ID delle tabelle, che come
@@ -131,15 +136,12 @@ export const contractStatusColor = (value: ContractEffectiveStatus): StatusColor
     }
 };
 
-/**
- * Quanto del pacchetto del mese è stato consumato, in percentuale (anche oltre il 100). `null`
- * per le ore illimitate, dove una percentuale non ha senso.
- */
 /** Nome del documento stampato: la bozza è un preventivo, il resto un contratto. */
 export const contractPrintName = (status: ContractEffectiveStatus) => (status === "draft" ? "preventivo" : "contratto");
 
-export const hoursUsagePercent = (usedHours: number, includedHours: number | null) =>
-    includedHours == null || includedHours <= 0 ? null : (usedHours / includedHours) * 100;
+/** Quanto del pacchetto è stato consumato, in percentuale (anche oltre il 100); `null` senza ore incluse. */
+export const hoursUsagePercent = (usedHours: number, includedHours: number) =>
+    includedHours <= 0 ? null : (usedHours / includedHours) * 100;
 
 /** Le soglie con cui il backend avvisa il fornitore: lo stesso 80% e 100% che colorano la barra. */
 export type HoursUsageLevel = "ok" | "warning" | "exceeded";
@@ -175,7 +177,7 @@ export const isContractLinkable = (
     date !== "" &&
     contract.startDate <= date &&
     date < contract.endDate &&
-    interventionTypesForAssistance(contract.assistance.assistanceType).includes(type);
+    interventionTypesForAssistance(contract.assistance.package).includes(type);
 
 /**
  * `keepContractId`: il contratto già collegato a un intervento in modifica. Se nel frattempo è
@@ -211,8 +213,7 @@ export const explainNoLinkableContract = (
 
     const consuming = contracts.filter(
         (contract) =>
-            contract.assistance != null &&
-            interventionTypesForAssistance(contract.assistance.assistanceType).includes(type)
+            contract.assistance != null && interventionTypesForAssistance(contract.assistance.package).includes(type)
     );
 
     if (consuming.length === 0) {
@@ -228,13 +229,6 @@ export const explainNoLinkableContract = (
     return "La data dell'intervento è fuori dal periodo dei contratti di assistenza del cliente.";
 };
 
-/** Come un contratto compare nel menu dell'intervento: "Remota 10 h/mese - Notebook (fino al 01/12/2026)". */
-export const formatContractOption = (contract: ContractDto) => {
-    const assistance = contract.assistance
-        ? `${formatAssistanceType(contract.assistance.assistanceType)}${
-              contract.assistance.includedHours == null ? "" : ` ${formatHours(contract.assistance.includedHours)}/mese`
-          }`
-        : formatContractType(contract.type);
-
-    return `#${contract.id} ${assistance} - ${contract.device} (fino al ${formatDate(contract.endDate)})`;
-};
+/** Come un contratto compare nel menu dell'intervento: "#4 Pronti Via 20 - Notebook (fino al 01/12/2026)". */
+export const formatContractOption = (contract: ContractDto) =>
+    `#${contract.id} ${contract.assistance?.name ?? formatContractType(contract.type)} - ${contract.device} (fino al ${formatDate(contract.endDate)})`;

@@ -323,6 +323,13 @@
       "when": 1776456421000,
       "tag": "0045_signed_contract",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1776456422000,
+      "tag": "0046_assistance_packages",
+      "breakpoints": true
     }
   ]
 }

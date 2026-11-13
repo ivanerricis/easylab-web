@@ -15,6 +15,10 @@ type Props = {
     value: string;
     onChange: (value: string) => void;
     error?: string;
+    /** Una nota sotto il campo, per dire perché il valore è fisso quando `disabled`. */
+    description?: string;
+    /** Il valore non si cambia (un pacchetto con durata fissa): menu e casella restano visibili ma spenti. */
+    disabled?: boolean;
     className?: string;
 };
 
@@ -23,15 +27,16 @@ type Props = {
  * quella che serve. Un valore che non è fra quelle proposte (un contratto di 18 mesi che si modifica)
  * apre la casella da solo.
  */
-const MonthsField = ({ id, label, value, onChange, error, className }: Props) => {
+const MonthsField = ({ id, label, value, onChange, error, description, disabled, className }: Props) => {
     const [isCustomChosen, setIsCustomChosen] = useState(false);
     const isPreset = monthsPresets.some((months) => String(months) === value.trim());
     const showsInput = isCustomChosen || !isPreset;
 
     return (
-        <FormField id={id} label={label} className={className} error={error}>
+        <FormField id={id} label={label} className={className} error={error} description={description}>
             <div className="grid gap-2">
                 <Select
+                    disabled={disabled}
                     value={showsInput ? customValue : value}
                     onValueChange={(next) => {
                         if (next === customValue) {
@@ -69,6 +74,7 @@ const MonthsField = ({ id, label, value, onChange, error, className }: Props) =>
                         min={1}
                         max={maxContractMonths}
                         step={1}
+                        disabled={disabled}
                         placeholder="Numero di mesi"
                         value={value}
                         onChange={(event) => onChange(event.target.value)}

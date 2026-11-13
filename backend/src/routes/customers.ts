@@ -121,9 +121,9 @@ const customersRouter = createCrudRouter({
             }
 
             const result = await listContracts({ customerId: id, timeZone: await getAppTimeZone() });
-            // Senza `page` la lista è sempre un array: il ramo `items` serve solo al tipo.
+            // Senza `page` la lista Ã¨ sempre un array: il ramo `items` serve solo al tipo.
             const rows = Array.isArray(result) ? result : result.items;
-            // Dal più recente, come l'elenco dei contratti.
+            // Dal piÃ¹ recente, come l'elenco dei contratti.
             const contracts = [...rows].sort((a, b) => b.id - a.id);
 
             const pdfBuffer = await createCustomerContractsPdfBuffer({
@@ -135,9 +135,14 @@ const customersRouter = createCrudRouter({
                     status: contract.effectiveStatus,
                     providerName: contract.providerName,
                     device: contract.device,
-                    assistance: contract.assistanceType
-                        ? { assistanceType: contract.assistanceType, includedHours: contract.includedHours }
-                        : null,
+                    assistance:
+                        contract.package && contract.includedHours !== null && contract.priceCents !== null
+                            ? {
+                                  package: contract.package,
+                                  includedHours: contract.includedHours,
+                                  priceCents: contract.priceCents,
+                              }
+                            : null,
                     startDateLabel: formatDayLabel(contract.startDate),
                     endDateLabel: formatDayLabel(contract.endDate),
                 })),

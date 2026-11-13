@@ -22,11 +22,19 @@ export const monthStart = (month: string) => `${month}-01`;
  */
 const hoursOf = sql`extract(epoch from (${interventionTable.endTime} - ${interventionTable.startTime}))`;
 
-/** Il pacchetto del contratto, o `undefined` se non è un contratto di assistenza. */
+/**
+ * Il pacchetto del contratto, o `undefined` se non è un contratto di assistenza. Con la data di
+ * inizio del contratto: i pacchetti Supporto la usano per la chiave fissa degli avvisi.
+ */
 export const getAssistancePackage = async (contractId: number) => {
     const [row] = await db
-        .select({ assistanceType: assistanceTable.assistanceType, includedHours: assistanceTable.includedHours })
+        .select({
+            package: assistanceTable.package,
+            includedHours: assistanceTable.includedHours,
+            startDate: contractTable.startDate,
+        })
         .from(assistanceTable)
+        .innerJoin(contractTable, eq(contractTable.id, assistanceTable.contractId))
         .where(eq(assistanceTable.contractId, contractId));
 
     return row;
@@ -52,6 +60,26 @@ export const sumUsedHours = async (contractId: number, types: readonly Intervent
                 inArray(interventionTable.type, [...types]),
                 sql`${interventionTable.interventionDate} >= ${start}::date`,
                 sql`${interventionTable.interventionDate} < (${start}::date + interval '1 month')`
+            )
+        );
+
+    return Number(row?.hours ?? 0);
+};
+
+/** Le ore consumate in tutta la vita del contratto (pacchetti Supporto): nessun filtro di mese. */
+export const sumUsedHoursTotal = async (contractId: number, types: readonly InterventionType[]) => {
+    if (types.length === 0) {
+        return 0;
+    }
+
+    const [row] = await db
+        .select({ hours: sql<number>`round(coalesce(sum(${hoursOf}), 0) / 3600.0, 2)::float8` })
+        .from(interventionTable)
+        .where(
+            and(
+                eq(interventionTable.contractId, contractId),
+                eq(interventionTable.status, "completed"),
+                inArray(interventionTable.type, [...types])
             )
         );
 
@@ -111,6 +139,11 @@ export const deleteAlerts = async (contractId: number, month: string, kinds: rea
                 inArray(assistanceHoursAlertTable.kind, [...kinds])
             )
         );
+};
+
+/** Toglie tutti gli avvisi di un contratto: al cambio di pacchetto le soglie si ricalcolano da zero. */
+export const deleteAllAlerts = async (contractId: number) => {
+    await db.delete(assistanceHoursAlertTable).where(eq(assistanceHoursAlertTable.contractId, contractId));
 };
 
 /** Quello che serve a scrivere l'email al fornitore: dispositivo, cliente e indirizzo di chi la riceve. */

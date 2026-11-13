@@ -27,12 +27,14 @@ import { toContractUpdatePayload } from "@/lib/contractForm";
 import {
     contractPrintName,
     contractStatusColor,
-    formatAssistanceType,
     formatContractStatus,
     formatBillingPeriod,
     formatContractTerm,
     formatContractType,
     formatHours,
+    formatPackageHours,
+    formatPackagePrice,
+    formatPackagePriority,
     hoursUsagePercent,
 } from "@/lib/contracts";
 import { entityPaths } from "@/lib/entityPaths";
@@ -133,6 +135,18 @@ const ContractPage = () => {
 
     const monthlyHours = sortedMonthlyHours(contract);
     const includedHours = contract.assistance?.includedHours ?? null;
+    // Per il Supporto le ore sono di tutto il contratto: lo storico mostra il totale progressivo, senza percentuale.
+    const isContractPeriod = contract.assistance?.period === "contract";
+    const cumulativeHours = new Map<string, number>();
+
+    if (isContractPeriod) {
+        let total = 0;
+
+        for (const row of [...monthlyHours].reverse()) {
+            total += row.usedHours;
+            cumulativeHours.set(row.month, total);
+        }
+    }
 
     return (
         // Scorre il `main` del layout, come nella scheda dell'intervento.
@@ -256,18 +270,14 @@ const ContractPage = () => {
                         <DetailGrid layout="rows">
                             {contract.assistance ? (
                                 <>
+                                    <DetailItem label="Pacchetto" value={contract.assistance.name} />
+                                    <DetailItem label="Ore incluse" value={formatPackageHours(contract.assistance)} />
+                                    <DetailItem label="Prezzo" value={formatPackagePrice(contract.assistance)} />
                                     <DetailItem
-                                        label="Pacchetto"
-                                        value={formatAssistanceType(contract.assistance.assistanceType)}
+                                        label="Priorità d'intervento"
+                                        value={formatPackagePriority(contract.assistance.priority)}
                                     />
-                                    <DetailItem
-                                        label="Ore al mese"
-                                        value={
-                                            contract.assistance.includedHours == null
-                                                ? "Ore illimitate"
-                                                : formatHours(contract.assistance.includedHours)
-                                        }
-                                    />
+                                    <DetailItem label="Tipologia" value={contract.assistance.typology} />
                                 </>
                             ) : null}
                             {contract.billingMonths != null ? (
@@ -287,9 +297,10 @@ const ContractPage = () => {
 
                 {isAssistance ? (
                     <>
-                        <DetailSection title="Ore del mese">
+                        <DetailSection title={isContractPeriod ? "Ore del contratto" : "Ore del mese"}>
                             {contract.hours ? (
                                 <ContractHoursBar
+                                    period={contract.hours.period}
                                     month={contract.hours.month}
                                     usedHours={contract.hours.usedHours}
                                     includedHours={contract.hours.includedHours}
@@ -307,14 +318,26 @@ const ContractPage = () => {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Mese</TableHead>
-                                            <TableHead>Ore usate</TableHead>
-                                            <TableHead>Ore incluse</TableHead>
-                                            <TableHead>Utilizzo</TableHead>
+                                            {isContractPeriod ? (
+                                                <>
+                                                    <TableHead>Ore usate nel mese</TableHead>
+                                                    <TableHead>Totale progressivo</TableHead>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <TableHead>Ore usate</TableHead>
+                                                    <TableHead>Ore incluse</TableHead>
+                                                    <TableHead>Utilizzo</TableHead>
+                                                </>
+                                            )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {monthlyHours.map((row) => {
-                                            const percent = hoursUsagePercent(row.usedHours, includedHours);
+                                            const percent =
+                                                includedHours == null
+                                                    ? null
+                                                    : hoursUsagePercent(row.usedHours, includedHours);
 
                                             return (
                                                 <TableRow key={row.month}>
@@ -322,20 +345,28 @@ const ContractPage = () => {
                                                         {getMonthLabel(row.month)}
                                                     </TableCell>
                                                     <TableCell>{formatHours(row.usedHours)}</TableCell>
-                                                    <TableCell>
-                                                        {includedHours == null
-                                                            ? "Illimitate"
-                                                            : formatHours(includedHours)}
-                                                    </TableCell>
-                                                    <TableCell
-                                                        className={cn(
-                                                            percent != null &&
-                                                                percent > 100 &&
-                                                                "font-medium text-destructive"
-                                                        )}
-                                                    >
-                                                        {percent == null ? "-" : `${Math.round(percent)}%`}
-                                                    </TableCell>
+                                                    {isContractPeriod ? (
+                                                        <TableCell>
+                                                            {formatHours(cumulativeHours.get(row.month) ?? 0)}
+                                                        </TableCell>
+                                                    ) : (
+                                                        <>
+                                                            <TableCell>
+                                                                {includedHours == null
+                                                                    ? "-"
+                                                                    : formatHours(includedHours)}
+                                                            </TableCell>
+                                                            <TableCell
+                                                                className={cn(
+                                                                    percent != null &&
+                                                                        percent > 100 &&
+                                                                        "font-medium text-destructive"
+                                                                )}
+                                                            >
+                                                                {percent == null ? "-" : `${Math.round(percent)}%`}
+                                                            </TableCell>
+                                                        </>
+                                                    )}
                                                 </TableRow>
                                             );
                                         })}

@@ -284,14 +284,15 @@ enum("ctype", "ContractType", C1, 1250, ["assistance", "rental"])
 cls("assistance", "Assistance", C2, 1160, [
     "+ contract_id: int PK FK [1]",
     "+ contract_type: text [1]  {sempre assistance}",
-    "+ assistance_type: AssistanceType [1]",
-    "+ included_hours: int [0..1]  {al mese}",
+    "+ package: AssistancePackage [1]",
+    "+ included_hours: int [1]  {copia del listino}",
+    "+ price_cents: int [1]  {copia del listino, IVA esclusa}",
     "+ created_at: datetime [1]",
     "+ updated_at: datetime",
-    "+ /used_hours_month: decimal",
-    "+ /remaining_hours_month: decimal",
+    "+ /used_hours: decimal  {mese o contratto}",
+    "+ /remaining_hours: decimal",
 ], color=NEW)
-enum("asstype", "AssistanceType", C1, 1380, ["remote", "on_site", "complete", "full_time"])
+enum("asstype", "AssistancePackage", C1, 1380, ["remote_20", "remote_40", "ready_20", "ready_40", "ready_60", "support_base", "support_plus"])
 cls("alert", "AssistanceHoursAlert", C2, 1410, [
     "+ contract_id: int PK FK [1]",
     "+ month: date PK [1]",
@@ -302,33 +303,42 @@ enum("alertkind", "AlertKind", C2, 1580, ["warning", "exhausted"])
 
 note_id = nid("n")
 note = (
-    "&lt;b&gt;Pacchetti di assistenza (ore al mese)&lt;/b&gt;&lt;br&gt;"
-    "{assistance_type → included_hours ammesse → interventi che le scalano}&lt;br&gt;"
-    "• remote → 5, 10, 20 → remote&lt;br&gt;"
-    "• on_site → 10, 20, 30 → customer_site, lab&lt;br&gt;"
-    "• complete → 100 → remote, customer_site, lab&lt;br&gt;"
-    "• full_time → NULL (illimitate) → remote, customer_site, lab&lt;br&gt;&lt;br&gt;"
-    "&lt;b&gt;Ore del mese&lt;/b&gt; (mese di calendario, senza riporto)&lt;br&gt;"
-    "/used_hours_month = somma (end_time − start_time) degli interventi&lt;br&gt;"
-    "&lt;i&gt;completed&lt;/i&gt; collegati, con intervention_date nel mese.&lt;br&gt;"
-    "/remaining_hours_month = included_hours − used_hours_month&lt;br&gt;&lt;br&gt;"
-    "&lt;b&gt;Email al provider&lt;/b&gt;, una volta per mese ciascuna&lt;br&gt;"
-    "(una riga in AssistanceHoursAlert per contratto, mese e tipo):&lt;br&gt;"
+    "&lt;b&gt;Pacchetti di assistenza&lt;/b&gt; (listino nel codice, IVA esclusa)&lt;br&gt;"
+    "{package → ore → prezzo → priorità → interventi che le scalano}&lt;br&gt;"
+    "• remote_20 → 20 h/mese → 400 € → 4 → remote&lt;br&gt;"
+    "• remote_40 → 40 h/mese → 720 € → 4 → remote&lt;br&gt;"
+    "• ready_20 → 20 h/mese → 500 € → 3 → remote, customer_site, lab&lt;br&gt;"
+    "• ready_40 → 40 h/mese → 900 € → 3 → idem&lt;br&gt;"
+    "• ready_60 → 60 h/mese → 1.230 € → 3 → idem&lt;br&gt;"
+    "• support_base → 80 h nei 12 mesi → 1.600 € → 2 → idem&lt;br&gt;"
+    "• support_plus → 150 h nei 12 mesi → 2.500 € → 1 → idem&lt;br&gt;"
+    "included_hours e price_cents sono una copia del listino, scritta dal&lt;br&gt;"
+    "server alla creazione e a ogni cambio di pacchetto (nessun CHECK).&lt;br&gt;&lt;br&gt;"
+    "&lt;b&gt;Ore usate&lt;/b&gt;&lt;br&gt;"
+    "/used_hours = somma (end_time − start_time) degli interventi&lt;br&gt;"
+    "&lt;i&gt;completed&lt;/i&gt; collegati e coperti dal pacchetto:&lt;br&gt;"
+    "• remote e ready: nel mese di calendario, senza riporto&lt;br&gt;"
+    "• support: su tutto il contratto&lt;br&gt;"
+    "/remaining_hours = included_hours − used_hours (anche negativo)&lt;br&gt;&lt;br&gt;"
+    "&lt;b&gt;Email al provider&lt;/b&gt;, una volta per periodo ciascuna&lt;br&gt;"
+    "(una riga in AssistanceHoursAlert per contratto, periodo e tipo;&lt;br&gt;"
+    "periodo = mese; per support il mese di start_date):&lt;br&gt;"
     "• warning quando used ≥ 80% di included_hours&lt;br&gt;"
     "• exhausted quando used ≥ 100%&lt;br&gt;"
-    "Se le ore tornano sotto soglia la riga si cancella (riarmo).&lt;br&gt;"
-    "full_time: nessun avviso.&lt;br&gt;&lt;br&gt;"
+    "Se le ore tornano sotto soglia la riga si cancella (riarmo);&lt;br&gt;"
+    "cambiando pacchetto si cancellano tutte le righe del contratto.&lt;br&gt;&lt;br&gt;"
     "&lt;b&gt;Contratto&lt;/b&gt;&lt;br&gt;"
     "/end_date = start_date + term_months&lt;br&gt;"
     "{expired derivato: active e oggi ≥ end_date, non salvato}&lt;br&gt;"
     "{intervention.customer_id = contract.customer_id}&lt;br&gt;"
-    "{intervention.type compatibile con assistance_type}&lt;br&gt;"
-    "{contratto active e start_date ≤ intervention_date &lt; end_date}"
+    "{intervention.type compatibile con package}&lt;br&gt;"
+    "{contratto active e start_date ≤ intervention_date &lt; end_date}&lt;br&gt;"
+    "{package support_*: term_months = 12}"
 )
 cells.append(
     f'<mxCell id="{note_id}" value="{note}" style="shape=note;whiteSpace=wrap;html=1;size=16;align=left;'
     f'verticalAlign=top;spacingLeft=8;spacingTop=4;fontSize=11;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">'
-    f'<mxGeometry x="{C3}" y="1160" width="420" height="420" as="geometry"/></mxCell>'
+    f'<mxGeometry x="{C3}" y="1160" width="420" height="500" as="geometry"/></mxCell>'
 )
 
 # --- Autenticazione e sistema ---

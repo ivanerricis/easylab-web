@@ -32,7 +32,7 @@ vi.mock("../services/assistanceHours", async (importOriginal) => ({
     // `consumingInterventionTypes` è la tabella vera: serve a tradurre gli interventi coperti.
     ...(await importOriginal<typeof import("../services/assistanceHours")>()),
     getContractHoursSummary: vi.fn(),
-    recheckAssistanceHours: vi.fn(),
+    resetAssistanceAlerts: vi.fn(),
 }));
 
 vi.mock("../services/contractPdf", () => ({ createContractPdfBuffer: vi.fn() }));
@@ -66,7 +66,7 @@ import {
 import { getCustomerById } from "../db/queries/customer";
 import { getProviderById } from "../db/queries/provider";
 import { getLabConfig } from "../config/lab";
-import { getContractHoursSummary, recheckAssistanceHours } from "../services/assistanceHours";
+import { getContractHoursSummary, resetAssistanceAlerts } from "../services/assistanceHours";
 import { createContractPdfBuffer } from "../services/contractPdf";
 import contractsRouter from "./contracts";
 import { errorHandler } from "../middleware/errorHandler";
@@ -94,8 +94,9 @@ const flatRow = {
     customerName: "Mario Rossi",
     providerId: 2,
     providerName: "Acme Srl",
-    assistanceType: "on_site",
+    package: "ready_20",
     includedHours: 20,
+    priceCents: 50000,
     signedFileName: null,
     signedSizeBytes: null,
     signedUploadedAt: null,
@@ -118,13 +119,31 @@ const dto = {
     customerName: "Mario Rossi",
     providerId: 2,
     providerName: "Acme Srl",
-    assistance: { assistanceType: "on_site", includedHours: 20 },
+    assistance: {
+        package: "ready_20",
+        name: "Pronti Via 20",
+        includedHours: 20,
+        priceCents: 50000,
+        period: "month",
+        priority: 3,
+        typology: "Teleassistenza, on site e in laboratorio: hardware, software, formazione",
+    },
     signedContract: null,
     created_at: "2026-10-01T08:00:00.000Z",
     updated_at: null,
 };
 
-const rentalRow = { ...flatRow, id: 8, type: "rental", billingMonths: 3, assistanceType: null, includedHours: null };
+const rentalRow = {
+    ...flatRow,
+    id: 8,
+    type: "rental",
+    billingMonths: 3,
+    package: null,
+    includedHours: null,
+    priceCents: null,
+};
+
+const supportRow = { ...flatRow, package: "support_base", includedHours: 80, priceCents: 160000 };
 
 const assistanceBody = {
     type: "assistance",
@@ -133,11 +152,11 @@ const assistanceBody = {
     startDate: "2026-10-01",
     customerId: 3,
     providerId: 2,
-    assistance: { assistanceType: "on_site", includedHours: 20 },
+    assistance: { package: "ready_20" },
 };
 
 const hoursSummary = {
-    hours: { month: "2026-10", usedHours: 12.5, includedHours: 20, remainingHours: 7.5 },
+    hours: { period: "month", month: "2026-10", usedHours: 12.5, includedHours: 20, remainingHours: 7.5 },
     monthlyHours: [
         { month: "2026-10", usedHours: 12.5 },
         { month: "2026-09", usedHours: 3 },
@@ -160,7 +179,12 @@ describe("contracts router", () => {
             expect(response.body).toEqual({ ...dto, ...hoursSummary });
             expect(getContractById).toHaveBeenCalledWith(7, "Europe/Rome");
             // Il mese corrente è quello del laboratorio, nel formato YYYY-MM.
-            expect(getContractHoursSummary).toHaveBeenCalledWith(7, 20, expect.stringMatching(/^\d{4}-\d{2}$/));
+            expect(getContractHoursSummary).toHaveBeenCalledWith(
+                7,
+                "ready_20",
+                20,
+                expect.stringMatching(/^\d{4}-\d{2}$/)
+            );
         });
 
         it("per il noleggio `hours` è null, lo storico è vuoto e le ore non si calcolano", async () => {
@@ -187,7 +211,67 @@ describe("contracts router", () => {
             const response = await request(buildApp()).get("/api/contracts/8");
 
             expect(response.body.assistance).toBeNull();
-            expect(response.body).not.toHaveProperty("assistanceType");
+            expect(response.body).not.toHaveProperty("package");
+        });
+
+        it("un Supporto ha periodo `contract`, priorità e prezzo unico nel DTO", async () => {
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
+            vi.mocked(getContractHoursSummary).mockResolvedValue({
+                hours: { period: "contract", month: null, usedHours: 10, includedHours: 80, remainingHours: 70 },
+                monthlyHours: [],
+            } as never);
+
+            const response = await request(buildApp()).get("/api/contracts/7");
+
+            expect(response.body.assistance).toMatchObject({
+                package: "support_base",
+                name: "Supporto Base",
+                includedHours: 80,
+                priceCents: 160000,
+                period: "contract",
+                priority: 2,
+            });
+            expect(response.body.hours).toMatchObject({ period: "contract", month: null });
+            expect(getContractHoursSummary).toHaveBeenCalledWith(
+                7,
+                "support_base",
+                80,
+                expect.stringMatching(/^\d{4}-\d{2}$/)
+            );
+        });
+
+        it("il listino dei pacchetti, nell'ordine, senza i tipi di intervento", async () => {
+            const response = await request(buildApp()).get("/api/contracts/packages");
+
+            expect(response.status).toBe(200);
+            expect(response.body.map((entry: { key: string }) => entry.key)).toEqual([
+                "remote_20",
+                "remote_40",
+                "ready_20",
+                "ready_40",
+                "ready_60",
+                "support_base",
+                "support_plus",
+            ]);
+            expect(response.body[0]).toEqual({
+                key: "remote_20",
+                name: "Assistenza Remota Pack 20",
+                includedHours: 20,
+                priceCents: 40000,
+                period: "month",
+                priority: 4,
+                typology: "Teleassistenza, solo software",
+            });
+            expect(response.body[4]).toMatchObject({ key: "ready_60", includedHours: 60, priceCents: 123000 });
+            expect(response.body[6]).toMatchObject({
+                key: "support_plus",
+                includedHours: 150,
+                priceCents: 250000,
+                period: "contract",
+                priority: 1,
+            });
+            // Non è letto come l'id di un contratto.
+            expect(getContractById).not.toHaveBeenCalled();
         });
 
         it("risponde 404 se il contratto non esiste", async () => {
@@ -291,7 +375,12 @@ describe("contracts router", () => {
             expect(getContractById).toHaveBeenCalledWith(7, "Europe/Rome");
             expect(getCustomerById).toHaveBeenCalledWith(3);
             expect(getProviderById).toHaveBeenCalledWith(2);
-            expect(getContractHoursSummary).toHaveBeenCalledWith(7, 20, expect.stringMatching(/^\d{4}-\d{2}$/));
+            expect(getContractHoursSummary).toHaveBeenCalledWith(
+                7,
+                "ready_20",
+                20,
+                expect.stringMatching(/^\d{4}-\d{2}$/)
+            );
 
             expect(printedData()).toMatchObject({
                 id: 7,
@@ -314,13 +403,49 @@ describe("contracts router", () => {
                 endDateLabel: "1 ott 2027",
                 note: null,
                 assistance: {
-                    assistanceTypeLabel: "In sede o in laboratorio",
-                    includedHoursLabel: "20 h al mese",
-                    coveredInterventionTypes: ["Intervento in sede", "Intervento in laboratorio"],
+                    period: "month",
+                    packageName: "Pronti Via 20",
+                    includedHoursLabel: "20 ore al mese",
+                    priceLabel: "500,00 € al mese + IVA",
+                    priorityLabel: "3",
+                    typology: "Teleassistenza, on site e in laboratorio: hardware, software, formazione",
+                    coveredInterventionTypes: [
+                        "Intervento da remoto",
+                        "Intervento in sede",
+                        "Intervento in laboratorio",
+                    ],
                 },
                 monthlyHours: [
-                    { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%" },
-                    { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%" },
+                    { monthLabel: "ottobre 2026", usedHoursLabel: "12,5 h", usageLabel: "63%", cumulativeLabel: null },
+                    { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: "15%", cumulativeLabel: null },
+                ],
+            });
+        });
+
+        it("un Supporto si stampa con ore in 12 mesi, prezzo unico e totale cumulato", async () => {
+            vi.mocked(getContractById).mockResolvedValue([
+                { ...supportRow, package: "support_plus", includedHours: 150, priceCents: 250000 },
+            ] as never);
+
+            await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(printedData()).toMatchObject({
+                assistance: {
+                    period: "contract",
+                    packageName: "Supporto Plus",
+                    includedHoursLabel: "150 ore in 12 mesi",
+                    priceLabel: "2.500,00 € + IVA",
+                    priorityLabel: "1 (massima)",
+                },
+                // Dal mese più recente; il totale di un mese comprende quelli prima.
+                monthlyHours: [
+                    {
+                        monthLabel: "ottobre 2026",
+                        usedHoursLabel: "12,5 h",
+                        usageLabel: null,
+                        cumulativeLabel: "15,5 h",
+                    },
+                    { monthLabel: "settembre 2026", usedHoursLabel: "3 h", usageLabel: null, cumulativeLabel: "3 h" },
                 ],
             });
         });
@@ -352,10 +477,8 @@ describe("contracts router", () => {
             });
         });
 
-        it("senza ore registrate il riepilogo è omesso e il full time mostra ore illimitate", async () => {
-            vi.mocked(getContractById).mockResolvedValue([
-                { ...flatRow, assistanceType: "full_time", includedHours: null },
-            ] as never);
+        it("senza ore registrate il riepilogo è omesso", async () => {
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
             vi.mocked(getContractHoursSummary).mockResolvedValue({
                 hours: {},
                 monthlyHours: [{ month: "2026-10", usedHours: 0 }],
@@ -364,7 +487,7 @@ describe("contracts router", () => {
             await request(buildApp()).get("/api/contracts/7/print");
 
             expect(printedData()).toMatchObject({
-                assistance: { includedHoursLabel: "Ore illimitate" },
+                assistance: { includedHoursLabel: "80 ore in 12 mesi" },
                 monthlyHours: [],
             });
         });
@@ -398,8 +521,54 @@ describe("contracts router", () => {
                     customerId: 3,
                     providerId: 2,
                 },
-                { assistanceType: "on_site", includedHours: 20 }
+                // Ore e prezzo li copia il server dal listino: il corpo ha solo la chiave.
+                { package: "ready_20", includedHours: 20, priceCents: 50000 }
             );
+        });
+
+        it("crea un Supporto di 12 mesi con lo snapshot del listino", async () => {
+            vi.mocked(createContract).mockResolvedValue({ id: 7 } as never);
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
+
+            const response = await request(buildApp())
+                .post("/api/contracts")
+                .send({ ...assistanceBody, assistance: { package: "support_base" } });
+
+            expect(response.status).toBe(201);
+            expect(createContract).toHaveBeenCalledWith(expect.anything(), {
+                package: "support_base",
+                includedHours: 80,
+                priceCents: 160000,
+            });
+        });
+
+        it.each(["support_base", "support_plus"])("un %s con durata diversa da 12 mesi è rifiutato", async (key) => {
+            const response = await request(buildApp())
+                .post("/api/contracts")
+                .send({ ...assistanceBody, termMonths: 24, assistance: { package: key } });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({
+                message: "Il pacchetto Supporto dura sempre 12 mesi",
+                field: "termMonths",
+            });
+            expect(createContract).not.toHaveBeenCalled();
+        });
+
+        it("un pacchetto mensile accetta qualunque durata", async () => {
+            vi.mocked(createContract).mockResolvedValue({ id: 7 } as never);
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+
+            const response = await request(buildApp())
+                .post("/api/contracts")
+                .send({ ...assistanceBody, termMonths: 7, assistance: { package: "remote_40" } });
+
+            expect(response.status).toBe(201);
+            expect(createContract).toHaveBeenCalledWith(expect.anything(), {
+                package: "remote_40",
+                includedHours: 40,
+                priceCents: 72000,
+            });
         });
 
         it("crea un noleggio senza dati di assistenza", async () => {
@@ -426,21 +595,6 @@ describe("contracts router", () => {
             expect(createContract).not.toHaveBeenCalled();
         });
 
-        it("tempo pieno: le ore sono NULL anche se omesse", async () => {
-            vi.mocked(createContract).mockResolvedValue({ id: 7 } as never);
-            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
-
-            const response = await request(buildApp())
-                .post("/api/contracts")
-                .send({ ...assistanceBody, assistance: { assistanceType: "full_time" } });
-
-            expect(response.status).toBe(201);
-            expect(createContract).toHaveBeenCalledWith(expect.anything(), {
-                assistanceType: "full_time",
-                includedHours: null,
-            });
-        });
-
         it("rifiuta un'assistenza senza i suoi dati", async () => {
             const { assistance: _assistance, ...body } = assistanceBody;
 
@@ -462,18 +616,17 @@ describe("contracts router", () => {
         });
 
         it.each([
-            ["remote", 30],
-            ["remote", null],
-            ["on_site", 5],
-            ["complete", 10],
-            ["full_time", 100],
-        ])("rifiuta il pacchetto %s con %s ore", async (assistanceType, includedHours) => {
+            ["un pacchetto inesistente", { package: "full_time" }],
+            ["un vecchio tipo", { assistanceType: "remote" }],
+            ["le ore nel corpo", { package: "ready_20", includedHours: 20 }],
+            ["il prezzo nel corpo", { package: "ready_20", priceCents: 1 }],
+            ["nessun pacchetto", {}],
+        ])("rifiuta %s", async (_label, assistance) => {
             const response = await request(buildApp())
                 .post("/api/contracts")
-                .send({ ...assistanceBody, assistance: { assistanceType, includedHours } });
+                .send({ ...assistanceBody, assistance });
 
             expect(response.status).toBe(400);
-            expect(response.body.message).toBe("Pacchetto di ore non valido per questo tipo di assistenza");
             expect(createContract).not.toHaveBeenCalled();
         });
 
@@ -507,22 +660,109 @@ describe("contracts router", () => {
 
             expect(response.status).toBe(200);
             expect(updateContractById).toHaveBeenCalledWith(7, { status: "cancelled", note: "Disdetto" }, undefined);
-            // Il pacchetto non è cambiato: nessun motivo di ricalcolare gli avvisi.
-            expect(recheckAssistanceHours).not.toHaveBeenCalled();
+            // Il pacchetto non è cambiato: nessun motivo di azzerare gli avvisi.
+            expect(resetAssistanceAlerts).not.toHaveBeenCalled();
         });
 
-        it("cambiando il pacchetto ricalcola gli avvisi del mese corrente", async () => {
+        it("cambiando il pacchetto copia ore e prezzo dal listino e azzera gli avvisi", async () => {
             vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
             vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
 
             const response = await request(buildApp())
                 .put("/api/contracts/7")
-                .send({ assistance: { includedHours: 30 } });
+                .send({ assistance: { package: "ready_40" } });
 
             expect(response.status).toBe(200);
-            expect(recheckAssistanceHours).toHaveBeenCalledWith([
-                { contractId: 7, month: expect.stringMatching(/^\d{4}-\d{2}$/) },
-            ]);
+            expect(updateContractById).toHaveBeenCalledWith(
+                7,
+                {},
+                { package: "ready_40", includedHours: 40, priceCents: 90000 }
+            );
+            expect(resetAssistanceAlerts).toHaveBeenCalledWith(7, expect.stringMatching(/^\d{4}-\d{2}$/));
+        });
+
+        it("lo stesso pacchetto ripetuto non riscrive ore e prezzo e non azzera gli avvisi", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ assistance: { package: "ready_20" }, note: "x" });
+
+            expect(response.status).toBe(200);
+            expect(updateContractById).toHaveBeenCalledWith(7, { note: "x" }, undefined);
+            expect(resetAssistanceAlerts).not.toHaveBeenCalled();
+        });
+
+        it("passare a Supporto con durata 12 mesi nel corpo è accettato e fa lo snapshot", async () => {
+            vi.mocked(getContractById).mockResolvedValue([{ ...flatRow, termMonths: 6 }] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ termMonths: 12, assistance: { package: "support_plus" } });
+
+            expect(response.status).toBe(200);
+            expect(updateContractById).toHaveBeenCalledWith(
+                7,
+                { termMonths: 12 },
+                { package: "support_plus", includedHours: 150, priceCents: 250000 }
+            );
+        });
+
+        it("passare a Supporto con la durata salvata diversa da 12 mesi è rifiutato", async () => {
+            vi.mocked(getContractById).mockResolvedValue([{ ...flatRow, termMonths: 6 }] as never);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ assistance: { package: "support_base" } });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({
+                message: "Il pacchetto Supporto dura sempre 12 mesi",
+                field: "termMonths",
+            });
+            expect(updateContractById).not.toHaveBeenCalled();
+        });
+
+        it("cambiare solo la durata di un contratto Supporto è rifiutato, 12 mesi invece va bene", async () => {
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+
+            const refused = await request(buildApp()).put("/api/contracts/7").send({ termMonths: 6 });
+
+            expect(refused.status).toBe(400);
+            expect(refused.body).toEqual({ message: "Il pacchetto Supporto dura sempre 12 mesi", field: "termMonths" });
+            expect(updateContractById).not.toHaveBeenCalled();
+
+            const accepted = await request(buildApp()).put("/api/contracts/7").send({ termMonths: 12 });
+
+            expect(accepted.status).toBe(200);
+        });
+
+        it("spostare la data di inizio di un Supporto azzera gli avvisi (la loro chiave è quella data)", async () => {
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+
+            await request(buildApp()).put("/api/contracts/7").send({ startDate: "2026-11-01" });
+
+            expect(resetAssistanceAlerts).toHaveBeenCalledWith(7, expect.stringMatching(/^\d{4}-\d{2}$/));
+        });
+
+        it("da Supporto a un pacchetto mensile la durata può cambiare", async () => {
+            vi.mocked(getContractById).mockResolvedValue([supportRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ termMonths: 6, assistance: { package: "remote_20" } });
+
+            expect(response.status).toBe(200);
+            expect(updateContractById).toHaveBeenCalledWith(
+                7,
+                { termMonths: 6 },
+                { package: "remote_20", includedHours: 20, priceCents: 40000 }
+            );
         });
 
         it("accetta il tipo se è lo stesso, e non lo riscrive", async () => {
@@ -580,7 +820,18 @@ describe("contracts router", () => {
 
             const response = await request(buildApp())
                 .put("/api/contracts/8")
-                .send({ assistance: { includedHours: 10 } });
+                .send({ assistance: { package: "ready_20" } });
+
+            expect(response.status).toBe(400);
+            expect(updateContractById).not.toHaveBeenCalled();
+        });
+
+        it("rifiuta ore o prezzo nel corpo: li decide il listino", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ assistance: { package: "ready_40", includedHours: 5 } });
 
             expect(response.status).toBe(400);
             expect(updateContractById).not.toHaveBeenCalled();
@@ -593,47 +844,6 @@ describe("contracts router", () => {
 
             expect(response.status).toBe(400);
             expect(updateContractById).not.toHaveBeenCalled();
-        });
-
-        it("valida il pacchetto sull'unione con i dati attuali", async () => {
-            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
-
-            // on_site: passare a 5 ore non è un pacchetto on_site.
-            const response = await request(buildApp())
-                .put("/api/contracts/7")
-                .send({ assistance: { includedHours: 5 } });
-
-            expect(response.status).toBe(400);
-            expect(response.body.message).toBe("Pacchetto di ore non valido per questo tipo di assistenza");
-            expect(updateContractById).not.toHaveBeenCalled();
-        });
-
-        it("aggiorna le ore dentro il pacchetto", async () => {
-            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
-            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
-
-            const response = await request(buildApp())
-                .put("/api/contracts/7")
-                .send({ assistance: { includedHours: 30 } });
-
-            expect(response.status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(7, {}, { assistanceType: "on_site", includedHours: 30 });
-        });
-
-        it("passando a tempo pieno le ore diventano illimitate", async () => {
-            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
-            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
-
-            const response = await request(buildApp())
-                .put("/api/contracts/7")
-                .send({ assistance: { assistanceType: "full_time" } });
-
-            expect(response.status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(
-                7,
-                {},
-                { assistanceType: "full_time", includedHours: null }
-            );
         });
 
         it("rifiuta un update senza campi e risponde 404 su un contratto mancante", async () => {

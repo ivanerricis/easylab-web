@@ -12,6 +12,7 @@ import {
 } from "../db/queries/intervention";
 import { getContractById } from "../db/queries/contract";
 import { consumingInterventionTypes, recheckAssistanceHours } from "../services/assistanceHours";
+import type { AssistancePackage } from "../services/assistancePackages";
 import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
 import { buildInterventionEmail } from "../services/interventionEmail";
@@ -24,13 +25,7 @@ import { idParamsSchema, listQuerySchema, sendListResponse } from "./crudRouter"
 import { validate } from "./validation";
 import { toCsv } from "../services/csv";
 import { exportRowLimit } from "../db/queries/pagination";
-import {
-    interventionStatuses,
-    interventionTypes,
-    type AssistanceType,
-    type InterventionStatus,
-    type InterventionType,
-} from "../db/schema";
+import { interventionStatuses, interventionTypes, type InterventionStatus, type InterventionType } from "../db/schema";
 
 const interventionsRouter = Router();
 
@@ -185,7 +180,7 @@ type LinkableContract = {
     effectiveStatus: string;
     startDate: string;
     endDate: string;
-    assistanceType: string | null;
+    package: string | null;
 };
 
 /**
@@ -204,7 +199,7 @@ const validateContractLink = (
         return fail("Il contratto selezionato non esiste");
     }
 
-    if (contract.type !== "assistance" || !contract.assistanceType) {
+    if (contract.type !== "assistance" || !contract.package) {
         return fail("Si può collegare solo un contratto di assistenza");
     }
 
@@ -226,7 +221,7 @@ const validateContractLink = (
         return fail("La data dell'intervento non rientra nel periodo del contratto");
     }
 
-    if (!consumingInterventionTypes(contract.assistanceType as AssistanceType).includes(row.type)) {
+    if (!consumingInterventionTypes(contract.package as AssistancePackage).includes(row.type)) {
         return fail("Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato");
     }
 

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EntityCardList from "./entity-card-list";
@@ -119,6 +119,169 @@ describe("EntityTable: colonne nascoste", () => {
         expect(within(table).queryByText("mario@example.com")).not.toBeInTheDocument();
         // Nelle schede (mobile) l'email c'è ancora: lì il menu non esiste.
         expect(screen.getByText("mario@example.com")).toBeInTheDocument();
+    });
+});
+
+describe("EntityTable: riordino delle colonne", () => {
+    const headerCell = (name: string) => within(screen.getByRole("table")).getByRole("columnheader", { name });
+    const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: "" });
+
+    /**
+     * jsdom non ha layout e i suoi eventi di drag non portano `clientX`: lo si aggiunge a mano.
+     * Con il rettangolo della colonna a zero, un valore negativo cade nella metà sinistra e uno
+     * positivo nella destra.
+     */
+    const fireDragEvent = (type: "dragOver" | "drop", name: string, side: "before" | "after") => {
+        const event = createEvent[type](headerCell(name), { dataTransfer: dataTransfer() });
+
+        Object.defineProperty(event, "clientX", { value: side === "before" ? -1 : 1 });
+        fireEvent(headerCell(name), event);
+    };
+
+    const dragColumn = (from: string, to: string, side: "before" | "after") => {
+        fireEvent.dragStart(headerCell(from), { dataTransfer: dataTransfer() });
+        fireDragEvent("dragOver", to, side);
+        fireDragEvent("drop", to, side);
+    };
+
+    it("senza onColumnMove le intestazioni non sono trascinabili", () => {
+        renderTable();
+
+        expect(headerCell("Nome")).not.toHaveAttribute("draggable");
+    });
+
+    it("rende trascinabili tutte le intestazioni tranne le azioni", () => {
+        renderTable({ onColumnMove: vi.fn() });
+
+        expect(headerCell("Nome")).toHaveAttribute("draggable", "true");
+        expect(headerCell("Azioni")).not.toHaveAttribute("draggable");
+    });
+
+    it("rilasciando sulla metà sinistra mette la colonna prima di quella sotto il puntatore", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove });
+        dragColumn("Email", "Nome", "before");
+
+        // id, firstName, lastName, status, email, actions: email (4) prima di firstName (1).
+        expect(onColumnMove).toHaveBeenCalledWith("email", 1);
+    });
+
+    it("rilasciando sulla metà destra mette la colonna dopo, con l'indice corretto dopo lo spostamento", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove });
+        dragColumn("ID", "Cognome", "after");
+
+        // id (0) dopo lastName (2): finisce all'indice 2, perché togliendola le altre scalano.
+        expect(onColumnMove).toHaveBeenCalledWith("id", 2);
+    });
+
+    it("calcola l'indice sull'elenco completo, anche con colonne nascoste in mezzo", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove, hiddenColumnKeys: ["lastName", "status"] });
+        dragColumn("ID", "Email", "after");
+
+        // Visibili: ID, Nome, Email, Azioni; ma nell'elenco completo email è alla posizione 4.
+        expect(onColumnMove).toHaveBeenCalledWith("id", 4);
+    });
+
+    it("non chiama onColumnMove se la colonna resterebbe dov'è", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove });
+        dragColumn("Nome", "Nome", "after");
+        dragColumn("Nome", "ID", "after");
+
+        expect(onColumnMove).not.toHaveBeenCalled();
+    });
+
+    it("la colonna delle azioni non accetta rilasci", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove });
+        dragColumn("Email", "Azioni", "before");
+
+        expect(onColumnMove).not.toHaveBeenCalled();
+    });
+
+    it("mostra dove cadrà la colonna e toglie l'indicatore a fine trascinamento", () => {
+        renderTable({ onColumnMove: vi.fn() });
+
+        fireEvent.dragStart(headerCell("Email"), { dataTransfer: dataTransfer() });
+        fireDragEvent("dragOver", "Nome", "before");
+        expect(headerCell("Nome")).toHaveAttribute("data-drop-side", "before");
+        expect(headerCell("Email")).toHaveAttribute("data-dragging", "true");
+        // La linea prosegue nel corpo, sulla colonna di destinazione.
+        const nomeIndex = Array.from(headerCell("Nome").parentElement!.children).indexOf(headerCell("Nome"));
+        const dropLineRule = () =>
+            Array.from(document.querySelectorAll("style"))
+                .map((style) => style.textContent ?? "")
+                .find((css) => css.includes("data-column-drag-table"));
+        expect(dropLineRule()).toContain(`tbody tr > :nth-child(${nomeIndex + 1})`);
+        expect(dropLineRule()).toContain("inset 4px");
+
+        fireEvent.dragEnd(headerCell("Email"));
+        expect(dropLineRule()).toBeUndefined();
+        expect(headerCell("Nome")).not.toHaveAttribute("data-drop-side");
+        expect(headerCell("Email")).not.toHaveAttribute("data-dragging");
+    });
+
+    it("non avvia il trascinamento dalla maniglia di ridimensionamento", () => {
+        const onColumnMove = vi.fn();
+
+        renderTable({ onColumnMove });
+        const handle = document.createElement("span");
+
+        handle.setAttribute("data-column-resize-handle", "");
+        headerCell("Nome").appendChild(handle);
+
+        fireEvent.mouseDown(handle);
+        const notCancelled = fireEvent.dragStart(headerCell("Nome"), { dataTransfer: dataTransfer() });
+
+        expect(notCancelled).toBe(false);
+        fireDragEvent("dragOver", "Cognome", "after");
+        fireDragEvent("drop", "Cognome", "after");
+        expect(onColumnMove).not.toHaveBeenCalled();
+    });
+
+    it("l'ordinamento per clic sull'intestazione continua a funzionare", () => {
+        const onSortChange = vi.fn();
+
+        renderTable({
+            onColumnMove: vi.fn(),
+            onSortChange,
+            columns: columns.map((column) => (column.key === "firstName" ? { ...column, sortKey: "name" } : column)),
+        });
+        fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Nome" }));
+
+        expect(onSortChange).toHaveBeenCalledWith({ key: "name", direction: "asc" });
+    });
+
+    it("con l'ordine cambiato le colonne seguono quello ricevuto, anche nelle righe", () => {
+        const { rerender } = renderTable();
+        const reordered = [columns[1], columns[0], ...columns.slice(2)];
+
+        rerender(
+            <EntityTable<Row>
+                tableKey="test"
+                columns={reordered}
+                rows={rows}
+                getRowKey={(row) => row.id}
+                emptyMessage="Nessun elemento."
+            />
+        );
+
+        const table = screen.getByRole("table");
+
+        expect(
+            within(table)
+                .getAllByRole("columnheader")
+                .slice(0, 2)
+                .map((cell) => cell.textContent)
+        ).toEqual(["Nome", "ID"]);
+        expect(within(table).getAllByRole("row")[1].querySelectorAll("td")[0]).toHaveTextContent("Mario");
     });
 });
 

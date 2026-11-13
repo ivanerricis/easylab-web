@@ -1,4 +1,5 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
 import TableActionButton from "@/components/table-action-button";
 import { Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -67,6 +68,8 @@ const EntityCrudTable = <TRow extends { id: number }>({
     skeletonRowCount,
 }: EntityCrudTableProps<TRow>) => {
     const navigate = useNavigate();
+    // Senza menu "Colonne" qui l'ordine si cambia solo trascinando le intestazioni.
+    const { orderedColumns, moveColumn } = useColumnOrder(tableKey, columns);
 
     const renderRowActions = (row: TRow) => (
         <>
@@ -97,7 +100,8 @@ const EntityCrudTable = <TRow extends { id: number }>({
     return (
         <EntityTable
             tableKey={tableKey}
-            columns={columns}
+            columns={orderedColumns}
+            onColumnMove={moveColumn}
             rows={rows}
             getRowKey={(row) => row.id}
             emptyMessage={emptyMessage}

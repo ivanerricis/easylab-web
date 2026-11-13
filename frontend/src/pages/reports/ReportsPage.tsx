@@ -3,6 +3,7 @@ import type { EditReportSubmitValues } from "@/components/dialogs/edit/editRepor
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
@@ -78,6 +79,11 @@ const ReportsPage = () => {
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("reports");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("reports", reportColumns);
+    // L'ordine delle colonne vale per tabella e menu insieme: entrambi ricevono `orderedColumns`.
+    const { orderedColumns, moveColumn, moveColumnBy, resetColumnOrder, isCustomOrder } = useColumnOrder(
+        "reports",
+        reportColumns
+    );
     const { reportRows, totalItems, totalPages, isLoading, isInitialLoading, isRefetching, loadError, loadReports } =
         useReportsRows({
             searchText: committedSearchText,
@@ -211,10 +217,13 @@ const ReportsPage = () => {
                     onClearDates={() => updateParams({ [listUrlParams.dateFrom]: null, [listUrlParams.dateTo]: null })}
                     columnsMenu={
                         <ColumnVisibilityMenu
-                            columns={reportColumns}
+                            columns={orderedColumns}
                             hiddenColumnKeys={hiddenColumnKeys}
                             onColumnVisibleChange={setColumnVisible}
                             onShowAll={showAllColumns}
+                            onColumnMoveBy={moveColumnBy}
+                            onResetOrder={resetColumnOrder}
+                            isCustomOrder={isCustomOrder}
                         />
                     }
                     onRefresh={loadReports}
@@ -227,7 +236,8 @@ const ReportsPage = () => {
                             isInitialLoading={isInitialLoading}
                             isRefetching={isRefetching}
                             skeletonRowCount={pageSize}
-                            columns={reportColumns}
+                            columns={orderedColumns}
+                            onColumnMove={moveColumn}
                             sort={parseSortOption(sortOption)}
                             onSortChange={handleTableSortChange}
                             hiddenColumnKeys={hiddenColumnKeys}

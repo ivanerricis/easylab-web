@@ -19,6 +19,8 @@ const api = vi.hoisted(() => ({
     uploadSignedContract: vi.fn(),
     deleteSignedContract: vi.fn(),
     sendContractEmail: vi.fn(),
+    deleteIntervention: vi.fn(),
+    sendInterventionEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -40,6 +42,7 @@ vi.mock("@/lib/api", async () => {
         deleteProvider: vi.fn(),
         listCustomers: vi.fn(),
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
+        getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
         getSignedContractUrl: (id: number) => `/api/contracts/${id}/signed-contract`,
         signedContractMaxBytes: 15 * 1024 * 1024,
     };
@@ -242,6 +245,46 @@ describe("ContractPage", () => {
             fireEvent.keyDown(linkedRows[0], { key: "Enter" });
             expect(navigate).toHaveBeenCalledWith("/interventions/9");
         });
+    });
+
+    it("gli interventi collegati hanno le azioni di riga, ed eliminarne uno ricarica la scheda", async () => {
+        api.getContract.mockResolvedValue(contract());
+        api.listInterventions.mockResolvedValue(
+            page([
+                {
+                    id: 9,
+                    type: "remote",
+                    status: "completed",
+                    customer: "Mario Rossi",
+                    collaborator: "Luca",
+                    interventionDate: "2026-10-02",
+                    startTime: null,
+                    endTime: null,
+                    contractId: 21,
+                    createdAt: "2026-10-02T10:00:00.000Z",
+                },
+            ])
+        );
+        api.deleteIntervention.mockResolvedValue(undefined);
+        await renderPage();
+
+        for (const action of ["Modifica", "Stampa", "Invia email", "Elimina"]) {
+            expect((await screen.findAllByRole("button", { name: `${action} intervento 9` })).length).toBeGreaterThan(
+                0
+            );
+        }
+        await userEvent.click(screen.getAllByRole("button", { name: "Stampa intervento 9" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/interventions/9/print");
+
+        const contractLoads = api.getContract.mock.calls.length;
+        await userEvent.click(screen.getAllByRole("button", { name: "Elimina intervento 9" })[0]);
+        const dialog = await screen.findByRole("dialog", { name: "Elimina intervento" });
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => expect(api.deleteIntervention).toHaveBeenCalledWith(9));
+        // Le ore usate cambiano: si ricarica anche il contratto, non solo la lista.
+        await waitFor(() => expect(api.getContract.mock.calls.length).toBeGreaterThan(contractLoads));
     });
 
     it("Stampa apre il PDF del contratto", async () => {

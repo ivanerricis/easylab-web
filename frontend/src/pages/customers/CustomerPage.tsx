@@ -36,6 +36,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
 import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
+import { useInterventionRowActions } from "@/hooks/useInterventionRowActions";
 import { formatPersonName } from "@/lib/people";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import { CustomerContractsFilter, CustomerContractsTable } from "./components/customer-contracts-section";
@@ -175,6 +176,10 @@ const CustomerPage = () => {
     const handleRefresh = useCallback(async () => {
         await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions(), reloadContracts()]);
     }, [reloadCustomer, reloadInterventions, reloadReports, reloadContracts]);
+
+    // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i contatori.
+    const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
+        useInterventionRowActions({ onChanged: handleRefresh });
 
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
@@ -319,6 +324,8 @@ const CustomerPage = () => {
                 />
             ) : null}
 
+            {interventionActionDialogs}
+
             <ReportsInterventionsTabs
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
@@ -329,6 +336,7 @@ const CustomerPage = () => {
                 ownerNoun="cliente"
                 onOpenReport={handleOpenReport}
                 onOpenIntervention={handleOpenIntervention}
+                renderInterventionActions={renderInterventionActions}
                 contractsTab={{
                     filter: <CustomerContractsFilter contracts={contracts} />,
                     content: <CustomerContractsTable contracts={contracts} />,

@@ -22,6 +22,8 @@ const api = vi.hoisted(() => ({
     listContracts: vi.fn(),
     createContract: vi.fn(),
     listContractPackages: vi.fn(),
+    deleteIntervention: vi.fn(),
+    sendInterventionEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -40,6 +42,9 @@ vi.mock("@/lib/api", async () => {
         listContracts: (...args: unknown[]) => api.listContracts(...args),
         createContract: (...args: unknown[]) => api.createContract(...args),
         listContractPackages: (...args: unknown[]) => api.listContractPackages(...args),
+        deleteIntervention: (...args: unknown[]) => api.deleteIntervention(...args),
+        sendInterventionEmail: (...args: unknown[]) => api.sendInterventionEmail(...args),
+        getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
         getCustomerContractsPrintUrl: (id: number) => `/api/customers/${id}/contracts/print`,
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
@@ -168,6 +173,23 @@ describe("CustomerPage", () => {
         expect(screen.getByRole("tab", { name: "Interventi" })).toHaveAttribute("aria-selected", "true");
         expect(document.title).toBe("Interventi di Mario Rossi · EasyLab");
         expect(screen.getByRole("button", { name: "Stampa resoconto interventi" })).toBeInTheDocument();
+    });
+
+    it("gli interventi del cliente hanno le azioni di riga", async () => {
+        api.sendInterventionEmail.mockResolvedValue({ message: "Email inviata a mario@example.com" });
+        await renderPage("/clients/3/interventions", "/clients/:id/interventions");
+
+        const panel = screen.getByRole("tabpanel");
+        for (const action of ["Modifica", "Stampa", "Invia email", "Elimina"]) {
+            expect(
+                (await within(panel).findAllByRole("button", { name: `${action} intervento 9` })).length
+            ).toBeGreaterThan(0);
+        }
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Invia email intervento 9" })[0]);
+        const dialog = await screen.findByRole("dialog");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Invia" }));
+
+        await waitFor(() => expect(api.sendInterventionEmail).toHaveBeenCalledWith(9));
     });
 
     it("cambiando tab cambia l'indirizzo, senza aggiungere voci alla cronologia", async () => {

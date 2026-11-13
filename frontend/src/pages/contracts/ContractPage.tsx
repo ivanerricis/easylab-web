@@ -15,6 +15,7 @@ import { useGoBack } from "@/hooks/useGoBack";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePendingAction } from "@/hooks/usePendingAction";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
+import { interventionActionsColumn, useInterventionRowActions } from "@/hooks/useInterventionRowActions";
 import {
     deleteContract,
     getContract,
@@ -51,6 +52,10 @@ import SignedContractSection from "./components/signed-contract-section";
 /** Le righe dello storico mensile, dal mese più recente: il server le manda in ordine non garantito. */
 const sortedMonthlyHours = (contract: ContractDto) =>
     [...(contract.monthlyHours ?? [])].sort((a, b) => b.month.localeCompare(a.month));
+
+// Le colonne della scheda cliente più i pulsanti di riga: fuori dal componente, così restano
+// lo stesso array a ogni render e le righe in `memo` non si ridisegnano.
+const contractInterventionColumns = [...customerInterventionColumns, interventionActionsColumn];
 
 const ContractPage = () => {
     const navigate = useNavigate();
@@ -104,6 +109,10 @@ const ContractPage = () => {
     const handleRefresh = async () => {
         await Promise.all([reload(), reloadInterventions()]);
     };
+
+    // Dopo una modifica o un'eliminazione si ricarica anche il contratto: le ore usate cambiano.
+    const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
+        useInterventionRowActions({ onChanged: handleRefresh });
 
     const handleEditContract = async (values: ContractSubmitValues) => {
         if (!contract) {
@@ -375,10 +384,12 @@ const ContractPage = () => {
                             )}
                         </DetailSection>
 
+                        {interventionActionDialogs}
                         <DetailSection title="Interventi collegati">
                             <EntityTable
                                 tableKey="contract-interventions"
-                                columns={customerInterventionColumns}
+                                columns={contractInterventionColumns}
+                                renderRowActions={renderInterventionActions}
                                 rows={interventions.rows}
                                 getRowKey={(row) => row.id}
                                 emptyMessage="Nessun intervento collegato a questo contratto."

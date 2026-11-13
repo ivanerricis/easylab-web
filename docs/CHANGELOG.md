@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-13 — Azioni sugli interventi anche nelle schede di contratto e cliente](changelog/2026-11.md#2026-11-13-azioni-sugli-interventi-anche-nelle-schede-di-contratto-e-cliente)
 - [2026-11-12 — Nuovi pacchetti di assistenza: Remota, Pronti Via, Supporto](changelog/2026-11.md#2026-11-12-nuovi-pacchetti-di-assistenza-remota-pronti-via-supporto)
 - [2026-11-12 — Contratto firmato: caricamento e invio al cliente](changelog/2026-11.md#2026-11-12-contratto-firmato-caricamento-e-invio-al-cliente)
 - [2026-11-12 — Pagina GitHub: badge, copertura su Codecov, SECURITY e CONTRIBUTING](changelog/2026-11.md#2026-11-12-pagina-github-badge-copertura-su-codecov-security-e-contributing)

@@ -1,4 +1,5 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
+import { interventionActionsColumn } from "@/hooks/useInterventionRowActions";
 import FilterSelect from "@/components/filters/filter-select";
 import TablePagination from "@/components/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +8,7 @@ import { interventionStatusColor, interventionStatusOptions } from "@/lib/interv
 import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
 import { ListFilter } from "lucide-react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 export type ReportsInterventionsTab = "reports" | "interventions" | "contracts";
 
@@ -23,6 +24,11 @@ type ReportsInterventionsTabsProps = {
     ownerNoun: string;
     onOpenReport: (id: number) => void;
     onOpenIntervention: (id: number) => void;
+    /**
+     * I pulsanti di riga degli interventi (`useInterventionRowActions`). Con questa la tabella
+     * ha in più la colonna delle azioni; senza, come nella scheda del collaboratore, no.
+     */
+    renderInterventionActions?: (intervention: InterventionDto) => ReactNode;
     /**
      * La terza tab, solo nella scheda del cliente: il filtro (sulla riga delle tab, come gli altri
      * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
@@ -44,9 +50,16 @@ const ReportsInterventionsTabs = ({
     ownerNoun,
     onOpenReport,
     onOpenIntervention,
+    renderInterventionActions,
     contractsTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
+    // Memorizzate: un array nuovo a ogni render farebbe ridisegnare tutte le righe (`memo`).
+    const hasInterventionActions = renderInterventionActions != null;
+    const interventionTableColumns = useMemo(
+        () => (hasInterventionActions ? [...interventionColumns, interventionActionsColumn] : interventionColumns),
+        [interventionColumns, hasInterventionActions]
+    );
 
     return (
         <Tabs
@@ -132,8 +145,9 @@ const ReportsInterventionsTabs = ({
                 <div className="min-h-0 flex-1 overflow-auto">
                     <EntityTable
                         tableKey={`${tableKeyPrefix}-interventions`}
-                        columns={interventionColumns}
+                        columns={interventionTableColumns}
                         rows={interventions.rows}
+                        renderRowActions={renderInterventionActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun intervento associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => interventionStatusColor[row.status]}

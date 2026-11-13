@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const listCollaborators = vi.fn();
 const listCustomers = vi.fn();
 const getIntervention = vi.fn();
+const createCustomer = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -16,7 +17,7 @@ vi.mock("@/lib/api", async () => {
         listCollaborators: (...args: unknown[]) => listCollaborators(...args),
         listCustomers: (...args: unknown[]) => listCustomers(...args),
         getIntervention: (...args: unknown[]) => getIntervention(...args),
-        createCustomer: vi.fn(),
+        createCustomer: (...args: unknown[]) => createCustomer(...args),
     };
 });
 
@@ -312,6 +313,78 @@ describe("CreateInterventionDialog", () => {
         });
     });
 
+    it("se i collaboratori non si caricano lo dice", async () => {
+        listCollaborators.mockRejectedValue(new Error("Collaboratori non disponibili"));
+        await renderDialog();
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Collaboratori non disponibili");
+        });
+    });
+
+    it("annullando chiude senza consegnare niente", async () => {
+        const onOpenChange = vi.fn();
+        const onSubmit = await renderDialog({ onOpenChange });
+
+        await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("se il salvataggio fallisce lo dice e il dialogo resta aperto", async () => {
+        const onOpenChange = vi.fn();
+        const onSubmit = await renderDialog({ initialDate: "2026-10-05", onOpenChange });
+        onSubmit.mockRejectedValue(new Error("Collaboratore non più disponibile"));
+
+        await fillCustomerAndCollaborator();
+        await save();
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Collaboratore non più disponibile");
+        });
+        expect(onOpenChange).not.toHaveBeenCalled();
+        expect(screen.getByRole("button", { name: "Salva" })).toBeEnabled();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+    });
+
+    /** Un cliente creato dal "+" entra nella casella già risolto: l'intervento parte col suo id. */
+    it("crea un cliente dal pulsante + e lo usa nell'intervento", async () => {
+        createCustomer.mockResolvedValue({
+            id: 99,
+            firstName: "Luigi",
+            lastName: "Verdi",
+            phoneNumber: "555",
+            phoneNumberSecondary: null,
+            email: null,
+            city: null,
+            ...timestamps,
+        });
+        const onSubmit = await renderDialog({ initialDate: "2026-10-05" });
+
+        await userEvent.click(screen.getByRole("button", { name: "Crea nuovo cliente" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nuovo cliente" });
+        await userEvent.type(within(dialog).getByLabelText(/^Nome o azienda/), "Luigi");
+        await userEvent.type(within(dialog).getByLabelText("Cognome"), "Verdi");
+        await userEvent.type(within(dialog).getByLabelText(/^Telefono 1/), "555");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Luigi Verdi - 555");
+        });
+        expect(createCustomer).toHaveBeenCalledWith(
+            expect.objectContaining({ firstName: "Luigi", lastName: "Verdi", phoneNumber: "555" })
+        );
+
+        await chooseOption(/^Collaboratore/, "Luca Bianchi");
+        await save();
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(
+                expect.objectContaining({ customer: "Luigi Verdi - 555", customerId: 99 })
+            );
+        });
+    });
     /** Su telefono il modulo diventa a quattro passi (vedi `interventionSteps`). */
     // Fra i test più lunghi: sotto carico i 20 secondi di default del file non bastavano.
     describe("su telefono, a passi", { timeout: 60_000 }, () => {
@@ -377,6 +450,35 @@ describe("CreateInterventionDialog", () => {
             );
             expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
             expect(screen.getByLabelText(/^Cliente/)).toHaveFocus();
+        });
+
+        it("se la verifica del cliente fallisce mostra l'errore sul campo e resta al primo passo", async () => {
+            await renderDialog({ initialDate: "2026-10-05" });
+            listCustomers.mockRejectedValue(new Error("Ricerca clienti non disponibile"));
+
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+            await chooseOption(/^Collaboratore/, "Luca Bianchi");
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByRole("alert")).toHaveTextContent("Ricerca clienti non disponibile");
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
+        });
+
+        it("Indietro torna al primo passo tenendo cliente e collaboratore, Annulla al primo chiude", async () => {
+            const onOpenChange = vi.fn();
+            await renderDialog({ initialDate: "2026-10-05", onOpenChange });
+
+            await fillCustomerAndCollaborator();
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+            await screen.findByRole("combobox", { name: "Tipo intervento" });
+
+            await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+            expect(onOpenChange).not.toHaveBeenCalled();
+
+            await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+            expect(onOpenChange).toHaveBeenCalledWith(false);
         });
     });
 });

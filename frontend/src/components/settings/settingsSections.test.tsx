@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
     listUsers: vi.fn(),
+    createUser: vi.fn(),
     regeneratePassword: vi.fn(),
     disableUser: vi.fn(),
     enableUser: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("@/lib/api", async () => {
             (...args: unknown[]) => (api[name as keyof typeof api] as (...a: unknown[]) => unknown)(...args),
         ])
     );
-    return { ...errors, ...forwarded, createUser: vi.fn() };
+    return { ...errors, ...forwarded };
 });
 
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }));
@@ -326,6 +327,127 @@ describe("UsersSettingsSection", () => {
         });
         expect(toast.success).toHaveBeenCalledWith("Sessione disconnessa");
     });
+    it("se l'elenco non si carica lo dice", async () => {
+        api.listUsers.mockRejectedValue(new Error("Elenco non disponibile"));
+        renderWithUser(<UsersSettingsSection />);
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Elenco non disponibile");
+        });
+    });
+
+    it("crea un utente, lo inserisce in ordine alfabetico e mostra la password una volta", async () => {
+        const anna = { ...luigi, id: 3, username: "anna" };
+        api.createUser.mockResolvedValue({ user: anna, generatedPassword: "Gen!Pass9" });
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo utente" }));
+        await userEvent.type(screen.getByLabelText(/^Nome utente/), "  anna ");
+        await userEvent.click(screen.getByRole("button", { name: "Crea utente" }));
+
+        const dialog = await screen.findByRole("dialog", { name: "Password generata" });
+        expect(api.createUser).toHaveBeenCalledWith("anna");
+        expect(toast.success).toHaveBeenCalledWith("Utente creato con successo");
+        // Chiusa la finestra la password non resta da nessuna parte.
+        await userEvent.click(within(dialog).getByRole("button", { name: "Ho copiato la password, chiudi" }));
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Password generata" })).not.toBeInTheDocument();
+        });
+        const usernames = within(screen.getByRole("table"))
+            .getAllByRole("row")
+            .slice(1)
+            .map((row) => row.querySelector("td")?.firstElementChild?.firstChild?.textContent);
+        expect(usernames).toEqual(["admin", "anna", "luigi"]);
+    });
+
+    it("se la riabilitazione fallisce lo dice e l'account resta disabilitato", async () => {
+        api.listUsers.mockResolvedValue([admin, { ...luigi, active: false }]);
+        api.enableUser.mockRejectedValue(new Error("Riabilitazione rifiutata"));
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click((await openActionsMenu("luigi")).getByRole("menuitem", { name: "Riabilita" }));
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Riabilitazione rifiutata");
+        });
+        expect(rowOf("luigi")).toHaveAttribute("data-status-color", "red");
+    });
+
+    /** Un errore che non è la password rifiutata (rete, permessi) non riguarda il campo: va in un avviso. */
+    it("un errore diverso dalla password sbagliata sulla propria 2FA va in un avviso, non sotto il campo", async () => {
+        const config = { headers: new AxiosHeaders() };
+        api.disableUserTwoFactor.mockRejectedValue(
+            new AxiosError("Request failed", "ERR_BAD_GATEWAY", config, null, {
+                data: { message: "Servizio non disponibile" },
+                status: 503,
+                statusText: "Service Unavailable",
+                headers: {},
+                config,
+            })
+        );
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
+        const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Servizio non disponibile");
+        });
+        expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("annullare la disattivazione della propria 2FA scarta la password scritta", async () => {
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
+        let dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Annulla" }));
+
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).toBeNull();
+        });
+        expect(api.disableUserTwoFactor).not.toHaveBeenCalled();
+
+        await userEvent.click((await openActionsMenu("admin")).getByRole("menuitem", { name: "Disattiva 2FA" }));
+        dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        expect(within(dialog).getByLabelText(/^Password/)).toHaveValue("");
+    });
+
+    /** Senza 2FA e sul proprio account non c'è nessuna azione oltre alle sessioni: niente menu "⋯". */
+    it("sul proprio account senza 2FA offre solo le sessioni", async () => {
+        const selfWithoutTwoFactor = { ...admin, twoFactorEnabled: false };
+        api.listUsers.mockResolvedValue([selfWithoutTwoFactor, luigi]);
+        renderWithUser(<UsersSettingsSection />, selfWithoutTwoFactor);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        const own = within(rowOf("admin"));
+        expect(own.getByRole("button", { name: "Sessioni" })).toBeInTheDocument();
+        expect(own.queryByRole("button", { name: "Altre azioni per admin" })).not.toBeInTheDocument();
+        expect(within(rowOf("luigi")).getByRole("button", { name: "Altre azioni per luigi" })).toBeInTheDocument();
+    });
+
+    it("chiude l'elenco delle sessioni di un utente", async () => {
+        api.listUserSessions.mockResolvedValue([]);
+        renderWithUser(<UsersSettingsSection />);
+        await within(await screen.findByRole("table")).findByText("luigi");
+
+        await userEvent.click(within(rowOf("luigi")).getByRole("button", { name: "Sessioni" }));
+        const dialog = await screen.findByRole("dialog", { name: "Sessioni attive" });
+        // Il pulsante in fondo e la X in alto hanno lo stesso nome.
+        await userEvent.click(within(dialog).getAllByRole("button", { name: "Chiudi" })[0]);
+
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Sessioni attive" })).not.toBeInTheDocument();
+        });
+    });
 });
 
 describe("SecuritySettingsSection", () => {
@@ -579,6 +701,236 @@ describe("SecuritySettingsSection", () => {
 
         expect(screen.queryByText("Tentativi di accesso falliti")).not.toBeInTheDocument();
         expect(api.listRecentFailedLogins).not.toHaveBeenCalled();
+    });
+    const otherSession = {
+        id: "hash-altro",
+        createdAt: "2026-09-10T08:00:00.000Z",
+        expiresAt: "2026-09-17T08:00:00.000Z",
+        lastSeenAt: new Date().toISOString(),
+        device: "Firefox su Linux",
+        deviceName: null,
+        isCurrent: false,
+    };
+
+    const axiosRejection = (status: number, message: string) => {
+        const config = { headers: new AxiosHeaders() };
+        return new AxiosError("Request failed", "ERR_BAD_REQUEST", config, null, {
+            data: { message },
+            status,
+            statusText: "",
+            headers: {},
+            config,
+        });
+    };
+
+    it("se le sessioni non si caricano lo dice", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: false, remainingRecoveryCodes: 0 });
+        api.listOwnSessions.mockRejectedValue(new Error("Sessioni non disponibili"));
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Sessioni non disponibili");
+        });
+    });
+
+    it("disconnette un'altra sessione solo dopo la conferma e la toglie dall'elenco", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: false, remainingRecoveryCodes: 0 });
+        api.listOwnSessions.mockResolvedValue([otherSession]);
+        api.revokeOwnSession.mockResolvedValue(undefined);
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disconnetti" }));
+        const dialog = await screen.findByRole("dialog", { name: "Disconnetti sessione" });
+        expect(within(dialog).getByText(/Disconnettere "Firefox su Linux"\?/)).toBeInTheDocument();
+        expect(api.revokeOwnSession).not.toHaveBeenCalled();
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disconnetti" }));
+
+        await waitFor(() => {
+            expect(api.revokeOwnSession).toHaveBeenCalledWith("hash-altro");
+        });
+        expect(toast.success).toHaveBeenCalledWith("Sessione disconnessa");
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Disconnetti sessione" })).not.toBeInTheDocument();
+        });
+        expect(screen.queryByText("Firefox su Linux")).not.toBeInTheDocument();
+    });
+
+    it("annullando la disconnessione la sessione resta e il server non viene chiamato", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: false, remainingRecoveryCodes: 0 });
+        api.listOwnSessions.mockResolvedValue([{ ...otherSession, device: null }]);
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disconnetti" }));
+        const dialog = await screen.findByRole("dialog", { name: "Disconnetti sessione" });
+        // Senza dispositivo noto il testo ripiega su una formula generica.
+        expect(within(dialog).getByText(/Disconnettere "questo dispositivo"\?/)).toBeInTheDocument();
+        await userEvent.click(within(dialog).getByRole("button", { name: "Annulla" }));
+
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Disconnetti sessione" })).not.toBeInTheDocument();
+        });
+        expect(api.revokeOwnSession).not.toHaveBeenCalled();
+        expect(screen.getByText("Dispositivo sconosciuto")).toBeInTheDocument();
+    });
+
+    it("se la disconnessione fallisce lo dice, chiude il dialogo e tiene la sessione", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: false, remainingRecoveryCodes: 0 });
+        api.listOwnSessions.mockResolvedValue([otherSession]);
+        api.revokeOwnSession.mockRejectedValue(new Error("Sessione non trovata"));
+        renderWithUser(<SecuritySettingsSection />, luigi);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disconnetti" }));
+        const dialog = await screen.findByRole("dialog", { name: "Disconnetti sessione" });
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disconnetti" }));
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Sessione non trovata");
+        });
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Disconnetti sessione" })).not.toBeInTheDocument();
+        });
+        expect(screen.getByText("Firefox su Linux")).toBeInTheDocument();
+        expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it("se gli accessi falliti non si caricano lo dice, e mostra l'elenco vuoto", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.listRecentFailedLogins.mockRejectedValue(new Error("Registro non leggibile"));
+        renderWithUser(<SecuritySettingsSection />, admin);
+
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith("Registro non leggibile");
+        });
+        expect(await screen.findAllByText("Nessun accesso fallito negli ultimi giorni.")).toHaveLength(2);
+    });
+
+    it("durante il primo caricamento degli accessi falliti mostra uno scheletro, non l'elenco vuoto", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.listRecentFailedLogins.mockReturnValue(new Promise(() => undefined));
+        renderWithUser(<SecuritySettingsSection />, admin);
+
+        expect(await screen.findByText("Caricamento tentativi di accesso...")).toBeInTheDocument();
+        expect(screen.queryByText("Nessun accesso fallito negli ultimi giorni.")).not.toBeInTheDocument();
+    });
+
+    it("un accesso fallito senza messaggio mostra un trattino nella scheda e niente in tabella", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.listRecentFailedLogins.mockResolvedValue([
+            {
+                timestamp: "2026-09-14T10:00:00.000Z",
+                ip: "5.6.7.8",
+                user: "luigi",
+                action: "tentativo di accesso",
+                status: 401,
+                error: null,
+            },
+        ]);
+        const { container } = renderWithUser(<SecuritySettingsSection />, admin);
+
+        const tableRow = within(await screen.findByRole("table")).getAllByRole("row")[1];
+        expect(within(tableRow).getByText("5.6.7.8")).toBeInTheDocument();
+        expect(tableRow.querySelectorAll("td")[3]).toHaveTextContent("");
+        expect(container.querySelector("article .text-destructive")).toHaveTextContent("-");
+    });
+
+    /** Password o codice sbagliati sono rifiuti del campo: sotto il campo giusto, non in un toast. */
+    it("con password rifiutata dal server mostra l'errore sotto la password", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.disableTwoFactor.mockRejectedValue(axiosRejection(400, "La password non è corretta"));
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disattiva" }));
+        const dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "sbagliata");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), "123456");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Disattiva" }));
+
+        expect(await within(dialog).findByRole("alert")).toHaveTextContent("La password non è corretta");
+        expect(within(dialog).getByLabelText(/^Password/)).toHaveAttribute("aria-invalid", "true");
+        expect(toast.error).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("con troppi tentativi (429) svuota il codice e mostra l'errore sotto di esso", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.regenerateRecoveryCodes.mockRejectedValue(axiosRejection(429, "Troppi tentativi, riprova tra poco"));
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
+        const dialog = screen.getByRole("dialog", { name: "Rigenera i codici di recupero" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(within(dialog).getByLabelText(/^Codice di verifica o di recupero/), "123456");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Rigenera" }));
+
+        expect(await within(dialog).findByRole("alert")).toHaveTextContent("Troppi tentativi");
+        const codeInput = within(dialog).getByLabelText(/^Codice di verifica o di recupero/);
+        expect(codeInput).toHaveValue("");
+        expect(codeInput).toHaveAttribute("aria-invalid", "true");
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    /** Un codice a metà non può essere giusto e conterebbe comunque fra i tentativi: il pulsante resta spento. */
+    it("tiene spento il pulsante finché il codice non ha la forma di un codice dell'app o di recupero", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
+        const dialog = screen.getByRole("dialog", { name: "Rigenera i codici di recupero" });
+        const confirm = within(dialog).getByRole("button", { name: "Rigenera" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        const codeInput = within(dialog).getByLabelText(/^Codice di verifica o di recupero/);
+
+        await userEvent.type(codeInput, "12345");
+        expect(confirm).toBeDisabled();
+        await userEvent.clear(codeInput);
+        // Alfabeto del server: senza O, I, 0, 1.
+        await userEvent.type(codeInput, "ABCD-0I1O");
+        expect(confirm).toBeDisabled();
+        await userEvent.clear(codeInput);
+        await userEvent.type(codeInput, "abcd-2345");
+        expect(confirm).toBeEnabled();
+    });
+
+    it("annullare il dialogo di conferma scarta ciò che era scritto", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Disattiva" }));
+        let dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Annulla" }));
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Disattiva la verifica in due passaggi" })).toBeNull();
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Disattiva" }));
+        dialog = screen.getByRole("dialog", { name: "Disattiva la verifica in due passaggi" });
+        expect(within(dialog).getByLabelText(/^Password/)).toHaveValue("");
+        expect(api.disableTwoFactor).not.toHaveBeenCalled();
+    });
+
+    /** I codici si vedono una volta sola: la finestra si chiude solo dopo aver spuntato di averli salvati. */
+    it("la finestra dei codici si chiude solo dopo la spunta di averli salvati", async () => {
+        api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 8 });
+        api.regenerateRecoveryCodes.mockResolvedValue({ recoveryCodes: ["WXYZ-2345"] });
+        renderWithUser(<SecuritySettingsSection />);
+
+        await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
+        const confirmDialog = screen.getByRole("dialog", { name: "Rigenera i codici di recupero" });
+        await userEvent.type(within(confirmDialog).getByLabelText(/^Password/), "segreta1!");
+        await userEvent.type(within(confirmDialog).getByLabelText(/^Codice di verifica o di recupero/), "123456");
+        await userEvent.click(within(confirmDialog).getByRole("button", { name: "Rigenera" }));
+
+        const codesDialog = await screen.findByRole("dialog", { name: "Codici di recupero" });
+        const close = within(codesDialog).getByRole("button", { name: "Ho salvato i codici, chiudi" });
+        expect(close).toBeDisabled();
+        await userEvent.click(within(codesDialog).getByRole("checkbox"));
+        await userEvent.click(close);
+
+        await waitFor(() => {
+            expect(screen.queryByRole("dialog", { name: "Codici di recupero" })).not.toBeInTheDocument();
+        });
+        expect(screen.queryByText("WXYZ-2345")).not.toBeInTheDocument();
     });
 });
 

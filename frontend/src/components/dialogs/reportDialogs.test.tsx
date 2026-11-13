@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { customerCandidatePageSize } from "@/lib/customerLookup";
+import { invalidEuroAmountMessage } from "@/lib/euroAmount";
 
 const listDevices = vi.fn();
 const listIssues = vi.fn();
@@ -10,6 +11,8 @@ const listCollaborators = vi.fn();
 const listTechnicians = vi.fn();
 const getReport = vi.fn();
 const createIssue = vi.fn();
+const createDevice = vi.fn();
+const createCustomer = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -24,8 +27,8 @@ vi.mock("@/lib/api", async () => {
         listTechnicians: (...args: unknown[]) => listTechnicians(...args),
         getReport: (...args: unknown[]) => getReport(...args),
         createIssue: (...args: unknown[]) => createIssue(...args),
-        createDevice: vi.fn(),
-        createCustomer: vi.fn(),
+        createDevice: (...args: unknown[]) => createDevice(...args),
+        createCustomer: (...args: unknown[]) => createCustomer(...args),
     };
 });
 
@@ -382,7 +385,105 @@ describe("CreateReportDialog", () => {
         expect(createIssue).toHaveBeenCalledWith({ description: "Tastiera bagnata" });
         expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Tastiera bagnata");
     });
+    it("se i cataloghi non si caricano lo dice, e il modulo resta utilizzabile", async () => {
+        listDevices.mockRejectedValue(new Error("Catalogo non disponibile"));
+        renderDialog();
 
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Catalogo non disponibile");
+        });
+        expect(screen.getByLabelText(/^Cliente/)).toBeEnabled();
+    });
+
+    it("se il salvataggio fallisce lo dice e il dialogo resta aperto con i dati scritti", async () => {
+        const onSubmit = vi.fn().mockRejectedValue(new Error("Numero report esaurito"));
+        const onOpenChange = vi.fn();
+        renderWithProviders(<CreateReportDialog open onOpenChange={onOpenChange} onSubmit={onSubmit} />);
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+        await userEvent.type(screen.getByLabelText(/^Tipologia dispositivo/), "Tablet");
+        await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+        await chooseYesNo(/^Alimentatore presente/, "No");
+        await chooseYesNo(/^Backup dati/, "No");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Numero report esaurito");
+        });
+        expect(onOpenChange).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi");
+        expect(screen.getByRole("button", { name: "Salva" })).toBeEnabled();
+    });
+
+    /** Un cliente creato dal "+" entra nella casella già risolto: il report parte con il suo id. */
+    it("crea un cliente dal pulsante + e lo seleziona", async () => {
+        createCustomer.mockResolvedValue({
+            id: 99,
+            firstName: "Luigi",
+            lastName: null,
+            phoneNumber: "555",
+            phoneNumberSecondary: null,
+            email: null,
+            city: null,
+            ...timestamps,
+        });
+        renderDialog();
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Crea nuovo cliente" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nuovo cliente" });
+        await userEvent.type(within(dialog).getByLabelText(/^Nome o azienda/), " Luigi ");
+        await userEvent.type(within(dialog).getByLabelText(/^Telefono 1/), "555");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Luigi - 555");
+        });
+        expect(createCustomer).toHaveBeenCalledWith(
+            expect.objectContaining({ firstName: "Luigi", phoneNumber: "555", lastName: null })
+        );
+    });
+
+    it("crea un dispositivo dal pulsante + e lo seleziona col nome dato dal server", async () => {
+        createDevice.mockResolvedValue({ id: 12, name: "Tablet Samsung", ...timestamps });
+        renderDialog();
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Crea nuovo dispositivo" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nuovo dispositivo" });
+        await userEvent.type(within(dialog).getByLabelText(/^Nome dispositivo/), "  Tablet Samsung ");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Tipologia dispositivo/)).toHaveValue("Tablet Samsung");
+        });
+        expect(createDevice).toHaveBeenCalledWith({ name: "Tablet Samsung" });
+    });
+
+    it("crea un difetto dal pulsante + e lo seleziona", async () => {
+        createIssue.mockResolvedValue({ id: 23, description: "Cerniera rotta", ...timestamps });
+        renderDialog();
+        await waitFor(() => {
+            expect(listIssues).toHaveBeenCalled();
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Crea nuovo difetto" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nuovo difetto" });
+        await userEvent.type(within(dialog).getByLabelText(/^Descrizione/), " Cerniera rotta ");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/^Difetto/)).toHaveValue("Cerniera rotta");
+        });
+        expect(createIssue).toHaveBeenCalledWith({ description: "Cerniera rotta" });
+    });
     /** Su telefono le tre sezioni diventano tre passi (vedi `reportSteps`). */
     // Fra i test più lunghi (il cliente si cerca e si sceglie, poi tre passi): sotto carico i 20 secondi
     // di default del file non bastavano.
@@ -495,6 +596,27 @@ describe("CreateReportDialog", () => {
             expect(
                 await screen.findByRole("radiogroup", { name: /^Alimentatore presente/ }, { timeout: 5000 })
             ).toBeInTheDocument();
+        });
+
+        it("se la verifica del cliente fallisce mostra l'errore sul campo e resta al primo passo", async () => {
+            renderDialog();
+            await waitFor(() => {
+                expect(listIssues).toHaveBeenCalled();
+            });
+
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "Mario Rossi");
+            await pickSuggestion(screen.getByLabelText(/^Tipologia dispositivo/), "note", "Notebook");
+            await pickSuggestion(screen.getByLabelText(/^Difetto/), "schermo", "Schermo rotto");
+            listCustomers.mockImplementation(({ pageSize }: { pageSize: number }) =>
+                pageSize === customerCandidatePageSize
+                    ? Promise.reject(new Error("Ricerca clienti non disponibile"))
+                    : Promise.resolve({ items: customers, totalItems: 1, page: 1, pageSize, totalPages: 1 })
+            );
+            await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+
+            expect(await screen.findByRole("alert")).toHaveTextContent("Ricerca clienti non disponibile");
+            expect(screen.getByText("Passo 1 di 2:")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Avanti" })).toBeEnabled();
         });
     });
 });
@@ -726,5 +848,120 @@ describe("EditReportDialog", () => {
         });
         expect(onOpenChange).not.toHaveBeenCalled();
         expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Salva" })).toBeEnabled();
+    });
+
+    it("annullando chiude senza salvare", async () => {
+        const onOpenChange = vi.fn();
+        const onSubmit = await renderDialog(vi.fn(), onOpenChange);
+
+        await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("carica collaboratore e tecnico assegnati, e senza tecnico lo lascia scegliere", async () => {
+        getReport.mockResolvedValue({ ...report, collaboratorId: 40, technicianId: null, technicianPrice: 0 });
+        const onSubmit = await renderDialog();
+
+        expect(screen.getByRole("combobox", { name: /^Collaboratore/ })).toHaveTextContent("Luca Bianchi");
+
+        await chooseOption("Tecnico", "Paolo");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ collaboratorId: 40, technicianId: 50 }));
+        });
+    });
+
+    it("cambiare il dispositivo lo consegna", async () => {
+        const onSubmit = await renderDialog();
+
+        await chooseOption(/^Dispositivo/, "Smartphone");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 11 }));
+        });
+    });
+
+    it("un dispositivo o un difetto non validi nel report si segnalano sul campo", async () => {
+        getReport.mockResolvedValue({ ...report, deviceId: 0, issueId: 0 });
+        const onSubmit = await renderDialog();
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+            "Seleziona un dispositivo valido",
+            "Seleziona un difetto valido",
+        ]);
+        expect(onSubmit).not.toHaveBeenCalled();
+
+        // Scegliere un dispositivo valido toglie solo il suo errore.
+        await chooseOption(/^Dispositivo/, "Notebook");
+        expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual(["Seleziona un difetto valido"]);
+    });
+
+    it("un importo scritto male o negativo non diventa zero in silenzio", async () => {
+        const onSubmit = await renderDialog();
+
+        await userEvent.clear(screen.getByLabelText("Prezzo lavoro tecnico"));
+        await userEvent.type(screen.getByLabelText("Prezzo lavoro tecnico"), "abc");
+        await userEvent.clear(screen.getByLabelText("Prezzo interno"));
+        await userEvent.type(screen.getByLabelText("Prezzo interno"), "-5");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+            invalidEuroAmountMessage,
+            "Il prezzo interno deve essere maggiore o uguale a zero",
+        ]);
+        expect(onSubmit).not.toHaveBeenCalled();
+
+        await userEvent.clear(screen.getByLabelText("Prezzo interno"));
+        await userEvent.type(screen.getByLabelText("Prezzo interno"), "abc");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+            invalidEuroAmountMessage,
+            invalidEuroAmountMessage,
+        ]);
+    });
+
+    it("accetta l'importo con la virgola e un campo vuoto vale zero", async () => {
+        const onSubmit = await renderDialog();
+
+        await userEvent.clear(screen.getByLabelText("Prezzo interno"));
+        await userEvent.type(screen.getByLabelText("Prezzo interno"), "12,50");
+        await userEvent.clear(screen.getByLabelText("Prezzo lavoro tecnico"));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ internalPrice: 12.5, technicianPrice: 0 }));
+        });
+    });
+
+    it("se il cliente del report non è valido avvisa e non salva", async () => {
+        getReport.mockResolvedValue({ ...report, customerId: 0 });
+        const onSubmit = await renderDialog();
+
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        expect(toastError).toHaveBeenCalledWith("Seleziona un cliente valido");
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("consegna password e note ripulite dagli spazi, e le svuotate come null", async () => {
+        getReport.mockResolvedValue({ ...report, note: "vecchia nota" });
+        const onSubmit = await renderDialog();
+
+        await userEvent.clear(screen.getByLabelText("Password sblocco"));
+        await userEvent.type(screen.getByLabelText("Password sblocco"), "  9999 ");
+        await userEvent.clear(screen.getByLabelText("Note"));
+        await userEvent.type(screen.getByLabelText("Note"), "   ");
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ password: "9999", note: null }));
+        });
     });
 });

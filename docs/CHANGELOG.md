@@ -25,6 +25,7 @@ data porta alla voce da qui.
 ## Novembre 2026
 
 - [2026-11-12 — Pagina GitHub: badge, copertura su Codecov, SECURITY e CONTRIBUTING](changelog/2026-11.md#2026-11-12-pagina-github-badge-copertura-su-codecov-security-e-contributing)
+- [2026-11-12 — Colonne delle tabelle riordinabili](changelog/2026-11.md#2026-11-12-colonne-delle-tabelle-riordinabili)
 - [2026-11-10 — Guida all'uso per gli utenti](changelog/2026-11.md#2026-11-10-guida-alluso-per-gli-utenti)
 - [2026-11-10 — Sidebar più stretta](changelog/2026-11.md#2026-11-10-sidebar-piu-stretta)
 - [2026-11-10 — Schede: anagrafica alta come i dettagli](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli)

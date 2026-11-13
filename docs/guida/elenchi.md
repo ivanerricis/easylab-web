@@ -29,6 +29,8 @@ Puoi anche **ordinare cliccando l'intestazione** di una colonna che ha le frecce
 
 Il pulsante **Colonne** apre un menu con la spunta su ogni colonna: togli quelle che non ti servono (per esempio la password) o aggiungi quelle nascoste (come **Stato**). **Mostra tutte** le riaccende. La colonna del cliente non si può nascondere.
 
+Puoi anche cambiare l'**ordine delle colonne**: trascina l'intestazione di una colonna dove la vuoi, oppure usa le frecce **su** e **giù** accanto a ogni voce del menu **Colonne**. **Ripristina ordine** riporta l'ordine di partenza. L'ordine resta salvato in quel browser.
+
 ![Il menu delle colonne](img/reports-columns.png)
 
 ## Colori e dettagli

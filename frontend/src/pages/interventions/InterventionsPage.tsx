@@ -4,6 +4,7 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import CustomDialog from "@/components/dialogs/customDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
@@ -88,6 +89,11 @@ const InterventionsPage = () => {
     );
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("interventions");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns(
+        "interventions",
+        interventionColumns
+    );
+    // L'ordine delle colonne vale per tabella e menu insieme: entrambi ricevono `orderedColumns`.
+    const { orderedColumns, moveColumn, moveColumnBy, resetColumnOrder, isCustomOrder } = useColumnOrder(
         "interventions",
         interventionColumns
     );
@@ -255,10 +261,13 @@ const InterventionsPage = () => {
                     onClearDates={() => updateParams({ [listUrlParams.dateFrom]: null, [listUrlParams.dateTo]: null })}
                     columnsMenu={
                         <ColumnVisibilityMenu
-                            columns={interventionColumns}
+                            columns={orderedColumns}
                             hiddenColumnKeys={hiddenColumnKeys}
                             onColumnVisibleChange={setColumnVisible}
                             onShowAll={showAllColumns}
+                            onColumnMoveBy={moveColumnBy}
+                            onResetOrder={resetColumnOrder}
+                            isCustomOrder={isCustomOrder}
                         />
                     }
                     onRefresh={loadInterventions}
@@ -271,7 +280,8 @@ const InterventionsPage = () => {
                             isInitialLoading={isInitialLoading}
                             isRefetching={isRefetching}
                             skeletonRowCount={pageSize}
-                            columns={interventionColumns}
+                            columns={orderedColumns}
+                            onColumnMove={moveColumn}
                             sort={parseSortOption(sortOption)}
                             onSortChange={handleTableSortChange}
                             hiddenColumnKeys={hiddenColumnKeys}

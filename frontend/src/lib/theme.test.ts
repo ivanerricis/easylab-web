@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
     applyPreference,
+    getStoredColumnOrder,
     getStoredKeyboardShortcutsEnabled,
     getStoredPreference,
     getStoredTableColumnWidths,
     getStoredTableRowsPerPage,
+    setStoredColumnOrder,
     setStoredKeyboardShortcutsEnabled,
     setStoredPreference,
     setStoredTableColumnWidths,
@@ -313,5 +315,37 @@ describe("scorciatoie da tastiera", () => {
         setStoredKeyboardShortcutsEnabled(true);
         expect(getStoredKeyboardShortcutsEnabled()).toBe(true);
         expect(localStorage.getItem("easylab-web-keyboard-shortcuts")).toBeNull();
+    });
+});
+
+describe("ordine delle colonne salvato", () => {
+    it("ricorda l'ordine per tabella", () => {
+        setStoredColumnOrder("reports", ["b", "a"], ["a", "b"]);
+
+        expect(getStoredColumnOrder("reports")).toEqual(["b", "a"]);
+        expect(getStoredColumnOrder("customers")).toEqual([]);
+    });
+
+    it("con l'ordine predefinito o vuoto toglie la chiave", () => {
+        setStoredColumnOrder("reports", ["b", "a"], ["a", "b"]);
+        setStoredColumnOrder("reports", ["a", "b"], ["a", "b"]);
+
+        expect(localStorage.length).toBe(0);
+
+        setStoredColumnOrder("reports", ["b", "a"], ["a", "b"]);
+        setStoredColumnOrder("reports", [], ["a", "b"]);
+
+        expect(localStorage.length).toBe(0);
+    });
+
+    it("legge in modo tollerante: contenuto non valido vale nessuna scelta", () => {
+        localStorage.setItem("easylab-web-table-column-order:t", "{non json");
+        expect(getStoredColumnOrder("t")).toEqual([]);
+
+        localStorage.setItem("easylab-web-table-column-order:t", '{"a":1}');
+        expect(getStoredColumnOrder("t")).toEqual([]);
+
+        localStorage.setItem("easylab-web-table-column-order:t", '["a", 3, null, "b"]');
+        expect(getStoredColumnOrder("t")).toEqual(["a", "b"]);
     });
 });

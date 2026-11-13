@@ -552,11 +552,14 @@ tr[data-status-color="green"] {
     --table-row-id-bg: var(--table-row-id-green);
 }
 
-/* Nello stile predefinito la riga resta neutra e a colorarsi è solo la cella ID (la prima):
-   pieno e con testo bianco, come le righe piene ma limitato a una cella. Negli altri stili le
-   variabili --table-row-id-* sono `initial` (valore non valido), quindi scattano i fallback
-   qui sotto e la cella non fa niente di suo. */
-tr[data-status-color] > :first-child {
+/* Nello stile predefinito la riga resta neutra e a colorarsi è solo la cella ID: pieno e con
+   testo bianco, come le righe piene ma limitato a una cella. Negli altri stili le variabili
+   --table-row-id-* sono `initial` (valore non valido), quindi scattano i fallback qui sotto e
+   la cella non fa niente di suo.
+   La cella la segna `EntityTable` con `data-status-cell` (l'ID, o la prima colonna se l'ID non
+   si vede): prima era `:first-child`, e con le colonne riordinabili il colore finiva su
+   qualunque colonna fosse spostata in testa, lasciando l'ID bianco. */
+tr[data-status-color] > [data-status-cell] {
     background-color: var(--table-row-id-bg, transparent);
     color: var(--table-row-id-foreground, inherit);
     font-weight: 600;

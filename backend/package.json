@@ -13,7 +13,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:db": "vitest run --config vitest.db.config.mts"
+    "test:coverage": "vitest run --coverage",
+    "test:db": "vitest run --config vitest.db.config.mts",
+    "test:db:coverage": "vitest run --config vitest.db.config.mts --coverage"
   },
   "keywords": [],
   "author": "",
@@ -46,6 +48,7 @@
     "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "5.0.5",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",

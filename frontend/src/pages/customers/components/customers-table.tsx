@@ -27,6 +27,8 @@ type CustomersTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /** Riordino delle colonne trascinando l'intestazione: vedi `EntityTable`. */
+    onColumnMove?: (key: string, toIndex: number) => void;
     /** La ricerca in vigore, per dire perché la lista è vuota: vedi `resolveEmptyListMessage`. */
     searchText?: string;
 };
@@ -46,6 +48,7 @@ const CustomersTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    onColumnMove,
     searchText,
 }: CustomersTableProps) => {
     const renderRowActions = (row: CustomerDto) => (
@@ -96,6 +99,7 @@ const CustomersTable = ({
             sort={sort}
             onSortChange={onSortChange}
             hiddenColumnKeys={hiddenColumnKeys}
+            onColumnMove={onColumnMove}
         />
     );
 };

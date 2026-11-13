@@ -8,7 +8,7 @@ import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, useId, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 export type EntityColumn<TRow> = {
     /** `"actions"` è speciale: quella colonna ospita i pulsanti di riga, non un valore. */
@@ -108,6 +108,34 @@ type EntityTableProps<TRow> = {
      * schede su mobile mostrano già un sottoinsieme deciso da `cardSlot`, e lì il menu non c'è.
      */
     hiddenColumnKeys?: readonly string[];
+    /**
+     * Con questa le intestazioni (tranne `actions`) si trascinano per riordinare le colonne.
+     * `columns` deve arrivare già nell'ordine voluto (di norma da `useColumnOrder`): qui si
+     * dice solo dove l'utente ha rilasciato. `toIndex` è la posizione finale della colonna
+     * nell'elenco completo, nascoste comprese, non fra le sole visibili: così il risultato
+     * coincide con quello del menu "Colonne". Facoltativa: senza, le intestazioni restano ferme.
+     */
+    onColumnMove?: (key: string, toIndex: number) => void;
+};
+
+/** Dove cade il rilascio rispetto alla colonna sotto il puntatore. */
+type ColumnDropTarget = { key: string; side: "before" | "after" };
+
+/**
+ * La linea di rilascio nel corpo della tabella, lungo tutta la colonna di destinazione.
+ *
+ * Solo sull'intestazione era un segno di pochi pixel, sul fondo scuro: trascinando non si vedeva.
+ * Una regola CSS con `:nth-child` evita di passare il bersaglio alle righe, che sono in `memo` e
+ * con "Tutte" possono essere migliaia: così durante il trascinamento non se ne ridisegna nessuna.
+ */
+const columnDropLineCss = (tableId: string, columnIndex: number, side: ColumnDropTarget["side"]) => {
+    if (columnIndex < 0) {
+        return "";
+    }
+
+    const shadow = side === "before" ? "inset 4px 0 0 0" : "inset -4px 0 0 0";
+
+    return `[data-column-drag-table="${tableId}"] tbody tr > :nth-child(${columnIndex + 1}) { box-shadow: ${shadow} var(--color-focus-ring); }`;
 };
 
 /** La colonna dei pulsanti: niente larghezza propria, si prende lo spazio che avanza. */
@@ -224,6 +252,10 @@ const EntityTableRowImpl = <TRow,>({
 
     // Senza più il pulsante "Apri" la riga è l'unico punto d'ingresso: da tastiera ci si arriva
     // con Tab e si apre con Invio. Solo se il focus è sulla riga stessa, non su un suo pulsante.
+    // La cella che prende il colore di stato (vedi `[data-status-cell]` in index.css): l'ID
+    // ovunque sia stato spostato, e la prima colonna solo se l'ID non c'è o è nascosto.
+    const statusCellKey = columns.some((column) => column.key === idColumnKey) ? idColumnKey : columns[0]?.key;
+
     const handleRowKeyDown = onRowOpen
         ? (event: React.KeyboardEvent<HTMLTableRowElement>) => {
               if (event.key === "Enter" && event.target === event.currentTarget) {
@@ -247,6 +279,7 @@ const EntityTableRowImpl = <TRow,>({
             {columns.map((column) => (
                 <TableCell
                     key={`${rowKey}-${column.key}`}
+                    data-status-cell={statusColor && column.key === statusCellKey ? "" : undefined}
                     className={cn(
                         truncateClassName(column.key),
                         column.key === idColumnKey && "tabular-nums",
@@ -308,7 +341,15 @@ const EntityTable = <TRow,>({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    onColumnMove,
 }: EntityTableProps<TRow>) => {
+    const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
+    const [dropTarget, setDropTarget] = useState<ColumnDropTarget | null>(null);
+    // Il trascinamento non deve partire dalla maniglia di ridimensionamento: `dragstart` non dice
+    // da quale figlio del `th` è nato il gesto, lo si ricorda dal `mousedown` che lo precede.
+    const pressStartedOnResizeHandleRef = useRef(false);
+    const dragTableId = useId();
+
     const columns = useMemo(() => {
         // Una colonna non nascondibile si disegna anche se le preferenze salvate la dicono
         // nascosta (l'utente l'aveva tolta prima che diventasse bloccata): vedi
@@ -360,10 +401,54 @@ const EntityTable = <TRow,>({
     const truncateClassName = (columnKey: string) =>
         isResizable && columnKey !== actionsColumnKey ? "overflow-hidden text-ellipsis" : undefined;
 
+    const clearColumnDrag = () => {
+        setDraggedColumnKey(null);
+        setDropTarget(null);
+    };
+
+    const getDropSide = (event: DragEvent<HTMLElement>): ColumnDropTarget["side"] => {
+        const rect = event.currentTarget.getBoundingClientRect();
+
+        return event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+    };
+
+    const handleColumnDrop = (event: DragEvent<HTMLElement>, targetKey: string) => {
+        event.preventDefault();
+
+        const side = getDropSide(event);
+        const fromIndex = allColumns.findIndex((column) => column.key === draggedColumnKey);
+        const targetIndex = allColumns.findIndex((column) => column.key === targetKey);
+
+        clearColumnDrag();
+
+        if (!onColumnMove || fromIndex === -1 || targetIndex === -1) {
+            return;
+        }
+
+        // Punto di inserimento nell'elenco completo, poi corretto perché togliere la colonna
+        // dalla sua posizione fa scalare di uno tutto ciò che sta dopo.
+        const insertionIndex = side === "before" ? targetIndex : targetIndex + 1;
+        const toIndex = fromIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
+
+        if (toIndex !== fromIndex) {
+            onColumnMove(allColumns[fromIndex].key, toIndex);
+        }
+    };
+
     return (
         <>
+            {dropTarget ? (
+                <style>
+                    {columnDropLineCss(
+                        dragTableId,
+                        columns.findIndex((column) => column.key === dropTarget.key),
+                        dropTarget.side
+                    )}
+                </style>
+            ) : null}
             <Table
                 ref={tableRef}
+                data-column-drag-table={onColumnMove ? dragTableId : undefined}
                 style={tableStyle}
                 aria-busy={isInitialLoading || isRefetching}
                 // Si nasconde il contenitore, non la tabella: vedi `containerClassName` in `Table`.
@@ -393,14 +478,101 @@ const EntityTable = <TRow,>({
                             const SortIcon =
                                 sortDirection === "asc" ? ArrowUp : sortDirection === "desc" ? ArrowDown : ArrowUpDown;
 
+                            const isDraggable = onColumnMove != null && column.key !== actionsColumnKey;
+                            // Il bordo evidenziato dice dove atterrerà la colonna: a sinistra o a
+                            // destra di quella sotto il puntatore.
+                            const dropSide = dropTarget?.key === column.key ? dropTarget.side : undefined;
+
                             return (
                                 <TableHead
                                     key={column.key}
+                                    draggable={isDraggable || undefined}
+                                    data-dragging={draggedColumnKey === column.key || undefined}
+                                    data-drop-side={dropSide}
+                                    onMouseDown={
+                                        isDraggable
+                                            ? (event) => {
+                                                  pressStartedOnResizeHandleRef.current =
+                                                      event.target instanceof Element &&
+                                                      event.target.closest("[data-column-resize-handle]") != null;
+                                              }
+                                            : undefined
+                                    }
+                                    onDragStart={
+                                        isDraggable
+                                            ? (event) => {
+                                                  if (pressStartedOnResizeHandleRef.current) {
+                                                      event.preventDefault();
+                                                      return;
+                                                  }
+
+                                                  // Firefox non avvia il trascinamento senza dati.
+                                                  event.dataTransfer?.setData("text/plain", column.key);
+
+                                                  if (event.dataTransfer) {
+                                                      event.dataTransfer.effectAllowed = "move";
+                                                  }
+
+                                                  setDraggedColumnKey(column.key);
+                                              }
+                                            : undefined
+                                    }
+                                    onDragOver={
+                                        isDraggable
+                                            ? (event) => {
+                                                  if (draggedColumnKey == null) {
+                                                      return;
+                                                  }
+
+                                                  // Senza `preventDefault` il browser non accetta il rilascio.
+                                                  event.preventDefault();
+
+                                                  const side = getDropSide(event);
+
+                                                  setDropTarget((current) =>
+                                                      current?.key === column.key && current.side === side
+                                                          ? current
+                                                          : { key: column.key, side }
+                                                  );
+                                              }
+                                            : undefined
+                                    }
+                                    onDragLeave={
+                                        isDraggable
+                                            ? (event) => {
+                                                  // Passare su un figlio (il titolo) non è uscire dalla colonna.
+                                                  if (
+                                                      !event.currentTarget.contains(event.relatedTarget as Node | null)
+                                                  ) {
+                                                      setDropTarget((current) =>
+                                                          current?.key === column.key ? null : current
+                                                      );
+                                                  }
+                                              }
+                                            : undefined
+                                    }
+                                    onDrop={
+                                        isDraggable && draggedColumnKey != null
+                                            ? (event) => handleColumnDrop(event, column.key)
+                                            : undefined
+                                    }
+                                    onDragEnd={isDraggable ? clearColumnDrag : undefined}
                                     // `aria-sort` sulla colonna ordinata: è ciò che fa dire a uno
                                     // screen reader "ordinata in modo crescente" arrivando lì.
                                     aria-sort={sortDirection ? ariaSortValue[sortDirection] : undefined}
                                     className={cn(
                                         "relative",
+                                        isDraggable && "cursor-grab",
+                                        draggedColumnKey === column.key && "opacity-50",
+                                        // Nell'intestazione il bordo usa il colore del suo testo, l'unico
+                                        // che si legge sul fondo in qualunque tema, e la colonna di
+                                        // destinazione si schiarisce; nel corpo prosegue la linea di
+                                        // `columnDropLineCss`.
+                                        dropSide && "bg-white/20",
+                                        dropSide === "before" &&
+                                            "shadow-[inset_4px_0_0_0_var(--color-table-header-foreground)]",
+                                        dropSide === "after" &&
+                                            "shadow-[inset_-4px_0_0_0_var(--color-table-header-foreground)]",
                                         truncateClassName(column.key),
                                         column.key === idColumnKey && idColumnClassName,
                                         column.className
@@ -450,6 +622,7 @@ const EntityTable = <TRow,>({
                                         // `overflow: hidden` che taglierebbe una linea esterna.
                                         <span
                                             {...resizeHandleProps}
+                                            data-column-resize-handle=""
                                             className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none focus-outline transition-colors outline-none select-none hover:bg-background/40 focus-visible:bg-background/60 focus-visible:-outline-offset-2!"
                                         />
                                     ) : null}

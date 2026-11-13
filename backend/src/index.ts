@@ -1,6 +1,7 @@
 import "dotenv/config";
 import app from "./app";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backupManager";
+import { startUpdateScheduler, stopUpdateScheduler } from "./services/updateSchedule";
 import { startDiskSpaceMonitor, stopDiskSpaceMonitor } from "./services/systemStatus";
 import { ensureCatchAllIssue } from "./services/issueCatalog";
 import { getCompanySettings } from "./services/companyManager";
@@ -17,6 +18,7 @@ const server = app.listen(3000, "0.0.0.0", () => {
         console.error("Lettura dei dati azienda non riuscita:", error);
     });
     startBackupScheduler();
+    startUpdateScheduler();
     startDiskSpaceMonitor();
     startSessionCleanupScheduler();
     // Il `.catch` non è decorativo: senza, un errore qui diventa una rejection non
@@ -54,6 +56,7 @@ const shutdown = (signal: NodeJS.Signals) => {
     console.log(`Ricevuto ${signal}, arresto in corso...`);
 
     stopBackupScheduler();
+    stopUpdateScheduler();
     stopDiskSpaceMonitor();
     stopSessionCleanupScheduler();
 

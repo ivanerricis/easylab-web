@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBusyGuard } from "@/components/use-busy-guard";
 import { getUpdateState } from "@/lib/api";
 import { buildProgressDetail, updatePhaseSteps } from "@/lib/updatePhases";
@@ -15,6 +15,8 @@ const POLL_INTERVAL_MS = 5000;
 export const useUpdateWatcher = () => {
     const { setBusy } = useBusyGuard();
     const wasUpdatingRef = useRef(false);
+    // Per il banner "aggiornamento programmato": arriva con lo stesso giro di polling.
+    const [scheduledAt, setScheduledAt] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -23,9 +25,10 @@ export const useUpdateWatcher = () => {
             let state;
             let phase;
             let build;
+            let nextScheduledAt;
 
             try {
-                ({ state, phase, build } = await getUpdateState());
+                ({ state, phase, build, scheduledAt: nextScheduledAt } = await getUpdateState());
             } catch {
                 // Mentre i container si ricostruiscono il backend non risponde: un errore di
                 // rete non è la fine dell'aggiornamento, quindi il blocco resta dov'è.
@@ -35,6 +38,8 @@ export const useUpdateWatcher = () => {
             if (cancelled) {
                 return;
             }
+
+            setScheduledAt(nextScheduledAt ?? null);
 
             if (state === "running") {
                 wasUpdatingRef.current = true;
@@ -78,4 +83,6 @@ export const useUpdateWatcher = () => {
             window.clearInterval(intervalId);
         };
     }, [setBusy]);
+
+    return { scheduledAt };
 };

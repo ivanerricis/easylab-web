@@ -268,4 +268,130 @@ describe("InterventionsPage", () => {
         });
         expect(toastSuccess).toHaveBeenCalledWith("Intervento eliminato con successo");
     });
+
+    /** Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: un link li riapre tali e quali. */
+    it("legge ordinamento, date, ricerca e pagina dall'indirizzo", async () => {
+        await renderPage("/interventions?sort=customer:asc&from=2026-09-01&to=2026-09-30&q=rossi&page=2&type=remote");
+
+        expect(listInterventions).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sortBy: "customer",
+                sortOrder: "asc",
+                dateFrom: "2026-09-01",
+                dateTo: "2026-09-30",
+                search: "rossi",
+                page: 2,
+                type: "remote",
+            })
+        );
+    });
+
+    it("ignora nell'indirizzo i valori che non riconosce e riparte dai predefiniti", async () => {
+        await renderPage("/interventions?status=boh&type=xx&sort=nonsense:asc&from=ieri&to=2026-9-1&page=-3");
+
+        expect(listInterventions).toHaveBeenCalledWith(
+            expect.objectContaining({
+                status: "all",
+                type: "all",
+                sortBy: "createdAt",
+                sortOrder: "desc",
+                dateFrom: undefined,
+                dateTo: undefined,
+                page: 1,
+            })
+        );
+    });
+
+    it("con filtri attivi e nessun risultato lo dice, senza proporre di crearne uno", async () => {
+        listInterventions.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 10, totalPages: 0 });
+        renderWithProviders(<InterventionsPage />, { route: "/interventions?status=completed" });
+
+        expect(await within(table()).findByText("Nessun intervento corrisponde ai filtri.")).toBeInTheDocument();
+    });
+
+    it("senza filtri né ricerca e nessun risultato mostra l'elenco vuoto", async () => {
+        listInterventions.mockResolvedValue({ items: [], totalItems: 0, page: 1, pageSize: 10, totalPages: 0 });
+        renderWithProviders(<InterventionsPage />);
+
+        expect(await within(table()).findByText("Nessun intervento disponibile.")).toBeInTheDocument();
+    });
+
+    it("se il caricamento fallisce mostra l'errore e Riprova ricarica", async () => {
+        listInterventions.mockRejectedValueOnce(new Error("Server non raggiungibile"));
+        renderWithProviders(<InterventionsPage />);
+
+        expect(await within(table()).findByText("Impossibile caricare gli interventi.")).toBeInTheDocument();
+        expect(toastError).toHaveBeenCalledWith("Server non raggiungibile");
+        expect(within(table()).queryByText("Mario Rossi")).not.toBeInTheDocument();
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Riprova" }));
+
+        expect(await within(table()).findByText("Mario Rossi")).toBeInTheDocument();
+        expect(listInterventions).toHaveBeenCalledTimes(2);
+    });
+
+    it("se l'eliminazione fallisce lo dice e l'intervento resta in elenco", async () => {
+        deleteIntervention.mockRejectedValue(new Error("Intervento fatturato"));
+        await renderPage();
+
+        await userEvent.click(within(table()).getByRole("button", { name: "Elimina intervento 9" }));
+        const dialog = screen.getByRole("dialog", { name: "Elimina intervento" });
+        await userEvent.type(within(dialog).getByLabelText("Digita ELIMINA per confermare"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledWith("Intervento fatturato");
+        });
+        // Il dialogo resta aperto per riprovare, e rende inaccessibile il resto: si cerca per testo.
+        expect(screen.getByRole("dialog", { name: "Elimina intervento" })).toBeInTheDocument();
+        expect(screen.getAllByText("Mario Rossi").length).toBeGreaterThan(0);
+        expect(toastSuccess).not.toHaveBeenCalled();
+    });
+
+    /** Scegliere un filtro lo scrive nell'indirizzo e rifà la richiesta; tornare a "tutti" lo toglie. */
+    it("cambia stato, tipo e ordinamento dai filtri e li toglie tornando ai predefiniti", async () => {
+        await renderPage();
+        const choose = async (label: string, option: string) => {
+            await userEvent.click(screen.getByRole("combobox", { name: label }));
+            await userEvent.click(await screen.findByRole("option", { name: option }));
+        };
+
+        await choose("Filtra per stato", "Completato");
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ status: "completed" }));
+        });
+
+        await choose("Filtra per tipo", "Intervento da remoto");
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenLastCalledWith(
+                expect.objectContaining({ status: "completed", type: "remote" })
+            );
+        });
+
+        await choose("Ordina per", "Cliente (A-Z)");
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenLastCalledWith(
+                expect.objectContaining({ sortBy: "customer", sortOrder: "asc" })
+            );
+        });
+
+        await choose("Ordina per", "Più recenti");
+        await choose("Filtra per stato", "Tutti gli stati");
+        await choose("Filtra per tipo", "Tutti i tipi");
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenLastCalledWith(
+                expect.objectContaining({ status: "all", type: "all", sortBy: "createdAt", sortOrder: "desc" })
+            );
+        });
+    });
+
+    it("la ricerca riparte dalla prima pagina e filtra per il testo scritto", async () => {
+        await renderPage("/interventions?page=2");
+
+        await userEvent.type(screen.getByRole("searchbox"), "rossi");
+
+        await waitFor(() => {
+            expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ search: "rossi", page: 1 }));
+        });
+    });
 });

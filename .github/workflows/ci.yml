@@ -35,7 +35,17 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      # Carica la copertura su Codecov. Gira anche se i test falliscono (`!cancelled()`) e non
+      # fa fallire la CI se Codecov non risponde: la copertura informa, non blocca. I percorsi
+      # di `files` sono relativi alla radice del repository, non al `working-directory`.
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        if: ${{ !cancelled() }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: frontend
+          files: frontend/coverage/lcov.info
+          fail_ci_if_error: false
       - run: npm run build
 
   # Test nel browser vero (Playwright), per ciò che jsdom non sa fare: coordinate del mouse
@@ -95,10 +105,19 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      - run: npm test
-      - run: npm run test:db
+      - run: npm run test:coverage
+      - run: npm run test:db:coverage
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/masso_test
+      # Come nel job frontend; qui i file sono due (test normali e test sul database) e
+      # Codecov li unisce sotto lo stesso flag.
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        if: ${{ !cancelled() }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: backend
+          files: backend/coverage/lcov.info,backend/coverage-db/lcov.info
+          fail_ci_if_error: false
       - run: npm run build
 
   # I job qui sopra compilano nella working copy, dove ogni file è presente per

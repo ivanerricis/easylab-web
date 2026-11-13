@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-    globalIgnores(["dist", "node_modules", "drizzle"]),
+    globalIgnores(["dist", "node_modules", "drizzle", "coverage", "coverage-db"]),
     {
         files: ["**/*.ts"],
         extends: [js.configs.recommended, tseslint.configs.recommended],

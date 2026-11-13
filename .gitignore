@@ -21,6 +21,7 @@ scripts/dev/certs/
 dist/
 build/
 coverage/
+coverage-db/
 backend/dist/
 frontend/dist/
 site/

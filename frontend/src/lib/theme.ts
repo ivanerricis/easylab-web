@@ -84,6 +84,7 @@ const fontSizeAttribute = "data-font-size";
 const tableRowsPerPageStorageKey = "easylab-web-table-rows-per-page";
 const tableColumnWidthsStorageKey = "easylab-web-table-column-widths";
 const tableHiddenColumnsStorageKey = "easylab-web-table-hidden-columns";
+const tableColumnOrderStorageKey = "easylab-web-table-column-order";
 const keyboardShortcutsStorageKey = "easylab-web-keyboard-shortcuts";
 
 export const cornerRadiusPresets: CornerRadiusPreset[] = [
@@ -538,6 +539,49 @@ export const setStoredHiddenColumns = (
     // Come per le altre preferenze si salva solo ciò che si discosta dal predefinito: anche una
     // lista vuota, quando di default qualcosa è nascosto ("Mostra tutte" è una scelta).
     if (isDefault) {
+        safeStorage.remove(storageKey);
+        return;
+    }
+
+    safeStorage.set(storageKey, JSON.stringify(columnKeys));
+};
+
+/**
+ * L'ordine delle colonne scelto dall'utente per una tabella, per chiave di tabella come le
+ * larghezze. Sono le chiavi delle colonne nell'ordine voluto; chi legge ignora quelle sparite e
+ * rimette al loro posto quelle nuove (vedi `useColumnOrder`). Un contenuto illeggibile o non
+ * valido vale "nessuna scelta": `[]`.
+ */
+export const getStoredColumnOrder = (tableKey: string): string[] => {
+    try {
+        const storedValue = safeStorage.get(`${tableColumnOrderStorageKey}:${tableKey}`);
+
+        if (storedValue == null) {
+            return [];
+        }
+
+        const parsedValue: unknown = JSON.parse(storedValue);
+
+        return Array.isArray(parsedValue) ? parsedValue.filter((item): item is string => typeof item === "string") : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Come per le altre preferenze si salva solo ciò che si discosta dal predefinito: un ordine
+ * vuoto o uguale a `defaultKeys` ("Ripristina ordine") toglie la chiave.
+ */
+export const setStoredColumnOrder = (
+    tableKey: string,
+    columnKeys: readonly string[],
+    defaultKeys: readonly string[] = []
+) => {
+    const storageKey = `${tableColumnOrderStorageKey}:${tableKey}`;
+    const isDefault =
+        columnKeys.length === defaultKeys.length && columnKeys.every((key, index) => key === defaultKeys[index]);
+
+    if (columnKeys.length === 0 || isDefault) {
         safeStorage.remove(storageKey);
         return;
     }

@@ -485,6 +485,35 @@ describe("ReportsPage", () => {
         expect(within(table()).getByRole("columnheader", { name: "Backup dati" })).toBeInTheDocument();
     });
 
+    it("riordina le colonne dal menu, se lo ricorda e lo ripristina", async () => {
+        const headers = () =>
+            within(table())
+                .getAllByRole("columnheader")
+                .map((cell) => cell.textContent);
+        const { unmount } = renderWithProviders(<ReportsPage />, { route: "/reports" });
+        await within(table()).findByText("Cliente 1");
+        const initial = headers();
+
+        expect(initial.slice(0, 3)).toEqual(["ID", "Cliente", "Telefono"]);
+
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
+        await userEvent.click(screen.getByRole("menuitem", { name: "Sposta Cliente giù" }));
+        await userEvent.keyboard("{Escape}");
+
+        expect(headers().slice(0, 3)).toEqual(["ID", "Telefono", "Cliente"]);
+        unmount();
+
+        // Dopo un nuovo montaggio l'ordine è ancora quello scelto.
+        renderWithProviders(<ReportsPage />, { route: "/reports" });
+        await within(table()).findByText("Cliente 1");
+        expect(headers().slice(0, 3)).toEqual(["ID", "Telefono", "Cliente"]);
+
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
+        await userEvent.click(screen.getByRole("menuitem", { name: "Ripristina ordine" }));
+
+        expect(headers()).toEqual(initial);
+    });
+
     it("ignora un filtro di stato sconosciuto nell'indirizzo", async () => {
         await renderPage("/reports?visibility=boh");
 

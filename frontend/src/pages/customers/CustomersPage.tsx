@@ -4,6 +4,7 @@ import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog
 import PrintRangeDialog from "@/components/dialogs/printRangeDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
@@ -56,6 +57,11 @@ const CustomersPage = () => {
     const [printKind, setPrintKind] = useState<CustomerPrintKind>("reports");
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("customers");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("customers", customerColumns);
+    // L'ordine delle colonne vale per tabella e menu insieme: entrambi ricevono `orderedColumns`.
+    const { orderedColumns, moveColumn, moveColumnBy, resetColumnOrder, isCustomOrder } = useColumnOrder(
+        "customers",
+        customerColumns
+    );
     const {
         customerRows,
         totalItems,
@@ -221,10 +227,13 @@ const CustomersPage = () => {
                 onSortOptionChange={handleSortOptionChange}
                 columnsMenu={
                     <ColumnVisibilityMenu
-                        columns={customerColumns}
+                        columns={orderedColumns}
                         hiddenColumnKeys={hiddenColumnKeys}
                         onColumnVisibleChange={setColumnVisible}
                         onShowAll={showAllColumns}
+                        onColumnMoveBy={moveColumnBy}
+                        onResetOrder={resetColumnOrder}
+                        isCustomOrder={isCustomOrder}
                     />
                 }
                 onRefresh={loadCustomers}
@@ -239,7 +248,8 @@ const CustomersPage = () => {
                         loadError={loadError}
                         onRetry={() => void loadCustomers()}
                         skeletonRowCount={pageSize}
-                        columns={customerColumns}
+                        columns={orderedColumns}
+                        onColumnMove={moveColumn}
                         sort={parseSortOption(sortOption)}
                         onSortChange={handleTableSortChange}
                         hiddenColumnKeys={hiddenColumnKeys}

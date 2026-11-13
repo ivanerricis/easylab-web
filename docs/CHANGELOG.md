@@ -26,6 +26,8 @@ data porta alla voce da qui.
 
 - [2026-11-12 — Nuovi pacchetti di assistenza: Remota, Pronti Via, Supporto](changelog/2026-11.md#2026-11-12-nuovi-pacchetti-di-assistenza-remota-pronti-via-supporto)
 - [2026-11-12 — Contratto firmato: caricamento e invio al cliente](changelog/2026-11.md#2026-11-12-contratto-firmato-caricamento-e-invio-al-cliente)
+- [2026-11-12 — Pagina GitHub: badge, copertura su Codecov, SECURITY e CONTRIBUTING](changelog/2026-11.md#2026-11-12-pagina-github-badge-copertura-su-codecov-security-e-contributing)
+- [2026-11-12 — Colonne delle tabelle riordinabili](changelog/2026-11.md#2026-11-12-colonne-delle-tabelle-riordinabili)
 - [2026-11-10 — Guida all'uso per gli utenti](changelog/2026-11.md#2026-11-10-guida-alluso-per-gli-utenti)
 - [2026-11-10 — Sidebar più stretta](changelog/2026-11.md#2026-11-10-sidebar-piu-stretta)
 - [2026-11-10 — Schede: anagrafica alta come i dettagli](changelog/2026-11.md#2026-11-10-schede-anagrafica-alta-come-i-dettagli)

@@ -29,6 +29,8 @@ type InterventionsTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /** Riordino delle colonne trascinando l'intestazione: vedi `EntityTable`. */
+    onColumnMove?: (key: string, toIndex: number) => void;
     /**
      * Ricerca e filtri in vigore, per dire perché la lista è vuota: vedi
      * `resolveEmptyListMessage`.
@@ -58,6 +60,7 @@ const InterventionsTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    onColumnMove,
     searchText,
     hasActiveFilters,
 }: InterventionsTableProps) => {
@@ -124,6 +127,7 @@ const InterventionsTable = ({
             sort={sort}
             onSortChange={onSortChange}
             hiddenColumnKeys={hiddenColumnKeys}
+            onColumnMove={onColumnMove}
         />
     );
 };

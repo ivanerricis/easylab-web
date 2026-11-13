@@ -28,6 +28,8 @@ type ReportsTableProps = {
     sort?: TableSort;
     onSortChange?: (sort: TableSort) => void;
     hiddenColumnKeys?: readonly string[];
+    /** Riordino delle colonne trascinando l'intestazione: vedi `EntityTable`. */
+    onColumnMove?: (key: string, toIndex: number) => void;
     /**
      * Ricerca e filtri in vigore, per dire perché la lista è vuota: vedi
      * `resolveEmptyListMessage`.
@@ -56,6 +58,7 @@ const ReportsTable = ({
     sort,
     onSortChange,
     hiddenColumnKeys,
+    onColumnMove,
     searchText,
     hasActiveFilters,
 }: ReportsTableProps) => {
@@ -113,6 +116,7 @@ const ReportsTable = ({
             sort={sort}
             onSortChange={onSortChange}
             hiddenColumnKeys={hiddenColumnKeys}
+            onColumnMove={onColumnMove}
         />
     );
 };

@@ -10,7 +10,8 @@ vi.mock("@/components/shortcuts-legend", () => ({ default: () => null }));
 vi.mock("@/components/notifications-menu", () => ({ NotificationsMenu: () => null }));
 vi.mock("@/components/user-badge", () => ({ UserBadge: () => null }));
 vi.mock("@/components/main-sidebar", () => ({ default: () => null }));
-vi.mock("@/hooks/useUpdateWatcher", () => ({ useUpdateWatcher: () => undefined }));
+const watcher = vi.hoisted(() => ({ scheduledAt: null as string | null }));
+vi.mock("@/hooks/useUpdateWatcher", () => ({ useUpdateWatcher: () => watcher }));
 
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MainLayout } from "./MainLayout";
@@ -59,6 +60,7 @@ const announcer = () => document.querySelector<HTMLElement>('[aria-live="polite"
 
 beforeEach(() => {
     document.title = "EasyLab";
+    watcher.scheduledAt = null;
 });
 
 afterEach(() => {
@@ -120,5 +122,23 @@ describe("MainLayout: cambio pagina", () => {
 
         expect(main()).not.toHaveFocus();
         expect(announcer()).toHaveTextContent("");
+    });
+});
+
+describe("MainLayout: banner dell'aggiornamento programmato", () => {
+    it("non mostra nulla senza un aggiornamento in programma", () => {
+        renderLayout();
+
+        expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("avvisa tutti, con giorno e ora, che l'app si fermera' per qualche minuto", () => {
+        watcher.scheduledAt = new Date(2026, 10, 12, 3, 0).toISOString();
+
+        renderLayout();
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Aggiornamento programmato per giovedì 12/11 alle 03:00: l'app sarà ferma per qualche minuto."
+        );
     });
 });

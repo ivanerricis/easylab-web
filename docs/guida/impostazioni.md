@@ -102,6 +102,8 @@ Quattro riquadri: la **versione installata**, la data dell'**ultima verifica**, 
 
 L'amministratore può premere **Verifica aggiornamenti** per controllare se esiste una versione nuova. Se c'è, **Aggiorna adesso** si attiva: l'app ricostruisce e riavvia i servizi, quindi per qualche istante **non è raggiungibile**. Conviene aggiornare quando nessuno sta lavorando, e dopo un backup.
 
+Per non dover restare davanti allo schermo c'è **Programma**: scegli data e ora (per esempio le 03:00 di stanotte) e il server si aggiorna da solo. Il riquadro «Aggiornamento programmato per…» mostra quando, con **Modifica** e **Annulla programmazione**; **Aggiorna adesso** annulla la programmazione e aggiorna subito. Fino a quell'ora tutti gli utenti vedono in cima alla pagina un avviso. Se all'ora fissata è in corso un backup, l'aggiornamento aspetta che finisca; se il server era spento e sono passate più di un'ora, la programmazione viene annullata. L'esito (riuscito, non riuscito, annullato) arriva come notifica, e se non è riuscito anche per email all'amministratore. Chi non è amministratore vede solo quando è programmato.
+
 Se la sezione dice che il servizio di aggiornamento non è configurato, l'aggiornamento si fa dal server: vedi [Deploy e configurazione server](../DEPLOY.md#aggiornamento-applicazione).
 
 ## Log

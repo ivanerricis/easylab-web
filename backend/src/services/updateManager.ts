@@ -139,9 +139,16 @@ const touchTrigger = async (triggerPath: string) => {
     await fs.promises.writeFile(triggerPath, "", "utf-8");
 };
 
+/**
+ * Scrive il trigger che l'host raccoglie per avviare l'aggiornamento, senza controlli: chi chiama
+ * (`requestUpdate`, lo scheduler degli aggiornamenti programmati) ha gia' verificato che non ce
+ * ne sia uno in corso.
+ */
+export const writeApplyTrigger = () => touchTrigger(applyTriggerPath);
+
 export const requestUpdate = async () => {
     await ensureNotRunning();
-    await touchTrigger(applyTriggerPath);
+    await writeApplyTrigger();
     return getUpdateStatus();
 };
 

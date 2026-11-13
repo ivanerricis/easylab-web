@@ -571,3 +571,182 @@ describe("useBackupPanel: chiave di backup", () => {
         expect(result.current.isBackupKeyDialogOpen).toBe(true);
     });
 });
+
+describe("useBackupPanel: casi limite", () => {
+    it("se l'elenco dei dump non si carica lo dice, e il pannello resta usabile", async () => {
+        api.listBackupDumps.mockRejectedValue(new Error("Cartella dei backup non leggibile"));
+        const { result } = await renderPanel();
+
+        expect(toast.error).toHaveBeenCalledWith("Cartella dei backup non leggibile");
+        expect(result.current.dumpFiles).toEqual([]);
+        expect(result.current.totalDumpsSize).toBe(0);
+    });
+
+    it("per il test di connessione elenca host, condivisione e utente mancanti, con la frase di quel contesto", async () => {
+        const { result } = await renderPanel();
+
+        edit(result, { smbPassword: "segreta" });
+        await act(async () => {
+            await result.current.handleTestSmbConnection();
+        });
+
+        expect(result.current.errors).toEqual({
+            smbHost: "Per testare la connessione specifica l'host del NAS",
+            smbShare: "Per testare la connessione specifica il nome della condivisione",
+            smbUsername: "Per testare la connessione specifica l'utente del NAS",
+        });
+        expect(api.testSmbConnection).not.toHaveBeenCalled();
+    });
+
+    it("se la prova di connessione fallisce lo dice e si può riprovare", async () => {
+        api.testSmbConnection.mockRejectedValueOnce(new Error("Accesso negato dal NAS"));
+        api.testSmbConnection.mockResolvedValue({ message: "Connessione riuscita" });
+        const { result } = await renderPanel();
+
+        edit(result, { smbHost: "nas", smbShare: "backup", smbUsername: "admin", smbPassword: "segreta" });
+        await act(async () => {
+            await result.current.handleTestSmbConnection();
+        });
+
+        expect(toast.error).toHaveBeenCalledWith("Accesso negato dal NAS");
+        expect(result.current.isTestingSmb).toBe(false);
+
+        await act(async () => {
+            await result.current.handleTestSmbConnection();
+        });
+        expect(toast.success).toHaveBeenCalledWith("Connessione riuscita");
+    });
+
+    it("se il backup fallisce lo dice, sblocca la pagina e non ricarica i dump", async () => {
+        api.runBackupNow.mockRejectedValue(new Error("Spazio su disco esaurito"));
+        const { result } = await renderPanel();
+
+        await act(async () => {
+            await result.current.handleRunBackup();
+        });
+
+        expect(toast.error).toHaveBeenCalledWith("Spazio su disco esaurito");
+        expect(result.current.isRunningBackup).toBe(false);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(api.listBackupDumps).toHaveBeenCalledTimes(1);
+    });
+
+    it("con la copia sul NAS accesa lo dice nell'avviso di attesa, e un secondo clic non rilancia il backup", async () => {
+        let finishBackup!: (value: unknown) => void;
+        api.runBackupNow.mockReturnValue(new Promise((resolve) => (finishBackup = resolve)));
+        const { result } = await renderPanel();
+
+        edit(result, { smbEnabled: true });
+        let running!: Promise<void>;
+        act(() => {
+            running = result.current.handleRunBackup();
+        });
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("copiato sul NAS");
+
+        await act(async () => {
+            await result.current.handleRunBackup();
+        });
+        expect(api.runBackupNow).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishBackup({ ...settings, smbEnabled: true, smbLastStatus: "success", message: "Backup completato" });
+            await running;
+        });
+        expect(toast.success).toHaveBeenCalledWith("Backup completato");
+    });
+
+    it("tiene il file scelto per il ripristino, e ignora una scelta annullata", async () => {
+        const { result } = await renderPanel();
+        const file = new File(["dump"], "backup.tar.gz");
+
+        act(() => {
+            result.current.handleRestoreFileSelected({
+                target: { files: [file] },
+            } as unknown as React.ChangeEvent<HTMLInputElement>);
+        });
+        expect(result.current.restoreUploadFile).toBe(file);
+
+        act(() => {
+            result.current.handleRestoreFileSelected({
+                target: { files: [] },
+            } as unknown as React.ChangeEvent<HTMLInputElement>);
+        });
+        expect(result.current.restoreUploadFile).toBe(file);
+    });
+
+    it("senza un ripristino in attesa la conferma non chiama il server", async () => {
+        const { result } = await renderPanel();
+
+        await act(async () => {
+            await result.current.handleConfirmRestore();
+        });
+
+        expect(api.restoreBackupFromExisting).not.toHaveBeenCalled();
+        expect(api.restoreBackupFromUpload).not.toHaveBeenCalled();
+    });
+
+    it("chiudendo il dialogo della chiave dimentica la password scritta", async () => {
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+            result.current.setBackupKeyPassword("segreta");
+        });
+        act(() => {
+            result.current.closeBackupKeyDialog();
+        });
+
+        expect(result.current.isBackupKeyDialogOpen).toBe(false);
+        expect(result.current.backupKeyPassword).toBe("");
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+        });
+        expect(result.current.backupKeyPassword).toBe("");
+    });
+
+    it("con la chiave già mostrata non riapre il dialogo della password", async () => {
+        api.getBackupKey.mockResolvedValue({ key: "ab".repeat(32) });
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+            result.current.setBackupKeyPassword("segreta");
+        });
+        await act(async () => {
+            await result.current.handleRevealBackupKey();
+        });
+        act(() => {
+            result.current.openBackupKeyDialog();
+        });
+
+        expect(result.current.isBackupKeyDialogOpen).toBe(false);
+    });
+
+    it("mentre recupera la chiave non si lascia chiudere il dialogo", async () => {
+        let finishKey!: (value: unknown) => void;
+        api.getBackupKey.mockReturnValue(new Promise((resolve) => (finishKey = resolve)));
+        const { result } = await renderPanel();
+
+        act(() => {
+            result.current.openBackupKeyDialog();
+            result.current.setBackupKeyPassword("segreta");
+        });
+        let revealing!: Promise<void>;
+        act(() => {
+            revealing = result.current.handleRevealBackupKey();
+        });
+        act(() => {
+            result.current.closeBackupKeyDialog();
+        });
+
+        expect(result.current.isBackupKeyDialogOpen).toBe(true);
+
+        await act(async () => {
+            finishKey({ key: "cd".repeat(32) });
+            await revealing;
+        });
+        expect(result.current.backupKey).toBe("cd".repeat(32));
+    });
+});

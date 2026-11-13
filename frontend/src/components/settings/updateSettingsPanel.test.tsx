@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -6,6 +6,9 @@ const api = vi.hoisted(() => ({
     checkForUpdates: vi.fn(),
     runUpdateNow: vi.fn(),
     getBackupSettings: vi.fn(),
+    getUpdateInfo: vi.fn(),
+    scheduleUpdate: vi.fn(),
+    cancelScheduledUpdate: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -30,6 +33,7 @@ vi.mock("sonner", () => ({ toast }));
 
 import UpdateSettingsPanel from "./updateSettingsPanel";
 import { renderWithProviders } from "@/test/render";
+import { formatDateISO } from "@/lib/utils";
 
 const status = {
     state: "idle",
@@ -316,5 +320,178 @@ describe("UpdateSettingsPanel", () => {
         expect(toast.error).toHaveBeenCalledWith("docker compose build fallito");
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
         expect(reload).not.toHaveBeenCalled();
+    });
+});
+
+describe("UpdateSettingsPanel: aggiornamento programmato", () => {
+    const emptySchedule = {
+        scheduledAt: null,
+        scheduledBy: null,
+        lastOutcome: null,
+        lastOutcomeAt: null,
+        lastOutcomeMessage: null,
+    };
+
+    /** Un'ora di domani, nel fuso del browser: i controlli del dialogo ragionano in ora locale. */
+    const inDays = (days: number, hours: number, minutes = 0) => {
+        const moment = new Date();
+        moment.setDate(moment.getDate() + days);
+        moment.setHours(hours, minutes, 0, 0);
+        return moment;
+    };
+
+    const scheduledStatus = (scheduledAt: Date, overrides: Record<string, unknown> = {}) => ({
+        ...status,
+        schedule: { ...emptySchedule, scheduledAt: scheduledAt.toISOString(), scheduledBy: "ivan", ...overrides },
+    });
+
+    beforeEach(() => {
+        api.getUpdateStatus.mockResolvedValue({ ...status, schedule: emptySchedule });
+    });
+
+    it("offre Programma solo se c'e' un aggiornamento disponibile", async () => {
+        await renderPanel();
+        expect(screen.getByRole("button", { name: "Programma" })).toBeEnabled();
+
+        cleanup();
+        api.getUpdateStatus.mockResolvedValue({ ...status, updateAvailable: false, schedule: emptySchedule });
+        await renderPanel();
+
+        expect(screen.queryByRole("button", { name: "Programma" })).not.toBeInTheDocument();
+    });
+
+    it("programma l'aggiornamento proponendo le 03:00 e mostra il riquadro", async () => {
+        const target = inDays(1, 3);
+        api.scheduleUpdate.mockResolvedValue({
+            ...emptySchedule,
+            scheduledAt: target.toISOString(),
+            scheduledBy: "ivan",
+        });
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Programma" }));
+        const dialog = screen.getByRole("dialog", { name: "Programma aggiornamento" });
+        await click(within(dialog).getByRole("button", { name: "Programma" }));
+
+        expect(api.scheduleUpdate).toHaveBeenCalledWith({
+            date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+            time: "03:00",
+        });
+        expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Aggiornamento programmato per"));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.getByText(/^Aggiornamento programmato per .* alle 03:00$/)).toBeInTheDocument();
+        expect(screen.getByText(/Programmato da ivan/)).toBeInTheDocument();
+    });
+
+    it("modifica: riapre il dialogo con l'orario gia' scelto", async () => {
+        const current = inDays(3, 4, 30);
+        api.getUpdateStatus.mockResolvedValue(scheduledStatus(current));
+        api.scheduleUpdate.mockResolvedValue({ ...emptySchedule, scheduledAt: current.toISOString() });
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Modifica" }));
+        const dialog = screen.getByRole("dialog", { name: "Modifica aggiornamento programmato" });
+        await click(within(dialog).getByRole("button", { name: "Programma" }));
+
+        expect(api.scheduleUpdate).toHaveBeenCalledWith({ date: formatDateISO(current), time: "04:30" });
+    });
+
+    it("rifiuta un orario passato senza chiamare il server", async () => {
+        api.getUpdateStatus.mockResolvedValue(scheduledStatus(inDays(-1, 3)));
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Modifica" }));
+        await click(within(screen.getByRole("dialog")).getByRole("button", { name: "Programma" }));
+
+        expect(api.scheduleUpdate).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert")).toHaveTextContent("Scegli un orario futuro");
+    });
+
+    it("mostra nel dialogo il rifiuto del server e lo lascia aperto", async () => {
+        api.scheduleUpdate.mockRejectedValue(new Error("Quell'ora non esiste (cambio dell'ora legale)"));
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Programma" }));
+        await click(within(screen.getByRole("dialog")).getByRole("button", { name: "Programma" }));
+
+        const dialog = screen.getByRole("dialog", { name: "Programma aggiornamento" });
+        expect(within(dialog).getByText(/cambio dell'ora legale/)).toBeInTheDocument();
+        expect(screen.queryByText(/^Aggiornamento programmato per/)).not.toBeInTheDocument();
+    });
+
+    it("annulla la programmazione solo dopo la conferma", async () => {
+        api.getUpdateStatus.mockResolvedValue(scheduledStatus(inDays(1, 3)));
+        api.cancelScheduledUpdate.mockResolvedValue(emptySchedule);
+        await renderPanel();
+
+        // Programmato: si cambia da «Modifica», non c'è un secondo pulsante «Programma».
+        expect(screen.queryByRole("button", { name: "Programma" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Modifica" })).toBeEnabled();
+        await click(screen.getByRole("button", { name: "Annulla programmazione" }));
+        expect(api.cancelScheduledUpdate).not.toHaveBeenCalled();
+
+        const dialog = screen.getByRole("dialog", { name: "Annulla programmazione" });
+        await click(within(dialog).getByRole("button", { name: "Annulla programmazione" }));
+
+        expect(api.cancelScheduledUpdate).toHaveBeenCalledOnce();
+        expect(toast.success).toHaveBeenCalledWith("Programmazione annullata");
+        expect(screen.queryByText(/^Aggiornamento programmato per/)).not.toBeInTheDocument();
+    });
+
+    it("se l'annullo fallisce lo dice e tiene la programmazione", async () => {
+        api.getUpdateStatus.mockResolvedValue(scheduledStatus(inDays(1, 3)));
+        api.cancelScheduledUpdate.mockRejectedValue(new Error("Server non raggiungibile"));
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Annulla programmazione" }));
+        await click(
+            within(screen.getByRole("dialog", { name: "Annulla programmazione" })).getByRole("button", {
+                name: "Annulla programmazione",
+            })
+        );
+
+        expect(toast.error).toHaveBeenCalledWith("Server non raggiungibile");
+        expect(screen.getByText(/^Aggiornamento programmato per/)).toBeInTheDocument();
+    });
+
+    it("avvisa nella conferma di 'Aggiorna adesso' che la programmazione verra' annullata", async () => {
+        api.getUpdateStatus.mockResolvedValue(scheduledStatus(inDays(1, 3)));
+        await renderPanel();
+
+        await click(screen.getByRole("button", { name: "Aggiorna adesso" }));
+
+        expect(screen.getByRole("dialog", { name: "Aggiorna applicazione" })).toHaveTextContent(
+            /programmato per .* verrà annullato/
+        );
+    });
+
+    it("mostra l'esito dell'ultimo aggiornamento programmato", async () => {
+        api.getUpdateStatus.mockResolvedValue({
+            ...status,
+            schedule: {
+                ...emptySchedule,
+                lastOutcome: "cancelled",
+                lastOutcomeAt: "2026-09-11T09:00:00.000Z",
+                lastOutcomeMessage: "Annullato: il server non era attivo all'ora fissata",
+            },
+        });
+        await renderPanel();
+
+        expect(screen.getByText(/Ultimo aggiornamento programmato annullato il/)).toBeInTheDocument();
+        expect(screen.getByText(/il server non era attivo all'ora fissata/)).toBeInTheDocument();
+    });
+
+    it("a chi non e' amministratore mostra l'orario ma nessun comando", async () => {
+        api.getUpdateInfo.mockResolvedValue({ ...status, scheduledAt: inDays(1, 3).toISOString() });
+        renderWithProviders(<UpdateSettingsPanel readOnly />);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(screen.getByText(/^Aggiornamento programmato per .* alle 03:00$/)).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Programma" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Modifica" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Annulla programmazione" })).not.toBeInTheDocument();
+        expect(screen.queryByText(/Programmato da/)).not.toBeInTheDocument();
     });
 });

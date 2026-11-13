@@ -11,8 +11,8 @@ import { BusyGuardProvider } from "@/components/busy-guard-provider";
 import { useUpdateWatcher } from "./useUpdateWatcher";
 
 const Watcher = () => {
-    useUpdateWatcher();
-    return null;
+    const { scheduledAt } = useUpdateWatcher();
+    return <p data-testid="scheduled-at">{scheduledAt ?? "nessuna"}</p>;
 };
 
 const reload = vi.fn();
@@ -168,5 +168,47 @@ describe("useUpdateWatcher", () => {
         });
 
         expect(getUpdateState).toHaveBeenCalledTimes(callsAtUnmount);
+    });
+});
+
+describe("useUpdateWatcher: aggiornamento programmato", () => {
+    it("espone l'orario programmato per il banner e lo toglie quando sparisce", async () => {
+        getUpdateState.mockResolvedValue({ state: "idle", scheduledAt: "2026-11-14T02:00:00.000Z" });
+        await renderWatcher();
+
+        expect(screen.getByTestId("scheduled-at")).toHaveTextContent("2026-11-14T02:00:00.000Z");
+
+        getUpdateState.mockResolvedValue({ state: "idle", scheduledAt: null });
+        await nextPoll();
+
+        expect(screen.getByTestId("scheduled-at")).toHaveTextContent("nessuna");
+    });
+
+    it("senza programmazione nello stato non c'e' niente da annunciare", async () => {
+        getUpdateState.mockResolvedValue({ state: "idle" });
+        await renderWatcher();
+
+        expect(screen.getByTestId("scheduled-at")).toHaveTextContent("nessuna");
+    });
+
+    it("tiene l'ultimo orario noto se il backend non risponde", async () => {
+        getUpdateState.mockResolvedValue({ state: "idle", scheduledAt: "2026-11-14T02:00:00.000Z" });
+        await renderWatcher();
+
+        getUpdateState.mockRejectedValue(new Error("Network Error"));
+        await nextPoll();
+
+        expect(screen.getByTestId("scheduled-at")).toHaveTextContent("2026-11-14T02:00:00.000Z");
+    });
+
+    it("lascia il blocco a schermo e il reload com'erano durante l'aggiornamento", async () => {
+        getUpdateState.mockResolvedValue({ state: "running", scheduledAt: null });
+        await renderWatcher();
+        expect(screen.getByRole("alert")).toHaveTextContent("Aggiornamento in corso...");
+
+        getUpdateState.mockResolvedValue({ state: "success", scheduledAt: null });
+        await nextPoll();
+
+        expect(reload).toHaveBeenCalledTimes(1);
     });
 });

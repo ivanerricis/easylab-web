@@ -256,4 +256,108 @@ describe("LoginPage", () => {
         expect(passwordInput).not.toHaveAttribute("aria-invalid");
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
+
+    it("toglie gli spazi dal nome utente prima di mandarlo", async () => {
+        login.mockResolvedValue({ status: "authenticated", user: { ...user, twoFactorEnabled: false } });
+
+        renderLoginPage();
+        await userEvent.type(screen.getByLabelText("Nome utente"), "  Mario ");
+        await userEvent.type(screen.getByLabelText("Password"), "segreta1!");
+        await userEvent.click(screen.getByRole("button", { name: /Accedi/ }));
+
+        await waitFor(() => {
+            expect(login).toHaveBeenCalledWith("Mario", "segreta1!");
+        });
+    });
+
+    it("mostra e nasconde la password a richiesta", async () => {
+        renderLoginPage();
+        const password = screen.getByLabelText("Password");
+        expect(password).toHaveAttribute("type", "password");
+
+        await userEvent.click(screen.getByRole("button", { name: "Mostra password" }));
+        expect(password).toHaveAttribute("type", "text");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nascondi password" }));
+        expect(password).toHaveAttribute("type", "password");
+    });
+
+    it("senza codice non chiama il server e dice che manca, secondo il tipo di codice", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        renderLoginPage();
+        await submitCredentials();
+
+        await userEvent.click(await screen.findByRole("button", { name: /Verifica/ }));
+        expect(screen.getByLabelText("Codice di verifica")).toHaveAccessibleDescription(
+            "Inserisci il codice di verifica"
+        );
+
+        await userEvent.click(screen.getByRole("button", { name: "Usa un codice di recupero" }));
+        // Passare all'altro tipo di codice toglie l'errore del precedente.
+        expect(screen.getByLabelText("Codice di recupero")).not.toHaveAttribute("aria-invalid");
+        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
+        expect(screen.getByLabelText("Codice di recupero")).toHaveAccessibleDescription(
+            "Inserisci un codice di recupero"
+        );
+        expect(screen.getByLabelText("Codice di recupero")).toHaveFocus();
+        expect(verifyTwoFactorLogin).not.toHaveBeenCalled();
+    });
+
+    it("manda il codice di recupero senza spazi attorno", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+        verifyTwoFactorLogin.mockResolvedValue(user);
+
+        renderLoginPage();
+        await submitCredentials();
+        await userEvent.click(await screen.findByRole("button", { name: "Usa un codice di recupero" }));
+        await userEvent.type(screen.getByLabelText("Codice di recupero"), " ABCD2345");
+        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
+
+        await waitFor(() => {
+            expect(verifyTwoFactorLogin).toHaveBeenCalledWith("abc123", "ABCD2345");
+        });
+        expect(navigate).toHaveBeenCalledWith("/dashboard", { replace: true });
+    });
+
+    it("si può tornare al codice dell'app dopo aver scelto quello di recupero", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        renderLoginPage();
+        await submitCredentials();
+        await userEvent.click(await screen.findByRole("button", { name: "Usa un codice di recupero" }));
+        await userEvent.type(screen.getByLabelText("Codice di recupero"), "ABCD");
+
+        await userEvent.click(screen.getByRole("button", { name: "Usa il codice dell'app di autenticazione" }));
+
+        expect(screen.getByLabelText("Codice di verifica")).toHaveValue("");
+        expect(screen.queryByLabelText("Codice di recupero")).not.toBeInTheDocument();
+    });
+
+    /** "Torna indietro" riparte dalle credenziali: la password si riscrive, il nome utente resta. */
+    it("con Torna indietro riparte dalle credenziali scartando la password", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+
+        renderLoginPage();
+        await submitCredentials();
+        await userEvent.click(await screen.findByRole("button", { name: "Torna indietro" }));
+
+        expect(screen.getByLabelText("Nome utente")).toHaveValue("mario");
+        expect(screen.getByLabelText("Password")).toHaveValue("");
+        expect(screen.queryByLabelText("Codice di verifica")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Password")).not.toHaveAttribute("aria-invalid");
+    });
+
+    it("dopo un errore sulla password la svuota per riscriverla", async () => {
+        login.mockRejectedValue(buildAxiosError("Credenziali non valide", 401));
+
+        renderLoginPage();
+        await submitCredentials();
+
+        await waitFor(() => {
+            expect(screen.getByLabelText("Password")).toHaveValue("");
+        });
+        expect(screen.getByLabelText("Password")).toHaveFocus();
+        expect(screen.getByLabelText("Nome utente")).toHaveValue("mario");
+    });
 });

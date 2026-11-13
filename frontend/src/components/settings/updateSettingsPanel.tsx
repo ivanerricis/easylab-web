@@ -13,21 +13,31 @@ import {
     type SettingsRunStatus,
 } from "@/components/settings/settingsUi";
 import CustomDialog from "@/components/dialogs/customDialog";
+import ScheduleUpdateDialog from "@/components/dialogs/settings/scheduleUpdateDialog";
 import DetailItem, { DetailGrid } from "@/components/detail-item";
 import { useBusyGuard } from "@/components/use-busy-guard";
 import {
+    cancelScheduledUpdate,
     checkForUpdates,
     getApiErrorMessage,
     getBackupSettings,
     getUpdateInfo,
     getUpdateStatus,
     runUpdateNow,
+    scheduleUpdate,
     type UpdateInfoDto,
     type UpdateStatusDto,
 } from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
 import { buildProgressDetail, updatePhaseSteps } from "@/lib/updatePhases";
-import { Download, RefreshCw } from "lucide-react";
+import { formatScheduledMoment } from "@/lib/updateSchedule";
+import { CalendarClock, Download, RefreshCw } from "lucide-react";
+
+const outcomeLabels = {
+    success: "completato",
+    failed: "non riuscito",
+    cancelled: "annullato",
+} as const;
 
 const POLL_INTERVAL_MS = 3000;
 const CHECK_MAX_ATTEMPTS = 20; // ~1 minute
@@ -46,6 +56,8 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
     const [isChecking, setIsChecking] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+    const [isCancelScheduleOpen, setIsCancelScheduleOpen] = useState(false);
     const [lastBackup, setLastBackup] = useState<{ at: string | null; status: SettingsRunStatus } | null>(null);
     const [isLoadingLastBackup, setIsLoadingLastBackup] = useState(false);
     const cancelledRef = useRef(false);
@@ -121,6 +133,38 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
             if (!cancelledRef.current) {
                 setIsChecking(false);
             }
+        }
+    };
+
+    // Il server risponde con la programmazione aggiornata: si sostituisce nello stato, senza
+    // ricaricare tutto. Un errore lo mostra il dialogo (programmazione) o il toast (annullo).
+    const handleSchedule = async (fields: { date: string; time: string }) => {
+        const schedule = await scheduleUpdate(fields);
+
+        if (!cancelledRef.current) {
+            setStatus((prev) => (prev ? { ...prev, schedule, scheduledAt: schedule.scheduledAt } : prev));
+        }
+
+        toast.success(
+            schedule.scheduledAt
+                ? `Aggiornamento programmato per ${formatScheduledMoment(schedule.scheduledAt)}`
+                : "Aggiornamento programmato"
+        );
+    };
+
+    const handleCancelSchedule = async () => {
+        setIsCancelScheduleOpen(false);
+
+        try {
+            const schedule = await cancelScheduledUpdate();
+
+            if (!cancelledRef.current) {
+                setStatus((prev) => (prev ? { ...prev, schedule, scheduledAt: schedule.scheduledAt } : prev));
+            }
+
+            toast.success("Programmazione annullata");
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Impossibile annullare la programmazione"));
         }
     };
 
@@ -236,6 +280,9 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
     };
 
     const isBusy = isChecking || isUpdating || isLoading;
+    // L'amministratore la legge da `schedule`, gli altri da `scheduledAt` (vedi /update-info).
+    const scheduledAt = status?.schedule?.scheduledAt ?? status?.scheduledAt ?? null;
+    const lastOutcome = readOnly ? null : (status?.schedule ?? null);
 
     return (
         <SettingsSection>
@@ -261,6 +308,19 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
                                 <Download className="size-4" />
                                 {isUpdating ? "Aggiornamento in corso..." : "Aggiorna adesso"}
                             </Button>
+                            {/* Con una programmazione già fissata la si cambia da «Modifica» nel riquadro: due
+                                pulsanti per la stessa cosa confondevano. */}
+                            {status?.updateAvailable && !scheduledAt ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={isBusy}
+                                    onClick={() => setIsScheduleOpen(true)}
+                                >
+                                    <CalendarClock className="size-4" />
+                                    Programma
+                                </Button>
+                            ) : null}
                         </>
                     )
                 }
@@ -300,6 +360,56 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
                             </p>
                         ) : null}
 
+                        {scheduledAt ? (
+                            <SettingsWarningNote
+                                title={`Aggiornamento programmato per ${formatScheduledMoment(scheduledAt)}`}
+                            >
+                                <p className="text-muted-foreground">
+                                    All&apos;ora fissata il server installa l&apos;ultima versione disponibile e
+                                    l&apos;applicazione resta non raggiungibile per qualche minuto.
+                                    {!readOnly && status?.schedule?.scheduledBy
+                                        ? ` Programmato da ${status.schedule.scheduledBy}.`
+                                        : null}
+                                </p>
+                                {readOnly ? null : (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isBusy}
+                                            onClick={() => setIsScheduleOpen(true)}
+                                        >
+                                            Modifica
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isBusy}
+                                            onClick={() => setIsCancelScheduleOpen(true)}
+                                        >
+                                            Annulla programmazione
+                                        </Button>
+                                    </div>
+                                )}
+                            </SettingsWarningNote>
+                        ) : null}
+
+                        {lastOutcome?.lastOutcome ? (
+                            lastOutcome.lastOutcome === "success" ? (
+                                <p className="text-xs text-muted-foreground">
+                                    Ultimo aggiornamento programmato: {outcomeLabels.success} il{" "}
+                                    {formatDateTime(lastOutcome.lastOutcomeAt)}.
+                                </p>
+                            ) : (
+                                <SettingsErrorNote
+                                    label={`Ultimo aggiornamento programmato ${outcomeLabels[lastOutcome.lastOutcome]} il ${formatDateTime(lastOutcome.lastOutcomeAt)}`}
+                                    message={lastOutcome.lastOutcomeMessage ?? "-"}
+                                />
+                            )
+                        ) : null}
+
                         {!readOnly && status?.lastError ? (
                             <SettingsErrorNote label="Ultimo errore" message={status.lastError} />
                         ) : null}
@@ -311,7 +421,11 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
                 open={isConfirmOpen}
                 onOpenChange={setIsConfirmOpen}
                 title="Aggiorna applicazione"
-                description="I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile."
+                description={
+                    scheduledAt
+                        ? `I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile. L'aggiornamento programmato per ${formatScheduledMoment(scheduledAt)} verrà annullato.`
+                        : "I servizi verranno ricostruiti e riavviati: l'applicazione sarà brevemente non raggiungibile."
+                }
                 content={
                     <SettingsWarningNote title="Esegui un backup prima di aggiornare">
                         <p className="text-muted-foreground">
@@ -343,6 +457,29 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
                 cancelLabel="Annulla"
                 onCancel={() => setIsConfirmOpen(false)}
                 onConfirm={() => void handleUpdate()}
+            />
+
+            <ScheduleUpdateDialog
+                open={isScheduleOpen}
+                onOpenChange={setIsScheduleOpen}
+                currentScheduledAt={scheduledAt}
+                onSubmit={handleSchedule}
+            />
+
+            <CustomDialog
+                open={isCancelScheduleOpen}
+                onOpenChange={setIsCancelScheduleOpen}
+                title="Annulla programmazione"
+                description={
+                    scheduledAt
+                        ? `L'aggiornamento programmato per ${formatScheduledMoment(scheduledAt)} non partirà. Potrai programmarlo di nuovo o aggiornare subito.`
+                        : undefined
+                }
+                confirmLabel="Annulla programmazione"
+                cancelLabel="Mantieni"
+                destructive
+                onCancel={() => setIsCancelScheduleOpen(false)}
+                onConfirm={() => void handleCancelSchedule()}
             />
         </SettingsSection>
     );

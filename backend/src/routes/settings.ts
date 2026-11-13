@@ -33,7 +33,15 @@ import {
     setLogRetentionDays,
 } from "../services/logManager";
 import { getSystemStatus } from "../services/systemStatus";
-import { getUpdateStatus, requestUpdate, requestUpdateCheck } from "../services/updateManager";
+import { getUpdateStatus, requestUpdateCheck } from "../services/updateManager";
+import {
+    cancelScheduledUpdate,
+    getScheduledAt,
+    getUpdateSchedule,
+    runUpdateNow,
+    scheduleUpdate,
+} from "../services/updateSchedule";
+import { auditAs } from "../middleware/auditContext";
 
 // Le rotte qui sotto non hanno try/catch: i servizi sollevano `ApiError` (messaggio e
 // status già decisi da chi sa cosa è andato storto) ed Express 5 inoltra da solo il
@@ -208,7 +216,7 @@ settingsRouter.get("/logo", async (_req, res) => {
 // messaggio d'errore restano su /update, riservato all'amministratore.
 settingsRouter.get("/update-state", async (_req, res) => {
     const { state, phase, build } = await getUpdateStatus();
-    res.json({ state, phase, build });
+    res.json({ state, phase, build, scheduledAt: await getScheduledAt() });
 });
 
 // Le informazioni sugli aggiornamenti per chi non è amministratore (Impostazioni > Aggiornamenti,
@@ -217,7 +225,16 @@ settingsRouter.get("/update-state", async (_req, res) => {
 settingsRouter.get("/update-info", async (_req, res) => {
     const { state, currentVersion, remoteVersion, updateAvailable, lastCheckedAt, lastUpdateAt, lastUpdateStatus } =
         await getUpdateStatus();
-    res.json({ state, currentVersion, remoteVersion, updateAvailable, lastCheckedAt, lastUpdateAt, lastUpdateStatus });
+    res.json({
+        state,
+        currentVersion,
+        remoteVersion,
+        updateAvailable,
+        lastCheckedAt,
+        lastUpdateAt,
+        lastUpdateStatus,
+        scheduledAt: await getScheduledAt(),
+    });
 });
 
 /**
@@ -425,7 +442,7 @@ settingsRouter.post("/backup/restore/upload", dumpUpload.single("dump"), async (
 // preferenza, eseguono sull'host il codice dell'ultima versione firmata (tag vX.Y.Z) e
 // ricostruiscono lo stack. Come il resto del router, sono coperte dal requireAdmin qui sopra.
 settingsRouter.get("/update", async (_req, res) => {
-    res.json(await getUpdateStatus());
+    res.json({ ...(await getUpdateStatus()), schedule: await getUpdateSchedule() });
 });
 
 // Sola lettura di spazio su disco e database: sotto il requireAdmin, e le GET non finiscono nel registro azioni.
@@ -434,7 +451,29 @@ settingsRouter.get("/system", async (_req, res) => {
 });
 
 settingsRouter.post("/update/run", async (_req, res) => {
-    res.status(202).json(await requestUpdate());
+    res.status(202).json(await runUpdateNow());
+});
+
+// Data e ora sono quelle del laboratorio; la conversione in istante (e i controlli su passato,
+// 30 giorni e ora legale) sta in `scheduleUpdate`.
+const updateScheduleSchema = z
+    .object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data non valida"),
+        time: z.string().regex(/^\d{2}:\d{2}$/, "Ora non valida"),
+    })
+    .strict();
+
+settingsRouter.put(
+    "/update/schedule",
+    auditAs("programmato aggiornamento"),
+    validate({ body: updateScheduleSchema }),
+    async (req, res) => {
+        res.json(await scheduleUpdate(req.body, req.user!.username));
+    }
+);
+
+settingsRouter.delete("/update/schedule", auditAs("annullato aggiornamento programmato"), async (_req, res) => {
+    res.json(await cancelScheduledUpdate());
 });
 
 settingsRouter.post("/update/check", async (_req, res) => {

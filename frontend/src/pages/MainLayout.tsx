@@ -10,6 +10,7 @@ import { UserBadge } from "@/components/user-badge";
 import MainSidebar from "@/components/main-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import UpdateScheduleBanner from "@/components/update-schedule-banner";
 import { useUpdateWatcher } from "@/hooks/useUpdateWatcher";
 
 /** Quanto deve restare fermo il titolo prima di annunciarlo: le pagine lo scrivono in più passi. */
@@ -110,7 +111,7 @@ const useRouteChangeFocus = (pathname: string) => {
 };
 
 export const MainLayout = () => {
-    useUpdateWatcher();
+    const { scheduledAt } = useUpdateWatcher();
     const { pathname } = useLocation();
     const { mainRef, announcerRef } = useRouteChangeFocus(pathname);
 
@@ -148,6 +149,9 @@ export const MainLayout = () => {
                             <UserBadge />
                         </div>
                     </header>
+                    {/* Per tutti, non solo per l'amministratore che l'ha programmato: chi sta lavorando
+                        deve poter finire prima che l'app si fermi. */}
+                    {scheduledAt ? <UpdateScheduleBanner scheduledAt={scheduledAt} /> : null}
                     {/* `tabIndex={-1}`: il link "Vai al contenuto" e il cambio pagina ci portano il
                         focus, e un elemento non focusabile lo ignorerebbe. Senza contorno: è un
                         contenitore, non un controllo, e un bordo blu attorno a tutta la pagina a ogni

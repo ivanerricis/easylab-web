@@ -421,3 +421,59 @@ describe("CustomDialog: altezza entro lo schermo", () => {
         expect(body).toHaveClass("relative", "min-h-0", "flex-1", "overflow-y-auto");
     });
 });
+
+/**
+ * Una sfumatura ai bordi dice da che parte il corpo scorre ancora: jsdom non misura, quindi le
+ * misure si fissano a mano e si scorre con l'evento.
+ */
+describe("CustomDialog: sfumature di scorrimento", () => {
+    const setMetrics = (
+        body: HTMLElement,
+        metrics: { scrollTop: number; scrollHeight: number; clientHeight: number }
+    ) => {
+        for (const [key, value] of Object.entries(metrics)) {
+            Object.defineProperty(body, key, { configurable: true, value });
+        }
+    };
+
+    const fades = (body: HTMLElement) =>
+        Array.from(body.parentElement?.querySelectorAll<HTMLElement>(".pointer-events-none.absolute") ?? []);
+
+    it("mostra la sfumatura sotto quando c'è altro da scorrere, e quella sopra solo dopo aver scorso", async () => {
+        renderDialog();
+        await screen.findByRole("dialog");
+        const body = screen.getByLabelText("Note").parentElement as HTMLElement;
+        const [top, bottom] = fades(body);
+
+        // Il contenuto è alto 400px in una finestra di 100: in cima, si scorre solo verso il basso.
+        setMetrics(body, { scrollTop: 0, scrollHeight: 400, clientHeight: 100 });
+        fireEvent.scroll(body);
+        expect(top).toHaveClass("opacity-0");
+        expect(bottom).toHaveClass("opacity-100");
+
+        // A metà strada tutte e due.
+        setMetrics(body, { scrollTop: 150, scrollHeight: 400, clientHeight: 100 });
+        fireEvent.scroll(body);
+        expect(top).toHaveClass("opacity-100");
+        expect(bottom).toHaveClass("opacity-100");
+
+        // In fondo resta solo quella sopra.
+        setMetrics(body, { scrollTop: 300, scrollHeight: 400, clientHeight: 100 });
+        fireEvent.scroll(body);
+        expect(top).toHaveClass("opacity-100");
+        expect(bottom).toHaveClass("opacity-0");
+    });
+
+    it("senza niente da scorrere non mostra nessuna sfumatura", async () => {
+        renderDialog();
+        await screen.findByRole("dialog");
+        const body = screen.getByLabelText("Note").parentElement as HTMLElement;
+
+        setMetrics(body, { scrollTop: 0, scrollHeight: 100, clientHeight: 100 });
+        fireEvent.scroll(body);
+
+        for (const fade of fades(body)) {
+            expect(fade).toHaveClass("opacity-0");
+        }
+    });
+});

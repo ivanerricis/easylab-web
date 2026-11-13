@@ -424,6 +424,9 @@ describe("UpdateSettingsPanel: aggiornamento programmato", () => {
         api.cancelScheduledUpdate.mockResolvedValue(emptySchedule);
         await renderPanel();
 
+        // Programmato: si cambia da «Modifica», non c'è un secondo pulsante «Programma».
+        expect(screen.queryByRole("button", { name: "Programma" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Modifica" })).toBeEnabled();
         await click(screen.getByRole("button", { name: "Annulla programmazione" }));
         expect(api.cancelScheduledUpdate).not.toHaveBeenCalled();
 

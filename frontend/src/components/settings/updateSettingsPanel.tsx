@@ -308,7 +308,9 @@ const UpdateSettingsPanel = ({ readOnly = false }: { readOnly?: boolean }) => {
                                 <Download className="size-4" />
                                 {isUpdating ? "Aggiornamento in corso..." : "Aggiorna adesso"}
                             </Button>
-                            {status?.updateAvailable ? (
+                            {/* Con una programmazione già fissata la si cambia da «Modifica» nel riquadro: due
+                                pulsanti per la stessa cosa confondevano. */}
+                            {status?.updateAvailable && !scheduledAt ? (
                                 <Button
                                     type="button"
                                     variant="outline"

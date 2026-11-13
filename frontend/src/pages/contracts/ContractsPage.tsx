@@ -7,6 +7,7 @@ import EntityTable from "@/components/entity-table";
 import PageHeader from "@/components/page-header";
 import TableActionButton from "@/components/table-action-button";
 import TablePagination from "@/components/table-pagination";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { listUrlParams, readEnumParam, useListUrlState, useUrlSearchText } from "@/hooks/useListUrlState";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
@@ -54,6 +55,11 @@ const ContractsPage = () => {
     const [contractToEdit, setContractToEdit] = useState<ContractDto | null>(null);
     const [pageSize, setStoredPageSize] = useTableRowsPerPage("contracts");
     const { hiddenColumnKeys, setColumnVisible, showAllColumns } = useHiddenColumns("contracts", contractColumns);
+    // L'ordine delle colonne vale per tabella e menu insieme: entrambi ricevono `orderedColumns`.
+    const { orderedColumns, moveColumn, moveColumnBy, resetColumnOrder, isCustomOrder } = useColumnOrder(
+        "contracts",
+        contractColumns
+    );
     const {
         contractRows,
         totalItems,
@@ -160,7 +166,10 @@ const ContractsPage = () => {
                 onSortOptionChange={handleSortOptionChange}
                 columnsMenu={
                     <ColumnVisibilityMenu
-                        columns={contractColumns}
+                        columns={orderedColumns}
+                        onColumnMoveBy={moveColumnBy}
+                        onResetOrder={resetColumnOrder}
+                        isCustomOrder={isCustomOrder}
                         hiddenColumnKeys={hiddenColumnKeys}
                         onColumnVisibleChange={setColumnVisible}
                         onShowAll={showAllColumns}
@@ -174,7 +183,8 @@ const ContractsPage = () => {
                 <div className="min-h-0 flex-1 overflow-y-auto">
                     <EntityTable
                         tableKey="contracts"
-                        columns={contractColumns}
+                        columns={orderedColumns}
+                        onColumnMove={moveColumn}
                         rows={contractRows}
                         getRowKey={(row) => row.id}
                         getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}

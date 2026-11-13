@@ -406,6 +406,23 @@ describe("EntityTable", () => {
         expect(second).toHaveAttribute("data-status-color", "green");
     });
 
+    it("il colore di stato resta sulla cella ID anche se l'ID non è la prima colonna", () => {
+        const idLast = [...columns.filter((column) => column.key !== "id" && column.key !== "actions"), columns[0]];
+        const { unmount } = renderTable({ columns: idLast, getRowStatusColor: () => "red" });
+        const [, firstRow] = within(screen.getByRole("table")).getAllByRole("row");
+        const markedCells = firstRow.querySelectorAll("[data-status-cell]");
+
+        expect(markedCells).toHaveLength(1);
+        expect(markedCells[0]).toHaveTextContent(String(rows[0].id));
+        unmount();
+
+        // Senza la colonna ID il colore va sulla prima colonna, come prima.
+        renderTable({ columns: idLast, hiddenColumnKeys: ["id"], getRowStatusColor: () => "red" });
+        const [, rowWithoutId] = within(screen.getByRole("table")).getAllByRole("row");
+
+        expect(rowWithoutId.querySelector("[data-status-cell]")).toBe(rowWithoutId.firstElementChild);
+    });
+
     it("segnala la ricarica senza togliere le righe", () => {
         renderTable({ isRefetching: true });
         const table = screen.getByRole("table");

@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-13 — Aggiornamenti programmati](changelog/2026-11.md#2026-11-13-aggiornamenti-programmati)
 - [2026-11-12 — Pagina GitHub: badge, copertura su Codecov, SECURITY e CONTRIBUTING](changelog/2026-11.md#2026-11-12-pagina-github-badge-copertura-su-codecov-security-e-contributing)
 - [2026-11-12 — Colonne delle tabelle riordinabili](changelog/2026-11.md#2026-11-12-colonne-delle-tabelle-riordinabili)
 - [2026-11-10 — Guida all'uso per gli utenti](changelog/2026-11.md#2026-11-10-guida-alluso-per-gli-utenti)

@@ -66,8 +66,14 @@ vi.mock("../services/updateManager", () => ({
         lastError: "Aggiornamento fallito (exit 1)",
         log: "=== git fetch ===",
     }),
-    requestUpdate: vi.fn(),
     requestUpdateCheck: vi.fn(),
+}));
+vi.mock("../services/updateSchedule", () => ({
+    getScheduledAt: vi.fn().mockResolvedValue("2027-03-10T02:00:00.000Z"),
+    getUpdateSchedule: vi.fn().mockResolvedValue({ scheduledAt: "2027-03-10T02:00:00.000Z", scheduledBy: "ivan" }),
+    scheduleUpdate: vi.fn(),
+    cancelScheduledUpdate: vi.fn(),
+    runUpdateNow: vi.fn(),
 }));
 
 import fs from "node:fs";
@@ -97,7 +103,9 @@ import {
     readLogEntries,
     setLogRetentionDays,
 } from "../services/logManager";
-import { requestUpdate, requestUpdateCheck } from "../services/updateManager";
+import { requestUpdateCheck } from "../services/updateManager";
+import { cancelScheduledUpdate, runUpdateNow, scheduleUpdate } from "../services/updateSchedule";
+
 import { assertOwnPassword } from "../services/authManager";
 
 const buildApp = (isAdmin: boolean) => {
@@ -153,6 +161,8 @@ describe("settings router: permessi", () => {
         ["post", "/api/settings/backup/run"],
         ["post", "/api/settings/backup/smb/test"],
         ["post", "/api/settings/update/run"],
+        ["put", "/api/settings/update/schedule"],
+        ["delete", "/api/settings/update/schedule"],
         ["get", "/api/settings/setup"],
         ["post", "/api/settings/setup/dismiss"],
     ] as const)("nega a un utente non amministratore %s %s", async (method, path) => {
@@ -175,14 +185,20 @@ describe("settings router: permessi", () => {
     it("espone solo lo stato dell'aggiornamento, non commit, log ed errori", async () => {
         const response = await request(buildApp(false)).get("/api/settings/update-state");
 
-        expect(response.body).toEqual({ state: "idle", phase: null, build: null });
+        expect(response.body).toEqual({
+            state: "idle",
+            phase: null,
+            build: null,
+            scheduledAt: "2027-03-10T02:00:00.000Z",
+        });
     });
 
     it("/update-info è leggibile da chi non è amministratore ma senza commit, errori e log", async () => {
         const response = await request(buildApp(false)).get("/api/settings/update-info");
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({ state: "idle" });
+        expect(response.body).toMatchObject({ state: "idle", scheduledAt: "2027-03-10T02:00:00.000Z" });
+        expect(response.body).not.toHaveProperty("schedule");
         expect(response.body).not.toHaveProperty("log");
         expect(response.body).not.toHaveProperty("lastError");
         expect(response.body).not.toHaveProperty("currentCommit");
@@ -822,7 +838,7 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
     });
 
     it("avvio e controllo dell'aggiornamento rispondono 202: il lavoro prosegue sull'host", async () => {
-        vi.mocked(requestUpdate).mockResolvedValue({ state: "requested" } as never);
+        vi.mocked(runUpdateNow).mockResolvedValue({ state: "requested" } as never);
         vi.mocked(requestUpdateCheck).mockResolvedValue({ state: "checking" } as never);
 
         const run = await request(buildApp(true)).post("/api/settings/update/run");
@@ -830,7 +846,58 @@ describe("settings router: logo, azienda, email e aggiornamento", () => {
 
         expect(run.status).toBe(202);
         expect(check.status).toBe(202);
-        expect(requestUpdate).toHaveBeenCalledOnce();
+        expect(runUpdateNow).toHaveBeenCalledOnce();
         expect(requestUpdateCheck).toHaveBeenCalledOnce();
+    });
+
+    it("/update include la programmazione per l'amministratore", async () => {
+        const response = await request(buildApp(true)).get("/api/settings/update");
+
+        expect(response.body.schedule).toEqual({ scheduledAt: "2027-03-10T02:00:00.000Z", scheduledBy: "ivan" });
+    });
+
+    it("programma l'aggiornamento passando data, ora e utente", async () => {
+        vi.mocked(scheduleUpdate).mockResolvedValue({ scheduledAt: "2027-03-10T02:00:00.000Z" } as never);
+
+        const response = await request(buildApp(true))
+            .put("/api/settings/update/schedule")
+            .send({ date: "2027-03-10", time: "03:00" });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ scheduledAt: "2027-03-10T02:00:00.000Z" });
+        expect(scheduleUpdate).toHaveBeenCalledWith({ date: "2027-03-10", time: "03:00" }, "mario");
+    });
+
+    it.each([
+        [{ date: "10/03/2027", time: "03:00" }],
+        [{ date: "2027-03-10", time: "3am" }],
+        [{ date: "2027-03-10" }],
+        [{ date: "2027-03-10", time: "03:00", extra: 1 }],
+    ])("rifiuta una programmazione con corpo non valido %j", async (body) => {
+        const response = await request(buildApp(true)).put("/api/settings/update/schedule").send(body);
+
+        expect(response.status).toBe(400);
+        expect(scheduleUpdate).not.toHaveBeenCalled();
+    });
+
+    it("riporta al client il motivo del rifiuto del servizio", async () => {
+        vi.mocked(scheduleUpdate).mockRejectedValue(new ApiError("Un aggiornamento è già in corso", 409));
+
+        const response = await request(buildApp(true))
+            .put("/api/settings/update/schedule")
+            .send({ date: "2027-03-10", time: "03:00" });
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toBe("Un aggiornamento è già in corso");
+    });
+
+    it("annulla la programmazione", async () => {
+        vi.mocked(cancelScheduledUpdate).mockResolvedValue({ scheduledAt: null } as never);
+
+        const response = await request(buildApp(true)).delete("/api/settings/update/schedule");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ scheduledAt: null });
+        expect(cancelScheduledUpdate).toHaveBeenCalledOnce();
     });
 });

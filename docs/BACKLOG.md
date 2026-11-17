@@ -11,6 +11,24 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
 ## Indice
 
 **Interfaccia**
+- Rimandati dal PDF dei contratti (CHANGELOG del 2026-11-03):
+  - **Invio per email del preventivo o del contratto da firmare.** Dal 2026-11-12 si invia al cliente
+    il contratto firmato caricato a mano (CHANGELOG del 2026-11-12); il PDF generato, da far firmare,
+    resta da stampare e consegnare. Deciso così: si invia solo il firmato.
+  - **Importo del noleggio (da inserire).** Dal 2026-11-12 i contratti di assistenza hanno il prezzo
+    del listino (CHANGELOG del 2026-11-12, migration 0047). Il noleggio non ha ancora un canone: serve
+    un campo nuovo (migration e class diagram), da compilare nel dialogo e da stampare nel PDF.
+  - **Testi legali (da inserire).** Oggi il PDF ha solo la frase sulla privacy e la regola delle ore:
+    mancano le clausole vere (recesso, rinnovo, SLA, foro competente), che l'utente deve ancora fornire.
+  - **Giorni di validità dell'offerta nel preventivo.**
+- Rimandati dai contratti (CHANGELOG del 2026-10-07):
+  - **Un gruppo Fornitori nella ricerca globale.** Banale: `listProviders` e la pagina esistono,
+    serve una richiesta in più nello stesso `Promise.allSettled`, un gruppo e un "Vedi tutti".
+  - **Date e durata di un contratto con interventi.** Si può spostare l'inizio o accorciare la
+    durata anche dopo aver collegato interventi: restano collegati, fuori dal periodo, e le ore
+    dei loro mesi si contano lo stesso. Deciso il 2026-11-03: si lascia così, va bene come storico.
+    Se un giorno si volesse un blocco, come per il cambio di cliente, la regola sta in
+    `PUT /api/contracts/:id`.
 - **"Nome Cognome" nella ricerca di report e interventi.** Dal 2026-10-14 i campi cliente e la lista
   Clienti trovano "Anna Romano" scritto per intero (vedi il CHANGELOG), ma le liste Report e Interventi
   no: `matchingReportIds` e il suo equivalente per gli interventi confrontano la frase intera con ogni

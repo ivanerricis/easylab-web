@@ -58,6 +58,8 @@ const defaultHandlers = (loggedIn: boolean): Record<string, ApiHandler> => ({
     "GET /api/customers": ({ url }) => listOrPage(url, []),
     "GET /api/collaborators": ({ url }) => listOrPage(url, []),
     "GET /api/technicians": ({ url }) => listOrPage(url, []),
+    "GET /api/providers": ({ url }) => listOrPage(url, []),
+    "GET /api/contracts": ({ url }) => listOrPage(url, []),
     "GET /api/devices": ({ url }) => listOrPage(url, []),
     "GET /api/issues": ({ url }) => listOrPage(url, []),
 });

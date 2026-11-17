@@ -33,6 +33,7 @@ const event: InterventionCalendarEvent = {
         endTime: "10:30:00",
         customerId: 30,
         collaboratorId: 40,
+        contractId: null,
         customer: "Mario Rossi",
         customerPhone: null,
         collaborator: "Luca",

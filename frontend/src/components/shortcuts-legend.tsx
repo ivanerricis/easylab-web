@@ -11,6 +11,7 @@ const groups: { heading: string; rows: { keys: string[]; label: string }[] }[] =
         heading: "Ovunque",
         rows: [
             { keys: [modifierKey, "K"], label: "Cerca clienti, report e interventi" },
+            { keys: [modifierKey, "B"], label: "Apri o chiudi il menu" },
             { keys: ["?"], label: "Questo elenco" },
         ],
     },

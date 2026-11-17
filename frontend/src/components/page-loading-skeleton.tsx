@@ -77,7 +77,7 @@ const PageLoadingSkeleton = ({ pathname }: { pathname: string }) => {
         return <SettingsPageSkeleton />;
     }
 
-    if (/^\/(reports|interventions|clients|collaborators|technicians)\/[^/]+/.test(pathname)) {
+    if (/^\/(reports|interventions|clients|collaborators|technicians|contracts|providers)\/[^/]+/.test(pathname)) {
         return <DetailPageSkeleton variant={detailSkeletonVariantForPath(pathname)} label="Caricamento della pagina" />;
     }
 

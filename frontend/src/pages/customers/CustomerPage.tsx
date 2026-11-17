@@ -21,20 +21,29 @@ import CreateCustomerDialog, { type CustomerSubmitValues } from "@/components/di
 import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import {
+    createContract,
     deleteCustomer,
     getCustomer,
+    getCustomerContractsPrintUrl,
     getCustomerInterventionsPrintUrl,
     getCustomerReportsPrintUrl,
     updateCustomer,
 } from "@/lib/api";
 import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { useCallback, useState } from "react";
-import { ClipboardList, HardHat, Pencil, Plus, Printer } from "lucide-react";
+import { ClipboardList, FileSignature, HardHat, Pencil, Plus, Printer } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
 import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
+import { useContractRowActions } from "@/hooks/useContractRowActions";
+import { useInterventionRowActions } from "@/hooks/useInterventionRowActions";
+import { useReportRowActions } from "@/hooks/useReportRowActions";
 import { formatPersonName } from "@/lib/people";
+import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
+import { CustomerContractsFilter, CustomerContractsTable } from "./components/customer-contracts-section";
+import { useCustomerContracts } from "@/hooks/useCustomerContracts";
+import { toContractCreatePayload } from "@/lib/contractForm";
 
 /**
  * La scheda del cliente: i suoi dati, i suoi report e i suoi interventi.
@@ -64,7 +73,9 @@ const CustomerPage = () => {
     const customerId = Number(id);
     const activeTab: ReportsInterventionsTab = location.pathname.endsWith("/interventions")
         ? "interventions"
-        : "reports";
+        : location.pathname.endsWith("/contracts")
+          ? "contracts"
+          : "reports";
 
     const {
         data: customer,
@@ -78,25 +89,45 @@ const CustomerPage = () => {
         errorMessage: "Impossibile caricare il cliente",
     });
     const customerName = customer ? formatPersonName(customer) : "Cliente";
-    useDocumentTitle(activeTab === "interventions" ? `Interventi di ${customerName}` : customerName);
+    useDocumentTitle(
+        activeTab === "interventions"
+            ? `Interventi di ${customerName}`
+            : activeTab === "contracts"
+              ? `Contratti di ${customerName}`
+              : customerName
+    );
 
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
     // Solo su telefono: la card dei dati parte chiusa, con nome e telefono (vedi sotto).
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
     const [isCreateInterventionDialogOpen, setIsCreateInterventionDialogOpen] = useState(false);
+    const [isCreateContractDialogOpen, setIsCreateContractDialogOpen] = useState(false);
 
     const handleBack = useGoBack("/clients");
 
     const handleTabChange = (value: ReportsInterventionsTab) => {
-        navigate(value === "interventions" ? `/clients/${customerId}/interventions` : `/clients/${customerId}`, {
+        navigate(value === "reports" ? `/clients/${customerId}` : `/clients/${customerId}/${value}`, {
             replace: true,
         });
     };
 
-    // La stampa segue il tab: dal tab dei report stampa il resoconto dei report, dall'altro
-    // quello degli interventi. Prima ognuna delle due pagine aveva il suo pulsante.
-    const printTitle = activeTab === "interventions" ? "Stampa resoconto interventi" : "Stampa resoconto report";
+    // La stampa segue il tab: report e interventi chiedono prima l'intervallo di date, i contratti
+    // aprono subito il PDF (tutti i contratti del cliente, senza intervallo).
+    const printTitle =
+        activeTab === "contracts"
+            ? "Stampa i contratti del cliente"
+            : activeTab === "interventions"
+              ? "Stampa resoconto interventi"
+              : "Stampa resoconto report";
+
+    const handlePrint = () => {
+        if (activeTab === "contracts") {
+            openPrintWindow(getCustomerContractsPrintUrl(customerId));
+        } else {
+            setIsPrintDialogOpen(true);
+        }
+    };
 
     const handleConfirmPrint = (range: { dateFrom?: string; dateTo?: string }) => {
         openPrintWindow(
@@ -122,6 +153,9 @@ const CustomerPage = () => {
     const { reload: reloadReports } = lists.reports;
     const { reload: reloadInterventions } = lists.interventions;
 
+    const contracts = useCustomerContracts(customerId);
+    const { reload: reloadContracts } = contracts;
+
     // Prima i dati si potevano cambiare solo dall'elenco clienti: dalla scheda bisognava
     // tornare indietro, ritrovare il cliente e aprire lì il dialogo. Il nome nell'intestazione
     // e il riquadro si aggiornano con il cliente che il server restituisce.
@@ -136,9 +170,24 @@ const CustomerPage = () => {
     const handleCreateReport = useCreateReportFlow(reloadReports);
     const handleCreateIntervention = useCreateInterventionFlow(reloadInterventions);
 
+    const handleCreateContract = async (values: ContractSubmitValues) => {
+        await createContract(toContractCreatePayload(values));
+        await reloadContracts();
+    };
+
     const handleRefresh = useCallback(async () => {
-        await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions()]);
-    }, [reloadCustomer, reloadInterventions, reloadReports]);
+        await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions(), reloadContracts()]);
+    }, [reloadCustomer, reloadInterventions, reloadReports, reloadContracts]);
+
+    // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i contatori.
+    const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
+        useInterventionRowActions({ onChanged: handleRefresh });
+    const { renderRowActions: renderReportActions, dialogs: reportActionDialogs } = useReportRowActions({
+        onChanged: handleRefresh,
+    });
+    const { renderRowActions: renderContractActions, dialogs: contractActionDialogs } = useContractRowActions({
+        onChanged: handleRefresh,
+    });
 
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
@@ -181,6 +230,13 @@ const CustomerPage = () => {
                 initialCustomer={customer}
             />
 
+            <CreateContractDialog
+                open={isCreateContractDialogOpen}
+                onOpenChange={setIsCreateContractDialogOpen}
+                onSubmit={handleCreateContract}
+                initialCustomer={customer}
+            />
+
             {isEditDialogOpen && customer ? (
                 <CreateCustomerDialog
                     open={isEditDialogOpen}
@@ -198,11 +254,11 @@ const CustomerPage = () => {
                     label="Aggiorna i dati del cliente"
                 />
 
-                {/* Un menu solo per le due creazioni: sono azioni sorelle, e due pulsanti in
+                {/* Un menu solo per le tre creazioni: sono azioni sorelle, e tre pulsanti in
                     più non starebbero nell'intestazione su un telefono. */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="lg" aria-label="Nuovo report o intervento">
+                        <Button variant="outline" size="lg" aria-label="Nuovo report, intervento o contratto">
                             <Plus className="size-5" />
                             {/* A 14px come le altre azioni dell'intestazione: vedi `DetailHeaderAction`. */}
                             <span className="hidden lg:inline">Nuovo</span>
@@ -219,6 +275,10 @@ const CustomerPage = () => {
                             <HardHat />
                             Nuovo intervento
                         </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setIsCreateContractDialogOpen(true)}>
+                            <FileSignature />
+                            Nuovo contratto
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -230,12 +290,8 @@ const CustomerPage = () => {
                     aria-label="Modifica cliente"
                 />
 
-                <DetailHeaderAction
-                    icon={Printer}
-                    text="Stampa"
-                    onClick={() => setIsPrintDialogOpen(true)}
-                    aria-label={printTitle}
-                />
+                {/* La stampa segue il tab (vedi `handlePrint`). */}
+                <DetailHeaderAction icon={Printer} text="Stampa" onClick={handlePrint} aria-label={printTitle} />
 
                 <DetailDeleteButton
                     label="Elimina cliente"
@@ -276,6 +332,10 @@ const CustomerPage = () => {
                 />
             ) : null}
 
+            {interventionActionDialogs}
+            {reportActionDialogs}
+            {contractActionDialogs}
+
             <ReportsInterventionsTabs
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
@@ -286,6 +346,12 @@ const CustomerPage = () => {
                 ownerNoun="cliente"
                 onOpenReport={handleOpenReport}
                 onOpenIntervention={handleOpenIntervention}
+                renderInterventionActions={renderInterventionActions}
+                renderReportActions={renderReportActions}
+                contractsTab={{
+                    filter: <CustomerContractsFilter contracts={contracts} />,
+                    content: <CustomerContractsTable contracts={contracts} renderRowActions={renderContractActions} />,
+                }}
             />
         </div>
     );

@@ -128,7 +128,7 @@ echo "Compose file: $COMPOSE_FILE"
 echo "Backup: $DUMP_PATH"
 echo "Database: $POSTGRES_DB_VALUE"
 if [ -n "$SETTINGS_DIR" ]; then
-    echo "Impostazioni incluse: si (email, backup, azienda, logo)"
+    echo "Impostazioni incluse: si (email, backup, azienda, logo, contratti firmati)"
 else
     echo "Impostazioni incluse: no (solo database)"
 fi
@@ -158,12 +158,16 @@ if [ -n "$SETTINGS_DIR" ]; then
     # (`backedUpDataEntries` in backend/src/services/backupFiles.ts): vanno tenute allineate.
     # Fino al 2026-09-14 qui mancava company-settings.json, e un ripristino da terminale
     # riportava i dati azienda ai valori iniziali.
-    for entry in email-settings.json backup-settings.json company-settings.json logo; do
+    for entry in email-settings.json backup-settings.json company-settings.json logo signed-contracts; do
         [ -e "$SETTINGS_DIR/$entry" ] || continue
         # Rimuove la voce esistente: senza, `docker compose cp` di una cartella
         # unirebbe il contenuto invece di sostituirlo.
         docker compose -f "$COMPOSE_FILE" exec -T backend rm -rf "/app/data/$entry"
         docker compose -f "$COMPOSE_FILE" cp "$SETTINGS_DIR/$entry" "backend:/app/data/$entry"
+        # `docker compose cp` lascia i file a root, e l'entrypoint sistema solo la cartella data/
+        # stessa: senza questo il backend (utente node) non potrebbe scrivere nelle cartelle
+        # ripristinate, per esempio caricare un nuovo contratto firmato.
+        docker compose -f "$COMPOSE_FILE" exec -T backend chown -R node:node "/app/data/$entry"
     done
 
     # Il backend tiene le impostazioni in cache in memoria: senza riavvio

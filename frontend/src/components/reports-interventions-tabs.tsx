@@ -1,4 +1,6 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
+import { interventionActionsColumn } from "@/hooks/useInterventionRowActions";
+import { reportActionsColumn } from "@/hooks/useReportRowActions";
 import FilterSelect from "@/components/filters/filter-select";
 import TablePagination from "@/components/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,8 +9,9 @@ import { interventionStatusColor, interventionStatusOptions } from "@/lib/interv
 import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
 import { ListFilter } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 
-export type ReportsInterventionsTab = "reports" | "interventions";
+export type ReportsInterventionsTab = "reports" | "interventions" | "contracts";
 
 type ReportsInterventionsTabsProps = {
     activeTab: ReportsInterventionsTab;
@@ -22,10 +25,25 @@ type ReportsInterventionsTabsProps = {
     ownerNoun: string;
     onOpenReport: (id: number) => void;
     onOpenIntervention: (id: number) => void;
+    /**
+     * I pulsanti di riga degli interventi (`useInterventionRowActions`). Con questa la tabella
+     * ha in più la colonna delle azioni; senza, come nella scheda del collaboratore, no.
+     */
+    renderInterventionActions?: (intervention: InterventionDto) => ReactNode;
+    /**
+     * I pulsanti di riga dei report (`useReportRowActions`), con la stessa regola degli
+     * interventi: senza, come nella scheda del collaboratore, la tabella non ha la colonna azioni.
+     */
+    renderReportActions?: (report: ReportDto) => ReactNode;
+    /**
+     * La terza tab, solo nella scheda del cliente: il filtro (sulla riga delle tab, come gli altri
+     * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
+     */
+    contractsTab?: { filter: ReactNode; content: ReactNode };
 };
 
 /**
- * Le due tab delle schede di cliente e collaboratore, con il filtro sulla stessa riga e la tabella
+ * Le tab delle schede di cliente e collaboratore (più i contratti, solo per il cliente), con il filtro sulla stessa riga e la tabella
  * con la sua impaginazione sotto. Erano circa 120 righe identiche nelle due pagine.
  */
 const ReportsInterventionsTabs = ({
@@ -38,8 +56,22 @@ const ReportsInterventionsTabs = ({
     ownerNoun,
     onOpenReport,
     onOpenIntervention,
+    renderInterventionActions,
+    renderReportActions,
+    contractsTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
+    // Memorizzate: un array nuovo a ogni render farebbe ridisegnare tutte le righe (`memo`).
+    const hasInterventionActions = renderInterventionActions != null;
+    const hasReportActions = renderReportActions != null;
+    const reportTableColumns = useMemo(
+        () => (hasReportActions ? [...reportColumns, reportActionsColumn] : reportColumns),
+        [reportColumns, hasReportActions]
+    );
+    const interventionTableColumns = useMemo(
+        () => (hasInterventionActions ? [...interventionColumns, interventionActionsColumn] : interventionColumns),
+        [interventionColumns, hasInterventionActions]
+    );
 
     return (
         <Tabs
@@ -58,8 +90,15 @@ const ReportsInterventionsTabs = ({
                     <TabsTrigger value="interventions" className="px-2 sm:px-3">
                         Interventi
                     </TabsTrigger>
+                    {contractsTab ? (
+                        <TabsTrigger value="contracts" className="px-2 sm:px-3">
+                            Contratti
+                        </TabsTrigger>
+                    ) : null}
                 </TabsList>
-                {activeTab === "interventions" ? (
+                {activeTab === "contracts" && contractsTab ? (
+                    contractsTab.filter
+                ) : activeTab === "interventions" ? (
                     <FilterSelect
                         variant="inline"
                         value={interventions.filter}
@@ -90,8 +129,9 @@ const ReportsInterventionsTabs = ({
                 <div className="min-h-0 flex-1 overflow-auto">
                     <EntityTable
                         tableKey={`${tableKeyPrefix}-reports`}
-                        columns={reportColumns}
+                        columns={reportTableColumns}
                         rows={reports.rows}
+                        renderRowActions={renderReportActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun report associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => reportStatusColor(row.closed)}
@@ -118,8 +158,9 @@ const ReportsInterventionsTabs = ({
                 <div className="min-h-0 flex-1 overflow-auto">
                     <EntityTable
                         tableKey={`${tableKeyPrefix}-interventions`}
-                        columns={interventionColumns}
+                        columns={interventionTableColumns}
                         rows={interventions.rows}
+                        renderRowActions={renderInterventionActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun intervento associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => interventionStatusColor[row.status]}
@@ -141,6 +182,12 @@ const ReportsInterventionsTabs = ({
                     onPageSizeChange={interventions.setPageSize}
                 />
             </TabsContent>
+
+            {contractsTab ? (
+                <TabsContent value="contracts" aria-label={`Contratti del ${ownerNoun}`} className="min-h-0 flex-1">
+                    {contractsTab.content}
+                </TabsContent>
+            ) : null}
         </Tabs>
     );
 };

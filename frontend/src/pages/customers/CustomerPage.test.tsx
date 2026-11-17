@@ -19,6 +19,13 @@ const api = vi.hoisted(() => ({
     listIssues: vi.fn(),
     listCollaborators: vi.fn(),
     listCustomers: vi.fn(),
+    listContracts: vi.fn(),
+    createContract: vi.fn(),
+    listContractPackages: vi.fn(),
+    deleteIntervention: vi.fn(),
+    sendInterventionEmail: vi.fn(),
+    deleteContract: vi.fn(),
+    deleteReport: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -34,6 +41,17 @@ vi.mock("@/lib/api", async () => {
         listIssues: (...args: unknown[]) => api.listIssues(...args),
         listCollaborators: (...args: unknown[]) => api.listCollaborators(...args),
         listCustomers: (...args: unknown[]) => api.listCustomers(...args),
+        listContracts: (...args: unknown[]) => api.listContracts(...args),
+        createContract: (...args: unknown[]) => api.createContract(...args),
+        listContractPackages: (...args: unknown[]) => api.listContractPackages(...args),
+        deleteIntervention: (...args: unknown[]) => api.deleteIntervention(...args),
+        sendInterventionEmail: (...args: unknown[]) => api.sendInterventionEmail(...args),
+        deleteContract: (...args: unknown[]) => api.deleteContract(...args),
+        deleteReport: (...args: unknown[]) => api.deleteReport(...args),
+        getReportPrintUrl: (id: number) => `/api/reports/${id}/print`,
+        getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
+        getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
+        getCustomerContractsPrintUrl: (id: number) => `/api/customers/${id}/contracts/print`,
         getCustomerReportsPrintUrl: (id: number) => `reports:${id}`,
         getCustomerInterventionsPrintUrl: (id: number) => `interventions:${id}`,
     };
@@ -67,6 +85,38 @@ beforeEach(() => {
     api.listIssues.mockResolvedValue([]);
     api.listCollaborators.mockResolvedValue([]);
     api.listCustomers.mockResolvedValue(page([]));
+    api.listContractPackages.mockResolvedValue([]);
+    api.listContracts.mockResolvedValue(
+        page([
+            {
+                id: 21,
+                type: "assistance",
+                status: "active",
+                effectiveStatus: "active",
+                termMonths: 12,
+                billingMonths: null,
+                device: "Server NAS",
+                note: null,
+                startDate: "2026-06-01",
+                endDate: "2027-06-01",
+                customerId: 3,
+                customerName: "Mario Rossi",
+                providerId: 8,
+                providerName: "Rossi Informatica",
+                assistance: {
+                    package: "remote_20",
+                    name: "Assistenza Remota Pack 20",
+                    includedHours: 20,
+                    priceCents: 40000,
+                    period: "month",
+                    priority: 4,
+                    typology: "Teleassistenza, solo software",
+                },
+                createdAt: "2026-06-01T10:00:00.000Z",
+                updatedAt: null,
+            },
+        ])
+    );
     api.getCustomer.mockResolvedValue({
         id: 3,
         firstName: "Mario",
@@ -116,7 +166,9 @@ describe("CustomerPage", () => {
         expect(screen.getByText("mario@example.com")).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "Report" })).toHaveAttribute("aria-selected", "true");
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, visibility: "all" }));
-        expect(await within(screen.getByRole("table")).findByText("Notebook")).toBeInTheDocument();
+        expect(
+            await within(within(screen.getByRole("tabpanel")).getByRole("table")).findByText("Notebook")
+        ).toBeInTheDocument();
     });
 
     /** L'indirizzo dice il tab: i collegamenti salvati e il ricaricamento non lo perdono. */
@@ -126,6 +178,46 @@ describe("CustomerPage", () => {
         expect(screen.getByRole("tab", { name: "Interventi" })).toHaveAttribute("aria-selected", "true");
         expect(document.title).toBe("Interventi di Mario Rossi · EasyLab");
         expect(screen.getByRole("button", { name: "Stampa resoconto interventi" })).toBeInTheDocument();
+    });
+
+    it("gli interventi del cliente hanno le azioni di riga", async () => {
+        api.sendInterventionEmail.mockResolvedValue({ message: "Email inviata a mario@example.com" });
+        await renderPage("/clients/3/interventions", "/clients/:id/interventions");
+
+        const panel = screen.getByRole("tabpanel");
+        for (const action of ["Modifica", "Stampa", "Invia email", "Elimina"]) {
+            expect(
+                (await within(panel).findAllByRole("button", { name: `${action} intervento 9` })).length
+            ).toBeGreaterThan(0);
+        }
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Invia email intervento 9" })[0]);
+        const dialog = await screen.findByRole("dialog");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Invia" }));
+
+        await waitFor(() => expect(api.sendInterventionEmail).toHaveBeenCalledWith(9));
+    });
+
+    it("i report del cliente hanno le azioni di riga, ed eliminarne uno ricarica la scheda", async () => {
+        api.deleteReport.mockResolvedValue(undefined);
+        await renderPage("/clients/3", "/clients/:id");
+
+        const panel = screen.getByRole("tabpanel");
+        for (const action of ["Modifica", "Stampa", "Elimina"]) {
+            expect(
+                (await within(panel).findAllByRole("button", { name: `${action} report 5` })).length
+            ).toBeGreaterThan(0);
+        }
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Stampa report 5" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/5/print");
+
+        const customerLoads = api.getCustomer.mock.calls.length;
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Elimina report 5" })[0]);
+        const dialog = await screen.findByRole("dialog", { name: "Elimina report" });
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => expect(api.deleteReport).toHaveBeenCalledWith(5));
+        await waitFor(() => expect(api.getCustomer.mock.calls.length).toBeGreaterThan(customerLoads));
     });
 
     it("cambiando tab cambia l'indirizzo, senza aggiungere voci alla cronologia", async () => {
@@ -144,6 +236,15 @@ describe("CustomerPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Stampa tutto" }));
 
         expect(openPrintWindow).toHaveBeenCalledWith("reports:3");
+    });
+
+    it("sulle tab report e interventi la stampa apre ancora il dialogo con l'intervallo", async () => {
+        await renderPage("/clients/3/interventions", "/clients/:id/interventions");
+
+        await userEvent.click(screen.getByRole("button", { name: "Stampa resoconto interventi" }));
+
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(openPrintWindow).not.toHaveBeenCalled();
     });
 
     it("modifica i dati del cliente dalla scheda", async () => {
@@ -176,7 +277,7 @@ describe("CustomerPage", () => {
     ])('"%s" apre il dialogo con il cliente già compilato', async (item, dialogTitle) => {
         await renderPage("/clients/3", "/clients/:id");
 
-        await userEvent.click(screen.getByRole("button", { name: "Nuovo report o intervento" }));
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
         await userEvent.click(await screen.findByRole("menuitem", { name: item }));
 
         const dialog = await screen.findByRole("dialog", { name: dialogTitle });
@@ -216,10 +317,60 @@ describe("CustomerPage", () => {
         });
     });
 
+    it("elenca i contratti del cliente nella terza tab, con filtro per stato", async () => {
+        await renderPage("/clients/3/contracts", "/clients/:id/contracts");
+
+        expect(screen.getByRole("tab", { name: "Contratti" })).toHaveAttribute("aria-selected", "true");
+        expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, status: "all" }));
+        // Tabella e schede mobili mostrano la stessa riga: basta che ci sia.
+        expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
+        const contractRow = screen.getAllByRole("row").find((row) => within(row).queryByText("Server NAS") !== null);
+        fireEvent.keyDown(contractRow as HTMLElement, { key: "Enter" });
+        expect(navigate).toHaveBeenCalledWith("/contracts/21");
+        // La colonna del cliente non c'è: nella sua scheda sarebbe sempre lo stesso nome.
+        expect(screen.queryByRole("columnheader", { name: "Cliente" })).not.toBeInTheDocument();
+        // L'intestazione stampa il resoconto dei contratti del cliente, subito e senza dialogo.
+        await userEvent.click(screen.getByRole("button", { name: "Stampa i contratti del cliente" }));
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/customers/3/contracts/print");
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        // Il pulsante di riga stampa il PDF di quel contratto.
+        await userEvent.click(screen.getAllByRole("button", { name: "Stampa contratto 21" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
+
+        // Le altre azioni di riga ci sono, e l'eliminazione ricarica la scheda.
+        expect(screen.getAllByRole("button", { name: "Modifica contratto 21" }).length).toBeGreaterThan(0);
+        api.deleteContract.mockResolvedValue(undefined);
+        const customerLoads = api.getCustomer.mock.calls.length;
+        await userEvent.click(screen.getAllByRole("button", { name: "Elimina contratto 21" })[0]);
+        const deleteDialog = await screen.findByRole("dialog", { name: "Elimina contratto" });
+        await userEvent.type(within(deleteDialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(deleteDialog).getByRole("button", { name: "Elimina" }));
+        await waitFor(() => expect(api.deleteContract).toHaveBeenCalledWith(21));
+        await waitFor(() => expect(api.getCustomer.mock.calls.length).toBeGreaterThan(customerLoads));
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Filtra i contratti per stato" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Scaduto" }));
+
+        await waitFor(() => {
+            expect(api.listContracts).toHaveBeenLastCalledWith(expect.objectContaining({ status: "expired" }));
+        });
+    });
+
+    it("crea un contratto dal menu Nuovo, partendo dal cliente della scheda", async () => {
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Nuovo contratto" }));
+
+        expect(await screen.findByRole("dialog", { name: "Nuovo contratto" })).toBeInTheDocument();
+        expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
+    });
+
     it("apre il report dalla riga", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
-        const table = screen.getByRole("table");
+        const table = within(screen.getByRole("tabpanel")).getByRole("table");
         await within(table).findByText("5");
         expect(within(table).queryByRole("link", { name: /^Apri / })).not.toBeInTheDocument();
         fireEvent.keyDown(within(table).getAllByRole("row")[1], { key: "Enter" });

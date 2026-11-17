@@ -22,6 +22,10 @@ export const formatInterventionType = (value: InterventionType) => {
         return "Intervento in sede";
     }
 
+    if (value === "lab") {
+        return "Intervento in laboratorio";
+    }
+
     return "Intervento da remoto";
 };
 

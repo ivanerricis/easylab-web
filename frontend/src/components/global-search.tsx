@@ -16,22 +16,27 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
     getApiErrorMessage,
     getApiErrorStatus,
+    getContract,
     getIntervention,
     getReport,
+    listContracts,
     listCustomers,
     listInterventions,
     listReports,
 } from "@/lib/api";
+import { formatContractStatus, formatContractType } from "@/lib/contracts";
 import { isSearchable, parseGlobalQuery } from "@/lib/globalSearchQuery";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
 import { formatDate, isMacLike, modifierKey } from "@/lib/utils";
 import Kbd from "@/components/ui/kbd";
-import type { CustomerDto, InterventionDto, ReportDto } from "@/types/dtos";
+import type { ContractDto, CustomerDto, InterventionDto, ReportDto } from "@/types/dtos";
 import {
     BookUser,
     Bug,
+    Building2,
     ClipboardList,
+    FileSignature,
     HardHat,
     LayoutDashboard,
     Laptop,
@@ -58,6 +63,7 @@ type SearchResults = {
     customers: CustomerDto[];
     reports: ReportRow[];
     interventions: InterventionRow[];
+    contracts: ContractDto[];
 };
 
 /** Quello che serve alle righe: la lista e il dettaglio lo danno con nomi diversi, qui si uniscono. */
@@ -71,6 +77,8 @@ const pages: { label: string; path: string; icon: LucideIcon }[] = [
     { label: "Clienti", path: "/clients", icon: Users },
     { label: "Collaboratori", path: "/collaborators", icon: BookUser },
     { label: "Tecnici esterni", path: "/technicians", icon: Wrench },
+    { label: "Contratti", path: "/contracts", icon: FileSignature },
+    { label: "Fornitori", path: "/providers", icon: Building2 },
     { label: "Dispositivi", path: "/devices", icon: Laptop },
     { label: "Difetti", path: "/issues", icon: Bug },
     { label: "Impostazioni", path: "/settings", icon: Settings },
@@ -87,7 +95,7 @@ const shortcutLabel = `${modifierKey} K`;
 const customerName = (customer: CustomerDto) => formatPersonName(customer);
 
 /**
- * La ricerca globale: una casella sola per clienti, report e interventi, più le pagine
+ * La ricerca globale: una casella sola per clienti, report, interventi e contratti, più le pagine
  * dell'app. Si apre dal pulsante nell'intestazione o con Ctrl+K (⌘K su Mac).
  *
  * Prima per trovare qualcosa bisognava sapere in quale sezione stava: il report di un
@@ -167,10 +175,12 @@ const GlobalSearch = () => {
                       status: intervention.status,
                       interventionDate: intervention.interventionDate,
                   })),
+                  findById(getContract, (contract) => contract),
               ]
             : [
                   listReports({ ...common, visibility: "all" }).then((page) => page.items),
                   listInterventions({ ...common, status: "all" }).then((page) => page.items),
+                  listContracts(common).then((page) => page.items),
               ];
 
         void Promise.allSettled([customersRequest ?? Promise.resolve([]), ...numberedRequests]).then((settled) => {
@@ -187,7 +197,7 @@ const GlobalSearch = () => {
                 toast.error(getApiErrorMessage(failed[0].reason, "Impossibile completare la ricerca"));
             }
 
-            const [customers, reports, interventions] = settled.map((result) =>
+            const [customers, reports, interventions, contracts] = settled.map((result) =>
                 result.status === "fulfilled" ? result.value : []
             );
 
@@ -196,6 +206,7 @@ const GlobalSearch = () => {
                 customers: customers as CustomerDto[],
                 reports: reports as ReportRow[],
                 interventions: interventions as InterventionRow[],
+                contracts: contracts as ContractDto[],
             });
         });
 
@@ -236,7 +247,11 @@ const GlobalSearch = () => {
     const showSeeAll = !parsedQuery.exact;
     const hasAnyResult =
         currentResults != null &&
-        currentResults.customers.length + currentResults.reports.length + currentResults.interventions.length > 0;
+        currentResults.customers.length +
+            currentResults.reports.length +
+            currentResults.interventions.length +
+            currentResults.contracts.length >
+            0;
 
     return (
         <>
@@ -257,7 +272,7 @@ const GlobalSearch = () => {
                 open={open}
                 onOpenChange={handleOpenChange}
                 title="Ricerca"
-                description="Cerca clienti, report e interventi, o vai a una pagina."
+                description="Cerca clienti, report, interventi e contratti, o vai a una pagina."
                 className="sm:max-w-xl"
             >
                 {/* Il filtro di cmdk resta spento: i risultati li sceglie già il server, e
@@ -399,9 +414,47 @@ const GlobalSearch = () => {
                             </CommandGroup>
                         ) : null}
 
+                        {/* Dopo gli interventi: i primi tre gruppi restano dove chi usa già la
+                            ricerca li cerca, e i contratti sono la consultazione meno frequente. */}
+                        {currentResults && currentResults.contracts.length > 0 ? (
+                            <CommandGroup heading="Contratti">
+                                {currentResults.contracts.map((contract) => (
+                                    <CommandItem
+                                        key={contract.id}
+                                        value={`contract-${contract.id}`}
+                                        onSelect={() => go(entityPaths.contract(contract.id))}
+                                    >
+                                        <FileSignature />
+                                        <div className="flex min-w-0 flex-col">
+                                            <span className="truncate">
+                                                <span className="font-medium tabular-nums">#{contract.id}</span> ·{" "}
+                                                {contract.customerName}
+                                            </span>
+                                            <span className="truncate text-xs text-muted-foreground">
+                                                {contract.device} · {formatContractType(contract.type)}
+                                            </span>
+                                        </div>
+                                        <CommandShortcut className="tracking-normal">
+                                            {formatContractStatus(contract.effectiveStatus)}
+                                        </CommandShortcut>
+                                    </CommandItem>
+                                ))}
+                                {showSeeAll ? (
+                                    <CommandItem
+                                        value="contracts-all"
+                                        onSelect={() => go(`/contracts?q=${searchParam}`)}
+                                        className="text-primary"
+                                    >
+                                        <Search className="text-primary" />
+                                        Vedi tutti i contratti trovati
+                                    </CommandItem>
+                                ) : null}
+                            </CommandGroup>
+                        ) : null}
+
                         {query.trim() === "" ? (
                             <p className="px-2 pt-3 pb-1 text-xs text-muted-foreground">
-                                Digita # e un numero per trovare un report o un intervento.
+                                Digita # e un numero per trovare un report, un intervento o un contratto.
                             </p>
                         ) : null}
 

@@ -145,7 +145,7 @@ export const labelColumnWidth = 66;
 export const wrapPdfDocument = (
     content: unknown[],
     pageMargins: [number, number, number, number] = [14, 14, 14, 14],
-    options: { pageNumbers?: boolean } = {}
+    options: { pageNumbers?: boolean; watermark?: string } = {}
 ) => ({
     pageSize: "A4" as const,
     pageMargins,
@@ -156,6 +156,10 @@ export const wrapPdfDocument = (
     },
     content,
     styles: pdfStyles,
+    // Scritta in diagonale, molto tenue, dietro al contenuto (es. "PREVENTIVO").
+    ...(options.watermark
+        ? { watermark: { text: options.watermark, opacity: 0.06, bold: true, color: brandColor } }
+        : {}),
     // Il footer occupa esattamente il margine inferiore della pagina (vedi
     // `LayoutBuilder.addHeadersAndFooters` di pdfmake): chi lo attiva deve passare un
     // `pageMargins` col margine inferiore abbastanza alto da contenerlo, altrimenti il

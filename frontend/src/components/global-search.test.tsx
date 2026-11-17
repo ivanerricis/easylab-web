@@ -7,8 +7,10 @@ const api = vi.hoisted(() => ({
     listCustomers: vi.fn(),
     listReports: vi.fn(),
     listInterventions: vi.fn(),
+    listContracts: vi.fn(),
     getReport: vi.fn(),
     getIntervention: vi.fn(),
+    getContract: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -57,6 +59,14 @@ const intervention = {
     interventionDate: "2026-09-20",
 };
 
+const contract = {
+    id: 21,
+    type: "rental",
+    effectiveStatus: "expired",
+    device: "Portatile",
+    customerName: "Mario Rossi",
+};
+
 const reportDetail = { ...report, customerName: "Mario Rossi", deviceName: "Notebook", issueName: "Schermo rotto" };
 const interventionDetail = { ...intervention, customerName: "Mario Rossi" };
 
@@ -79,8 +89,10 @@ beforeEach(() => {
     api.listCustomers.mockResolvedValue(page([customer]));
     api.listReports.mockResolvedValue(page([report]));
     api.listInterventions.mockResolvedValue(page([intervention]));
+    api.listContracts.mockResolvedValue(page([contract]));
     api.getReport.mockResolvedValue(reportDetail);
     api.getIntervention.mockResolvedValue(interventionDetail);
+    api.getContract.mockResolvedValue(contract);
 });
 
 describe("GlobalSearch", () => {
@@ -141,6 +153,39 @@ describe("GlobalSearch", () => {
         expect(currentLocation()).toEqual({ pathname: "/reports", params: { visibility: "all", q: "12" } });
     });
 
+    it("mostra i contratti con cliente, dispositivo, tipo e stato, e apre quello scelto", async () => {
+        renderSearch();
+        await userEvent.click(screen.getByRole("button", { name: "Cerca clienti, report e interventi" }));
+
+        await userEvent.type(input(), "portatile");
+
+        const option = await within(dialog()).findByRole("option", {
+            name: /#21.*Mario Rossi.*Portatile.*Noleggio.*Scaduto/,
+        });
+        expect(within(dialog()).getByText("Contratti")).toBeInTheDocument();
+        expect(api.listContracts).toHaveBeenCalledWith(
+            expect.objectContaining({ search: "portatile", page: 1, pageSize: 5 })
+        );
+
+        await userEvent.click(option);
+
+        expect(currentLocation().pathname).toBe("/contracts/21");
+    });
+
+    it("con un numero di una cifra cerca anche nei contratti, e porta alla loro lista", async () => {
+        renderSearch();
+        await userEvent.click(screen.getByRole("button", { name: "Cerca clienti, report e interventi" }));
+
+        await userEvent.type(input(), "2");
+
+        await within(dialog()).findByRole("option", { name: /#21/ });
+        expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ search: "2" }));
+
+        await userEvent.click(within(dialog()).getByRole("option", { name: "Vedi tutti i contratti trovati" }));
+
+        expect(currentLocation()).toEqual({ pathname: "/contracts", params: { q: "2" } });
+    });
+
     describe("con il cancelletto", () => {
         const openAndType = async (text: string) => {
             renderSearch();
@@ -154,10 +199,13 @@ describe("GlobalSearch", () => {
             await within(dialog()).findByRole("option", { name: /#12.*Mario Rossi.*Notebook/ });
             expect(api.getReport).toHaveBeenCalledWith(123, expect.any(AbortSignal));
             expect(api.getIntervention).toHaveBeenCalledWith(123, expect.any(AbortSignal));
+            expect(api.getContract).toHaveBeenCalledWith(123, expect.any(AbortSignal));
             expect(within(dialog()).getByRole("option", { name: /#9.*Mario Rossi.*Programmato/ })).toBeInTheDocument();
+            expect(within(dialog()).getByRole("option", { name: /#21.*Portatile.*Noleggio/ })).toBeInTheDocument();
             expect(api.listCustomers).not.toHaveBeenCalled();
             expect(api.listReports).not.toHaveBeenCalled();
             expect(api.listInterventions).not.toHaveBeenCalled();
+            expect(api.listContracts).not.toHaveBeenCalled();
             expect(within(dialog()).queryByRole("option", { name: /Vedi tutti/ })).not.toBeInTheDocument();
             expect(within(dialog()).queryByRole("option", { name: /Dashboard/ })).not.toBeInTheDocument();
             expect(within(dialog()).queryByText("Clienti")).not.toBeInTheDocument();
@@ -171,7 +219,7 @@ describe("GlobalSearch", () => {
             api.getReport.mockRejectedValue(notFound());
             await openAndType("#123");
 
-            await within(dialog()).findByRole("option", { name: /#9/ });
+            await within(dialog()).findByRole("option", { name: /#21/ });
             expect(within(dialog()).queryByText("Report")).not.toBeInTheDocument();
             expect(within(dialog()).getByText("Interventi")).toBeInTheDocument();
             expect(toastError).not.toHaveBeenCalled();
@@ -181,7 +229,7 @@ describe("GlobalSearch", () => {
             api.getIntervention.mockRejectedValue(new Error("Timeout"));
             await openAndType("#123");
 
-            await within(dialog()).findByRole("option", { name: /#12/ });
+            await within(dialog()).findByRole("option", { name: /#21/ });
             expect(within(dialog()).getByText("Report")).toBeInTheDocument();
             expect(within(dialog()).queryByText("Interventi")).not.toBeInTheDocument();
             expect(toastError).not.toHaveBeenCalled();
@@ -190,6 +238,7 @@ describe("GlobalSearch", () => {
         it("se nessun record ha quel numero dice che non c'è niente", async () => {
             api.getReport.mockRejectedValue(notFound());
             api.getIntervention.mockRejectedValue(notFound());
+            api.getContract.mockRejectedValue(notFound());
             await openAndType("#123");
 
             expect(await within(dialog()).findByText('Nessun risultato per "#123".')).toBeInTheDocument();
@@ -201,21 +250,22 @@ describe("GlobalSearch", () => {
 
             expect(await within(dialog()).findByText('Nessun risultato per "#99999999999".')).toBeInTheDocument();
             expect(api.getReport).not.toHaveBeenCalled();
-            expect(api.getIntervention).not.toHaveBeenCalled();
+            expect(api.getContract).not.toHaveBeenCalled();
         });
 
-        it("#server cerca il testo solo in report e interventi, con 'Vedi tutti'", async () => {
+        it("#server cerca il testo solo in report, interventi e contratti, con 'Vedi tutti'", async () => {
             await openAndType("#server");
 
             await within(dialog()).findByRole("option", { name: /#12/ });
             expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ search: "server" }));
             expect(api.listInterventions).toHaveBeenCalledWith(expect.objectContaining({ search: "server" }));
+            expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ search: "server" }));
             expect(api.listCustomers).not.toHaveBeenCalled();
             expect(api.getReport).not.toHaveBeenCalled();
 
-            await userEvent.click(within(dialog()).getByRole("option", { name: "Vedi tutti i report trovati" }));
+            await userEvent.click(within(dialog()).getByRole("option", { name: "Vedi tutti i contratti trovati" }));
 
-            expect(currentLocation()).toEqual({ pathname: "/reports", params: { visibility: "all", q: "server" } });
+            expect(currentLocation()).toEqual({ pathname: "/contracts", params: { q: "server" } });
         });
 
         it("il solo # non cerca e non mostra le pagine", async () => {
@@ -248,10 +298,23 @@ describe("GlobalSearch", () => {
         expect(api.listCustomers).not.toHaveBeenCalled();
     });
 
+    it("non mostra il gruppo dei contratti se la ricerca non ne trova", async () => {
+        api.listContracts.mockResolvedValue(page([]));
+        renderSearch();
+        await userEvent.click(screen.getByRole("button", { name: "Cerca clienti, report e interventi" }));
+
+        await userEvent.type(input(), "rossi");
+
+        await within(dialog()).findByRole("option", { name: /#12/ });
+        expect(within(dialog()).queryByText("Contratti")).not.toBeInTheDocument();
+        expect(within(dialog()).queryByRole("option", { name: /Vedi tutti i contratti/ })).not.toBeInTheDocument();
+    });
+
     it("dice quando non trova niente", async () => {
         api.listCustomers.mockResolvedValue(page([]));
         api.listReports.mockResolvedValue(page([]));
         api.listInterventions.mockResolvedValue(page([]));
+        api.listContracts.mockResolvedValue(page([]));
         renderSearch();
         await userEvent.click(screen.getByRole("button", { name: "Cerca clienti, report e interventi" }));
 
@@ -263,6 +326,7 @@ describe("GlobalSearch", () => {
     /** Un gruppo che fallisce non svuota gli altri; l'avviso arriva solo se non risponde nessuno. */
     it("mostra quello che arriva se un gruppo fallisce, e avvisa solo se falliscono tutti", async () => {
         api.listCustomers.mockRejectedValue(new Error("Timeout"));
+        api.listContracts.mockRejectedValue(new Error("Timeout"));
         renderSearch();
         await userEvent.click(screen.getByRole("button", { name: "Cerca clienti, report e interventi" }));
 

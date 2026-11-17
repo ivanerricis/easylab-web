@@ -160,6 +160,27 @@ describe("getSystemStatus: dischi", () => {
     });
 });
 
+describe("getSystemStatus: contratti firmati", () => {
+    it("riporta numero e peso dei PDF, convertiti in numero", async () => {
+        execute
+            .mockResolvedValueOnce({ rows: [{ size: "123456789" }] })
+            .mockResolvedValueOnce({ rows: [{ count: "3", total: "4194304" }] });
+
+        expect((await getSystemStatus()).signedContracts).toEqual({ count: 3, totalBytes: 4194304 });
+    });
+
+    it("restituisce null se la query fallisce, senza togliere la dimensione del database", async () => {
+        execute
+            .mockResolvedValueOnce({ rows: [{ size: "123456789" }] })
+            .mockRejectedValueOnce(new Error("tabella mancante"));
+
+        const status = await getSystemStatus();
+
+        expect(status.signedContracts).toBeNull();
+        expect(status.databaseSizeBytes).toBe(123456789);
+    });
+});
+
 describe("getSystemStatus: database", () => {
     it("converte in numero la dimensione restituita come stringa", async () => {
         expect((await getSystemStatus()).databaseSizeBytes).toBe(123456789);

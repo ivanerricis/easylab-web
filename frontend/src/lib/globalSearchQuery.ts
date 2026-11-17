@@ -15,7 +15,7 @@ export type GlobalQuery = {
 const maxId = 2_147_483_647;
 
 /**
- * Il "#" davanti al testo restringe la ricerca a report e interventi. Prima veniva
+ * Il "#" davanti al testo restringe la ricerca a report, interventi e contratti. Prima veniva
  * tolto e il resto cercato dappertutto: "#123" trovava anche i clienti con 123 nel telefono, e i
  * report con 123 in una nota. Con solo cifre dopo il "#" è invece il numero esatto del record.
  * Gli spazi attorno al testo non contano ("# 12" è "#12"); "##5" cerca il testo "#5".
@@ -41,6 +41,6 @@ export const parseGlobalQuery = (query: string): GlobalQuery => {
 
 /**
  * Da quando vale la pena chiedere al server: due lettere, oppure un numero di qualunque
- * lunghezza (il numero di un report o di un intervento, che la ricerca confronta esatto).
+ * lunghezza (il numero di un report, di un intervento o di un contratto, che la ricerca confronta esatto).
  */
 export const isSearchable = ({ text }: GlobalQuery) => text.length >= 2 || /^\d+$/.test(text);

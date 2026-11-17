@@ -12,7 +12,7 @@ Per vederlo come immagine, con draw.io installato (Windows):
 
     "C:/Program Files/draw.io/draw.io.exe" -x -f png -s 1 -o /percorso/class-diagram.png docs/diagrams/class-diagram.drawio
 
-Legenda: blu = tabella esistente, verde = tabella nuova, giallo = enumerazione, grigio =
+Legenda: blu = tabella esistente, verde = contratti (nuovo), giallo = enumerazione, grigio =
 autenticazione e sistema; PK in blu, FK in rosso, colonne aggiunte di recente in verde; "[1]" =
 NOT NULL; "/attributo" = derivato, calcolato e non salvato.
 
@@ -238,9 +238,108 @@ cls("intervention", "Intervention", C2, 490, [
     "+ updated_at: datetime",
     "+ customer_id: int FK [1]",
     "+ collaborator_id: int FK [1]",
-])
-enum("inttype", "InterventionType", C3, 490, ["material_delivery", "customer_site", "remote"])
+    "+ contract_id: int FK",
+], new_rows=(16,))
+enum("inttype", "InterventionType", C3, 490, ["material_delivery", "customer_site", "remote", "lab"])
 enum("intstatus", "InterventionStatus", C3, 660, ["scheduled", "in_progress", "completed"])
+
+# --- Contratti (nuovo) ---
+cls("provider", "Provider", C0, 800, [
+    "+ id: int PK",
+    "+ provider_name: text UQ [1]  {case-insensitive}",
+    "+ first_name: text",
+    "+ last_name: text",
+    "+ email: text UQ [1]",
+    "+ phone_number: text UQ [1]",
+    "+ logo_data_url: text  {PNG/JPEG per i PDF}",
+    "+ created_at: datetime [1]",
+    "+ updated_at: datetime",
+], color=NEW)
+cls("signed", "SignedContract", C0, 1040, [
+    "+ contract_id: int PK FK [1]",
+    "+ file_name: text [1]",
+    "+ size_bytes: int [1]  {> 0, al massimo 15 MB}",
+    "+ uploaded_at: datetime [1]",
+    "{il PDF: data/signed-contracts/[contract_id].pdf}",
+], color=NEW)
+enum("cstatus", "ContractStatus", C0, 1210, ["draft", "active", "cancelled", "/expired  (derivato)"])
+cls("contract", "Contract", C1, 800, [
+    "+ id: int PK",
+    "+ type: ContractType [1]",
+    "+ status: ContractStatus [1]",
+    "+ term_months: int [1]  {da 1 a 120}",
+    "+ billing_months: int [0..1]  {solo noleggio, da 1 a 120}",
+    "+ device: text [1]",
+    "+ note: text",
+    "+ start_date: date [1]",
+    "+ /end_date: date",
+    "+ /effective_status: ContractStatus",
+    "+ created_at: datetime [1]",
+    "+ updated_at: datetime",
+    "+ customer_id: int FK [1]",
+    "+ provider_id: int FK [1]",
+], color=NEW)
+cls("rental", "Rental", C1, 1160, ["{nessuna tabella: contract.type = rental}", "{la fatturazione sta in contract.billing_months}"], color=NEW)
+enum("ctype", "ContractType", C1, 1250, ["assistance", "rental"])
+cls("assistance", "Assistance", C2, 1160, [
+    "+ contract_id: int PK FK [1]",
+    "+ contract_type: text [1]  {sempre assistance}",
+    "+ package: AssistancePackage [1]",
+    "+ included_hours: int [1]  {copia del listino}",
+    "+ price_cents: int [1]  {copia del listino, IVA esclusa}",
+    "+ created_at: datetime [1]",
+    "+ updated_at: datetime",
+    "+ /used_hours: decimal  {mese o contratto}",
+    "+ /remaining_hours: decimal",
+], color=NEW)
+enum("asstype", "AssistancePackage", C1, 1380, ["remote_20", "remote_40", "ready_20", "ready_40", "ready_60", "support_base", "support_plus"])
+cls("alert", "AssistanceHoursAlert", C2, 1410, [
+    "+ contract_id: int PK FK [1]",
+    "+ month: date PK [1]",
+    "+ kind: AlertKind PK [1]",
+    "+ notified_at: datetime [1]",
+], color=NEW)
+enum("alertkind", "AlertKind", C2, 1580, ["warning", "exhausted"])
+
+note_id = nid("n")
+note = (
+    "&lt;b&gt;Pacchetti di assistenza&lt;/b&gt; (listino nel codice, IVA esclusa)&lt;br&gt;"
+    "{package → ore → prezzo → priorità → interventi che le scalano}&lt;br&gt;"
+    "• remote_20 → 20 h/mese → 400 € → 4 → remote&lt;br&gt;"
+    "• remote_40 → 40 h/mese → 720 € → 4 → remote&lt;br&gt;"
+    "• ready_20 → 20 h/mese → 500 € → 3 → remote, customer_site, lab&lt;br&gt;"
+    "• ready_40 → 40 h/mese → 900 € → 3 → idem&lt;br&gt;"
+    "• ready_60 → 60 h/mese → 1.230 € → 3 → idem&lt;br&gt;"
+    "• support_base → 80 h nei 12 mesi → 1.600 € → 2 → idem&lt;br&gt;"
+    "• support_plus → 150 h nei 12 mesi → 2.500 € → 1 → idem&lt;br&gt;"
+    "included_hours e price_cents sono una copia del listino, scritta dal&lt;br&gt;"
+    "server alla creazione e a ogni cambio di pacchetto (nessun CHECK).&lt;br&gt;&lt;br&gt;"
+    "&lt;b&gt;Ore usate&lt;/b&gt;&lt;br&gt;"
+    "/used_hours = somma (end_time − start_time) degli interventi&lt;br&gt;"
+    "&lt;i&gt;completed&lt;/i&gt; collegati e coperti dal pacchetto:&lt;br&gt;"
+    "• remote e ready: nel mese di calendario, senza riporto&lt;br&gt;"
+    "• support: su tutto il contratto&lt;br&gt;"
+    "/remaining_hours = included_hours − used_hours (anche negativo)&lt;br&gt;&lt;br&gt;"
+    "&lt;b&gt;Email al provider&lt;/b&gt;, una volta per periodo ciascuna&lt;br&gt;"
+    "(una riga in AssistanceHoursAlert per contratto, periodo e tipo;&lt;br&gt;"
+    "periodo = mese; per support il mese di start_date):&lt;br&gt;"
+    "• warning quando used ≥ 80% di included_hours&lt;br&gt;"
+    "• exhausted quando used ≥ 100%&lt;br&gt;"
+    "Se le ore tornano sotto soglia la riga si cancella (riarmo);&lt;br&gt;"
+    "cambiando pacchetto si cancellano tutte le righe del contratto.&lt;br&gt;&lt;br&gt;"
+    "&lt;b&gt;Contratto&lt;/b&gt;&lt;br&gt;"
+    "/end_date = start_date + term_months&lt;br&gt;"
+    "{expired derivato: active e oggi ≥ end_date, non salvato}&lt;br&gt;"
+    "{intervention.customer_id = contract.customer_id}&lt;br&gt;"
+    "{intervention.type compatibile con package}&lt;br&gt;"
+    "{contratto active e start_date ≤ intervention_date &lt; end_date}&lt;br&gt;"
+    "{package support_*: term_months = 12}"
+)
+cells.append(
+    f'<mxCell id="{note_id}" value="{note}" style="shape=note;whiteSpace=wrap;html=1;size=16;align=left;'
+    f'verticalAlign=top;spacingLeft=8;spacingTop=4;fontSize=11;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">'
+    f'<mxGeometry x="{C3}" y="1160" width="420" height="500" as="geometry"/></mxCell>'
+)
 
 # --- Autenticazione e sistema ---
 cls("user", "User", C4, 40, [
@@ -303,12 +402,31 @@ edge("collaborator", "left", "report", "right", 320, "0..1", "0..*")
 edge("customer", "top", "report", "bottom", mid("customer"), "1", "0..*")
 edge("collaborator", "bottom", "intervention", "top", mid("collaborator"), "1", "0..*")
 edge("customer", "right", "intervention", "left", 600, "1", "0..*")
+edge("customer", "bottom", "contract", "top", mid("customer"), "1", "0..*")
+edge("provider", "right", "contract", "left", 900, "1", "0..*")
+edge("contract", "left", "signed", "right", 1085, "1", "0..1", style=COMPOSITION)
+edge("assistance", "top", "intervention", "bottom", C2 + 225, "0..1", "0..*", style=GREEN)
+edge("rental", "top", "contract", "bottom", mid("rental"), style=GENERALIZATION)
+gen_y = 1138
+edge("assistance", "top", "contract", "bottom", mid("assistance"), style=GENERALIZATION,
+     tgt_at=mid("contract"), pts=[(mid("assistance"), gen_y), (mid("contract"), gen_y)])
+cells.append(
+    f'<mxCell id="{nid("l")}" value="{{complete, disjoint}}" style="text;html=1;align=left;fontSize=11;'
+    f'fontStyle=2;" vertex="1" parent="1"><mxGeometry x="{mid("contract") + 12}" y="{gen_y + 1}" width="140" height="20" as="geometry"/></mxCell>'
+)
+edge("assistance", "bottom", "alert", "top", mid("assistance"), "1", "0..*", style=COMPOSITION)
+ax, ay = anchor("assistance", "right", 1190)
+cells.append(
+    f'<mxCell id="{nid("e")}" style="endArrow=none;dashed=1;html=1;strokeColor=#82b366;exitX=0;exitY=0.3;exitDx=0;exitDy=0;'
+    f'entryX={ax};entryY={ay};entryDx=0;entryDy=0;" edge="1" parent="1" source="{note_id}" target="{box["assistance"][0]}">'
+    f'<mxGeometry relative="1" as="geometry"/></mxCell>'
+)
 edge("user", "right", "session", "left", 100, "1", "0..*", style=COMPOSITION)
 edge("user", "right", "userdevice", "left", 290, "1", "0..*", style=COMPOSITION)
 edge("user", "bottom", "recovery", "top", mid("user"), "1", "0..*", style=COMPOSITION)
 
 # ================= Legenda =================
-legend = [("Tabella esistente", EXISTING), ("Enumerazione", ENUM), ("Autenticazione / sistema", AUTH)]
+legend = [("Tabella esistente", EXISTING), ("Nuovo (contratti)", NEW), ("Enumerazione", ENUM), ("Autenticazione / sistema", AUTH)]
 for i, (text, color) in enumerate(legend):
     cells.append(
         f'<mxCell id="{nid("g")}" value="{escape(text)}" style="rounded=0;html=1;fontSize=11;{color}" vertex="1" parent="1">'

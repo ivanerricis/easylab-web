@@ -18,6 +18,7 @@ import {
     type InterventionFormState,
 } from "@/lib/interventionForm";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import { useLinkableContracts } from "@/hooks/useLinkableContracts";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
@@ -37,6 +38,12 @@ export type EditInterventionSubmitValues = {
     /** Indipendente dal pagamento: dice se va emessa fattura. Di default no. */
     toInvoice: boolean;
     collaboratorId: number;
+    /**
+     * Il contratto di assistenza. Assente se non è stato toccato: il PUT è parziale, e un vecchio
+     * intervento il cui contratto è scaduto non va ricontrollato dal server a ogni altra modifica.
+     * `null` lo scollega.
+     */
+    contractId?: number | null;
     interventionDate: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -62,6 +69,9 @@ const EditInterventionDialog = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadedInterventionId, setLoadedInterventionId] = useState<number | null>(null);
     const [collaborators, setCollaborators] = useState<CollaboratorDto[]>([]);
+    // Il cliente non si cambia in modifica: arriva con l'intervento, insieme al contratto già collegato.
+    const [customerId, setCustomerId] = useState<number | null>(null);
+    const [savedContractId, setSavedContractId] = useState<number | null>(null);
 
     const [formValues, setFormValues] = useState<InterventionFormState>(() => emptyInterventionFormState(""));
 
@@ -70,6 +80,29 @@ const EditInterventionDialog = ({
     const [savedFormValues, setSavedFormValues] = useState<InterventionFormState | null>(null);
     const isDirty =
         loadedInterventionId != null && savedFormValues != null && hasFormChanged(formValues, savedFormValues);
+
+    const {
+        isReady: areContractsReady,
+        options: contractOptions,
+        hint: contractHint,
+    } = useLinkableContracts({
+        customerId,
+        type: formValues.type,
+        date: formValues.interventionDate,
+        keepContractId: savedContractId,
+    });
+    const { contractId: selectedContractId } = formValues;
+    // Come nel dialogo di creazione: un contratto che con il nuovo tipo o la nuova data non vale più si toglie.
+    const isSelectedContractValid =
+        selectedContractId === "" ||
+        !areContractsReady ||
+        contractOptions.some((contract) => String(contract.id) === selectedContractId);
+
+    useEffect(() => {
+        if (!isSelectedContractValid) {
+            startTransition(() => setFormValues((prev) => ({ ...prev, contractId: "" })));
+        }
+    }, [isSelectedContractValid]);
 
     /** Applica i campi cambiati e toglie l'errore a quelli toccati. */
     const handleChange = (patch: Partial<InterventionFormState>) => {
@@ -118,6 +151,8 @@ const EditInterventionDialog = ({
                 }
 
                 setCollaborators(collaboratorsData);
+                setCustomerId(intervention.customerId);
+                setSavedContractId(intervention.contractId ?? null);
                 const loadedFormValues: InterventionFormState = {
                     type: intervention.type,
                     status: intervention.status,
@@ -128,6 +163,7 @@ const EditInterventionDialog = ({
                     paid: intervention.paid,
                     toInvoice: intervention.toInvoice,
                     collaboratorId: String(intervention.collaboratorId),
+                    contractId: intervention.contractId != null ? String(intervention.contractId) : "",
                     interventionDate: intervention.interventionDate,
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
                     endTime: intervention.endTime?.slice(0, 5) ?? "",
@@ -172,7 +208,12 @@ const EditInterventionDialog = ({
 
         try {
             setIsSubmitting(true);
-            await onSubmit({ interventionId, ...toInterventionSubmitFields(formValues) });
+            const fields = toInterventionSubmitFields(formValues);
+            await onSubmit({
+                interventionId,
+                ...fields,
+                contractId: formValues.contractId === savedFormValues?.contractId ? undefined : fields.contractId,
+            });
 
             toast.success("Intervento aggiornato con successo");
             onOpenChange(false);
@@ -244,6 +285,8 @@ const EditInterventionDialog = ({
                                     errors={errors}
                                     onChange={handleChange}
                                     withoutProgress
+                                    contractOptions={contractOptions}
+                                    contractHint={contractHint}
                                 />
                             </div>
 

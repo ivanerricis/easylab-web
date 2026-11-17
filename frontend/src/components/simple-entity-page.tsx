@@ -170,7 +170,9 @@ const SimpleEntityPage = <TRow extends { id: number }, TValues>({
             <PageHeader
                 title={title}
                 description={description}
-                action={<CreateEntityButton label={createLabel} onClick={() => setIsCreateDialogOpen(true)} />}
+                action={
+                    <CreateEntityButton label={createLabel} shortcut="n" onClick={() => setIsCreateDialogOpen(true)} />
+                }
             />
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onSubmit={handleCreate} />

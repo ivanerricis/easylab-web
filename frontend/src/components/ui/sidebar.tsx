@@ -4,7 +4,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { cn, modifierKey } from "@/lib/utils";
+import ShortcutKeys from "@/components/shortcut-keys";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -264,7 +265,10 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
                     <span className="sr-only">Apri/chiudi menu</span>
                 </Button>
             </TooltipTrigger>
-            <TooltipContent>Apri/chiudi menu</TooltipContent>
+            <TooltipContent>
+                Apri/chiudi menu
+                <ShortcutKeys keys={[modifierKey, SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()]} />
+            </TooltipContent>
         </Tooltip>
     );
 }

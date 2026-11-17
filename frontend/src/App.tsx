@@ -22,6 +22,10 @@ const CollaboratorsPage = lazy(() => import("@/pages/collaborators/Collaborators
 const CollaboratorPage = lazy(() => import("./pages/collaborators/CollaboratorPage"));
 const TechnicianPage = lazy(() => import("@/pages/technicians/TechniciansPage"));
 const SingleTechnicianPage = lazy(() => import("./pages/technicians/TechnicianPage"));
+const ContractsPage = lazy(() => import("@/pages/contracts/ContractsPage"));
+const ContractPage = lazy(() => import("./pages/contracts/ContractPage"));
+const ProvidersPage = lazy(() => import("@/pages/providers/ProvidersPage"));
+const ProviderPage = lazy(() => import("./pages/providers/ProviderPage"));
 const DevicesPage = lazy(() => import("@/pages/devices/DevicesPage"));
 const IssuesPage = lazy(() => import("@/pages/issues/IssuesPage"));
 const SettingsPage = lazy(() => import("./pages/settings/SettingsPage"));
@@ -52,10 +56,16 @@ export function App() {
                                             <Route path="clients/:id" element={<CustomerPage />} />
                                             {/* Stessa pagina, tab degli interventi: vedi `CustomerPage`. */}
                                             <Route path="clients/:id/interventions" element={<CustomerPage />} />
+                                            {/* E tab dei contratti. */}
+                                            <Route path="clients/:id/contracts" element={<CustomerPage />} />
                                             <Route path="collaborators" element={<CollaboratorsPage />} />
                                             <Route path="collaborators/:id" element={<CollaboratorPage />} />
                                             <Route path="technicians" element={<TechnicianPage />} />
                                             <Route path="technicians/:id" element={<SingleTechnicianPage />} />
+                                            <Route path="contracts" element={<ContractsPage />} />
+                                            <Route path="contracts/:id" element={<ContractPage />} />
+                                            <Route path="providers" element={<ProvidersPage />} />
+                                            <Route path="providers/:id" element={<ProviderPage />} />
                                             <Route path="devices" element={<DevicesPage />} />
                                             <Route path="issues" element={<IssuesPage />} />
                                             <Route path="settings" element={<SettingsPage />} />

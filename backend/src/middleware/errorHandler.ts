@@ -75,6 +75,30 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
         onDeleteParent: "Impossibile eliminare il collaboratore: è ancora associato a uno o più interventi.",
         onInvalidReference: "Il collaboratore selezionato non esiste.",
     },
+    contract_customer_id_customer_id_fk: {
+        onDeleteParent: "Impossibile eliminare il cliente: è ancora associato a uno o più contratti.",
+        onInvalidReference: "Il cliente selezionato non esiste.",
+    },
+    contract_provider_id_provider_id_fk: {
+        onDeleteParent: "Impossibile eliminare il fornitore: è ancora associato a uno o più contratti.",
+        onInvalidReference: "Il fornitore selezionato non esiste.",
+    },
+    // Chiave composta (customer_id, contract_id): oltre a un contratto inesistente, scatta
+    // quando il contratto è di un altro cliente rispetto a quello dell'intervento.
+    intervention_customer_contract_fk: {
+        onDeleteParent: "Impossibile eliminare il contratto: è ancora collegato a uno o più interventi.",
+        onInvalidReference: "Il contratto selezionato non esiste o non appartiene al cliente dell'intervento.",
+    },
+    // In cascata verso il contratto (la cancellazione non la raggiunge mai): resta il caso di
+    // una riga di assistenza agganciata a un contratto di noleggio o inesistente.
+    assistance_contract_fk: {
+        onDeleteParent: "Impossibile eliminare il contratto: ha ancora dati di assistenza collegati.",
+        onInvalidReference: "Il contratto selezionato non esiste o non è un contratto di assistenza.",
+    },
+    assistance_hours_alert_contract_id_assistance_contract_id_fk: {
+        onDeleteParent: "Impossibile eliminare il contratto: ha ancora avvisi di ore collegati.",
+        onInvalidReference: "Il contratto di assistenza selezionato non esiste.",
+    },
 };
 
 // Stessa idea per l'unicità. Prima al client arrivava il `detail` di Postgres ("Key
@@ -85,6 +109,9 @@ const UNIQUE_MESSAGES: Record<string, string> = {
     device_name_lower_idx: "Esiste già un dispositivo con questo nome.",
     issue_description_lower_idx: "Esiste già un guasto con questa descrizione.",
     technician_vat_number_unique: "Esiste già un tecnico con questa partita IVA.",
+    provider_provider_name_lower_idx: "Esiste già un fornitore con questo nome.",
+    provider_email_unique: "Esiste già un fornitore con questa email.",
+    provider_phone_number_unique: "Esiste già un fornitore con questo numero di telefono.",
 };
 
 const GENERIC_UNIQUE_MESSAGE = "Esiste già un elemento con questi dati.";
@@ -100,6 +127,12 @@ const CHECK_MESSAGES: Record<string, string> = {
     report_closed_collaborator_check: "Per chiudere un report è necessario indicare un collaboratore",
     intervention_type_check: "Tipo di intervento non valido",
     intervention_status_check: "Stato dell'intervento non valido",
+    contract_type_check: "Tipo di contratto non valido",
+    contract_status_check: "Stato del contratto non valido",
+    contract_term_check: "Durata del contratto non valida",
+    assistance_contract_type_check: "Il contratto non è un contratto di assistenza",
+    assistance_package_check: "Pacchetto di ore non valido per questo tipo di assistenza",
+    assistance_hours_alert_kind_check: "Tipo di avviso ore non valido",
 };
 
 const GENERIC_CHECK_MESSAGE = "I dati inseriti non sono validi.";

@@ -15,6 +15,18 @@ vi.mock("../db/queries/intervention", () => ({
     getInterventionStats: vi.fn(),
 }));
 
+// Il collegamento al contratto legge il contratto dal query layer; il ricalcolo degli avvisi
+// delle ore è mockato (lo coprono `assistanceHours.db.test.ts` e i test qui sotto sulle chiamate),
+// mentre la tabella dei tipi consumati resta quella vera.
+vi.mock("../db/queries/contract", () => ({
+    getContractById: vi.fn(),
+}));
+
+vi.mock("../services/assistanceHours", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../services/assistanceHours")>()),
+    recheckAssistanceHours: vi.fn(),
+}));
+
 vi.mock("../config/lab", () => ({
     getLabConfig: vi.fn(),
     getAppTimeZone: vi.fn(async () => "Europe/Rome"),
@@ -45,6 +57,8 @@ import {
     listInterventions,
     updateInterventionById,
 } from "../db/queries/intervention";
+import { getContractById } from "../db/queries/contract";
+import { recheckAssistanceHours } from "../services/assistanceHours";
 import { getLabConfig } from "../config/lab";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
 import { buildInterventionEmail } from "../services/interventionEmail";
@@ -844,6 +858,220 @@ describe("interventions router", () => {
 
             expect(updateResponse.status).toBe(400);
             expect(updateResponse.body.message).toBe(createResponse.body.message);
+        });
+    });
+
+    describe("collegamento a un contratto di assistenza", () => {
+        // Un contratto Assistenza Remota Pack 20 del cliente 1, valido per tutto il 2026.
+        const contract = {
+            id: 5,
+            type: "assistance",
+            customerId: 1,
+            effectiveStatus: "active",
+            startDate: "2026-01-01",
+            endDate: "2027-01-01",
+            package: "remote_20",
+        };
+
+        const linkedBody = {
+            type: "remote",
+            customerId: 1,
+            collaboratorId: 1,
+            interventionDate: "2026-01-10",
+            problem: "Non si accende",
+            contractId: 5,
+        };
+
+        const linkedStored = { ...storedIntervention, type: "remote", problem: "Non si accende", contractId: 5 };
+
+        beforeEach(() => {
+            vi.mocked(getContractById).mockResolvedValue([contract] as never);
+            vi.mocked(createIntervention).mockResolvedValue([linkedStored] as never);
+        });
+
+        it("la lista inoltra il filtro per contratto", async () => {
+            vi.mocked(listInterventions).mockResolvedValue([] as never);
+
+            await request(buildApp()).get("/api/interventions?contractId=5");
+
+            expect(vi.mocked(listInterventions).mock.calls[0][0]).toMatchObject({ contractId: 5 });
+        });
+
+        it("crea l'intervento collegato e ricalcola le ore del suo mese", async () => {
+            const response = await request(buildApp()).post("/api/interventions").send(linkedBody);
+
+            expect(response.status).toBe(201);
+            expect(getContractById).toHaveBeenCalledWith(5, "Europe/Rome");
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ contractId: 5 }));
+            expect(recheckAssistanceHours).toHaveBeenCalledWith([{ contractId: 5, month: "2026-01" }]);
+        });
+
+        it("senza contratto non legge nessun contratto e salva contractId null", async () => {
+            vi.mocked(createIntervention).mockResolvedValue([storedIntervention] as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...linkedBody, contractId: null });
+
+            expect(response.status).toBe(201);
+            expect(getContractById).not.toHaveBeenCalled();
+            expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ contractId: null }));
+        });
+
+        it.each([
+            ["il contratto non esiste", undefined, {}, "Il contratto selezionato non esiste"],
+            [
+                "il contratto non è di assistenza",
+                { ...contract, type: "rental", package: null },
+                {},
+                "Si può collegare solo un contratto di assistenza",
+            ],
+            [
+                "il contratto è di un altro cliente",
+                { ...contract, customerId: 2 },
+                {},
+                "Il contratto selezionato appartiene a un altro cliente",
+            ],
+            [
+                "il contratto è in bozza",
+                { ...contract, effectiveStatus: "draft" },
+                {},
+                "Il contratto selezionato non è attivo",
+            ],
+            [
+                "il contratto è scaduto",
+                { ...contract, effectiveStatus: "expired" },
+                {},
+                "Il contratto selezionato non è attivo",
+            ],
+            [
+                "la data precede l'inizio del contratto",
+                contract,
+                { interventionDate: "2025-12-31" },
+                "La data dell'intervento non rientra nel periodo del contratto",
+            ],
+            [
+                "la data è quella di fine (esclusa)",
+                contract,
+                { interventionDate: "2027-01-01" },
+                "La data dell'intervento non rientra nel periodo del contratto",
+            ],
+            [
+                "il pacchetto remoto non consuma gli interventi in sede",
+                contract,
+                { type: "customer_site" },
+                "Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato",
+            ],
+            [
+                "la consegna di materiale non consuma mai",
+                { ...contract, package: "ready_60" },
+                { type: "material_delivery" },
+                "Questo tipo di intervento non consuma le ore del pacchetto del contratto selezionato",
+            ],
+        ])("POST rifiuta se %s", async (_label, foundContract, patch, message) => {
+            vi.mocked(getContractById).mockResolvedValue((foundContract ? [foundContract] : []) as never);
+
+            const response = await request(buildApp())
+                .post("/api/interventions")
+                .send({ ...linkedBody, ...patch });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toMatchObject({ message, field: "contractId" });
+            expect(createIntervention).not.toHaveBeenCalled();
+            expect(recheckAssistanceHours).not.toHaveBeenCalled();
+        });
+
+        it.each(["ready_20", "support_plus"])(
+            "il pacchetto %s accetta remoto, intervento in sede e in laboratorio",
+            async (key) => {
+                vi.mocked(getContractById).mockResolvedValue([{ ...contract, package: key }] as never);
+
+                for (const type of ["remote", "customer_site", "lab"]) {
+                    const response = await request(buildApp())
+                        .post("/api/interventions")
+                        .send({ ...linkedBody, type });
+
+                    expect(response.status).toBe(201);
+                }
+            }
+        );
+
+        it("PUT valida la riga risultante: spostare la data fuori dal contratto è un 400", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([linkedStored] as never);
+
+            const response = await request(buildApp())
+                .put("/api/interventions/1")
+                .send({ interventionDate: "2027-02-01" });
+
+            expect(response.status).toBe(400);
+            expect(response.body.field).toBe("contractId");
+            expect(updateInterventionById).not.toHaveBeenCalled();
+        });
+
+        it("PUT: cambiando tipo in uno non consumato dal pacchetto è un 400", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([linkedStored] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ type: "customer_site" });
+
+            expect(response.status).toBe(400);
+            expect(response.body.message).toContain("non consuma le ore");
+        });
+
+        it("PUT collega un contratto a un intervento che non lo aveva", async () => {
+            const existing = { ...linkedStored, contractId: null };
+            vi.mocked(getInterventionById).mockResolvedValue([existing] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([linkedStored] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ contractId: 5 });
+
+            expect(response.status).toBe(200);
+            expect(updateInterventionById).toHaveBeenCalledWith(1, expect.objectContaining({ contractId: 5 }));
+        });
+
+        it("PUT di un campo estraneo non ricontrolla il contratto (può essere scaduto nel frattempo)", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([linkedStored] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([{ ...linkedStored, note: "x" }] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ note: "x" });
+
+            expect(response.status).toBe(200);
+            expect(getContractById).not.toHaveBeenCalled();
+        });
+
+        it("PUT ricalcola il posto di partenza e quello di arrivo (contratto e mese)", async () => {
+            const existing = { ...linkedStored, contractId: 4, interventionDate: "2025-12-20" };
+            vi.mocked(getInterventionById).mockResolvedValue([existing] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([linkedStored] as never);
+
+            const response = await request(buildApp())
+                .put("/api/interventions/1")
+                .send({ contractId: 5, interventionDate: "2026-01-10" });
+
+            expect(response.status).toBe(200);
+            expect(recheckAssistanceHours).toHaveBeenCalledWith([
+                { contractId: 4, month: "2025-12" },
+                { contractId: 5, month: "2026-01" },
+            ]);
+        });
+
+        it("PUT con contractId null scollega l'intervento", async () => {
+            vi.mocked(getInterventionById).mockResolvedValue([linkedStored] as never);
+            vi.mocked(updateInterventionById).mockResolvedValue([{ ...linkedStored, contractId: null }] as never);
+
+            const response = await request(buildApp()).put("/api/interventions/1").send({ contractId: null });
+
+            expect(response.status).toBe(200);
+            expect(getContractById).not.toHaveBeenCalled();
+            expect(updateInterventionById).toHaveBeenCalledWith(1, expect.objectContaining({ contractId: null }));
+        });
+
+        it("DELETE ricalcola le ore del contratto e del mese dell'intervento tolto", async () => {
+            vi.mocked(deleteInterventionById).mockResolvedValue([linkedStored] as never);
+
+            const response = await request(buildApp()).delete("/api/interventions/1");
+
+            expect(response.status).toBe(200);
+            expect(recheckAssistanceHours).toHaveBeenCalledWith([{ contractId: 5, month: "2026-01" }]);
         });
     });
 

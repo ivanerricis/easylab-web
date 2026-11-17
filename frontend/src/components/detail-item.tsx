@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -133,6 +133,7 @@ const DetailGrid = ({
 const DetailSection = ({
     title,
     titleAs: TitleTag = "h2",
+    action,
     isBusy = false,
     className,
     contentClassName,
@@ -145,6 +146,11 @@ const DetailSection = ({
      * `h1` dentro un `h2` non è HTML valido.
      */
     titleAs?: "h2" | "div";
+    /**
+     * Un pulsante in cima a destra della card (es. "Nuovo contratto"). Fuori dal titolo: dentro l'`h2`
+     * finirebbe nel nome accessibile dell'intestazione.
+     */
+    action?: ReactNode;
     /**
      * Ricarica con i dati già in pagina (vedi `isReloading` in `useEntityDetail`): il contenuto
      * resta leggibile, appena attenuato, come le righe di `EntityTable` quando la lista ricarica.
@@ -159,6 +165,7 @@ const DetailSection = ({
             <CardTitle className="font-semibold">
                 <TitleTag>{title}</TitleTag>
             </CardTitle>
+            {action ? <CardAction>{action}</CardAction> : null}
         </CardHeader>
         <CardContent className={contentClassName}>{children}</CardContent>
     </Card>

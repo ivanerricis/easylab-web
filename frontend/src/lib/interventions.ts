@@ -6,6 +6,7 @@ export const interventionTypeOptions: { value: InterventionType; label: string }
     { value: "material_delivery", label: "Consegna materiale" },
     { value: "customer_site", label: "Intervento in sede" },
     { value: "remote", label: "Intervento da remoto" },
+    { value: "lab", label: "Intervento in laboratorio" },
 ];
 
 export const interventionStatusOptions: { value: InterventionStatus; label: string }[] = [
@@ -53,12 +54,12 @@ export const formatInterventionStatus = (value: InterventionStatus) =>
     interventionStatusOptions.find((option) => option.value === value)?.label ?? value;
 
 /**
- * Un intervento di assistenza, in sede o da remoto, contrapposto alla consegna di materiale: è
- * l'assistenza ad avere orari e un problema da descrivere. Si chiamava `isOnSiteInterventionType`,
+ * Un intervento di assistenza, in sede, da remoto o in laboratorio, contrapposto alla consegna di materiale: è
+ * l'assistenza ad avere orari e un problema da descrivere (anche quella in laboratorio, `lab`). Si chiamava `isOnSiteInterventionType`,
  * ma valeva anche per gli interventi da remoto e il nome faceva pensare a un errore.
  */
 export const isAssistanceInterventionType = (value: InterventionType) =>
-    value === "customer_site" || value === "remote";
+    value === "customer_site" || value === "remote" || value === "lab";
 
 export const interventionDescriptionLabel = (value: InterventionType) =>
     value === "material_delivery" ? "Materiali da consegnare/consegnati" : "Assistenza effettuata";

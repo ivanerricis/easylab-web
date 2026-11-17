@@ -30,6 +30,7 @@ type ListInterventionsParams = {
     scheduledTo?: string;
     customerId?: number;
     collaboratorId?: number;
+    contractId?: number;
     sortBy?: InterventionSortBy;
     sortOrder?: "asc" | "desc";
     /** Il fuso in cui leggere i giorni delle date di creazione: vedi `timeZone.ts`. */
@@ -94,6 +95,7 @@ export const listInterventions = async ({
     scheduledTo,
     customerId,
     collaboratorId,
+    contractId,
     sortBy = "createdAt",
     sortOrder = "desc",
     unpaginatedLimit,
@@ -137,6 +139,7 @@ export const listInterventions = async ({
         : undefined;
     const customerCondition = customerId ? eq(interventionTable.customerId, customerId) : undefined;
     const collaboratorCondition = collaboratorId ? eq(interventionTable.collaboratorId, collaboratorId) : undefined;
+    const contractCondition = contractId ? eq(interventionTable.contractId, contractId) : undefined;
     const whereConditions = [
         statusCondition,
         typeCondition,
@@ -145,6 +148,7 @@ export const listInterventions = async ({
         scheduledRangeCondition,
         customerCondition,
         collaboratorCondition,
+        contractCondition,
         searchCondition,
     ].filter((condition): condition is NonNullable<typeof condition> => condition != null);
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
@@ -182,6 +186,7 @@ export const listInterventions = async ({
             endTime: interventionTable.endTime,
             customerId: interventionTable.customerId,
             collaboratorId: interventionTable.collaboratorId,
+            contractId: interventionTable.contractId,
             customer: customerSortExpr,
             customerPhone: sql<
                 string | null

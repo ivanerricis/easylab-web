@@ -15,8 +15,29 @@ import {
     loadLogoDataUrl,
     sectionBarCell,
     sectionBarRow,
+    wrapPdfDocument,
     type CustomerSummaryHeaderData,
 } from "./shared";
+
+describe("wrapPdfDocument", () => {
+    it("senza opzioni non aggiunge né watermark né footer", () => {
+        const doc = wrapPdfDocument([]);
+
+        expect(doc).not.toHaveProperty("watermark");
+        expect(doc).not.toHaveProperty("footer");
+    });
+
+    it("con `watermark` aggiunge la scritta tenue del marchio", () => {
+        const doc = wrapPdfDocument([], [14, 14, 14, 24], { pageNumbers: true, watermark: "PREVENTIVO" });
+
+        expect(doc).toHaveProperty("watermark", { text: "PREVENTIVO", opacity: 0.06, bold: true, color: "#2A75B9" });
+        expect(doc).toHaveProperty("footer");
+    });
+
+    it("un watermark vuoto equivale a nessun watermark", () => {
+        expect(wrapPdfDocument([], undefined, { watermark: "" })).not.toHaveProperty("watermark");
+    });
+});
 
 const buildCustomer = (overrides: Partial<CustomerSummaryHeaderData> = {}): CustomerSummaryHeaderData => ({
     customerId: 5,

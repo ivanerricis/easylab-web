@@ -15,6 +15,8 @@ import {
     index,
     uniqueIndex,
     check,
+    unique,
+    foreignKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -348,12 +350,207 @@ export const notificationTable = pgTable(
 );
 
 /**
+ * Contratti fra un cliente del laboratorio e un fornitore. Due specializzazioni disgiunte e
+ * totali: `assistance` (pacchetti di ore) e `rental` (noleggio, senza dati propri per
+ * ora). Come per `reportPaymentMethods`, le liste dei valori vivono qui una volta sola, con il
+ * tipo della colonna: rotte, query e frontend le leggono da qui.
+ */
+export const contractTypes = ["assistance", "rental"] as const;
+export const contractStoredStatuses = ["draft", "active", "cancelled"] as const;
+/**
+ * Lo stato che vede l'utente: a quelli salvati si aggiunge `expired`, che nel database non
+ * esiste mai. Un contratto `active` la cui data di fine è passata risulta scaduto al momento
+ * della lettura (vedi `db/queries/contract.ts`), così nessun cron deve riscrivere lo stato.
+ */
+export const contractStatuses = [...contractStoredStatuses, "expired"] as const;
+export type ContractType = (typeof contractTypes)[number];
+export type ContractStoredStatus = (typeof contractStoredStatuses)[number];
+export type ContractStatus = (typeof contractStatuses)[number];
+
+/** Durata del contratto, in mesi interi: da qui la data di fine (`start_date + N mesi`). */
+export const contractTermMonthsRange = { min: 1, max: 120 } as const;
+
+/**
+ * Le chiavi dei pacchetti di assistenza; nome, ore, prezzo e il resto stanno nel listino
+ * `services/assistancePackages.ts`, che è l'unica fonte. Il CHECK `assistance_package_check`
+ * ripete solo questa lista di chiavi.
+ */
+export const assistancePackageKeys = [
+    "remote_20",
+    "remote_40",
+    "ready_20",
+    "ready_40",
+    "ready_60",
+    "support_base",
+    "support_plus",
+] as const;
+export type AssistancePackage = (typeof assistancePackageKeys)[number];
+
+export const assistanceAlertKinds = ["warning", "exhausted"] as const;
+export type AssistanceAlertKind = (typeof assistanceAlertKinds)[number];
+
+export const providerTable = pgTable(
+    "provider",
+    {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        providerName: varchar("provider_name", { length: 255 }).notNull(),
+        firstName: varchar("first_name", { length: 255 }),
+        lastName: varchar("last_name", { length: 255 }),
+        email: varchar("email", { length: 255 }).notNull().unique(),
+        phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(),
+        /**
+         * Il logo che compare nei PDF dei contratti, come data URL (PNG o JPEG, ridotto dal browser).
+         * Obbligatorio per chi lo crea ora, ma NULL per i fornitori nati prima: il PDF allora lo omette.
+         */
+        logoDataUrl: text("logo_data_url"),
+        ...timestamps,
+    },
+    (table) => [
+        // Senza maiuscole, come il catalogo dispositivi: "Acme" e "ACME" sono lo stesso fornitore.
+        uniqueIndex("provider_provider_name_lower_idx").on(sql`lower(${table.providerName})`),
+        index("provider_provider_name_trgm_idx").using("gin", sql`${table.providerName} gin_trgm_ops`),
+        index("provider_email_trgm_idx").using("gin", sql`${table.email} gin_trgm_ops`),
+        index("provider_phone_number_trgm_idx").using("gin", sql`${table.phoneNumber} gin_trgm_ops`),
+    ]
+);
+
+export const contractTable = pgTable(
+    "contract",
+    {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        type: varchar("type", { length: 20 }).$type<ContractType>().notNull(),
+        // Solo lo stato salvato: `expired` si deriva in lettura, vedi `contractStatuses`.
+        status: varchar("status", { length: 20 }).$type<ContractStoredStatus>().notNull().default("draft"),
+        /** Mesi di durata, a scelta libera fra `contractTermMonthsRange`; i valori proposti (3, 6, 12, 24) sono solo scorciatoie. */
+        termMonths: integer("term_months").notNull(),
+        /** Ogni quanti mesi si fattura: solo per il noleggio (NULL per l'assistenza), stessa scala della durata. */
+        billingMonths: integer("billing_months"),
+        /** Testo libero, di proposito non una chiave verso `device`: è il bene coperto dal contratto. */
+        device: varchar("device", { length: 255 }).notNull(),
+        note: text("note"),
+        startDate: date("start_date").notNull(),
+        ...timestamps,
+        customerId: integer("customer_id")
+            .notNull()
+            .references(() => customerTable.id),
+        providerId: integer("provider_id")
+            .notNull()
+            .references(() => providerTable.id),
+    },
+    (table) => [
+        index("contract_customer_id_idx").on(table.customerId),
+        index("contract_provider_id_idx").on(table.providerId),
+        index("contract_start_date_idx").on(table.startDate),
+        index("contract_created_at_idx").on(table.created_at),
+        index("contract_device_trgm_idx").using("gin", sql`${table.device} gin_trgm_ops`),
+        // Bersagli delle chiavi esterne composte: (id, type) tiene disgiunte le specializzazioni
+        // (vedi `assistanceTable`), (customer_id, id) obbliga l'intervento a un contratto dello
+        // stesso cliente. Sono ridondanti con la chiave primaria, ma Postgres vuole un vincolo
+        // di unicità esatto sulle colonne referenziate.
+        unique("contract_id_type_unique").on(table.id, table.type),
+        unique("contract_customer_id_id_unique").on(table.customerId, table.id),
+        check("contract_type_check", sql`${table.type} IN ('assistance', 'rental')`),
+        check("contract_status_check", sql`${table.status} IN ('draft', 'active', 'cancelled')`),
+        check("contract_term_months_check", sql`${table.termMonths} BETWEEN 1 AND 120`),
+        // Il periodo di fatturazione c'è se e solo se il contratto è un noleggio.
+        check(
+            "contract_billing_months_check",
+            sql`(${table.type} = 'rental') = (${table.billingMonths} IS NOT NULL) AND (${table.billingMonths} IS NULL OR ${table.billingMonths} BETWEEN 1 AND 120)`
+        ),
+    ]
+);
+
+/**
+ * Specializzazione "assistenza" del contratto. La disgiunzione sta nel database: `contract_type`
+ * vale sempre 'assistance' e la chiave esterna composta (contract_id, contract_type) punta a
+ * `contract(id, type)`, quindi una riga qui può appartenere solo a un contratto di assistenza.
+ *
+ * La totalità (ogni contratto di assistenza ha la sua riga) NON è garantita da SQL: la rotta
+ * crea contratto e riga nella stessa transazione (`routes/contracts.ts`).
+ */
+export const assistanceTable = pgTable(
+    "assistance",
+    {
+        contractId: integer("contract_id").primaryKey(),
+        contractType: varchar("contract_type", { length: 20 }).notNull().default("assistance"),
+        package: varchar("package", { length: 20 }).$type<AssistancePackage>().notNull(),
+        /**
+         * Ore del pacchetto (al mese, senza riporto, o per tutto il contratto per i Supporto) e
+         * prezzo IVA esclusa in centesimi: una copia (snapshot) del listino presa alla creazione e a
+         * ogni cambio di pacchetto, la scrive il server. Nessun CHECK le lega al pacchetto, così un
+         * listino futuro non rende invalidi i contratti già firmati.
+         */
+        includedHours: integer("included_hours").notNull(),
+        priceCents: integer("price_cents").notNull(),
+        ...timestamps,
+    },
+    (table) => [
+        foreignKey({
+            name: "assistance_contract_fk",
+            columns: [table.contractId, table.contractType],
+            foreignColumns: [contractTable.id, contractTable.type],
+        }).onDelete("cascade"),
+        check("assistance_contract_type_check", sql`${table.contractType} = 'assistance'`),
+        check(
+            "assistance_package_check",
+            sql`${table.package} IN ('remote_20', 'remote_40', 'ready_20', 'ready_40', 'ready_60', 'support_base', 'support_plus')`
+        ),
+        check("assistance_included_hours_check", sql`${table.includedHours} > 0`),
+        check("assistance_price_cents_check", sql`${table.priceCents} > 0`),
+    ]
+);
+
+/** Dimensione massima del contratto firmato caricato: una scansione in PDF ci sta con margine. */
+export const signedContractMaxBytes = 15 * 1024 * 1024;
+
+/**
+ * Il contratto firmato dal cliente, caricato a mano come PDF: uno per contratto (la chiave
+ * primaria è anche la chiave esterna), sostituibile ed eliminabile. Qui ci sono solo i dati del
+ * file: il PDF sta in `data/signed-contracts/<contract_id>.pdf` (`services/signedContractFiles.ts`),
+ * per non far crescere il database con i documenti. La cartella è nei backup (`backupFiles.ts`).
+ */
+export const signedContractTable = pgTable(
+    "signed_contract",
+    {
+        contractId: integer("contract_id")
+            .primaryKey()
+            .references(() => contractTable.id, { onDelete: "cascade" }),
+        /** Il nome del file come l'ha caricato l'utente, solo per mostrarlo. */
+        fileName: varchar("file_name", { length: 255 }).notNull(),
+        sizeBytes: integer("size_bytes").notNull(),
+        uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+    },
+    (table) => [check("signed_contract_size_bytes_check", sql`${table.sizeBytes} > 0`)]
+);
+
+/**
+ * Gli avvisi di ore già inviati, uno per contratto, mese e tipo: la chiave primaria è anche
+ * ciò che impedisce di mandare due volte la stessa email.
+ */
+export const assistanceHoursAlertTable = pgTable(
+    "assistance_hours_alert",
+    {
+        contractId: integer("contract_id")
+            .notNull()
+            .references(() => assistanceTable.contractId, { onDelete: "cascade" }),
+        /** Primo giorno del mese a cui si riferisce l'avviso. */
+        month: date("month").notNull(),
+        kind: varchar("kind", { length: 20 }).$type<AssistanceAlertKind>().notNull(),
+        notifiedAt: timestamp("notified_at").defaultNow().notNull(),
+    },
+    (table) => [
+        primaryKey({ columns: [table.contractId, table.month, table.kind] }),
+        check("assistance_hours_alert_kind_check", sql`${table.kind} IN ('warning', 'exhausted')`),
+    ]
+);
+
+/**
  * Come `reportPaymentMethods` qui sopra: tipo e stato dell'intervento erano riscritti identici
  * in `routes/interventions.ts`, `services/interventionLabels.ts`, `db/queries/intervention.ts`
  * e `routes/summaryPrint.ts`, con un cast `as` a ogni punto in cui la colonna (tipizzata
  * `string` senza `$type`) doveva tornare a essere l'unione letterale.
  */
-export const interventionTypes = ["material_delivery", "customer_site", "remote"] as const;
+export const interventionTypes = ["material_delivery", "customer_site", "remote", "lab"] as const;
 export const interventionStatuses = ["scheduled", "in_progress", "completed"] as const;
 export type InterventionType = (typeof interventionTypes)[number];
 export type InterventionStatus = (typeof interventionStatuses)[number];
@@ -404,8 +601,20 @@ export const interventionTable = pgTable(
         collaboratorId: integer("collaborator_id")
             .notNull()
             .references(() => collaboratorTable.id),
+        /**
+         * Il contratto a cui l'intervento è imputato, facoltativo. La chiave composta con
+         * `customer_id` (MATCH SIMPLE: con `contract_id` NULL non vincola nulla) garantisce che
+         * il contratto sia dello stesso cliente dell'intervento.
+         */
+        contractId: integer("contract_id"),
     },
     (table) => [
+        foreignKey({
+            name: "intervention_customer_contract_fk",
+            columns: [table.customerId, table.contractId],
+            foreignColumns: [contractTable.customerId, contractTable.id],
+        }),
+        index("intervention_contract_id_idx").on(table.contractId),
         index("intervention_customer_id_idx").on(table.customerId),
         index("intervention_collaborator_id_idx").on(table.collaboratorId),
         // Il calendario carica solo l'intervallo di date che sta mostrando: senza questo
@@ -418,7 +627,7 @@ export const interventionTable = pgTable(
         // I valori ammessi di tipo e stato erano solo un tipo TypeScript: una scrittura diretta
         // poteva salvarne uno qualunque. Il CHECK li fa rispettare dal database
         // (0040_intervention_enum_english); `errorHandler.ts` traduce la violazione.
-        check("intervention_type_check", sql`${table.type} IN ('material_delivery', 'customer_site', 'remote')`),
+        check("intervention_type_check", sql`${table.type} IN ('material_delivery', 'customer_site', 'remote', 'lab')`),
         check("intervention_status_check", sql`${table.status} IN ('scheduled', 'in_progress', 'completed')`),
     ]
 );

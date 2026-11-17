@@ -20,6 +20,14 @@ vi.mock("../db/queries/intervention", () => ({
     listInterventions: vi.fn(),
 }));
 
+vi.mock("../db/queries/contract", () => ({
+    listContracts: vi.fn(),
+}));
+
+vi.mock("../services/contractPdf", () => ({
+    createCustomerContractsPdfBuffer: vi.fn(),
+}));
+
 vi.mock("../services/reportPdf", () => ({
     createCustomerReportsPdfBuffer: vi.fn(),
 }));
@@ -40,7 +48,9 @@ import {
     listCustomers,
     updateCustomerById,
 } from "../db/queries/customer";
+import { listContracts } from "../db/queries/contract";
 import { listReports } from "../db/queries/report";
+import { createCustomerContractsPdfBuffer } from "../services/contractPdf";
 import { listInterventions } from "../db/queries/intervention";
 import { createCustomerReportsPdfBuffer } from "../services/reportPdf";
 import { createCustomerInterventionsPdfBuffer } from "../services/interventionPdf";
@@ -378,6 +388,88 @@ describe("customers router", () => {
                         }),
                     ],
                 })
+            );
+        });
+    });
+
+    describe("stampa PDF contratti del cliente", () => {
+        it("risponde 404 quando il cliente non esiste", async () => {
+            vi.mocked(getCustomerById).mockResolvedValue([] as never);
+
+            const response = await request(buildApp()).get("/api/customers/999/contracts/print");
+
+            expect(response.status).toBe(404);
+            expect(response.body).toEqual({ message: "Cliente non trovato" });
+            expect(listContracts).not.toHaveBeenCalled();
+        });
+
+        it("genera il PDF con i contratti dal più recente, stato effettivo e date", async () => {
+            vi.mocked(getCustomerById).mockResolvedValue([customer] as never);
+            vi.mocked(listContracts).mockResolvedValue([
+                {
+                    id: 2,
+                    type: "assistance",
+                    status: "active",
+                    effectiveStatus: "expired",
+                    providerName: "Acme Srl",
+                    device: "NAS",
+                    package: "ready_20",
+                    includedHours: 20,
+                    priceCents: 50000,
+                    startDate: "2025-10-01",
+                    endDate: "2026-04-01",
+                },
+                {
+                    id: 8,
+                    type: "rental",
+                    status: "draft",
+                    effectiveStatus: "draft",
+                    providerName: "Beta Spa",
+                    device: "Notebook",
+                    package: null,
+                    includedHours: null,
+                    priceCents: null,
+                    startDate: "2026-10-01",
+                    endDate: "2027-04-01",
+                },
+            ] as never);
+            vi.mocked(createCustomerContractsPdfBuffer).mockResolvedValue(Buffer.from("pdf") as never);
+
+            const response = await request(buildApp()).get("/api/customers/5/contracts/print");
+
+            expect(response.status).toBe(200);
+            expect(response.headers["content-type"]).toContain("application/pdf");
+            expect(response.headers["content-disposition"]).toBe("inline; filename=contratti-cliente-5.pdf");
+            expect(listContracts).toHaveBeenCalledWith({ customerId: 5, timeZone: "Europe/Rome" });
+            expect(createCustomerContractsPdfBuffer).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    customerId: 5,
+                    contractCount: 2,
+                    contracts: [
+                        expect.objectContaining({ id: 8, status: "draft", assistance: null }),
+                        expect.objectContaining({
+                            id: 2,
+                            // Lo stato effettivo, non quello salvato.
+                            status: "expired",
+                            assistance: { package: "ready_20", includedHours: 20, priceCents: 50000 },
+                            startDateLabel: expect.stringContaining("2025"),
+                            endDateLabel: expect.stringContaining("2026"),
+                        }),
+                    ],
+                })
+            );
+        });
+
+        it("genera comunque il PDF per un cliente senza contratti", async () => {
+            vi.mocked(getCustomerById).mockResolvedValue([customer] as never);
+            vi.mocked(listContracts).mockResolvedValue({ items: [], totalItems: 0 } as never);
+            vi.mocked(createCustomerContractsPdfBuffer).mockResolvedValue(Buffer.from("pdf") as never);
+
+            const response = await request(buildApp()).get("/api/customers/5/contracts/print");
+
+            expect(response.status).toBe(200);
+            expect(createCustomerContractsPdfBuffer).toHaveBeenCalledWith(
+                expect.objectContaining({ contractCount: 0, contracts: [] })
             );
         });
     });

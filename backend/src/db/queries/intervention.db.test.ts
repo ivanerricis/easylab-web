@@ -304,6 +304,7 @@ describe("listInterventions: righe e join", () => {
                     endTime: "10:30:00",
                     customerId: customer.id,
                     collaboratorId: collaborator.id,
+                    contractId: null,
                     customer: "Anna Rossi",
                     customerPhone: "011 222",
                     collaborator: "Luca Verdi",

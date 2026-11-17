@@ -41,8 +41,15 @@ export const archiveDataEntry = "data";
 // Elenco esplicito invece di una lista di esclusioni: un file nuovo in data/ non
 // finisce nel backup per sbaglio. `secret.key` è escluso di proposito (aprirebbe i
 // segreti cifrati custoditi nello stesso archivio, che finisce anche su NAS), e con
-// esso `initial-admin-password.txt`, che è una credenziale in chiaro.
-export const backedUpDataEntries = ["email-settings.json", "backup-settings.json", "company-settings.json", "logo"];
+// esso `initial-admin-password.txt`, che è una credenziale in chiaro. `signed-contracts` sono i
+// PDF dei contratti firmati (`signedContractFiles.ts`): il database ne ha solo nome e dimensione.
+export const backedUpDataEntries = [
+    "email-settings.json",
+    "backup-settings.json",
+    "company-settings.json",
+    "logo",
+    "signed-contracts",
+];
 
 export const getConfiguredOutputDir = () => defaultOutputDir;
 

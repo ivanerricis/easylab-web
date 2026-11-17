@@ -58,6 +58,9 @@ export const getCustomerReportsPrintUrl = (id: number, params?: CustomerPrintRan
         },
     });
 
+/** Resoconto PDF di tutti i contratti del cliente: nessun intervallo di date. */
+export const getCustomerContractsPrintUrl = (id: number) => api.getUri({ url: `/customers/${id}/contracts/print` });
+
 export const getCustomerInterventionsPrintUrl = (id: number, params?: CustomerPrintRangeParams) =>
     api.getUri({
         url: `/customers/${id}/interventions/print`,

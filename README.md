@@ -5,7 +5,7 @@
 [![Copertura frontend](https://codecov.io/gh/ivanerricis/easylab-web/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/ivanerricis/easylab-web)
 [![Copertura backend](https://codecov.io/gh/ivanerricis/easylab-web/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/ivanerricis/easylab-web)
 
-Applicazione web per la gestione di un laboratorio di riparazione: anagrafica clienti e dispositivi, apertura e tracciamento degli interventi assegnati ai tecnici, segnalazione dei guasti riscontrati e generazione dei report/ricevute in PDF da consegnare al cliente.
+Applicazione web per la gestione di un laboratorio di riparazione: anagrafica clienti e dispositivi, apertura e tracciamento degli interventi assegnati ai tecnici, segnalazione dei guasti riscontrati e generazione dei report/ricevute in PDF (e contratti e preventivi) da consegnare al cliente.
 
 Stack:
 - frontend React + Vite

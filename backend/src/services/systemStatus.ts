@@ -38,6 +38,8 @@ type DiskStatus = {
 type SystemStatus = {
     disks: DiskStatus[];
     databaseSizeBytes: number | null;
+    /** I contratti firmati caricati: quanti sono e quanto pesano i PDF in `data/signed-contracts/`. */
+    signedContracts: { count: number; totalBytes: number } | null;
     checkedAt: string;
 };
 
@@ -117,9 +119,30 @@ const getDatabaseSizeBytes = async (): Promise<number | null> => {
     }
 };
 
+/**
+ * Numero e peso dei contratti firmati, dalle righe di `signed_contract`: una query sola invece
+ * di leggere la cartella, e il peso è quello dei PDF così come sono stati caricati.
+ */
+const getSignedContractsUsage = async (): Promise<SystemStatus["signedContracts"]> => {
+    try {
+        const result = await db.execute(
+            sql`select count(*) as count, coalesce(sum(size_bytes), 0) as total from signed_contract`
+        );
+        const row = result.rows[0] as { count: string | number; total: string | number } | undefined;
+        const count = Number(row?.count);
+        const totalBytes = Number(row?.total);
+
+        return Number.isFinite(count) && Number.isFinite(totalBytes) ? { count, totalBytes } : null;
+    } catch (error) {
+        console.error("Lettura dello spazio dei contratti firmati non riuscita:", error);
+        return null;
+    }
+};
+
 export const getSystemStatus = async (): Promise<SystemStatus> => ({
     disks: await getDisks(),
     databaseSizeBytes: await getDatabaseSizeBytes(),
+    signedContracts: await getSignedContractsUsage(),
     checkedAt: new Date().toISOString(),
 });
 

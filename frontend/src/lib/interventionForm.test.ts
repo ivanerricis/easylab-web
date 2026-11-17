@@ -30,6 +30,7 @@ const shared = {
     paid: true,
     toInvoice: false,
     collaboratorId: 40,
+    contractId: null,
     interventionDate: "2026-09-10",
     startTime: "09:00",
     endTime: "10:15",

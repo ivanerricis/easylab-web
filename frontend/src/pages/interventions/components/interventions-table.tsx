@@ -1,20 +1,17 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import TableActionButton from "@/components/table-action-button";
 import { interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
-import { Mail, Pencil, Printer, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { InterventionColumn } from "./intervention-columns";
 
 type InterventionsTableProps = {
     columns: InterventionColumn[];
     rows: InterventionDto[];
     onOpenIntervention: (id: number) => void;
-    onEditIntervention: (id: number) => void;
-    onPrintIntervention: (id: number) => void;
-    onSendEmailIntervention: (id: number) => void;
-    onDeleteIntervention: (intervention: InterventionDto) => void;
+    /** I pulsanti di riga: vedi `useInterventionRowActions`, condiviso con le schede. */
+    renderRowActions: (intervention: InterventionDto) => ReactNode;
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
@@ -48,10 +45,7 @@ const InterventionsTable = ({
     columns,
     rows,
     onOpenIntervention,
-    onEditIntervention,
-    onPrintIntervention,
-    onSendEmailIntervention,
-    onDeleteIntervention,
+    renderRowActions,
     isInitialLoading,
     isRefetching,
     loadError,
@@ -64,46 +58,6 @@ const InterventionsTable = ({
     searchText,
     hasActiveFilters,
 }: InterventionsTableProps) => {
-    const renderRowActions = (row: InterventionDto) => (
-        <>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-primary/20"
-                onClick={() => onEditIntervention(row.id)}
-                aria-label={`Modifica intervento ${row.id}`}
-            >
-                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-print/20"
-                onClick={() => onPrintIntervention(row.id)}
-                aria-label={`Stampa intervento ${row.id}`}
-            >
-                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-email/20"
-                onClick={() => onSendEmailIntervention(row.id)}
-                aria-label={`Invia email intervento ${row.id}`}
-            >
-                <Mail className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-email" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => onDeleteIntervention(row)}
-                aria-label={`Elimina intervento ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
-        </>
-    );
-
     return (
         <EntityTable
             tableKey="interventions"

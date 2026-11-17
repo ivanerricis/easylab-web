@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-17 — Ripristino dei backup bloccato dalla funzione della ricerca senza accenti](changelog/2026-11.md#2026-11-17-ripristino-dei-backup-bloccato-dalla-funzione-della-ricerca-senza-accenti)
 - [2026-11-17 — Correzioni dal controllo con Modern Web Guidance, note delle release in italiano](changelog/2026-11.md#2026-11-17-correzioni-dal-controllo-con-modern-web-guidance-note-delle-release-in-italiano)
 - [2026-11-13 — Più test sul frontend: regole dei dialoghi, sicurezza, accesso](changelog/2026-11.md#2026-11-13-piu-test-sul-frontend-regole-dei-dialoghi-sicurezza-accesso)
 - [2026-11-13 — Aggiornamenti programmati](changelog/2026-11.md#2026-11-13-aggiornamenti-programmati)

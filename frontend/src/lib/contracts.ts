@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/utils";
+import { euroFormatter, formatDate } from "@/lib/utils";
 import type {
     AssistancePackage,
     AssistancePeriod,
@@ -91,21 +91,11 @@ export const formatBillingPeriod = (months: number) => (months === 1 ? "ogni mes
 /** Le ore all'italiana: "3,5 h", senza decimali inutili ("10 h") e con al massimo due cifre. */
 export const formatHours = (hours: number) => `${hours.toLocaleString("it-IT", { maximumFractionDigits: 2 })} h`;
 
-// Con il solo stile "currency" i numeri a quattro cifre escono senza punto ("1600,00"): qui il
-// punto delle migliaia serve sempre, perché "1.600,00 €" è il prezzo del listino.
-const priceFormatter = new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: "always",
-} as unknown as Intl.NumberFormatOptions);
-
 type PackageTerms = { priceCents: number; period: AssistancePeriod; includedHours: number };
 
 /** Il prezzo IVA esclusa: "400,00 € al mese + IVA" per i pacchetti mensili, "1.600,00 € + IVA" per il Supporto. */
 export const formatPackagePrice = ({ priceCents, period }: Pick<PackageTerms, "priceCents" | "period">) =>
-    `${priceFormatter.format(priceCents / 100)}${period === "month" ? " al mese" : ""} + IVA`;
+    `${euroFormatter.format(priceCents / 100)}${period === "month" ? " al mese" : ""} + IVA`;
 
 /** Le ore incluse con il loro periodo: "20 ore al mese", "80 ore in 12 mesi". */
 export const formatPackageHours = ({ includedHours, period }: Pick<PackageTerms, "includedHours" | "period">) =>

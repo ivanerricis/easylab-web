@@ -43,9 +43,10 @@ Se un'azione viene negata (push, tag, impostazioni del ruleset), fermarsi e dirl
 
 Una release è un **tag firmato `vX.Y.Z`** ed è **sempre una decisione esplicita dell'utente**: non proporla né farla di iniziativa.
 
-1. Sul commit di main giusto: `git tag -s vX.Y.Z`, poi `git push origin vX.Y.Z`.
-2. Il workflow `release.yml` controlla firma, che il commit sia su main e che le verifiche siano verdi, e crea la GitHub release.
-3. Il server offre l'ultima versione firmata da "Verifica aggiornamenti". L'utente fa lo snapshot della VM e poi "Aggiorna adesso".
+1. **Prima**, nella PR che chiude la release: le note in `.github/release-notes/vX.Y.Z.md`, in italiano e per chi usa l'app, non per chi legge il codice. Sezioni, solo quelle che servono: `## Novità`, `## Correzioni`, `## Miglioramenti`, `## Da sapere per l'aggiornamento` (migration, variabili d'ambiente, controlli sulla VM). Una riga per voce, il dettaglio tecnico resta nel CHANGELOG. Prendere come modello le note delle release precedenti.
+2. Sul commit di main giusto: `git tag -s vX.Y.Z`, poi `git push origin vX.Y.Z`.
+3. Il workflow `release.yml` controlla firma, che il commit sia su main e che le verifiche siano verdi, e crea la GitHub release con le note del file in cima e l'elenco automatico delle PR sotto. Senza il file la release esce lo stesso, ma solo con l'elenco delle PR e un avviso nel log.
+4. Il server offre l'ultima versione firmata da "Verifica aggiornamenti". L'utente fa lo snapshot della VM e poi "Aggiorna adesso".
 
 ## Più branch in parallelo
 

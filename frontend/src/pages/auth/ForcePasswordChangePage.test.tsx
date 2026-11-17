@@ -83,7 +83,12 @@ describe("ForcePasswordChangePage", () => {
 
         await fill("", "nuova-pass1!", "nuova-pass1!");
 
-        expect(toastError).toHaveBeenCalledWith("Inserisci la password attuale");
+        const field = screen.getByLabelText("Password attuale");
+        expect(screen.getByRole("alert")).toHaveTextContent("Inserisci la password attuale");
+        expect(field).toHaveAttribute("aria-invalid", "true");
+        expect(field).toHaveAccessibleDescription("Inserisci la password attuale");
+        expect(field).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(changeOwnPassword).not.toHaveBeenCalled();
     });
 
@@ -92,7 +97,11 @@ describe("ForcePasswordChangePage", () => {
 
         await fill("vecchia", "corta", "corta");
 
-        expect(toastError).toHaveBeenCalledWith(expect.stringContaining("Almeno 8 caratteri"));
+        const field = screen.getByLabelText("Nuova password");
+        expect(screen.getByRole("alert")).toHaveTextContent(/Almeno 8 caratteri/);
+        expect(field).toHaveAttribute("aria-invalid", "true");
+        expect(field).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(changeOwnPassword).not.toHaveBeenCalled();
     });
 
@@ -101,8 +110,34 @@ describe("ForcePasswordChangePage", () => {
 
         await fill("vecchia", "nuova-pass1!", "nuova-pass2!");
 
-        expect(toastError).toHaveBeenCalledWith("Le due password inserite non coincidono");
+        const field = screen.getByLabelText("Conferma nuova password");
+        expect(screen.getByRole("alert")).toHaveTextContent("Le due password inserite non coincidono");
+        expect(field).toHaveFocus();
+        expect(toastError).not.toHaveBeenCalled();
         expect(changeOwnPassword).not.toHaveBeenCalled();
+    });
+
+    it("porta il focus sul primo campo sbagliato e toglie l'errore appena si scrive", async () => {
+        renderPage();
+
+        await fill("", "corta", "");
+
+        expect(screen.getAllByRole("alert")).toHaveLength(3);
+        expect(screen.getByLabelText("Password attuale")).toHaveFocus();
+
+        await userEvent.type(screen.getByLabelText("Password attuale"), "x");
+
+        expect(screen.getByLabelText("Password attuale")).not.toHaveAttribute("aria-invalid");
+        expect(screen.getAllByRole("alert")).toHaveLength(2);
+    });
+
+    it("ha un campo nome utente nascosto per il gestore di password", () => {
+        const { container } = renderPage();
+
+        const username = container.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+        expect(username).not.toBeNull();
+        expect(username).toHaveValue("mario");
+        expect(username).toHaveAttribute("readonly");
     });
 
     /** È `refresh` a far sparire questa pagina: rilegge l'utente, ora senza l'obbligo. */

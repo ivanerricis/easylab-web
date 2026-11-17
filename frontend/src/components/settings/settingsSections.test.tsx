@@ -870,8 +870,11 @@ describe("SecuritySettingsSection", () => {
     });
 
     /** Un codice a metà non può essere giusto e conterebbe comunque fra i tentativi: il pulsante resta spento. */
-    it("tiene spento il pulsante finché il codice non ha la forma di un codice dell'app o di recupero", async () => {
+    // Il pulsante resta attivo: un codice che non ha la forma di un codice dell'app o di recupero
+    // si ferma al clic, con l'errore sotto il campo, invece di un pulsante spento senza spiegazioni.
+    it("non manda al server un codice che non ha la forma di un codice dell'app o di recupero", async () => {
         api.getTwoFactorStatus.mockResolvedValue({ enabled: true, remainingRecoveryCodes: 5 });
+        api.regenerateRecoveryCodes.mockResolvedValue({ recoveryCodes: [] });
         renderWithUser(<SecuritySettingsSection />);
 
         await userEvent.click(await screen.findByRole("button", { name: "Rigenera codici di recupero" }));
@@ -880,15 +883,22 @@ describe("SecuritySettingsSection", () => {
         await userEvent.type(within(dialog).getByLabelText(/^Password/), "segreta1!");
         const codeInput = within(dialog).getByLabelText(/^Codice di verifica o di recupero/);
 
-        await userEvent.type(codeInput, "12345");
-        expect(confirm).toBeDisabled();
-        await userEvent.clear(codeInput);
-        // Alfabeto del server: senza O, I, 0, 1.
-        await userEvent.type(codeInput, "ABCD-0I1O");
-        expect(confirm).toBeDisabled();
+        for (const wrongCode of ["12345", /* Alfabeto del server: senza O, I, 0, 1. */ "ABCD-0I1O"]) {
+            await userEvent.clear(codeInput);
+            await userEvent.type(codeInput, wrongCode);
+            expect(confirm).toBeEnabled();
+            await userEvent.click(confirm);
+            expect(
+                await within(dialog).findByText("Il codice dell'app ha 6 cifre, quello di recupero 8 caratteri")
+            ).toBeInTheDocument();
+            expect(codeInput).toHaveAttribute("aria-invalid", "true");
+        }
+        expect(api.regenerateRecoveryCodes).not.toHaveBeenCalled();
+
         await userEvent.clear(codeInput);
         await userEvent.type(codeInput, "abcd-2345");
-        expect(confirm).toBeEnabled();
+        await userEvent.click(confirm);
+        await waitFor(() => expect(api.regenerateRecoveryCodes).toHaveBeenCalled());
     });
 
     it("annullare il dialogo di conferma scarta ciò che era scritto", async () => {

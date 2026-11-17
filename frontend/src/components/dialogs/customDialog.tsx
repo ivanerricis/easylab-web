@@ -315,7 +315,7 @@ const CustomDialog = ({
                         <div
                             ref={setBodyElement}
                             onScroll={updateScrollEdges}
-                            className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto p-1 pb-4"
+                            className="relative -m-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-1 pb-4"
                         >
                             {content}
                         </div>

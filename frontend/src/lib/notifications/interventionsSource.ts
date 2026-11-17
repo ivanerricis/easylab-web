@@ -19,17 +19,14 @@ export const interventionsNotificationSource: NotificationSource = {
         const today = getTodayDateString();
         const response = await listInterventions({ page: 1, pageSize: 100, scheduledDate: today });
 
-        return response.items
-            .slice()
-            .sort(byStartTime)
-            .map((intervention) => ({
-                // La data nell'id fa ricomparire domani un intervento chiuso oggi.
-                id: `intervention-${today}-${intervention.id}`,
-                title: intervention.customer,
-                description: formatInterventionStatus(intervention.status),
-                meta: intervention.startTime ? formatInterventionTime(intervention.startTime) : undefined,
-                href: entityPaths.intervention(intervention.id),
-                resolved: intervention.status === "completed",
-            }));
+        return response.items.toSorted(byStartTime).map((intervention) => ({
+            // La data nell'id fa ricomparire domani un intervento chiuso oggi.
+            id: `intervention-${today}-${intervention.id}`,
+            title: intervention.customer,
+            description: formatInterventionStatus(intervention.status),
+            meta: intervention.startTime ? formatInterventionTime(intervention.startTime) : undefined,
+            href: entityPaths.intervention(intervention.id),
+            resolved: intervention.status === "completed",
+        }));
     },
 };

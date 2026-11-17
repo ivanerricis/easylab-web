@@ -189,6 +189,7 @@ const LoginPage = () => {
                                         autoCorrect="off"
                                         spellCheck={false}
                                         maxLength={9}
+                                        enterKeyHint="go"
                                         autoFocus
                                         className="text-center font-mono text-lg tracking-widest"
                                         value={code}
@@ -204,6 +205,7 @@ const LoginPage = () => {
                                         {...fieldProps("loginCode", { error: codeError })}
                                         autoComplete="one-time-code"
                                         maxLength={6}
+                                        enterKeyHint="go"
                                         pattern={REGEXP_ONLY_DIGITS}
                                         autoFocus
                                         containerClassName="justify-center"
@@ -283,6 +285,9 @@ const LoginPage = () => {
                                 // ("Ivan"), e il confronto del server è esatto di proposito.
                                 autoCorrect="off"
                                 spellCheck={false}
+                                // Il tasto Invio della tastiera del telefono dice "Avanti" sul
+                                // nome utente e "Vai" sulla password, che invia il modulo.
+                                enterKeyHint="next"
                                 autoFocus
                                 value={username}
                                 onChange={(event) => {
@@ -300,6 +305,7 @@ const LoginPage = () => {
                                     {...fieldProps("loginPassword", { error: passwordError })}
                                     type={isPasswordVisible ? "text" : "password"}
                                     autoComplete="current-password"
+                                    enterKeyHint="go"
                                     value={password}
                                     onChange={(event) => {
                                         setPassword(event.target.value);

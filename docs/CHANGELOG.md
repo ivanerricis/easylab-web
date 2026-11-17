@@ -26,6 +26,7 @@ data porta alla voce da qui.
 
 - [2026-11-17 — Dialogo del contratto senza scorrimento, stampa per fornitore, azioni nelle schede, scorciatoie nei suggerimenti](changelog/2026-11.md#2026-11-17-dialogo-del-contratto-senza-scorrimento-stampa-per-fornitore-azioni-nelle-schede-scorciatoie-nei-suggerimenti)
 - [2026-11-17 — Ombra di scorrimento sempre in fondo allo schermo](changelog/2026-11.md#2026-11-17-ombra-di-scorrimento-sempre-in-fondo-allo-schermo)
+- [2026-11-17 — Correzioni dal controllo con Modern Web Guidance, note delle release in italiano](changelog/2026-11.md#2026-11-17-correzioni-dal-controllo-con-modern-web-guidance-note-delle-release-in-italiano)
 - [2026-11-13 — Azioni sugli interventi anche nelle schede di contratto e cliente](changelog/2026-11.md#2026-11-13-azioni-sugli-interventi-anche-nelle-schede-di-contratto-e-cliente)
 - [2026-11-12 — Nuovi pacchetti di assistenza: Remota, Pronti Via, Supporto](changelog/2026-11.md#2026-11-12-nuovi-pacchetti-di-assistenza-remota-pronti-via-supporto)
 - [2026-11-12 — Contratto firmato: caricamento e invio al cliente](changelog/2026-11.md#2026-11-12-contratto-firmato-caricamento-e-invio-al-cliente)

@@ -412,7 +412,7 @@ describe("ContractPage", () => {
             await renderPage();
 
             expect(screen.getByText("Contratto Rossi firmato.pdf")).toBeInTheDocument();
-            expect(screen.getByText(/250\.0 KB/)).toBeInTheDocument();
+            expect(screen.getByText(/250 KB/)).toBeInTheDocument();
 
             await userEvent.click(screen.getByRole("button", { name: "Apri" }));
             expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/signed-contract");

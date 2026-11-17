@@ -97,18 +97,21 @@ describe("formatRelativeTime", () => {
 describe("formatFileSize", () => {
     it("sceglie l'unità di misura in base alla dimensione", () => {
         expect(formatFileSize(512)).toBe("512 B");
-        expect(formatFileSize(1536)).toBe("1.5 KB");
-        expect(formatFileSize(5 * 1024 * 1024)).toBe("5.0 MB");
-        expect(formatFileSize(3 * 1024 * 1024 * 1024)).toBe("3.0 GB");
+        expect(formatFileSize(1536)).toBe("1,5 KB");
+        expect(formatFileSize(5 * 1024 * 1024)).toBe("5 MB");
+        expect(formatFileSize(3 * 1024 * 1024 * 1024)).toBe("3 GB");
+        expect(formatFileSize(200 * 1024 * 1024 * 1024)).toBe("200 GB");
+        expect(formatFileSize(1.5 * 1024 * 1024)).toBe("1,5 MB");
     });
 });
 
 describe("formatEuro", () => {
     it("formatta in euro con due decimali", () => {
-        // Intl separa simbolo e cifra con uno spazio non divisibile. In it-IT il separatore
-        // delle migliaia compare solo da cinque cifre in su: 1234,50 è corretto.
+        // Intl separa simbolo e cifra con uno spazio non divisibile. Il separatore delle
+        // migliaia c'è anche a quattro cifre (di default in it-IT comparirebbe da cinque in su).
         expect(formatEuro(12345.5).replace(/\s/g, " ")).toBe("12.345,50 €");
-        expect(formatEuro(1234.5).replace(/\s/g, " ")).toBe("1234,50 €");
+        expect(formatEuro(1234.5).replace(/\s/g, " ")).toBe("1.234,50 €");
+        expect(formatEuro(1600).replace(/\s/g, " ")).toBe("1.600,00 €");
     });
 
     it("tratta un valore assente o non numerico come zero", () => {

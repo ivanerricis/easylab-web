@@ -97,6 +97,57 @@ describe("writeRestrictedSql", () => {
         expect(output).not.toContain("\r");
     });
 
+    it("nei backup di prima della 0042 qualifica `unaccent` dentro `immutable_unaccent`, e nient'altro", async () => {
+        const unaccentFunction = [
+            "CREATE FUNCTION public.immutable_unaccent(text) RETURNS text",
+            "    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE",
+            "    AS $_$",
+            "  SELECT unaccent('unaccent', $1)",
+            "$_$;",
+        ].join("\n");
+        const dump = [
+            "SELECT pg_catalog.set_config('search_path', '', false);",
+            unaccentFunction,
+            "CREATE FUNCTION public.altra(text) RETURNS text",
+            "    AS $_$",
+            "  SELECT unaccent('unaccent', $1)",
+            "$_$;",
+            "COPY public.issue (id, description) FROM stdin;",
+            "1\t  SELECT unaccent('unaccent', $1)",
+            "\\.",
+            "",
+        ].join("\n");
+
+        const output = await transform(dump);
+
+        expect(output).toContain(
+            "    AS $_$\n  SELECT public.unaccent('public.unaccent'::regdictionary, $1)\n$_$;\nCREATE FUNCTION public.altra"
+        );
+        // L'altra funzione e i dati del COPY restano com'erano.
+        expect(output.match(/ {2}SELECT unaccent\('unaccent', \$1\)/g)).toHaveLength(2);
+    });
+
+    it("qualifica `unaccent` anche quando pg_dump riporta il corpo sulla riga di `AS`", async () => {
+        const dump = [
+            "CREATE FUNCTION public.immutable_unaccent(text) RETURNS text",
+            "    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE",
+            "    AS $_$ SELECT unaccent('unaccent', $1) $_$;",
+            "SELECT unaccent('unaccent', $1);",
+            "",
+        ].join("\n");
+
+        expect(await transform(dump)).toBe(
+            [
+                "\\restrict chiavenostra",
+                "CREATE FUNCTION public.immutable_unaccent(text) RETURNS text",
+                "    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE",
+                "    AS $_$ SELECT public.unaccent('public.unaccent'::regdictionary, $1) $_$;",
+                "SELECT unaccent('unaccent', $1);",
+                "",
+            ].join("\n")
+        );
+    });
+
     it("rifiuta una chiave che psql non accetterebbe", async () => {
         await expect(transform("SELECT 1;\n", "chiave con spazi")).rejects.toThrow("solo lettere e cifre");
     });

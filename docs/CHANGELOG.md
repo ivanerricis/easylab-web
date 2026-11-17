@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-17 — Ripristino dei backup bloccato dalla funzione della ricerca senza accenti](changelog/2026-11.md#2026-11-17-ripristino-dei-backup-bloccato-dalla-funzione-della-ricerca-senza-accenti)
 - [2026-11-17 — Dialogo del contratto senza scorrimento, stampa per fornitore, azioni nelle schede, scorciatoie nei suggerimenti](changelog/2026-11.md#2026-11-17-dialogo-del-contratto-senza-scorrimento-stampa-per-fornitore-azioni-nelle-schede-scorciatoie-nei-suggerimenti)
 - [2026-11-17 — Ombra di scorrimento sempre in fondo allo schermo](changelog/2026-11.md#2026-11-17-ombra-di-scorrimento-sempre-in-fondo-allo-schermo)
 - [2026-11-17 — Correzioni dal controllo con Modern Web Guidance, note delle release in italiano](changelog/2026-11.md#2026-11-17-correzioni-dal-controllo-con-modern-web-guidance-note-delle-release-in-italiano)

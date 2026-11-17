@@ -16,7 +16,7 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     il contratto firmato caricato a mano (CHANGELOG del 2026-11-12); il PDF generato, da far firmare,
     resta da stampare e consegnare. Deciso così: si invia solo il firmato.
   - **Importo del noleggio (da inserire).** Dal 2026-11-12 i contratti di assistenza hanno il prezzo
-    del listino (CHANGELOG del 2026-11-12, migration 0046). Il noleggio non ha ancora un canone: serve
+    del listino (CHANGELOG del 2026-11-12, migration 0047). Il noleggio non ha ancora un canone: serve
     un campo nuovo (migration e class diagram), da compilare nel dialogo e da stampare nel PDF.
   - **Testi legali (da inserire).** Oggi il PDF ha solo la frase sulla privacy e la regola delle ore:
     mancano le clausole vere (recesso, rinnovo, SLA, foro competente), che l'utente deve ancora fornire.

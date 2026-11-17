@@ -20,6 +20,11 @@
  * (lì non possono esserci dati di un `COPY`) e l'`\unrestrict` con la stessa chiave come ultima
  * riga del file. Tutto il resto passa com'è; se il dump contiene altri meta-comandi, psql si
  * ferma e il ripristino fallisce, che è l'effetto voluto.
+ *
+ * Un'altra sola riga cambia: il corpo di `immutable_unaccent` nei backup fatti prima della
+ * migrazione 0042. Lì la funzione chiamava `unaccent` senza schema, e con il `search_path` vuoto
+ * che pg_dump imposta in testa il ripristino si fermava ricreando gli indici della ricerca
+ * clienti. Si riscrive solo quella chiamata, e solo dentro quella `CREATE FUNCTION`.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -32,6 +37,12 @@ const dumpRestrictPattern = /^\\restrict ([A-Za-z0-9]+)$/;
 export const generateRestrictKey = () => crypto.randomBytes(32).toString("hex");
 
 const isHeaderLine = (line: string) => line.trim() === "" || line.startsWith("--");
+
+// Come pg_dump apre `immutable_unaccent`, e la chiamata prima della 0042 e come la scrive la 0042.
+// Il corpo pg_dump lo riporta com'era stato scritto: su una riga sua (la 0034) o in coda ad `AS`.
+const unaccentFunctionHeader = "CREATE FUNCTION public.immutable_unaccent(text) RETURNS text";
+const unqualifiedUnaccentCall = /\bSELECT unaccent\('unaccent', \$1\)/;
+const qualifiedUnaccentCall = "SELECT public.unaccent('public.unaccent'::regdictionary, $1)";
 
 export const writeRestrictedSql = async (
     sourcePath: string,
@@ -57,6 +68,7 @@ export const writeRestrictedSql = async (
     // Righe trattenute: l'`\unrestrict` finale di pg_dump e le righe vuote dopo di lui. Si
     // scrivono solo se dopo arriva altro, cioè se non era davvero la fine del file.
     let held: string[] = [];
+    let inUnaccentFunction = false;
 
     try {
         await write(`\\restrict ${restrictKey}\n`);
@@ -92,6 +104,17 @@ export const writeRestrictedSql = async (
 
             if (dumpKey !== null && line === `\\unrestrict ${dumpKey}`) {
                 held = [line];
+                continue;
+            }
+
+            if (line === unaccentFunctionHeader) {
+                inUnaccentFunction = true;
+            }
+
+            if (inUnaccentFunction) {
+                // Il corpo finisce con `$_$;`, sulla riga della chiamata o su quella dopo.
+                inUnaccentFunction = !line.includes("$_$;");
+                await write(`${line.replace(unqualifiedUnaccentCall, qualifiedUnaccentCall)}\n`);
                 continue;
             }
 

@@ -312,14 +312,18 @@ body,
    (nessun overflow) l'animazione non si applica e resta l'opacità 0 di base.
    Solo CSS, sticky in fondo con altezza netta zero (margine negativo) per non allungare
    il contenuto. Dove `animation-timeline` non esiste (Firefox) non si vede nulla: la
-   scrollbar classica resta l'indizio. */
+   scrollbar classica resta l'indizio.
+   Lo sticky si ferma al bordo interno del padding del contenitore, non al suo bordo: chi ha un
+   padding lo dichiara in `--scroll-hint-inset`, e l'ombra scende fino al bordo vero. Senza,
+   restava sospesa a 12px dal fondo dell'area principale (`p-3`), con il contenuto visibile
+   sotto: sulla scheda contratto sembrava un'ombra a metà della barra delle ore. */
 @utility scroll-hint-y {
     @supports (animation-timeline: scroll()) {
         &::after {
             content: "";
             display: block;
             position: sticky;
-            bottom: 0;
+            bottom: calc(-1 * var(--scroll-hint-inset, 0px));
             z-index: 5;
             height: 1.5rem;
             margin-top: -1.5rem;

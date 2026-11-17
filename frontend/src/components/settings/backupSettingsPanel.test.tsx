@@ -124,7 +124,7 @@ describe("BackupSettingsPanel", () => {
         await renderPanel();
 
         const row = within(screen.getByRole("table")).getByText("db-backup-1.tar.gz").closest("tr") as HTMLElement;
-        expect(within(row).getByText("2.0 KB")).toBeInTheDocument();
+        expect(within(row).getByText("2 KB")).toBeInTheDocument();
     });
 
     it("mostra quali password vanno reinserite dopo un ripristino", async () => {

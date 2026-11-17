@@ -202,13 +202,13 @@ describe("DashboardPage", () => {
         await renderPage();
 
         const card = screen.getByRole("button", { name: /Incassi mese/ });
-        expect(card).not.toHaveTextContent("1520,50");
+        expect(card).not.toHaveTextContent("1.520,50");
 
         await userEvent.click(card);
         const dialog = screen.getByRole("dialog", { name: "Incassi mese" });
-        // In it-IT le migliaia si separano solo da cinque cifre in su: 1520,50 è corretto.
-        expect(within(dialog).getByText(/1520,50/)).toBeInTheDocument();
-        expect(within(dialog).getByText(/1320,50/)).toBeInTheDocument();
+        // Le migliaia si separano anche a quattro cifre: 1.520,50.
+        expect(within(dialog).getByText(/1\.520,50/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/1\.320,50/)).toBeInTheDocument();
         expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
         // Il confronto con il mese prima, scritto e non solo colorato: (1520,50 - 900) / 900.
         expect(within(dialog).getByText(/\+69% rispetto ad agosto 2026/)).toBeInTheDocument();
@@ -388,7 +388,7 @@ describe("DashboardPage", () => {
             expect(toastError).toHaveBeenCalledWith("Database non raggiungibile");
         });
         expect(within(dialog).getByText("settembre 2026")).toBeInTheDocument();
-        expect(within(dialog).getByText(/^1520,50/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/^1\.520,50/)).toBeInTheDocument();
         // Un solo tentativo: tornare al mese caricato non deve far partire un'altra richiesta.
         expect(api.getReportStats).toHaveBeenCalledTimes(2);
     });

@@ -10,6 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { changeOwnPassword, getApiErrorMessage } from "@/lib/api";
 import { isPasswordCompliant, passwordRequirementsHint } from "@/lib/passwordPolicy";
 import { useAuth } from "@/components/use-auth";
+import { FieldError } from "@/components/form-field";
+import { fieldProps, reportFieldErrors } from "@/lib/formField";
+
+/** L'ordine in cui i campi stanno nella pagina: decide su quale si posa il focus. */
+const fieldOrder = ["forceCurrentPassword", "forceNewPassword", "forceConfirmPassword"] as const;
+
+type FieldId = (typeof fieldOrder)[number];
+type FieldErrors = Partial<Record<FieldId, string>>;
 
 const ForcePasswordChangePage = () => {
     useDocumentTitle("Cambio password");
@@ -28,24 +36,34 @@ const ForcePasswordChangePage = () => {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState<FieldErrors>({});
+
+    const clearError = (field: FieldId) => setErrors((prev) => ({ ...prev, [field]: undefined }));
 
     const handleSubmit = async () => {
         if (isSubmitting) {
             return;
         }
 
+        // Gli errori di validazione stanno sotto il campo, come nei dialoghi: un toast sparisce
+        // da solo e non dice su quale campo intervenire.
+        const nextErrors: FieldErrors = {};
+
         if (!currentPassword) {
-            toast.error("Inserisci la password attuale");
-            return;
+            nextErrors.forceCurrentPassword = "Inserisci la password attuale";
         }
 
         if (!isPasswordCompliant(newPassword)) {
-            toast.error(passwordRequirementsHint);
-            return;
+            nextErrors.forceNewPassword = passwordRequirementsHint;
         }
 
-        if (newPassword !== confirmPassword) {
-            toast.error("Le due password inserite non coincidono");
+        if (!confirmPassword) {
+            nextErrors.forceConfirmPassword = "Ripeti la nuova password";
+        } else if (newPassword !== confirmPassword) {
+            nextErrors.forceConfirmPassword = "Le due password inserite non coincidono";
+        }
+
+        if (reportFieldErrors(nextErrors, fieldOrder, setErrors)) {
             return;
         }
 
@@ -86,27 +104,47 @@ const ForcePasswordChangePage = () => {
                             void handleSubmit();
                         }}
                     >
+                        {/* Il nome utente c'è ma non si vede: senza, il gestore di password non sa a
+                            quale voce salvata riferire il cambio e può aggiornare quella sbagliata. */}
+                        <input
+                            type="text"
+                            name="username"
+                            autoComplete="username"
+                            value={user?.username ?? ""}
+                            readOnly
+                            tabIndex={-1}
+                            aria-hidden="true"
+                            className="sr-only"
+                        />
+
                         <div className="grid gap-2">
                             <Label htmlFor="forceCurrentPassword">Password attuale</Label>
                             <Input
-                                id="forceCurrentPassword"
+                                {...fieldProps("forceCurrentPassword", { error: errors.forceCurrentPassword })}
                                 type="password"
                                 autoComplete="current-password"
                                 autoFocus
                                 value={currentPassword}
-                                onChange={(event) => setCurrentPassword(event.target.value)}
+                                onChange={(event) => {
+                                    setCurrentPassword(event.target.value);
+                                    clearError("forceCurrentPassword");
+                                }}
                             />
+                            <FieldError id="forceCurrentPassword" error={errors.forceCurrentPassword} />
                         </div>
 
                         <div className="grid gap-2">
                             <Label htmlFor="forceNewPassword">Nuova password</Label>
                             <div className="relative">
                                 <Input
-                                    id="forceNewPassword"
+                                    {...fieldProps("forceNewPassword", { error: errors.forceNewPassword })}
                                     type={isPasswordVisible ? "text" : "password"}
                                     autoComplete="new-password"
                                     value={newPassword}
-                                    onChange={(event) => setNewPassword(event.target.value)}
+                                    onChange={(event) => {
+                                        setNewPassword(event.target.value);
+                                        clearError("forceNewPassword");
+                                    }}
                                     className="pr-9"
                                 />
                                 <div className="absolute inset-y-0 right-1.5 flex items-center">
@@ -121,18 +159,27 @@ const ForcePasswordChangePage = () => {
                                     </Button>
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">{passwordRequirementsHint}</p>
+                            {/* Il suggerimento resta finché non c'è l'errore: l'errore dice lo stesso. */}
+                            {errors.forceNewPassword ? (
+                                <FieldError id="forceNewPassword" error={errors.forceNewPassword} />
+                            ) : (
+                                <p className="text-xs text-muted-foreground">{passwordRequirementsHint}</p>
+                            )}
                         </div>
 
                         <div className="grid gap-2">
                             <Label htmlFor="forceConfirmPassword">Conferma nuova password</Label>
                             <Input
-                                id="forceConfirmPassword"
+                                {...fieldProps("forceConfirmPassword", { error: errors.forceConfirmPassword })}
                                 type={isPasswordVisible ? "text" : "password"}
                                 autoComplete="new-password"
                                 value={confirmPassword}
-                                onChange={(event) => setConfirmPassword(event.target.value)}
+                                onChange={(event) => {
+                                    setConfirmPassword(event.target.value);
+                                    clearError("forceConfirmPassword");
+                                }}
                             />
+                            <FieldError id="forceConfirmPassword" error={errors.forceConfirmPassword} />
                         </div>
 
                         <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>

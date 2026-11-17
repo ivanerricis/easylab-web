@@ -22,23 +22,49 @@ export function ThemeProvider({
 
     useEffect(() => {
         const root = window.document.documentElement;
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
 
-        root.classList.remove("light", "dark");
+        // Una funzione sola per applicare il tema, richiamabile anche quando cambia il sistema.
+        const applyTheme = () => {
+            root.classList.remove("light", "dark");
+            root.classList.add(theme === "system" ? (media.matches ? "dark" : "light") : theme);
+        };
 
-        if (theme === "system") {
-            const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-
-            root.classList.add(systemTheme);
-        } else {
-            root.classList.add(theme);
-        }
+        applyTheme();
 
         applyPreference("accent", getStoredPreference("accent"));
         applyPreference("rowIntensity", getStoredPreference("rowIntensity"));
         applyPreference("density", getStoredPreference("density"));
         applyPreference("fontSize", getStoredPreference("fontSize"));
         applyPreference("radius", getStoredPreference("radius"));
+
+        // Con "system" il tema segue il sistema operativo anche a pagina aperta (tramonto,
+        // tema automatico di Windows/macOS): prima si leggeva una volta sola al montaggio.
+        if (theme !== "system") {
+            return;
+        }
+
+        media.addEventListener("change", applyTheme);
+
+        return () => media.removeEventListener("change", applyTheme);
     }, [theme]);
+
+    useEffect(() => {
+        // L'evento `storage` parte solo nelle *altre* schede: la scelta fatta in una si propaga
+        // alle altre, che altrimenti restavano sul tema vecchio fino al ricaricamento. `key`
+        // è null quando lo storage viene svuotato: si torna al tema predefinito.
+        const onStorage = (event: StorageEvent) => {
+            if (event.key !== null && event.key !== storageKey) {
+                return;
+            }
+
+            setTheme((event.newValue as Theme) || defaultTheme);
+        };
+
+        window.addEventListener("storage", onStorage);
+
+        return () => window.removeEventListener("storage", onStorage);
+    }, [storageKey, defaultTheme]);
 
     const value = {
         theme,

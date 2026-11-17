@@ -335,40 +335,54 @@ describe("TwoFactorConfirmDialog", () => {
             />
         );
 
-    it("tiene spento il pulsante finché password e codice non hanno la forma giusta", async () => {
+    it("non spegne il pulsante e mostra gli errori all'invio, col focus sul primo campo sbagliato", async () => {
         const onConfirm = vi.fn();
         renderConfirm(onConfirm);
         const confirm = screen.getByRole("button", { name: "Disattiva" });
+        const passwordInput = screen.getByLabelText(/^Password/);
         const codeInput = screen.getByLabelText(/^Codice di verifica o di recupero/);
 
-        expect(confirm).toBeDisabled();
+        expect(confirm).toBeEnabled();
 
-        await userEvent.type(screen.getByLabelText(/^Password/), "segreta1!");
-        expect(confirm).toBeDisabled();
+        // Tutto vuoto: due errori, il focus va sulla password.
+        await userEvent.click(confirm);
+        expect(passwordInput).toHaveAccessibleDescription("Inserisci la password");
+        expect(codeInput).toHaveAccessibleDescription("Inserisci un codice dell'app o di recupero");
+        expect(passwordInput).toHaveFocus();
+
+        // L'errore sparisce appena si scrive nel campo.
+        await userEvent.type(passwordInput, "segreta1!");
+        expect(passwordInput).not.toHaveAttribute("aria-invalid");
 
         // Sei cifre dell'app, ma ne mancano.
         await userEvent.type(codeInput, "12345");
-        expect(confirm).toBeDisabled();
-        await userEvent.type(codeInput, "6");
-        expect(confirm).toBeEnabled();
-
-        // Un codice di recupero: otto caratteri, con trattino o minuscole non cambia.
-        await userEvent.clear(codeInput);
-        await userEvent.type(codeInput, "abcd-23");
-        expect(confirm).toBeDisabled();
-        await userEvent.type(codeInput, "45");
-        expect(confirm).toBeEnabled();
+        await userEvent.click(confirm);
+        expect(codeInput).toHaveAccessibleDescription("Il codice dell'app ha 6 cifre, quello di recupero 8 caratteri");
+        expect(codeInput).toHaveFocus();
 
         // Caratteri che l'alfabeto dei codici non usa (O, I, 0, 1).
         await userEvent.clear(codeInput);
         await userEvent.type(codeInput, "ABCD-OI01");
-        expect(confirm).toBeDisabled();
+        await userEvent.click(confirm);
+        expect(codeInput).toHaveAttribute("aria-invalid", "true");
 
-        await userEvent.clear(screen.getByLabelText(/^Password/));
-        await userEvent.clear(codeInput);
-        await userEvent.type(codeInput, "123456");
-        expect(confirm).toBeDisabled();
         expect(onConfirm).not.toHaveBeenCalled();
+
+        // Un codice di recupero: otto caratteri, con trattino o minuscole non cambia.
+        await userEvent.clear(codeInput);
+        await userEvent.type(codeInput, "abcd-2345");
+        onConfirm.mockResolvedValue(undefined);
+        await userEvent.click(confirm);
+        expect(onConfirm).toHaveBeenCalledWith("segreta1!", "abcd-2345");
+    });
+
+    it("usa una tastiera da codice per il campo del codice", () => {
+        renderConfirm(vi.fn());
+
+        const codeInput = screen.getByLabelText(/^Codice di verifica o di recupero/);
+        expect(codeInput).toHaveAttribute("autocapitalize", "none");
+        expect(codeInput).toHaveAttribute("autocorrect", "off");
+        expect(codeInput).toHaveAttribute("spellcheck", "false");
     });
 
     it.each([

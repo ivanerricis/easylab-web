@@ -250,15 +250,17 @@ const EntityTableRowImpl = <TRow,>({
           }
         : undefined;
 
-    // Senza più il pulsante "Apri" la riga è l'unico punto d'ingresso: da tastiera ci si arriva
-    // con Tab e si apre con Invio. Solo se il focus è sulla riga stessa, non su un suo pulsante.
     // La cella che prende il colore di stato (vedi `[data-status-cell]` in index.css): l'ID
     // ovunque sia stato spostato, e la prima colonna solo se l'ID non c'è o è nascosto.
     const statusCellKey = columns.some((column) => column.key === idColumnKey) ? idColumnKey : columns[0]?.key;
 
+    // Senza più il pulsante "Apri" la riga è l'unico punto d'ingresso: da tastiera ci si arriva
+    // con Tab e si apre con Invio o Spazio (come un pulsante). Solo se il focus è sulla riga
+    // stessa, non su un suo pulsante. Con lo Spazio `preventDefault`, altrimenti la pagina scorre.
     const handleRowKeyDown = onRowOpen
         ? (event: React.KeyboardEvent<HTMLTableRowElement>) => {
-              if (event.key === "Enter" && event.target === event.currentTarget) {
+              if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+                  event.preventDefault();
                   onRowOpen(row);
               }
           }
@@ -273,6 +275,7 @@ const EntityTableRowImpl = <TRow,>({
                     : undefined
             }
             tabIndex={onRowOpen ? 0 : undefined}
+            aria-keyshortcuts={onRowOpen ? "Enter Space" : undefined}
             onDoubleClick={handleRowDoubleClick}
             onKeyDown={handleRowKeyDown}
         >

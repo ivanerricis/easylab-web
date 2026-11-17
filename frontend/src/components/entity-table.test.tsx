@@ -1,4 +1,5 @@
 import { act, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EntityCardList from "./entity-card-list";
@@ -374,6 +375,42 @@ describe("EntityTable", () => {
         onRowOpen.mockClear();
         fireEvent.doubleClick(within(table).getByRole("button", { name: "Modifica 1" }));
         expect(onRowOpen).not.toHaveBeenCalled();
+    });
+
+    it("apre la riga da tastiera con Invio e con Spazio, solo se il focus è sulla riga", () => {
+        const onRowOpen = vi.fn();
+        renderTable({ onRowOpen });
+        const row = within(screen.getByRole("table")).getAllByRole("row")[1];
+
+        expect(fireEvent.keyDown(row, { key: " " })).toBe(false);
+        expect(onRowOpen).toHaveBeenCalledWith(rows[0]);
+
+        onRowOpen.mockClear();
+        fireEvent.keyDown(row, { key: "Enter" });
+        expect(onRowOpen).toHaveBeenCalledTimes(1);
+
+        onRowOpen.mockClear();
+        fireEvent.keyDown(within(row).getByRole("button", { name: "Modifica 1" }), { key: " " });
+        expect(onRowOpen).not.toHaveBeenCalled();
+    });
+
+    it("apre la scheda su mobile dal pulsante del titolo, usabile da tastiera", async () => {
+        const onRowOpen = vi.fn();
+        render(
+            <EntityCardList<Row>
+                columns={columns}
+                rows={rows}
+                getRowKey={(row) => row.id}
+                emptyMessage="Nessun elemento."
+                onRowOpen={onRowOpen}
+            />
+        );
+        const button = screen.getByRole("button", { name: /Mario\s*Rossi/ });
+
+        button.focus();
+        await userEvent.keyboard("{Enter}");
+
+        expect(onRowOpen).toHaveBeenCalledWith(rows[0]);
     });
 
     /**

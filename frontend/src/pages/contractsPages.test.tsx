@@ -42,6 +42,7 @@ vi.mock("@/lib/api", async () => {
         deleteProvider: vi.fn(),
         listCustomers: vi.fn(),
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
+        getProviderContractsPrintUrl: (id: number) => `/api/providers/${id}/contracts/print`,
         getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
         getSignedContractUrl: (id: number) => `/api/contracts/${id}/signed-contract`,
         signedContractMaxBytes: 15 * 1024 * 1024,
@@ -485,5 +486,50 @@ describe("ProviderPage", () => {
         expect(screen.getByText("Anna Verdi")).toBeInTheDocument();
         expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ providerId: 8 }));
         expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
+    });
+
+    const provider = {
+        id: 8,
+        providerName: "Rossi Informatica",
+        firstName: "Anna",
+        lastName: "Verdi",
+        email: "info@rossi.it",
+        phoneNumber: "081 123",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: null,
+    };
+
+    it("i contratti hanno le azioni di riga, ed eliminarne uno ricarica contratti e fornitore", async () => {
+        api.getProvider.mockResolvedValue(provider);
+        api.deleteContract.mockResolvedValue(undefined);
+        renderWithProviders(<ProviderPage />, { route: "/providers/8", path: "/providers/:id" });
+
+        for (const action of ["Modifica", "Stampa", "Elimina"]) {
+            expect((await screen.findAllByRole("button", { name: `${action} contratto 21` })).length).toBeGreaterThan(
+                0
+            );
+        }
+        await userEvent.click(screen.getAllByRole("button", { name: "Stampa contratto 21" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
+
+        const providerLoads = api.getProvider.mock.calls.length;
+        const contractLoads = api.listContracts.mock.calls.length;
+        await userEvent.click(screen.getAllByRole("button", { name: "Elimina contratto 21" })[0]);
+        const dialog = await screen.findByRole("dialog", { name: "Elimina contratto" });
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => expect(api.deleteContract).toHaveBeenCalledWith(21));
+        await waitFor(() => expect(api.listContracts.mock.calls.length).toBeGreaterThan(contractLoads));
+        await waitFor(() => expect(api.getProvider.mock.calls.length).toBeGreaterThan(providerLoads));
+    });
+
+    it("Stampa apre il PDF di tutti i contratti del fornitore", async () => {
+        api.getProvider.mockResolvedValue(provider);
+        renderWithProviders(<ProviderPage />, { route: "/providers/8", path: "/providers/:id" });
+
+        await userEvent.click(await screen.findByRole("button", { name: "Stampa i contratti del fornitore" }));
+
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/providers/8/contracts/print");
     });
 });

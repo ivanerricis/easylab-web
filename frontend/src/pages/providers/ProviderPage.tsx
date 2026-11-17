@@ -8,17 +8,19 @@ import EntityTable from "@/components/entity-table";
 import RefreshButton from "@/components/refresh-button";
 import TablePagination from "@/components/table-pagination";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useContractRowActions } from "@/hooks/useContractRowActions";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { useGoBack } from "@/hooks/useGoBack";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
-import { deleteProvider, getProvider, listContracts, updateProvider } from "@/lib/api";
+import { deleteProvider, getProvider, getProviderContractsPrintUrl, listContracts, updateProvider } from "@/lib/api";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatProviderContact, toProviderPayload } from "@/lib/providers";
+import { openPrintWindow } from "@/lib/utils";
 import type { ContractDto } from "@/types/dtos";
-import { Pencil } from "lucide-react";
+import { Pencil, Printer } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { contractColumnsWithout } from "../contracts/components/contract-columns";
@@ -83,6 +85,11 @@ const ProviderPage = () => {
         await Promise.all([reloadProvider(), reloadContracts()]);
     }, [reloadProvider, reloadContracts]);
 
+    // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i dati del fornitore.
+    const { renderRowActions: renderContractActions, dialogs: contractActionDialogs } = useContractRowActions({
+        onChanged: handleRefresh,
+    });
+
     if (isNotFound || (isProviderLoading && !provider)) {
         return (
             <EntityDetailGate
@@ -116,6 +123,14 @@ const ProviderPage = () => {
                     aria-label="Modifica fornitore"
                 />
 
+                {/* Tutti i contratti del fornitore in un PDF, come la stampa dei contratti del cliente. */}
+                <DetailHeaderAction
+                    icon={Printer}
+                    text="Stampa"
+                    onClick={() => openPrintWindow(getProviderContractsPrintUrl(providerId))}
+                    aria-label="Stampa i contratti del fornitore"
+                />
+
                 <DetailDeleteButton
                     label="Elimina fornitore"
                     title="Elimina fornitore"
@@ -137,17 +152,33 @@ const ProviderPage = () => {
                 />
             ) : null}
 
+            {contractActionDialogs}
+
             {provider ? (
                 // Le stesse card dei dati del cliente e del tecnico. Sotto `sm` diventano una card sola
                 // con il nome come titolo (vedi `DetailStats`).
                 <DetailStats
                     mobileTitle={providerName}
-                    gridClassName="xl:grid-cols-3"
+                    gridClassName="xl:grid-cols-4"
                     items={[
                         { label: "Referente", value: formatProviderContact(provider) },
                         // `break-all`: un indirizzo lungo non ha punti dove andare a capo e usciva dalla card.
                         { label: "Email", value: <span className="break-all">{provider.email}</span> },
                         { label: "Telefono", value: provider.phoneNumber },
+                        // Il logo che va in testa ai PDF dei suoi contratti: qui si vede quale, senza
+                        // stampare. I fornitori nati prima che fosse obbligatorio possono non averlo.
+                        {
+                            label: "Logo",
+                            value: provider.logoDataUrl ? (
+                                <img
+                                    src={provider.logoDataUrl}
+                                    alt={`Logo di ${provider.providerName}`}
+                                    className="h-10 max-w-40 object-contain object-left"
+                                />
+                            ) : (
+                                "Nessun logo"
+                            ),
+                        },
                     ]}
                 />
             ) : null}
@@ -160,6 +191,7 @@ const ProviderPage = () => {
                         tableKey="provider-contracts"
                         columns={columns}
                         rows={contracts}
+                        renderRowActions={renderContractActions}
                         getRowKey={(row) => row.id}
                         getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}
                         emptyMessage={resolveEmptyListMessage({

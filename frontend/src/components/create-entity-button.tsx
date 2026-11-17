@@ -1,3 +1,4 @@
+import ShortcutKeys from "@/components/shortcut-keys";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -13,10 +14,22 @@ type CreateEntityButtonProps = Omit<ComponentProps<typeof Button>, "children"> &
      * `md`. Senza questa prop il comportamento resta quello di sempre.
      */
     mobileLabel?: string;
+    /**
+     * Il tasto che apre lo stesso dialogo (`usePageShortcut` della pagina), mostrato nel
+     * suggerimento. Va passato solo dove la pagina registra davvero la scorciatoia.
+     */
+    shortcut?: string;
     onClick: NonNullable<ComponentProps<typeof Button>["onClick"]>;
 };
 
-const CreateEntityButton = ({ label, mobileLabel, size = "lg", className, ...props }: CreateEntityButtonProps) => {
+const CreateEntityButton = ({
+    label,
+    mobileLabel,
+    shortcut,
+    size = "lg",
+    className,
+    ...props
+}: CreateEntityButtonProps) => {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -36,7 +49,10 @@ const CreateEntityButton = ({ label, mobileLabel, size = "lg", className, ...pro
                     <span className="hidden md:inline">{label}</span>
                 </Button>
             </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
+            <TooltipContent>
+                {label}
+                {shortcut ? <ShortcutKeys keys={[shortcut]} singleKey /> : null}
+            </TooltipContent>
         </Tooltip>
     );
 };

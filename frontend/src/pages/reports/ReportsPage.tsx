@@ -1,15 +1,11 @@
 import CreateEntityButton from "@/components/create-entity-button";
-import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import PageHeader from "@/components/page-header";
 import ColumnVisibilityMenu from "@/components/column-visibility-menu";
 import { useColumnOrder } from "@/hooks/useColumnOrder";
 import { useHiddenColumns } from "@/hooks/useHiddenColumns";
 import { formatSortOption, parseSortOption, type TableSort } from "@/lib/tableSort";
 import TablePagination from "@/components/table-pagination";
-import { deleteReport, getReportPrintUrl, updateReport } from "@/lib/api";
 import { Suspense, useState } from "react";
-import type { ReportDto } from "@/types/dtos";
 import { useNavigate } from "react-router-dom";
 import { reportColumns } from "./components/report-columns";
 import ReportsFilters from "./components/reports-filters";
@@ -30,11 +26,9 @@ import {
 } from "@/hooks/useListUrlState";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
 import { usePageShortcut } from "@/hooks/usePageShortcut";
-import { usePendingAction } from "@/hooks/usePendingAction";
+import { prefetchEditReportDialog, useReportRowActions } from "@/hooks/useReportRowActions";
 import { lazyWithPrefetch, useHasBeenOpen, usePrefetchWhenIdle } from "@/lib/lazyDialog";
-import { openPrintWindow } from "@/lib/utils";
 import { entityPaths } from "@/lib/entityPaths";
-import { toReportUpdatePayload } from "@/lib/reportForm";
 import { useCreateReportFlow } from "@/hooks/useCreateEntityFlow";
 
 /**
@@ -44,9 +38,6 @@ import { useCreateReportFlow } from "@/hooks/useCreateEntityFlow";
  */
 const { Component: CreateReportDialog, prefetch: prefetchCreateReportDialog } = lazyWithPrefetch(
     () => import("@/components/dialogs/create/createReportDialog")
-);
-const { Component: EditReportDialog, prefetch: prefetchEditReportDialog } = lazyWithPrefetch(
-    () => import("@/components/dialogs/edit/editReportDialog")
 );
 const prefetchReportDialogs = () => {
     prefetchCreateReportDialog();
@@ -61,12 +52,7 @@ const ReportsPage = () => {
     const { searchParams, updateParams, currentPage, setCurrentPage, resetPage } = useListUrlState();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     usePageShortcut("n", () => setIsCreateDialogOpen(true));
-    // Un solo stato per dialogo + bersaglio, invece di un booleano più uno o due stati
-    // separati che ogni `onOpenChange` doveva azzerare insieme: `open={reportToEdit != null}`
-    // basta da solo a dire se il dialogo è aperto.
-    const [reportToEdit, setReportToEdit] = useState<ReportDto | null>(null);
     const hasOpenedCreateDialog = useHasBeenOpen(isCreateDialogOpen);
-    const hasOpenedEditDialog = useHasBeenOpen(reportToEdit != null);
     // Filtri, ordinamento, ricerca e pagina stanno nell'indirizzo: vedi `useListUrlState`.
     // "visibility" è il nome che usa già la dashboard nei suoi collegamenti.
     const visibilityFilter = readEnumParam(searchParams, "visibility", visibilityFilters, "open");
@@ -95,12 +81,8 @@ const ReportsPage = () => {
             pageSize,
             onPageOutOfRange: setCurrentPage,
         });
-    const deleteAction = usePendingAction({
-        run: (report: ReportDto) => deleteReport(report.id),
-        successMessage: "Report eliminato con successo",
-        errorMessage: "Impossibile eliminare il report",
-        onDone: () => loadReports(),
-    });
+    // Modifica, stampa ed eliminazione sono le stesse della scheda del cliente.
+    const { renderRowActions, dialogs: rowActionDialogs } = useReportRowActions({ onChanged: loadReports });
 
     usePrefetchWhenIdle(prefetchReportDialogs);
 
@@ -129,23 +111,6 @@ const ReportsPage = () => {
         updateParams({ visibility: value === "open" ? null : value });
     };
 
-    const handleOpenEditDialog = (id: number) => {
-        const report = reportRows.find((row) => row.id === id);
-        setReportToEdit(report ?? null);
-    };
-
-    const handleEditReport = async (values: EditReportSubmitValues) => {
-        await updateReport(values.reportId, toReportUpdatePayload(values));
-        // Niente ritocco della riga in pagina prima di ricaricare: la lista si ricarica subito
-        // comunque (la riga può anche uscire dal filtro), e il ritocco copiava sul client regole
-        // del server (il totale come prezzo interno più compenso del tecnico), mostrando per un istante una riga a metà.
-        await loadReports();
-    };
-
-    const handlePrintReport = (id: number) => {
-        openPrintWindow(getReportPrintUrl(id));
-    };
-
     return (
         <div className="relative flex h-full min-h-0 w-full flex-col gap-4">
             <>
@@ -157,6 +122,7 @@ const ReportsPage = () => {
                     action={
                         <CreateEntityButton
                             label="Crea nuovo report"
+                            shortcut="n"
                             onClick={() => setIsCreateDialogOpen(true)}
                             onPointerEnter={prefetchCreateReportDialog}
                             onFocus={prefetchCreateReportDialog}
@@ -174,34 +140,7 @@ const ReportsPage = () => {
                     </Suspense>
                 ) : null}
 
-                {hasOpenedEditDialog ? (
-                    <Suspense fallback={null}>
-                        <EditReportDialog
-                            open={reportToEdit != null}
-                            reportId={reportToEdit?.id ?? null}
-                            customerName={reportToEdit?.customer ?? ""}
-                            onOpenChange={(open) => {
-                                if (!open) {
-                                    setReportToEdit(null);
-                                }
-                            }}
-                            onSubmit={handleEditReport}
-                        />
-                    </Suspense>
-                ) : null}
-
-                <ConfirmDeleteDialog
-                    open={deleteAction.isOpen}
-                    onOpenChange={deleteAction.onOpenChange}
-                    title="Elimina report"
-                    description={
-                        deleteAction.pending
-                            ? `Sei sicuro di voler eliminare il report ID ${deleteAction.pending.id}?`
-                            : "Sei sicuro di voler eliminare questo report?"
-                    }
-                    isDeleting={deleteAction.isRunning}
-                    onConfirm={deleteAction.confirm}
-                />
+                {rowActionDialogs}
 
                 <ReportsFilters
                     searchText={searchText}
@@ -249,9 +188,7 @@ const ReportsPage = () => {
                             loadError={loadError}
                             onRetry={() => void loadReports()}
                             onOpenReport={handleOpenReport}
-                            onEditReport={handleOpenEditDialog}
-                            onPrintReport={handlePrintReport}
-                            onDeleteReport={deleteAction.open}
+                            renderRowActions={renderRowActions}
                         />
                     </div>
                     <TablePagination

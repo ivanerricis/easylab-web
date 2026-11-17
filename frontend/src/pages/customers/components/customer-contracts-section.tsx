@@ -1,15 +1,13 @@
 import EntityTable from "@/components/entity-table";
 import FilterSelect from "@/components/filters/filter-select";
-import TableActionButton from "@/components/table-action-button";
 import TablePagination from "@/components/table-pagination";
 import type { CustomerContractsList } from "@/hooks/useCustomerContracts";
-import { getContractPrintUrl } from "@/lib/api";
-import { contractEffectiveStatusOptions, contractPrintName, contractStatusColor } from "@/lib/contracts";
+import { contractEffectiveStatusOptions, contractStatusColor } from "@/lib/contracts";
 import { entityPaths } from "@/lib/entityPaths";
-import { openPrintWindow } from "@/lib/utils";
 import { contractColumnsWithout } from "@/pages/contracts/components/contract-columns";
-import { ListFilter, Printer } from "lucide-react";
-import { useMemo } from "react";
+import type { ContractDto } from "@/types/dtos";
+import { ListFilter } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -30,7 +28,13 @@ export const CustomerContractsFilter = ({ contracts }: { contracts: CustomerCont
     />
 );
 
-export const CustomerContractsTable = ({ contracts }: { contracts: CustomerContractsList }) => {
+type CustomerContractsTableProps = {
+    contracts: CustomerContractsList;
+    /** I pulsanti di riga (`useContractRowActions`): modifica, stampa, eliminazione. */
+    renderRowActions: (contract: ContractDto) => ReactNode;
+};
+
+export const CustomerContractsTable = ({ contracts, renderRowActions }: CustomerContractsTableProps) => {
     const navigate = useNavigate();
     // La colonna del cliente no: nella sua scheda sarebbe sempre lo stesso nome.
     const columns = useMemo(() => contractColumnsWithout("customerName"), []);
@@ -46,19 +50,7 @@ export const CustomerContractsTable = ({ contracts }: { contracts: CustomerContr
                     getRowKey={(row) => row.id}
                     getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}
                     emptyMessage="Nessun contratto associato a questo cliente."
-                    renderRowActions={(row) => (
-                        <>
-                            <TableActionButton
-                                variant="default"
-                                size="icon-lg"
-                                className="bg-muted hover:bg-action-print/20"
-                                onClick={() => openPrintWindow(getContractPrintUrl(row.id))}
-                                aria-label={`Stampa ${contractPrintName(row.effectiveStatus)} ${row.id}`}
-                            >
-                                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-                            </TableActionButton>
-                        </>
-                    )}
+                    renderRowActions={renderRowActions}
                     onRowOpen={(row) => void navigate(entityPaths.contract(row.id))}
                     isInitialLoading={contracts.isInitialLoading}
                     isRefetching={contracts.isRefetching}

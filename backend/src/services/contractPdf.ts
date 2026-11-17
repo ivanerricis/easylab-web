@@ -401,6 +401,8 @@ export type CustomerContractSummaryItem = {
     /** Lo stato effettivo (compreso `expired`). */
     status: ContractStatus;
     providerName: string;
+    /** Nel resoconto di un fornitore la colonna è il cliente, non il fornitore (sempre lo stesso). */
+    customerName: string;
     device: string;
     /** Solo per i contratti di assistenza. */
     assistance: { package: AssistancePackage; includedHours: number; priceCents: number } | null;
@@ -449,10 +451,25 @@ const buildStatusSummary = (contracts: CustomerContractSummaryItem[]) =>
 
 const summaryColumnCount = 8;
 
-const buildCustomerContractsTable = (contracts: CustomerContractSummaryItem[]) => {
+/**
+ * La tabella dei contratti, per il resoconto di un cliente o di un fornitore: la quarta colonna
+ * è l'altra parte del contratto (il fornitore per il cliente, il cliente per il fornitore).
+ */
+const buildContractsSummaryTable = (contracts: CustomerContractSummaryItem[], isProviderSummary: boolean) => {
+    const counterpart = (contract: CustomerContractSummaryItem) =>
+        isProviderSummary ? contract.customerName : contract.providerName;
     const body: object[][] = [
         sectionBarRow("RESOCONTO CONTRATTI", summaryColumnCount),
-        ["ID", "Tipo", "Stato", "Fornitore", "Dispositivo", "Pacchetto", "Inizio", "Fine"].map((text) => ({
+        [
+            "ID",
+            "Tipo",
+            "Stato",
+            isProviderSummary ? "Cliente" : "Fornitore",
+            "Dispositivo",
+            "Pacchetto",
+            "Inizio",
+            "Fine",
+        ].map((text) => ({
             text,
             style: "summaryHeader",
         })),
@@ -475,7 +492,7 @@ const buildCustomerContractsTable = (contracts: CustomerContractSummaryItem[]) =
                 { text: String(contract.id), alignment: "center", bold: true },
                 { text: formatContractType(contract.type) },
                 { text: formatSummaryStatus(contract.status) },
-                { text: contract.providerName },
+                { text: counterpart(contract) },
                 { text: contract.device, bold: true },
                 { text: formatPackage(contract.assistance), fontSize: 8.5 },
                 { text: contract.startDateLabel, alignment: "center" },
@@ -508,7 +525,7 @@ export const createCustomerContractsPdfBuffer = async (customer: CustomerContrac
         buildCustomerSummaryInfoSection(customer),
         { text: "Contratti", style: "sectionTitle", margin: [0, 0, 0, 2] },
         ...(statusSummary ? [{ text: statusSummary, style: "fineprint", margin: [0, 0, 0, 4] }] : []),
-        buildCustomerContractsTable(customer.contracts),
+        buildContractsSummaryTable(customer.contracts, customer.subjectLabel === "Fornitore"),
     ]);
 
     return await pdfmake.createPdf(documentDefinition).getBuffer();

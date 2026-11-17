@@ -1,5 +1,6 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
 import { interventionActionsColumn } from "@/hooks/useInterventionRowActions";
+import { reportActionsColumn } from "@/hooks/useReportRowActions";
 import FilterSelect from "@/components/filters/filter-select";
 import TablePagination from "@/components/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +31,11 @@ type ReportsInterventionsTabsProps = {
      */
     renderInterventionActions?: (intervention: InterventionDto) => ReactNode;
     /**
+     * I pulsanti di riga dei report (`useReportRowActions`), con la stessa regola degli
+     * interventi: senza, come nella scheda del collaboratore, la tabella non ha la colonna azioni.
+     */
+    renderReportActions?: (report: ReportDto) => ReactNode;
+    /**
      * La terza tab, solo nella scheda del cliente: il filtro (sulla riga delle tab, come gli altri
      * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
      */
@@ -51,11 +57,17 @@ const ReportsInterventionsTabs = ({
     onOpenReport,
     onOpenIntervention,
     renderInterventionActions,
+    renderReportActions,
     contractsTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
     // Memorizzate: un array nuovo a ogni render farebbe ridisegnare tutte le righe (`memo`).
     const hasInterventionActions = renderInterventionActions != null;
+    const hasReportActions = renderReportActions != null;
+    const reportTableColumns = useMemo(
+        () => (hasReportActions ? [...reportColumns, reportActionsColumn] : reportColumns),
+        [reportColumns, hasReportActions]
+    );
     const interventionTableColumns = useMemo(
         () => (hasInterventionActions ? [...interventionColumns, interventionActionsColumn] : interventionColumns),
         [interventionColumns, hasInterventionActions]
@@ -117,8 +129,9 @@ const ReportsInterventionsTabs = ({
                 <div className="min-h-0 flex-1 overflow-auto">
                     <EntityTable
                         tableKey={`${tableKeyPrefix}-reports`}
-                        columns={reportColumns}
+                        columns={reportTableColumns}
                         rows={reports.rows}
+                        renderRowActions={renderReportActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun report associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => reportStatusColor(row.closed)}

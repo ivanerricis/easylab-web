@@ -36,7 +36,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
 import { useReportsAndInterventionsOf } from "@/hooks/useReportsAndInterventionsOf";
+import { useContractRowActions } from "@/hooks/useContractRowActions";
 import { useInterventionRowActions } from "@/hooks/useInterventionRowActions";
+import { useReportRowActions } from "@/hooks/useReportRowActions";
 import { formatPersonName } from "@/lib/people";
 import CreateContractDialog, { type ContractSubmitValues } from "@/components/dialogs/create/createContractDialog";
 import { CustomerContractsFilter, CustomerContractsTable } from "./components/customer-contracts-section";
@@ -180,6 +182,12 @@ const CustomerPage = () => {
     // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i contatori.
     const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
         useInterventionRowActions({ onChanged: handleRefresh });
+    const { renderRowActions: renderReportActions, dialogs: reportActionDialogs } = useReportRowActions({
+        onChanged: handleRefresh,
+    });
+    const { renderRowActions: renderContractActions, dialogs: contractActionDialogs } = useContractRowActions({
+        onChanged: handleRefresh,
+    });
 
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
@@ -325,6 +333,8 @@ const CustomerPage = () => {
             ) : null}
 
             {interventionActionDialogs}
+            {reportActionDialogs}
+            {contractActionDialogs}
 
             <ReportsInterventionsTabs
                 activeTab={activeTab}
@@ -337,9 +347,10 @@ const CustomerPage = () => {
                 onOpenReport={handleOpenReport}
                 onOpenIntervention={handleOpenIntervention}
                 renderInterventionActions={renderInterventionActions}
+                renderReportActions={renderReportActions}
                 contractsTab={{
                     filter: <CustomerContractsFilter contracts={contracts} />,
-                    content: <CustomerContractsTable contracts={contracts} />,
+                    content: <CustomerContractsTable contracts={contracts} renderRowActions={renderContractActions} />,
                 }}
             />
         </div>

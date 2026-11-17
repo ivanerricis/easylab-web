@@ -180,6 +180,7 @@ const DashboardPage = () => {
                             <CreateEntityButton
                                 label="Nuovo report"
                                 mobileLabel="Report"
+                                shortcut="r"
                                 onClick={() => setDialogCreateReportOpen(true)}
                                 onPointerEnter={prefetchCreateReportDialog}
                                 onFocus={prefetchCreateReportDialog}
@@ -187,6 +188,7 @@ const DashboardPage = () => {
                             <CreateEntityButton
                                 label="Nuovo intervento"
                                 mobileLabel="Intervento"
+                                shortcut="i"
                                 onClick={() => setDialogCreateInterventionOpen(true)}
                                 onPointerEnter={prefetchCreateInterventionDialog}
                                 onFocus={prefetchCreateInterventionDialog}

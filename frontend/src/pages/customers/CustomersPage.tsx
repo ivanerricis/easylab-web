@@ -153,7 +153,13 @@ const CustomersPage = () => {
                 description="Gestisci i clienti del laboratorio."
                 // L'esportazione CSV sta in Impostazioni → Esportazione: è un'operazione
                 // sull'archivio, non una delle azioni quotidiane di questa pagina.
-                action={<CreateEntityButton label="Crea nuovo cliente" onClick={() => setIsCreateDialogOpen(true)} />}
+                action={
+                    <CreateEntityButton
+                        label="Crea nuovo cliente"
+                        shortcut="n"
+                        onClick={() => setIsCreateDialogOpen(true)}
+                    />
+                }
             />
 
             {isCreateDialogOpen && (

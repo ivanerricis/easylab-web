@@ -24,6 +24,8 @@ const api = vi.hoisted(() => ({
     listContractPackages: vi.fn(),
     deleteIntervention: vi.fn(),
     sendInterventionEmail: vi.fn(),
+    deleteContract: vi.fn(),
+    deleteReport: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -44,6 +46,9 @@ vi.mock("@/lib/api", async () => {
         listContractPackages: (...args: unknown[]) => api.listContractPackages(...args),
         deleteIntervention: (...args: unknown[]) => api.deleteIntervention(...args),
         sendInterventionEmail: (...args: unknown[]) => api.sendInterventionEmail(...args),
+        deleteContract: (...args: unknown[]) => api.deleteContract(...args),
+        deleteReport: (...args: unknown[]) => api.deleteReport(...args),
+        getReportPrintUrl: (id: number) => `/api/reports/${id}/print`,
         getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
         getCustomerContractsPrintUrl: (id: number) => `/api/customers/${id}/contracts/print`,
@@ -192,6 +197,29 @@ describe("CustomerPage", () => {
         await waitFor(() => expect(api.sendInterventionEmail).toHaveBeenCalledWith(9));
     });
 
+    it("i report del cliente hanno le azioni di riga, ed eliminarne uno ricarica la scheda", async () => {
+        api.deleteReport.mockResolvedValue(undefined);
+        await renderPage("/clients/3", "/clients/:id");
+
+        const panel = screen.getByRole("tabpanel");
+        for (const action of ["Modifica", "Stampa", "Elimina"]) {
+            expect(
+                (await within(panel).findAllByRole("button", { name: `${action} report 5` })).length
+            ).toBeGreaterThan(0);
+        }
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Stampa report 5" })[0]);
+        expect(openPrintWindow).toHaveBeenCalledWith("/api/reports/5/print");
+
+        const customerLoads = api.getCustomer.mock.calls.length;
+        await userEvent.click(within(panel).getAllByRole("button", { name: "Elimina report 5" })[0]);
+        const dialog = await screen.findByRole("dialog", { name: "Elimina report" });
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => expect(api.deleteReport).toHaveBeenCalledWith(5));
+        await waitFor(() => expect(api.getCustomer.mock.calls.length).toBeGreaterThan(customerLoads));
+    });
+
     it("cambiando tab cambia l'indirizzo, senza aggiungere voci alla cronologia", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
@@ -309,6 +337,17 @@ describe("CustomerPage", () => {
         // Il pulsante di riga stampa il PDF di quel contratto.
         await userEvent.click(screen.getAllByRole("button", { name: "Stampa contratto 21" })[0]);
         expect(openPrintWindow).toHaveBeenCalledWith("/api/contracts/21/print");
+
+        // Le altre azioni di riga ci sono, e l'eliminazione ricarica la scheda.
+        expect(screen.getAllByRole("button", { name: "Modifica contratto 21" }).length).toBeGreaterThan(0);
+        api.deleteContract.mockResolvedValue(undefined);
+        const customerLoads = api.getCustomer.mock.calls.length;
+        await userEvent.click(screen.getAllByRole("button", { name: "Elimina contratto 21" })[0]);
+        const deleteDialog = await screen.findByRole("dialog", { name: "Elimina contratto" });
+        await userEvent.type(within(deleteDialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(deleteDialog).getByRole("button", { name: "Elimina" }));
+        await waitFor(() => expect(api.deleteContract).toHaveBeenCalledWith(21));
+        await waitFor(() => expect(api.getCustomer.mock.calls.length).toBeGreaterThan(customerLoads));
 
         await userEvent.click(screen.getByRole("combobox", { name: "Filtra i contratti per stato" }));
         await userEvent.click(await screen.findByRole("option", { name: "Scaduto" }));

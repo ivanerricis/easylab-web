@@ -36,6 +36,7 @@ const buildItem = (overrides: Partial<CustomerContractSummaryItem> = {}): Custom
     type: "assistance",
     status: "active",
     providerName: "Acme Srl",
+    customerName: "Luca Verdi",
     device: "Server NAS",
     assistance: { package: "ready_20", includedHours: 20, priceCents: 50000 },
     startDateLabel: "1 ott 2026",
@@ -113,6 +114,16 @@ describe("createCustomerContractsPdfBuffer", () => {
         ]);
         expect(rows[1][1]).toBe("Noleggio");
         expect(rows[1][5]).toBe("-");
+    });
+
+    it("nel resoconto di un fornitore la colonna dell'altra parte è il cliente", async () => {
+        const doc = await capture({ ...buildData([buildItem({ id: 9 })]), subjectLabel: "Fornitore" });
+        const { table } = tableOf(doc);
+        const headers = table.body[1].map((cell) => cell.text);
+
+        expect(headers[3]).toBe("Cliente");
+        expect(dataRows(doc)[0][3]).toBe("Luca Verdi");
+        expect(JSON.stringify(doc)).toContain("Fornitore #5");
     });
 
     it("etichetta come preventivo la bozza e scrive il Supporto con le ore su 12 mesi e il prezzo unico", async () => {

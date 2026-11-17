@@ -32,6 +32,7 @@ const buildItem = (id: number): CustomerContractSummaryItem => ({
     type: id % 3 === 0 ? "rental" : "assistance",
     status: (["active", "draft", "expired", "cancelled"] as const)[id % 4],
     providerName: "Fornitore con un nome piuttosto lungo Srl",
+    customerName: "Mario Bianchi",
     device: "Server di produzione nella sala macchine del secondo piano",
     assistance: id % 3 === 0 ? null : { package: "ready_20", includedHours: 20, priceCents: 50000 },
     startDateLabel: "1 ott 2026",

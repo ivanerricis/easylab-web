@@ -134,6 +134,7 @@ const customersRouter = createCrudRouter({
                     type: contract.type,
                     status: contract.effectiveStatus,
                     providerName: contract.providerName,
+                    customerName: contract.customerName ?? "-",
                     device: contract.device,
                     assistance:
                         contract.package && contract.includedHours !== null && contract.priceCents !== null

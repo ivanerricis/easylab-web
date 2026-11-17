@@ -143,6 +143,7 @@ const InterventionsPage = () => {
                     action={
                         <CreateEntityButton
                             label="Crea nuovo intervento"
+                            shortcut="n"
                             onClick={() => setIsCreateDialogOpen(true)}
                             onPointerEnter={prefetchCreateInterventionDialog}
                             onFocus={prefetchCreateInterventionDialog}

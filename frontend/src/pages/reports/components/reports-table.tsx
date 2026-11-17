@@ -1,9 +1,8 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import TableActionButton from "@/components/table-action-button";
 import type { ReportDto } from "@/types/dtos";
-import { Pencil, Printer, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { ReportColumn } from "./report-columns";
 import { reportStatusColor } from "@/lib/reports";
 
@@ -11,9 +10,8 @@ type ReportsTableProps = {
     columns: ReportColumn[];
     rows: ReportDto[];
     onOpenReport: (id: number) => void;
-    onEditReport: (id: number) => void;
-    onPrintReport: (id: number) => void;
-    onDeleteReport: (report: ReportDto) => void;
+    /** I pulsanti di riga (`useReportRowActions`): modifica, stampa, eliminazione. */
+    renderRowActions: (report: ReportDto) => ReactNode;
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
@@ -47,9 +45,7 @@ const ReportsTable = ({
     columns,
     rows,
     onOpenReport,
-    onEditReport,
-    onPrintReport,
-    onDeleteReport,
+    renderRowActions,
     isInitialLoading,
     isRefetching,
     loadError,
@@ -62,37 +58,6 @@ const ReportsTable = ({
     searchText,
     hasActiveFilters,
 }: ReportsTableProps) => {
-    const renderRowActions = (row: ReportDto) => (
-        <>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-primary/20"
-                onClick={() => onEditReport(row.id)}
-                aria-label={`Modifica report ${row.id}`}
-            >
-                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-print/20"
-                onClick={() => onPrintReport(row.id)}
-                aria-label={`Stampa report ${row.id}`}
-            >
-                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => onDeleteReport(row)}
-                aria-label={`Elimina report ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
-        </>
-    );
-
     return (
         <EntityTable
             tableKey="reports"

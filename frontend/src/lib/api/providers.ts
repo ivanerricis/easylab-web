@@ -1,5 +1,5 @@
 import type { ProviderDto } from "@/types/dtos";
-import { createEntityApi } from "./client";
+import { api, createEntityApi } from "./client";
 import type { EntityListParams } from "./client";
 
 export type ProviderCreateInput = {
@@ -21,6 +21,9 @@ export type ListProvidersParams = EntityListParams & {
 
 // Come i tecnici: tutte le chiamate vengono da `createEntityApi`. L'ordinamento è l'unico
 // parametro in più, come per i clienti.
+/** Resoconto PDF di tutti i contratti del fornitore, come `getCustomerContractsPrintUrl`. */
+export const getProviderContractsPrintUrl = (id: number) => api.getUri({ url: `/providers/${id}/contracts/print` });
+
 const providersApi = createEntityApi<ProviderDto, ProviderCreateInput, ProviderUpdateInput, ListProvidersParams>(
     "/providers",
     {

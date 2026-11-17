@@ -46,7 +46,7 @@ import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
 import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { getTodayDateString } from "@/lib/interventions";
 import { toProviderPayload } from "@/lib/providers";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type {
     AssistancePackage,
     ContractDto,
@@ -56,7 +56,7 @@ import type {
     CustomerDto,
 } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 /** I valori che questo dialogo consegna a chi lo apre, con cliente e fornitore già risolti in id. */
@@ -88,6 +88,32 @@ type Props = {
 
 const formatInitialCustomer = (customer: CustomerDto) =>
     formatCustomerOption(customer.firstName, customer.lastName, customer.phoneNumber, customer.phoneNumberSecondary);
+
+/**
+ * Un gruppo di campi con il suo titolo, per le sezioni affiancate del dialogo su desktop. Un
+ * `section` con `h3` (il titolo del dialogo è l'`h2`): chi naviga per titoli salta da un gruppo
+ * all'altro.
+ */
+const ContractFormSection = ({
+    title,
+    className,
+    children,
+}: {
+    title: string;
+    className?: string;
+    children: ReactNode;
+}) => {
+    const titleId = useId();
+
+    return (
+        <section aria-labelledby={titleId} className={cn("grid content-start gap-3 rounded-lg border p-3", className)}>
+            <h3 id={titleId} className="text-sm font-semibold text-muted-foreground">
+                {title}
+            </h3>
+            {children}
+        </section>
+    );
+};
 
 /** Dal contratto ai campi del modulo: l'inverso di `toContractSubmitValues`. */
 const toFormState = (contract: ContractDto): ContractFormState => ({
@@ -588,7 +614,8 @@ const CreateContractDialog = ({
             <Textarea
                 id="note"
                 className="resize-none"
-                rows={3}
+                // Su desktop sta su tutta la larghezza sotto le sezioni: due righe bastano.
+                rows={isStepped ? 3 : 2}
                 placeholder="Annotazioni libere sul contratto"
                 value={formValues.note}
                 onChange={(event) => handleChange({ note: event.target.value })}
@@ -682,7 +709,8 @@ const CreateContractDialog = ({
                 }
                 // Sotto `sm`, dove si procede a passi, il dialogo è ancorato in alto e ha un'altezza fissa
                 // (come l'intervento): i campi scorrono dentro e i pulsanti restano fermi in fondo.
-                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-xl"
+                // Da `sm` in su è largo quanto serve alle sezioni affiancate (vedi sotto).
+                contentClassName="max-sm:top-4 max-sm:h-[min(44rem,calc(100dvh-2rem))] max-sm:translate-y-0 sm:max-w-3xl lg:max-w-[68rem]"
                 confirmLabel={isLastStep ? (isSubmitting ? "Salvataggio..." : "Salva") : "Avanti"}
                 confirmIcon={isLastStep ? Save : undefined}
                 cancelLabel={isStepped && step > 0 ? "Indietro" : "Annulla"}
@@ -727,19 +755,33 @@ const CreateContractDialog = ({
                                 {step === 3 ? summary : null}
                             </>
                         ) : (
+                            // Da `sm` in su tre sezioni affiancate (Parti, Pacchetto o Noleggio, Periodo),
+                            // tipo sopra e note sotto su tutta la larghezza: tutto in vista senza
+                            // scorrere. In una colonna sola i dieci campi superavano l'altezza dello
+                            // schermo e il dialogo scorreva. Fra `sm` e `lg` le sezioni vanno su due
+                            // colonne, con il Periodo sotto su tutta la riga.
                             <>
                                 {typeField}
-                                {customerField}
-                                {providerField}
-                                {deviceField}
-                                {assistanceFields}
-                                <div className="grid items-start gap-4 sm:grid-cols-2">
-                                    {startDateField}
-                                    {statusField}
+                                {/* Senza `items-start`: le tre sezioni si allungano alla più alta, e i bordi
+                                    finiscono alla stessa altezza anche se Pacchetto e Periodo hanno meno campi. */}
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    <ContractFormSection title="Parti">
+                                        {customerField}
+                                        {providerField}
+                                        {deviceField}
+                                    </ContractFormSection>
+                                    <ContractFormSection title={isAssistance ? "Pacchetto" : "Noleggio"}>
+                                        {isAssistance ? assistanceFields : billingField}
+                                    </ContractFormSection>
+                                    <ContractFormSection title="Periodo" className="sm:col-span-2 lg:col-span-1">
+                                        {startDateField}
+                                        <div className="grid items-start gap-3 sm:grid-cols-2">
+                                            {termField}
+                                            {statusField}
+                                        </div>
+                                        {periodSummary}
+                                    </ContractFormSection>
                                 </div>
-                                {termField}
-                                {billingField}
-                                {periodSummary}
                                 {noteField}
                                 {draftHint}
                             </>

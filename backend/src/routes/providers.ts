@@ -7,7 +7,13 @@ import {
     listProviders,
     updateProviderById,
 } from "../db/queries/provider";
-import { createCrudRouter } from "./crudRouter";
+import { listContracts } from "../db/queries/contract";
+import { personDisplayName } from "../db/queries/personName";
+import { getAppTimeZone, getLabConfig } from "../config/lab";
+import { createCustomerContractsPdfBuffer } from "../services/contractPdf";
+import { createCrudRouter, idParamsSchema } from "./crudRouter";
+import { formatDayLabel } from "./formatting";
+import { validate } from "./validation";
 
 // Il logo arriva già ridotto dal browser (PNG o JPEG come data URL): il tetto (90.000 caratteri) sta sotto i 100 kB del corpo JSON di express.
 const logoDataUrlSchema = z
@@ -47,6 +53,59 @@ const providersRouter = createCrudRouter({
         create: createProvider,
         update: updateProviderById,
         remove: deleteProviderById,
+    },
+    extraRoutes: (router) => {
+        // Il resoconto di tutti i contratti del fornitore, come quello del cliente
+        // (`/customers/:id/contracts/print`): stesso PDF, con il fornitore in testa e il cliente
+        // nella colonna dell'altra parte.
+        router.get("/:id/contracts/print", validate({ params: idParamsSchema }), async (req, res) => {
+            const { id } = req.params as unknown as { id: number };
+            const [provider] = await getProviderById(id);
+
+            if (!provider) {
+                res.status(404).json({ message: "Fornitore non trovato" });
+                return;
+            }
+
+            const result = await listContracts({ providerId: id, timeZone: await getAppTimeZone() });
+            // Senza `page` la lista è sempre un array: il ramo `items` serve solo al tipo.
+            const rows = Array.isArray(result) ? result : result.items;
+            // Dal più recente, come l'elenco dei contratti.
+            const contracts = [...rows].sort((a, b) => b.id - a.id);
+            const contactName = personDisplayName(provider.firstName ?? "", provider.lastName ?? "").trim();
+
+            const pdfBuffer = await createCustomerContractsPdfBuffer({
+                customerId: provider.id,
+                customerName: contactName ? `${provider.providerName} (${contactName})` : provider.providerName,
+                customerPhone: provider.phoneNumber,
+                customerEmail: provider.email,
+                subjectLabel: "Fornitore",
+                ...(await getLabConfig()),
+                contractCount: contracts.length,
+                contracts: contracts.map((contract) => ({
+                    id: contract.id,
+                    type: contract.type,
+                    status: contract.effectiveStatus,
+                    providerName: contract.providerName,
+                    customerName: contract.customerName ?? "-",
+                    device: contract.device,
+                    assistance:
+                        contract.package && contract.includedHours !== null && contract.priceCents !== null
+                            ? {
+                                  package: contract.package,
+                                  includedHours: contract.includedHours,
+                                  priceCents: contract.priceCents,
+                              }
+                            : null,
+                    startDateLabel: formatDayLabel(contract.startDate),
+                    endDateLabel: formatDayLabel(contract.endDate),
+                })),
+            });
+
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader("Content-Disposition", `inline; filename=contratti-fornitore-${id}.pdf`);
+            res.send(pdfBuffer);
+        });
     },
 });
 

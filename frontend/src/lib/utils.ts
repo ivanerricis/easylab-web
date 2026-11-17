@@ -33,12 +33,20 @@ const dateTimeFormatter = new Intl.DateTimeFormat("it-IT", {
     minute: "2-digit",
 });
 const dateFormatter = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-const euroFormatter = new Intl.NumberFormat("it-IT", {
+/**
+ * `useGrouping: "always"`: in it-IT il separatore delle migliaia, per default, compare solo da
+ * cinque cifre in su ("1234,00 €" ma "12.345,00 €"), e in una colonna di importi 1.600,00 e
+ * 12.345,00 sarebbero scritti con due convenzioni diverse. Con "always" anche i quattro cifre
+ * diventano "1.600,00 €". Esportato perché lo usano anche i contratti.
+ */
+export const euroFormatter = new Intl.NumberFormat("it-IT", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+    useGrouping: "always",
 });
+const fileSizeFormatter = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
 
 const formatDateWith = (formatter: Intl.DateTimeFormat, value: string | Date | null | undefined) => {
     if (!value) {
@@ -140,16 +148,18 @@ export function formatFileSize(sizeBytes: number) {
         return `${sizeBytes} B`;
     }
 
+    // Virgola decimale all'italiana ("1,5 MB"), come gli importi; "5 MB" e non "5,0 MB" quando
+    // il decimale è zero.
     if (sizeBytes < 1024 * 1024) {
-        return `${(sizeBytes / 1024).toFixed(1)} KB`;
+        return `${fileSizeFormatter.format(sizeBytes / 1024)} KB`;
     }
 
-    // I dischi del server si contano in GB: senza, 200 GB si leggerebbero "204800.0 MB".
+    // I dischi del server si contano in GB: senza, 200 GB si leggerebbero "204.800 MB".
     if (sizeBytes < 1024 * 1024 * 1024) {
-        return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${fileSizeFormatter.format(sizeBytes / (1024 * 1024))} MB`;
     }
 
-    return `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    return `${fileSizeFormatter.format(sizeBytes / (1024 * 1024 * 1024))} GB`;
 }
 
 export function formatEuro(value: number | null | undefined) {

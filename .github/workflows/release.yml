@@ -46,9 +46,20 @@ jobs:
           echo "CI on $GITHUB_SHA: $conclusion"
           test "$conclusion" = "success"
 
+      # Le note scritte a mano (`.github/release-notes/vX.Y.Z.md`: novità, correzioni, cosa
+      # controllare) in cima, poi l'elenco automatico delle PR. Prima c'era solo quello, con i
+      # titoli delle PR in inglese: dalla pagina della release non si capiva cosa fosse cambiato.
+      # Senza il file la release si crea lo stesso, con un avviso: il tag è già pubblicato e il
+      # server si aggiorna comunque, meglio una pagina scarna che nessuna.
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes --latest
+          notes=".github/release-notes/$TAG.md"
+          if [ -f "$notes" ]; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$notes" --generate-notes --latest
+          else
+            echo "::warning::$notes non esiste: la release ha solo l'elenco automatico delle PR."
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes --latest
+          fi

@@ -45,8 +45,8 @@ describe("SystemSettingsPanel", () => {
         renderWithProviders(<SystemSettingsPanel />);
 
         expect(await screen.findByText(diskLabel)).toBeInTheDocument();
-        expect(screen.getByText("40.0 GB usati su 100.0 GB (40%)")).toBeInTheDocument();
-        expect(screen.getByText("5.0 MB")).toBeInTheDocument();
+        expect(screen.getByText("40 GB usati su 100 GB (40%)")).toBeInTheDocument();
+        expect(screen.getByText("5 MB")).toBeInTheDocument();
         expect(screen.getByText(/Ultimo controllo:/)).toBeInTheDocument();
         expect(screen.queryByText(/Libera spazio o sposta i backup/)).not.toBeInTheDocument();
     });

@@ -168,22 +168,8 @@ const EntityCardImpl = <T,>({
         return idColumn ? `#${String(idColumn.render(row))}` : null;
     };
 
-    // Il tap apre la scheda, ma non se cade su un punto interattivo (link, pulsanti): lo gestiscono
-    // da sé. Stessa regola del doppio click della riga in `EntityTable`.
-    const handleOpen = onRowOpen
-        ? (event: React.MouseEvent<HTMLElement>) => {
-              const target = event.target;
-
-              if (target instanceof HTMLElement && target.closest("a, button, input, [role=button]")) {
-                  return;
-              }
-
-              onRowOpen(row);
-          }
-        : undefined;
-
     return (
-        <article className={cn(cardClassName, onRowOpen && "cursor-pointer active:bg-muted/40")} onClick={handleOpen}>
+        <article className={cn(cardClassName, onRowOpen && "cursor-pointer active:bg-muted/40")}>
             {status ? (
                 <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", status.stripe)} />
             ) : null}
@@ -200,7 +186,27 @@ const EntityCardImpl = <T,>({
                     ) : null}
                     {/* `h2` e non `h3`: nelle liste il titolo sopra è l'`h1` della pagina, e un
                         salto di livello fa credere a chi naviga per titoli che manchi un pezzo. */}
-                    <h2 className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{renderTitle()}</h2>
+                    {/* Con `onRowOpen` il titolo è un vero pulsante, steso su tutta la scheda con
+                        `after:absolute after:inset-0` (la scheda è `relative`): l'`onClick` sull'`article`
+                        non si raggiungeva da tastiera né con i comandi a scansione, e un tap
+                        qualunque sulla scheda continua ad aprirla. Gli elementi interattivi
+                        dentro la scheda (azioni, "Altri dettagli", link nei dettagli) stanno
+                        sopra con `relative z-10`, così il pulsante steso non li copre. Il focus
+                        è disegnato sul pseudo-elemento, con l'offset negativo: la scheda ha
+                        `overflow-hidden` e un contorno esterno verrebbe tagliato. */}
+                    <h2 className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">
+                        {onRowOpen ? (
+                            <button
+                                type="button"
+                                onClick={() => onRowOpen(row)}
+                                className="cursor-pointer text-left outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--focus-ring)"
+                            >
+                                {renderTitle()}
+                            </button>
+                        ) : (
+                            renderTitle()
+                        )}
+                    </h2>
                 </div>
                 {badgeColumn ? (
                     <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>
@@ -215,7 +221,10 @@ const EntityCardImpl = <T,>({
                 // 2026-09-10): le righe etichetta/valore di allora mandavano a capo i valori lunghi
                 // allineati a destra. Qui quel problema lo risolve `wide` → `longText`, che mette il
                 // valore sotto l'etichetta, come fanno problema e note nella scheda report.
-                <div id={detailsId} className={cn("px-4 pt-2", hiddenCount > 0 ? "pb-1" : "pb-2.5")}>
+                <div
+                    id={detailsId}
+                    className={cn("px-4 pt-2 [&_a]:relative [&_a]:z-10", hiddenCount > 0 ? "pb-1" : "pb-2.5")}
+                >
                     <DetailGrid layout="rows">
                         {visibleDetailColumns.map((column) => (
                             <DetailItem
@@ -242,7 +251,7 @@ const EntityCardImpl = <T,>({
                     aria-controls={detailsId}
                     onClick={() => setIsExpanded((expanded) => !expanded)}
                     className={cn(
-                        "flex w-full items-center justify-center gap-1.5 px-4 pb-2.5 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline",
+                        "relative z-10 flex w-full items-center justify-center gap-1.5 px-4 pb-2.5 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline",
                         "min-h-10 pointer-coarse:min-h-11"
                     )}
                 >
@@ -262,7 +271,7 @@ const EntityCardImpl = <T,>({
                 // 12px di padding + 6px di striscia).
                 <div
                     className={cn(
-                        "flex items-center gap-2 border-t bg-muted/40 px-3 py-2.5 *:h-11 *:w-auto *:min-w-0 *:flex-1 empty:hidden",
+                        "relative z-10 flex items-center gap-2 border-t bg-muted/40 px-3 py-2.5 *:h-11 *:w-auto *:min-w-0 *:flex-1 empty:hidden",
                         status && "pl-4.5"
                     )}
                 >

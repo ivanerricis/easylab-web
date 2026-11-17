@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import CustomDialog from "@/components/dialogs/customDialog";
 import FormField from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { fieldProps } from "@/lib/formField";
+import { fieldProps, reportFieldErrors } from "@/lib/formField";
 import { getApiErrorMessage, isFieldRejection } from "@/lib/api";
 
 /**
@@ -16,15 +16,19 @@ import { getApiErrorMessage, isFieldRejection } from "@/lib/api";
 /**
  * Un codice plausibile, prima ancora di mandarlo al server: sei cifre dell'app, oppure un codice
  * di recupero, otto caratteri dell'alfabeto del server (senza O, I, 0, 1) con o senza trattino
- * e spazi in mezzo (vedi `normalizeRecoveryCode` nel backend). Il pulsante resta spento finché
- * il codice non ha una di queste due forme: un codice a metà non può essere giusto, e provarlo
- * conterebbe comunque fra i tentativi concessi.
+ * e spazi in mezzo (vedi `normalizeRecoveryCode` nel backend). Il pulsante resta sempre
+ * attivo e la forma si controlla all'invio, con l'errore sotto il campo: un pulsante spento non
+ * dice cosa manca, e un codice a metà non può essere giusto (provarlo conterebbe comunque fra i
+ * tentativi concessi).
  */
 const isPlausibleSecondFactorCode = (code: string) => {
     const normalized = code.replace(/[\s-]/g, "").toUpperCase();
 
     return /^\d{6}$/.test(normalized) || /^[A-HJ-NP-Z2-9]{8}$/.test(normalized);
 };
+
+/** L'ordine in cui i campi stanno nel dialogo: decide su quale si posa il focus. */
+const fieldOrder = ["twoFactorConfirmPassword", "twoFactorConfirmCode"] as const;
 
 type Props = {
     open: boolean;
@@ -73,11 +77,17 @@ const TwoFactorConfirmDialog = ({
             : isPlausibleSecondFactorCode(code)
               ? undefined
               : "Il codice dell'app ha 6 cifre, quello di recupero 8 caratteri";
-        setPasswordError(nextPasswordError);
-        setCodeError(nextCodeError);
 
-        if (nextPasswordError || nextCodeError) {
-            document.getElementById(nextPasswordError ? "twoFactorConfirmPassword" : "twoFactorConfirmCode")?.focus();
+        if (
+            reportFieldErrors(
+                { twoFactorConfirmPassword: nextPasswordError, twoFactorConfirmCode: nextCodeError },
+                fieldOrder,
+                (errors) => {
+                    setPasswordError(errors.twoFactorConfirmPassword);
+                    setCodeError(errors.twoFactorConfirmCode);
+                }
+            )
+        ) {
             return;
         }
 
@@ -122,7 +132,7 @@ const TwoFactorConfirmDialog = ({
             destructive={destructive}
             confirmLabel={isSubmitting ? submittingLabel : confirmLabel}
             confirmIcon={confirmIcon}
-            confirmDisabled={isSubmitting || password === "" || !isPlausibleSecondFactorCode(code)}
+            confirmDisabled={isSubmitting}
             cancelDisabled={isSubmitting}
             onCancel={() => handleOpenChange(false)}
             onConfirm={() => void handleConfirm()}
@@ -150,6 +160,12 @@ const TwoFactorConfirmDialog = ({
                         <Input
                             {...fieldProps("twoFactorConfirmCode", { error: codeError, required: true })}
                             autoComplete="one-time-code"
+                            inputMode="text"
+                            // Un codice, non una parola: la tastiera del telefono non deve
+                            // metterci la maiuscola né "correggerlo".
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
                             maxLength={9}
                             className="text-center font-mono tracking-widest"
                             value={code}

@@ -10,6 +10,7 @@ import { changeOwnPassword, getApiErrorMessage, getApiErrorStatus } from "@/lib/
 import { fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { isPasswordCompliant, passwordRequirements } from "@/lib/passwordPolicy";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/use-auth";
 
 type Props = {
     open: boolean;
@@ -73,6 +74,7 @@ const PasswordInput = ({
 );
 
 const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
+    const { user } = useAuth();
     const [formValues, setFormValues] = useState(emptyForm);
     const [errors, setErrors] = useState<FieldErrors>({});
     // I requisiti restano grigi finché non si scrive nel campo: aprendo il dialogo li si vedeva
@@ -172,6 +174,18 @@ const ChangePasswordDialog = ({ open, onOpenChange }: Props) => {
             confirmDisabled={isSubmitting}
             content={
                 <div className="grid gap-4">
+                    {/* Il nome utente c'è ma non si vede: senza, il gestore di password non sa a quale
+                        voce salvata riferire il cambio e può aggiornare (o creare) quella sbagliata. */}
+                    <input
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        value={user?.username ?? ""}
+                        readOnly
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        className="sr-only"
+                    />
                     <FormField id="currentPassword" label="Password attuale" required error={errors.currentPassword}>
                         <PasswordInput
                             id="currentPassword"

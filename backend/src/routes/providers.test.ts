@@ -158,7 +158,7 @@ describe("providers router", () => {
 
         it("genera il PDF con i contratti del fornitore dal più recente, con il cliente di ognuno", async () => {
             vi.mocked(getProviderById).mockResolvedValue([
-                { ...provider, firstName: "Anna", lastName: "Neri" },
+                { ...provider, firstName: "Anna", lastName: "Neri", logoDataUrl: "data:image/png;base64,TE9HTw==" },
             ] as never);
             vi.mocked(listContracts).mockResolvedValue([
                 {
@@ -202,6 +202,7 @@ describe("providers router", () => {
                     customerName: "Acme Srl (Anna Neri)",
                     customerEmail: "info@acme.it",
                     subjectLabel: "Fornitore",
+                    logoDataUrl: "data:image/png;base64,TE9HTw==",
                     labName: "Lab",
                     contractCount: 2,
                     contracts: [

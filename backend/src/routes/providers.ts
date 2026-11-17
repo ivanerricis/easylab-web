@@ -80,6 +80,7 @@ const providersRouter = createCrudRouter({
                 customerPhone: provider.phoneNumber,
                 customerEmail: provider.email,
                 subjectLabel: "Fornitore",
+                logoDataUrl: provider.logoDataUrl,
                 ...(await getLabConfig()),
                 contractCount: contracts.length,
                 contracts: contracts.map((contract) => ({

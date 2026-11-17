@@ -415,6 +415,11 @@ export type CustomerContractsPrintData = CustomerSummaryHeaderData & {
     contractCount: number;
     /** Già nell'ordine di stampa: dal più recente. */
     contracts: CustomerContractSummaryItem[];
+    /**
+     * Il logo in testa al resoconto, come nei PDF dei singoli contratti: quello del fornitore nel
+     * suo resoconto. Se manca (cliente, o fornitore senza logo) si usa quello del laboratorio.
+     */
+    logoDataUrl?: string | null;
 };
 
 // Una bozza è un preventivo: lo si dice, perché nell'elenco non c'è altro a distinguerla.
@@ -513,7 +518,7 @@ const buildContractsSummaryTable = (contracts: CustomerContractSummaryItem[], is
 };
 
 export const createCustomerContractsPdfBuffer = async (customer: CustomerContractsPrintData) => {
-    const logoDataUrl = await loadLogoDataUrl();
+    const logoDataUrl = customer.logoDataUrl || (await loadLogoDataUrl());
     const statusSummary = buildStatusSummary(customer.contracts);
 
     const documentDefinition = wrapPdfDocument([

@@ -126,6 +126,27 @@ describe("createCustomerContractsPdfBuffer", () => {
         expect(JSON.stringify(doc)).toContain("Fornitore #5");
     });
 
+    it("nel resoconto di un fornitore usa il suo logo, e quello del laboratorio se non ne ha", async () => {
+        loadLogoDataUrl.mockResolvedValue("data:image/png;base64,TEFC");
+
+        const withLogo = await capture({
+            ...buildData([buildItem()]),
+            subjectLabel: "Fornitore",
+            logoDataUrl: "data:image/png;base64,Rk9STg==",
+        });
+        expect(JSON.stringify(withLogo)).toContain("data:image/png;base64,Rk9STg==");
+        expect(JSON.stringify(withLogo)).not.toContain("data:image/png;base64,TEFC");
+        expect(loadLogoDataUrl).not.toHaveBeenCalled();
+
+        createPdf.mockClear();
+        const withoutLogo = await capture({
+            ...buildData([buildItem()]),
+            subjectLabel: "Fornitore",
+            logoDataUrl: null,
+        });
+        expect(JSON.stringify(withoutLogo)).toContain("data:image/png;base64,TEFC");
+    });
+
     it("etichetta come preventivo la bozza e scrive il Supporto con le ore su 12 mesi e il prezzo unico", async () => {
         const doc = await capture(
             buildData([

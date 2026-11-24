@@ -56,6 +56,7 @@ export type ReportPrintData = {
     dataBackup: boolean;
     charger: boolean;
     alerted: boolean;
+    toInvoice: boolean;
     totalPrice: number;
     createdAtLabel: string;
 };
@@ -125,6 +126,15 @@ const cardIconSvg = `
     <path d="M2 10h20" />
     <path d="M6 14h4" />
     <path d="M6 16h2.5" />
+</svg>`;
+
+const invoiceIconSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2A75B9" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 2.5h8.5L19 7v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z" />
+    <path d="M14 2.5V7h5" />
+    <path d="M8.5 11.5h7" />
+    <path d="M8.5 15h7" />
+    <path d="M8.5 18h4" />
 </svg>`;
 
 const euroIconSvg = `
@@ -380,11 +390,14 @@ const boxedTable = (title: string, cell: object, rowPadding: number) => ({
     layout: reportTableLayout(rowPadding),
 });
 
-const paymentIconCell = (iconSvg: string, label: string) => ({
+// `marked` evidenzia la casella gia' scelta nel gestionale (oggi solo "Da fatturare"): le altre
+// due si spuntano a mano alla consegna.
+const paymentIconCell = (iconSvg: string, label: string, marked = false) => ({
     stack: [
         { svg: iconSvg, width: 26, height: 26, alignment: "center", margin: [0, 1, 0, 2] },
-        { text: label, style: "paymentLabel", alignment: "center" },
+        { text: label, style: "paymentLabel", alignment: "center", ...(marked ? { bold: true } : {}) },
     ],
+    ...(marked ? { fillColor: "#E7ECF3" } : {}),
 });
 
 const buildAmountCell = (report: ReportPrintData) => ({
@@ -424,21 +437,25 @@ const buildWorkAndAlertBox = (report: ReportPrintData, rowPadding: number) => ({
 const buildNotesAndPaymentSection = (report: ReportPrintData, rowPadding: number) => ({
     columns: [
         {
-            width: "33%",
+            width: "31%",
             ...buildWorkAndAlertBox(report, rowPadding),
         },
         {
-            width: "33%",
+            width: "21%",
             ...boxedTable("IMPORTO", buildAmountCell(report), rowPadding),
         },
         {
-            width: "34%",
+            width: "48%",
             table: {
-                widths: ["*", "*"],
+                widths: ["*", "*", "*"],
                 heights: (row: number) => (row === 0 ? "auto" : 42),
                 body: [
-                    sectionBarRow("PAGAMENTO", 2),
-                    [paymentIconCell(cashIconSvg, "Contanti"), paymentIconCell(cardIconSvg, "Carta")],
+                    sectionBarRow("PAGAMENTO", 3),
+                    [
+                        paymentIconCell(cashIconSvg, "Contanti"),
+                        paymentIconCell(cardIconSvg, "Carta"),
+                        paymentIconCell(invoiceIconSvg, "Da fatturare", report.toInvoice),
+                    ],
                 ],
             },
             layout: reportTableLayout(rowPadding),

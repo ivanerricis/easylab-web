@@ -96,7 +96,7 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     effectiveStatus: "active",
     termMonths: 12,
     billingMonths: null,
-    device: "Server NAS",
+    devices: [{ id: 5, type: "server", name: "Server NAS", serialNumber: "SN-1", model: null }],
     note: "Rinnovo automatico",
     startDate: "2026-06-01",
     endDate: "2027-06-01",
@@ -118,7 +118,14 @@ beforeEach(() => {
     // si parte con la colonna Azioni mostrata. Quelli sulle colonne nascoste svuotano la preferenza.
     setStoredHiddenColumns("contracts", ["!actions"]);
     api.listContracts.mockResolvedValue(
-        page([contract(), contract({ id: 22, effectiveStatus: "expired", device: "Firewall" })])
+        page([
+            contract(),
+            contract({
+                id: 22,
+                effectiveStatus: "expired",
+                devices: [{ id: 6, type: "firewall", name: "Firewall", serialNumber: "FW-1", model: null }],
+            }),
+        ])
     );
     api.listInterventions.mockResolvedValue(page([]));
 });
@@ -128,11 +135,11 @@ describe("ContractsPage", () => {
         renderWithProviders(<ContractsPage />, { route: "/contracts" });
 
         const table = await screen.findByRole("table");
-        expect(await within(table).findByText("Server NAS")).toBeInTheDocument();
+        expect(await within(table).findByText("Server NAS – Server – S/N SN-1")).toBeInTheDocument();
         expect(within(table).getAllByText("Assistenza Remota Pack 20")).toHaveLength(2);
         expect(within(table).getByText("Scaduto")).toBeInTheDocument();
         expect(within(table).getByText("Attivo")).toBeInTheDocument();
-        for (const header of ["Cliente", "Fornitore", "Tipo", "Pacchetto", "Dispositivo", "Inizio", "Fine", "Stato"]) {
+        for (const header of ["Cliente", "Fornitore", "Tipo", "Pacchetto", "Dispositivi", "Inizio", "Fine", "Stato"]) {
             expect(within(table).getByRole("columnheader", { name: new RegExp(header) })).toBeInTheDocument();
         }
         expect(api.listContracts).toHaveBeenCalledWith(
@@ -489,7 +496,7 @@ describe("ProviderPage", () => {
         expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Rossi Informatica");
         expect(screen.getByText("Anna Verdi")).toBeInTheDocument();
         expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ providerId: 8 }));
-        expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
+        expect((await screen.findAllByText("Server NAS – Server – S/N SN-1")).length).toBeGreaterThan(0);
     });
 
     const provider = {

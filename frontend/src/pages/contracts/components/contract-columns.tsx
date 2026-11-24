@@ -1,6 +1,7 @@
 import CustomerLink from "@/components/customer-link";
 import type { EntityColumn } from "@/components/entity-table";
 import { formatContractPackage, formatContractStatus, formatContractType } from "@/lib/contracts";
+import { formatDeviceLine } from "@/lib/customerDevices";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatDate } from "@/lib/utils";
 import type { ContractDto } from "@/types/dtos";
@@ -49,10 +50,20 @@ export const contractColumns: ContractColumn[] = [
         render: (row) => (row.assistance ? formatContractPackage(row) : "-"),
     },
     {
-        key: "device",
-        header: "Dispositivo",
+        key: "devices",
+        header: "Dispositivi",
         cardSlot: "wide",
-        render: (row) => row.device,
+        // Uno per riga: "Nome – Tipo – S/N", senza i seriali la colonna non distinguerebbe due apparecchi omonimi.
+        render: (row) =>
+            row.devices.length > 0 ? (
+                <ul className="grid gap-0.5">
+                    {row.devices.map((device) => (
+                        <li key={device.id}>{formatDeviceLine(device)}</li>
+                    ))}
+                </ul>
+            ) : (
+                "-"
+            ),
     },
     {
         key: "startDate",

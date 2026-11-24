@@ -63,7 +63,7 @@ const contract = {
     id: 21,
     type: "rental",
     effectiveStatus: "expired",
-    device: "Portatile",
+    devices: [{ id: 5, type: "server", name: "Portatile", serialNumber: "SN-1", model: null }],
     customerName: "Mario Rossi",
 };
 

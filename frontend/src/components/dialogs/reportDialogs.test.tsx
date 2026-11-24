@@ -641,6 +641,7 @@ describe("EditReportDialog", () => {
         closed: false,
         price: 80,
         paymentMethod: "cash",
+        toInvoice: true,
         created_at: "2026-01-01T00:00:00.000Z",
         updated_at: null,
     };
@@ -711,6 +712,7 @@ describe("EditReportDialog", () => {
             note: null,
             password: "0000",
             paymentMethod: "cash",
+            toInvoice: true,
             dataBackup: false,
             charger: true,
             alerted: false,

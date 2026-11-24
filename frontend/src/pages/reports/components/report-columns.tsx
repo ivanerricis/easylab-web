@@ -3,6 +3,7 @@ import type { EntityColumn } from "@/components/entity-table";
 import HoverDetailCell from "@/components/hover-detail-cell";
 import { formatDateTime, formatEuro, formatYesNo } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
+import { formatToInvoiceStatus } from "@/lib/interventions";
 import { formatReportStatus, paymentMethodLabels } from "@/lib/reports";
 
 // Le proprietà di `EntityColumn` (ordinamento, visibilità), con la chiave ristretta ai campi
@@ -72,6 +73,15 @@ export const reportColumns: ReportColumn[] = [
         header: "Pagato",
         cardCollapsed: true,
         render: (row) => (row.paymentMethod === "non_paid" ? "No" : paymentMethodLabels[row.paymentMethod]),
+    },
+    {
+        // Facoltativa e nascosta di default: la fattura è l'eccezione, e la colonna serve solo a
+        // chi vuole vedere a colpo d'occhio quali report vanno fatturati.
+        key: "toInvoice",
+        header: "Da fatturare",
+        hiddenByDefault: true,
+        cardCollapsed: true,
+        render: (row) => formatToInvoiceStatus(row.toInvoice),
     },
     {
         // Lo stato non era scritto da nessuna parte: lo diceva solo il colore della riga

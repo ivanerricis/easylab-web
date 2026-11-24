@@ -347,14 +347,14 @@ const buildRetentionNoticeSection = () => ({
     margin: [0, 0, 0, 4],
 });
 
-const buildWorkSection = (report: ReportPrintData, rowHeight: number, rowPadding: number) => {
+const buildWorkSection = (report: ReportPrintData, rowHeight: number, rowPadding: number, valueFontSize: number) => {
     const serviceDescription = report.serviceDescription?.trim();
 
     // Se l'intervento ha gia' una descrizione scritta in digitale, va stampata: le righe
     // vuote servono solo quando manca, per lasciare spazio da compilare a mano.
     const bodyRows = serviceDescription
         ? [
-              [{ text: serviceDescription, rowSpan: WORK_ROW_COUNT, fontSize: 9, margin: [2, 2, 2, 2] }],
+              [{ text: serviceDescription, rowSpan: WORK_ROW_COUNT, fontSize: valueFontSize, margin: [2, 2, 2, 2] }],
               ...Array.from({ length: WORK_ROW_COUNT - 1 }, () => [{}]),
           ]
         : Array.from({ length: WORK_ROW_COUNT }, () => [emptyCell()]);
@@ -504,7 +504,7 @@ const buildReceiptDefinition = (
                 margin: [0, 6, 0, 8],
             },
             ...copyBlock(true),
-            buildWorkSection(report, workRowHeight, rowPadding),
+            buildWorkSection(report, workRowHeight, rowPadding, valueFontSize),
             buildNotesAndPaymentSection(report, rowPadding),
             // Sentinella invisibile: la sua posizione di partenza e' la fine del contenuto.
             // Solo nella passata di misura: nel PDF finale il contenuto arriva a filo pagina

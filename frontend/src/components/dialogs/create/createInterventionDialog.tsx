@@ -25,6 +25,7 @@ import {
     type InterventionFormState,
 } from "@/lib/interventionForm";
 import { getTodayDateString } from "@/lib/interventions";
+import { useInterventionDeviceChoice } from "@/hooks/useInterventionDeviceChoice";
 import { useLinkableContracts } from "@/hooks/useLinkableContracts";
 import type { CollaboratorDto, CustomerDto, InterventionStatus, InterventionType } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
@@ -49,6 +50,8 @@ export type CreateInterventionSubmitValues = {
     collaboratorId: number;
     /** Il contratto di assistenza a cui imputare le ore; `null` se nessuno. */
     contractId: number | null;
+    /** Il dispositivo del contratto su cui si interviene; `null` se nessuno. */
+    customerDeviceId: number | null;
     interventionDate: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -142,6 +145,15 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
     });
     const { contractId: selectedContractId } = formValues;
     const { isReady: areContractsReady, options: contractOptions, hint: contractHint } = linkableContracts;
+    // Con un solo dispositivo nel contratto scelto lo si propone già (l'utente può toglierlo).
+    const deviceChoices = useInterventionDeviceChoice({
+        values: formValues,
+        setValues: setFormValues,
+        contractOptions,
+        areContractsReady,
+        preselectSingle: true,
+        resetKey: open,
+    });
     const isSelectedContractValid =
         selectedContractId === "" ||
         (selectedCustomerId != null &&
@@ -450,6 +462,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         onChange={handleChange}
                                         contractOptions={contractOptions}
                                         contractHint={contractHint}
+                                        deviceChoices={deviceChoices}
                                     />
                                 ) : null}
                             </>
@@ -467,6 +480,7 @@ const CreateInterventionDialog = ({ open, onOpenChange, onSubmit, initialDate, i
                                         withoutProgress
                                         contractOptions={contractOptions}
                                         contractHint={contractHint}
+                                        deviceChoices={deviceChoices}
                                     />
                                 </div>
                                 <InterventionProgressSection

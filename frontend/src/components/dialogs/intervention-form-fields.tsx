@@ -19,9 +19,10 @@ import {
     isCompletedInterventionStatus,
 } from "@/lib/interventions";
 import { formatContractOption } from "@/lib/contracts";
+import { formatDeviceLine } from "@/lib/customerDevices";
 import { formatPersonName } from "@/lib/people";
 import { cn } from "@/lib/utils";
-import type { CollaboratorDto, ContractDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import type { CollaboratorDto, ContractDto, InterventionStatus, InterventionType, LinkedDeviceDto } from "@/types/dtos";
 import type { ReactNode } from "react";
 
 /**
@@ -303,6 +304,7 @@ export const InterventionDetailsSection = ({
     withoutProgress = false,
     contractOptions,
     contractHint,
+    deviceChoices = [],
 }: FieldsProps & {
     withoutProgress?: boolean;
     /**
@@ -312,6 +314,12 @@ export const InterventionDetailsSection = ({
     contractOptions?: ContractDto[];
     /** Perché il menu dei contratti manca pur avendo il cliente dei contratti (vedi `explainNoLinkableContract`). */
     contractHint?: string | null;
+    /**
+     * I dispositivi del contratto scelto (vedi `useInterventionDeviceChoice`). Il campo "Dispositivo"
+     * c'è solo se il contratto ne ha almeno uno: senza contratto, o con un contratto senza dispositivi,
+     * non compare.
+     */
+    deviceChoices?: LinkedDeviceDto[];
 }) => {
     const common = { values, errors, onChange };
     const isAssistance = isAssistanceInterventionType(values.type);
@@ -361,6 +369,33 @@ export const InterventionDetailsSection = ({
                                 {contractOptions.map((contract) => (
                                     <SelectItem key={contract.id} value={String(contract.id)}>
                                         {formatContractOption(contract)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </FormField>
+                ) : null}
+
+                {deviceChoices.length > 0 && isAssistance && values.contractId !== "" ? (
+                    <FormField labelSize="sm" id="customerDeviceId" label="Dispositivo" className="gap-1 lg:col-span-2">
+                        <Select
+                            value={values.customerDeviceId || noContractValue}
+                            onValueChange={(customerDeviceId) => {
+                                if (customerDeviceId !== "") {
+                                    onChange({
+                                        customerDeviceId: customerDeviceId === noContractValue ? "" : customerDeviceId,
+                                    });
+                                }
+                            }}
+                        >
+                            <SelectTrigger id="customerDeviceId" className="w-full">
+                                <SelectValue placeholder="Nessun dispositivo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={noContractValue}>Nessun dispositivo</SelectItem>
+                                {deviceChoices.map((device) => (
+                                    <SelectItem key={device.id} value={String(device.id)}>
+                                        {formatDeviceLine(device)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

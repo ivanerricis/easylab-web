@@ -29,6 +29,8 @@ export type InterventionFormState = {
     collaboratorId: string;
     /** Il contratto di assistenza scelto (id come testo, come `collaboratorId`); vuoto = nessuno. */
     contractId: string;
+    /** Il dispositivo del contratto scelto (id come testo); vuoto = nessuno. Solo se c'è il contratto. */
+    customerDeviceId: string;
     interventionDate: string;
     startTime: string;
     endTime: string;
@@ -47,6 +49,7 @@ export const emptyInterventionFormState = (interventionDate: string): Interventi
     toInvoice: false,
     collaboratorId: "",
     contractId: "",
+    customerDeviceId: "",
     interventionDate,
     startTime: "",
     endTime: "",
@@ -116,6 +119,11 @@ export const toInterventionSubmitFields = (values: InterventionFormState) => {
         collaboratorId: Number(values.collaboratorId),
         // La consegna di materiale non consuma mai ore: il contratto non le si applica.
         contractId: isAssistance && values.contractId !== "" ? Number(values.contractId) : null,
+        // Il dispositivo è uno di quelli del contratto: senza contratto non c'è.
+        customerDeviceId:
+            isAssistance && values.contractId !== "" && values.customerDeviceId !== ""
+                ? Number(values.customerDeviceId)
+                : null,
         interventionDate: values.interventionDate,
         startTime: isAssistance ? values.startTime || null : null,
         endTime: isAssistance ? values.endTime || null : null,
@@ -146,6 +154,7 @@ export const toInterventionCreatePayload = (
     customerId,
     collaboratorId: values.collaboratorId,
     contractId: values.contractId,
+    customerDeviceId: values.customerDeviceId,
     interventionDate: values.interventionDate,
     startTime: values.startTime,
     endTime: values.endTime,
@@ -182,6 +191,7 @@ export const toInterventionUpdatePayload = (
     // Assente = invariato: un vecchio intervento il cui contratto è nel frattempo scaduto non deve
     // essere ricontrollato dal server a ogni modifica di altro.
     ...(values.contractId === undefined ? {} : { contractId: values.contractId }),
+    ...(values.customerDeviceId === undefined ? {} : { customerDeviceId: values.customerDeviceId }),
     interventionDate: values.interventionDate,
     startTime: values.startTime,
     endTime: values.endTime,

@@ -15,7 +15,8 @@ export type ContractFormState = {
     termMonths: string;
     /** Come `termMonths`, per il periodo di fatturazione del noleggio (ignorato per l'assistenza). */
     billingMonths: string;
-    device: string;
+    /** Gli id dei dispositivi del cliente coperti: facoltativi, anche più d'uno. */
+    deviceIds: number[];
     note: string;
     startDate: string;
     customer: string;
@@ -24,8 +25,7 @@ export type ContractFormState = {
     package: AssistancePackage;
 };
 
-export type ContractFormField =
-    "customer" | "provider" | "device" | "startDate" | "termMonths" | "billingMonths" | "package";
+export type ContractFormField = "customer" | "provider" | "startDate" | "termMonths" | "billingMonths" | "package";
 
 export type ContractFieldErrors = Partial<Record<ContractFormField, string>>;
 
@@ -36,7 +36,6 @@ export const contractFieldOrder = [
     "startDate",
     "termMonths",
     "billingMonths",
-    "device",
     "package",
 ] as const;
 
@@ -54,7 +53,7 @@ export const emptyContractFormState = (startDate: string, customer = ""): Contra
     status: "active",
     termMonths: "12",
     billingMonths: "3",
-    device: "",
+    deviceIds: [],
     note: "",
     startDate,
     customer,
@@ -95,10 +94,6 @@ export const validateContractForm = (
         errors.billingMonths = monthsError;
     }
 
-    if (values.device.trim() === "") {
-        errors.device = "Indica il dispositivo";
-    }
-
     return errors;
 };
 
@@ -106,13 +101,15 @@ export const validateContractForm = (
 export const toContractSubmitValues = (
     values: ContractFormState,
     customerId: number,
-    providerId: number
+    providerId: number,
+    /** Già filtrati sui dispositivi del cliente risolto: vedi il dialogo. */
+    deviceIds: number[] = values.deviceIds
 ): ContractSubmitValues => ({
     type: values.type,
     status: values.status,
     termMonths: Number(values.termMonths),
     billingMonths: values.type === "rental" ? Number(values.billingMonths) : null,
-    device: values.device.trim(),
+    deviceIds,
     note: trimOrNull(values.note),
     startDate: values.startDate,
     customerId,
@@ -126,7 +123,7 @@ const toContractBody = (values: ContractSubmitValues) => ({
     termMonths: values.termMonths,
     // Il periodo di fatturazione solo per il noleggio: il server lo vieta all'assistenza.
     ...(values.billingMonths != null ? { billingMonths: values.billingMonths } : {}),
-    device: values.device,
+    deviceIds: values.deviceIds,
     note: values.note,
     startDate: values.startDate,
     customerId: values.customerId,

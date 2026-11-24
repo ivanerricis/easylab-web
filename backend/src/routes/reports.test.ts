@@ -80,6 +80,7 @@ const printReportRow = {
     charger: false,
     alerted: true,
     pickedUp: false,
+    toInvoice: true,
     price: 50,
     created_at: new Date("2026-01-01T10:00:00Z"),
     customerName: "Mario Rossi",
@@ -106,6 +107,7 @@ const storedReport = {
     pickedUp: false,
     closed: false,
     paymentMethod: "non_paid",
+    toInvoice: false,
     price: 0,
     created_at: new Date("2026-01-01T10:00:00Z"),
     updated_at: null,
@@ -204,6 +206,7 @@ describe("reports router", () => {
             technicianPrice: 20,
             totalPrice: 70,
             paymentMethod: "cash",
+            toInvoice: true,
             closed: true,
             note: "Richiamare",
             password: "1234",
@@ -229,6 +232,7 @@ describe("reports router", () => {
             });
             expect(response.text).toContain("Metodo di pagamento");
             expect(response.text).toContain("Contanti");
+            expect(response.text).toContain("Da fatturare");
 
             // Colonne per nome, non solo per contenuto: verifica anche l'ordine, così un
             // futuro riordino delle colonne farebbe fallire il test invece di passare per caso.
@@ -245,6 +249,8 @@ describe("reports router", () => {
             expect(columnValue("Prezzo interno")).toBe("50");
             expect(columnValue("Compenso tecnico")).toBe("20");
             expect(columnValue("Prezzo totale")).toBe("70");
+            expect(headers.indexOf("Da fatturare")).toBe(headers.indexOf("Metodo di pagamento") + 1);
+            expect(columnValue("Da fatturare")).toBe("Sì");
         });
 
         it("senza filtri la visibilità di default è 'all', a differenza della lista paginata", async () => {
@@ -341,6 +347,7 @@ describe("reports router", () => {
                     issueDescription: "Schermo incrinato sull'angolo",
                     serviceDescription: "Sostituito display",
                     totalPrice: 70,
+                    toInvoice: true,
                     createdAtLabel: "1 gen 2026",
                     ...labHeader,
                 })
@@ -555,6 +562,25 @@ describe("reports router", () => {
             );
         });
 
+        it("senza indicarlo il report non è da fatturare", async () => {
+            vi.mocked(createReport).mockResolvedValue([storedReport] as never);
+
+            await request(buildApp()).post("/api/reports").send(minimalBody);
+
+            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ toInvoice: false }), undefined);
+        });
+
+        it("crea un report da fatturare", async () => {
+            vi.mocked(createReport).mockResolvedValue([storedReport] as never);
+
+            const response = await request(buildApp())
+                .post("/api/reports")
+                .send({ ...minimalBody, toInvoice: true });
+
+            expect(response.status).toBe(201);
+            expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ toInvoice: true }), undefined);
+        });
+
         it("accetta un pagamento con carta con prezzo maggiore di zero", async () => {
             vi.mocked(createReport).mockResolvedValue([storedReport] as never);
 
@@ -616,6 +642,16 @@ describe("reports router", () => {
 
             expect(response.status).toBe(200);
             expect(updateReportById).toHaveBeenCalledWith(1, { pickedUp: true }, undefined);
+        });
+
+        it("inoltra il flag toInvoice all'aggiornamento", async () => {
+            vi.mocked(getReportById).mockResolvedValue([storedReport] as never);
+            vi.mocked(updateReportById).mockResolvedValue([{ ...storedReport, toInvoice: true }] as never);
+
+            const response = await request(buildApp()).put("/api/reports/1").send({ toInvoice: true });
+
+            expect(response.status).toBe(200);
+            expect(updateReportById).toHaveBeenCalledWith(1, { toInvoice: true }, undefined);
         });
 
         it("aggiorna un campo mantenendo il resto della riga esistente", async () => {

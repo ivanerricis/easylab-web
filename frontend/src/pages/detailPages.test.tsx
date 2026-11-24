@@ -137,6 +137,7 @@ const report = {
     // lo ricalcola più da sé sommando prezzo e compenso tecnico.
     totalPrice: 105,
     paymentMethod: "card",
+    toInvoice: true,
     created_at: "2026-09-01T10:00:00.000Z",
     updated_at: null,
 };
@@ -192,6 +193,7 @@ describe("ReportPage", () => {
         expect(detailValue("Problema riscontrato")).toBe("Non carica");
         expect(detailValue("Avvisato")).toBe("Sì");
         expect(detailValue("Ritirato")).toBe("Sì");
+        expect(detailValue("Da fatturare")).toBe("Sì");
         expect(detailValue("Alimentatore")).toBe("No");
         expect(screen.getByText("Carta")).toBeInTheDocument();
         expect(screen.getByText("Paolo")).toBeInTheDocument();

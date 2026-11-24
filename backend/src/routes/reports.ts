@@ -64,6 +64,7 @@ const reportBodySchema = z
         closed: z.boolean().optional(),
         paymentMethod: z.enum(reportPaymentMethods).optional(),
         price: z.coerce.number().int().min(0).optional(),
+        toInvoice: z.boolean().optional(),
         // Il tecnico esterno viaggia con il report: `null` lo toglie, assente lo lascia com'è.
         // Vedi `ReportTechnicianInput`.
         technicianId: z.coerce.number().int().positive().nullable().optional(),
@@ -170,6 +171,7 @@ reportsRouter.get("/export.csv", validate({ query: reportExportQuerySchema }), a
                 header: "Metodo di pagamento",
                 value: (report) => formatReportPaymentMethod(report.paymentMethod),
             },
+            { header: "Da fatturare", value: (report) => report.toInvoice },
             { header: "Chiuso", value: (report) => report.closed },
             { header: "Note", value: (report) => report.note },
             { header: "Password", value: (report) => report.password },
@@ -233,6 +235,7 @@ reportsRouter.get("/:id/print", validate({ params: idParamsSchema }), async (req
         dataBackup: report.dataBackup,
         charger: report.charger,
         alerted: report.alerted,
+        toInvoice: report.toInvoice,
         totalPrice: report.totalPrice,
         createdAtLabel: formatDateLabel(report.created_at, timeZone),
     });
@@ -291,7 +294,10 @@ reportsRouter.post("/", auditAs("creato report"), validate({ body: reportCreateB
 
     // Il CHECK di riga sul database (migration 0035_report_domain_checks) fa rifiutare a
     // Postgres sia questa sia la PUT qui sotto: vedi il commento su `reportCreateBodySchema`.
-    const createdReport = await createReport({ ...report, paymentMethod, price }, technician);
+    const createdReport = await createReport(
+        { ...report, paymentMethod, price, toInvoice: report.toInvoice ?? false },
+        technician
+    );
 
     setAuditSubject(res, describeSubject(createdReport[0].id));
     res.status(201).json(createdReport[0]);

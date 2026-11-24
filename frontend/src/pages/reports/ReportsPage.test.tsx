@@ -146,6 +146,7 @@ const buildReport = (id: number, overrides: Record<string, unknown> = {}) => ({
     alerted: false,
     pickedUp: false,
     paymentMethod: "non_paid",
+    toInvoice: false,
     price: 0,
     customer: `Cliente ${id}`,
     customerPhone: "333",
@@ -176,6 +177,7 @@ const baseEdit = {
     note: null,
     password: null,
     paymentMethod: "cash",
+    toInvoice: false,
     dataBackup: false,
     charger: false,
     alerted: false,
@@ -208,12 +210,12 @@ beforeEach(() => {
 });
 
 describe("ReportsPage", () => {
-    it("mostra di default i report aperti, con la colonna Stato nascosta", async () => {
+    it("mostra di default i report aperti, con le colonne Stato e Da fatturare nascoste", async () => {
         await renderPage();
 
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ visibility: "open" }));
         expect(within(table()).queryByRole("columnheader", { name: "Stato" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Colonne, 1 nascoste" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 2 nascoste" })).toBeInTheDocument();
     });
 
     it("la colonna Stato si mostra dal menu, e lo stato di ogni riga è scritto", async () => {
@@ -225,6 +227,16 @@ describe("ReportsPage", () => {
 
         expect(within(table()).getAllByText("Aperto")).toHaveLength(1);
         expect(within(table()).getByText("Chiuso")).toBeInTheDocument();
+    });
+
+    it("la colonna Da fatturare si mostra dal menu", async () => {
+        await renderPage();
+
+        await userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
+        await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Da fatturare" }));
+        await userEvent.keyboard("{Escape}");
+
+        expect(within(table()).getByRole("columnheader", { name: "Da fatturare" })).toBeInTheDocument();
     });
 
     it('apre la creazione con "n"', async () => {
@@ -471,7 +483,7 @@ describe("ReportsPage", () => {
 
         expect(within(table()).queryByRole("columnheader", { name: "Password" })).not.toBeInTheDocument();
         expect(within(table()).queryByRole("columnheader", { name: "Backup dati" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Colonne, 3 nascoste" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 4 nascoste" })).toBeInTheDocument();
         unmount();
 
         renderWithProviders(<ReportsPage />, { route: "/reports" });

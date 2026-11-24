@@ -113,6 +113,7 @@ export const toReportUpdatePayload = (values: EditReportSubmitValues) => ({
     closed: values.closed,
     paymentMethod: values.paymentMethod,
     price: values.internalPrice,
+    toInvoice: values.toInvoice,
     technicianId: values.technicianId,
     technicianPrice: values.technicianId == null ? 0 : values.technicianPrice,
 });

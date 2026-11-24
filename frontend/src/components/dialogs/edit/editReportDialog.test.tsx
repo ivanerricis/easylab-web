@@ -39,6 +39,7 @@ const baseReport = {
     password: null,
     paymentMethod: "non_paid" as const,
     price: 0,
+    toInvoice: false,
     dataBackup: false,
     charger: false,
     alerted: false,
@@ -168,6 +169,24 @@ describe("EditReportDialog: prezzi", () => {
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ technicianPrice: 25.5 }));
+        });
+    });
+});
+
+describe("EditReportDialog: fatturazione", () => {
+    it("mostra lo stato salvato e lo invia modificato insieme al resto del report", async () => {
+        api.getReport.mockResolvedValue({ ...report(1, ""), toInvoice: true });
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        renderDialog({ onSubmit });
+
+        const daFatturare = await screen.findByRole("radio", { name: "Da fatturare" });
+        expect(daFatturare).toBeChecked();
+
+        await userEvent.click(screen.getByRole("radio", { name: "Non da fatturare" }));
+        await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ toInvoice: false }));
         });
     });
 });

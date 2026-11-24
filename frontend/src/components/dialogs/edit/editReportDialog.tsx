@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import PaymentMethodSelector from "@/components/payment-method-selector";
+import ToInvoiceSelector from "@/components/to-invoice-selector";
 import { getApiErrorMessage, getReport, listCollaborators, listDevices, listIssues, listTechnicians } from "@/lib/api";
 import { isCatchAllIssue } from "@/lib/issues";
 import type { CollaboratorDto, DeviceDto, IssueDto, PaymentMethod, TechnicianDto } from "@/types/dtos";
@@ -56,6 +57,7 @@ export type EditReportSubmitValues = {
     note: string | null;
     password: string | null;
     paymentMethod: PaymentMethod;
+    toInvoice: boolean;
     dataBackup: boolean;
     charger: boolean;
     alerted: boolean;
@@ -100,6 +102,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
         note: "",
         password: "",
         paymentMethod: "non_paid" as PaymentMethod,
+        toInvoice: false,
         internalPrice: "0",
         dataBackup: false,
         charger: false,
@@ -167,6 +170,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                     note: report.note ?? "",
                     password: report.password ?? "",
                     paymentMethod: report.paymentMethod,
+                    toInvoice: report.toInvoice,
                     internalPrice: String(report.price),
                     dataBackup: report.dataBackup,
                     charger: report.charger,
@@ -283,6 +287,7 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                 note: formValues.note.trim() || null,
                 password: formValues.password.trim() || null,
                 paymentMethod: formValues.paymentMethod,
+                toInvoice: formValues.toInvoice,
                 dataBackup: formValues.dataBackup,
                 charger: formValues.charger,
                 alerted: formValues.alerted,
@@ -682,6 +687,15 @@ const EditReportDialog = ({ open, reportId, customerName, onOpenChange, onSubmit
                                                 }));
                                                 setErrors((prev) => ({ ...prev, internalPrice: undefined }));
                                             }}
+                                            orientation="stacked"
+                                        />
+
+                                        {/* Indipendente dal metodo: si fattura anche un report pagato in contanti. */}
+                                        <ToInvoiceSelector
+                                            value={formValues.toInvoice}
+                                            onValueChange={(toInvoice) =>
+                                                setFormValues((prev) => ({ ...prev, toInvoice }))
+                                            }
                                             orientation="stacked"
                                         />
                                     </FormSection>

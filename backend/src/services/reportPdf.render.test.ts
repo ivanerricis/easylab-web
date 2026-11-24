@@ -41,6 +41,7 @@ const buildReport = (overrides: Partial<ReportPrintData> = {}): ReportPrintData 
     dataBackup: false,
     charger: false,
     alerted: false,
+    toInvoice: false,
     totalPrice: 120,
     createdAtLabel: "10/09/2026",
     ...overrides,
@@ -153,6 +154,7 @@ describe("PADDING_COST_PER_POINT", () => {
             buildReport({ issueDescription: "Non si accende. ".repeat(10), note: "Richiamare. ".repeat(12) }),
         ],
         ["con l'avviso al cliente", buildReport({ alerted: true, dataBackup: true, charger: true })],
+        ["con la ricevuta da fatturare", buildReport({ toInvoice: true })],
     ])("è quello che misura l'impaginazione vera %s", async (_label, report) => {
         const layout = { workRowHeight: 18, rowPadding: 2.5, valueFontSize: 11.75 };
 

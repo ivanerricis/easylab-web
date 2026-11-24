@@ -338,6 +338,20 @@ describe("listReports: righe e join", () => {
         });
     });
 
+    it("restituisce toInvoice, falso se non indicato", async () => {
+        const toInvoice = await insertReport({ toInvoice: true });
+        const notToInvoice = await insertReport();
+
+        const result = await listReports({ page: 1, pageSize: 10, sortOrder: "asc", timeZone });
+
+        expect(result).toMatchObject({
+            items: [
+                { id: toInvoice.id, toInvoice: true },
+                { id: notToInvoice.id, toInvoice: false },
+            ],
+        });
+    });
+
     // D4: `technician` si chiamava così ma leggeva sempre il collaboratore, mai il tecnico
     // esterno vero. Ora `collaborator` è il collaboratore e `technicianName` (nullable) è il
     // tecnico esterno, dal join su `technicianTable` — vedi il contratto nel CHANGELOG.

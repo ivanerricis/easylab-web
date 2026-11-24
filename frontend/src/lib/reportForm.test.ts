@@ -153,6 +153,7 @@ describe("toReportUpdatePayload", () => {
             pickedUp: true,
             closed: true,
             internalPrice: 50,
+            toInvoice: true,
         };
 
         expect(toReportUpdatePayload(values)).toEqual({
@@ -171,6 +172,7 @@ describe("toReportUpdatePayload", () => {
             pickedUp: true,
             closed: true,
             price: 50,
+            toInvoice: true,
             technicianId: null,
             technicianPrice: 0,
         });

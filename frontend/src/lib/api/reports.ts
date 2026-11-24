@@ -29,6 +29,7 @@ export type ReportEntityDto = {
     closed: boolean;
     price: number;
     paymentMethod: PaymentMethod;
+    toInvoice: boolean;
     deviceId: number;
     issueId: number;
     collaboratorId: number | null;
@@ -53,6 +54,7 @@ export type ReportCreateInput = {
     closed?: boolean;
     paymentMethod?: PaymentMethod;
     price?: number;
+    toInvoice?: boolean;
     /**
      * Il tecnico esterno viaggia con il report: `null` lo toglie, assente lo lascia com'è. Il
      * server lo scrive nella stessa transazione del report (prima era una risorsa a parte, e

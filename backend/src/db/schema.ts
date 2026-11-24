@@ -66,6 +66,12 @@ export const reportTable = pgTable(
             .notNull()
             .default("non_paid"),
         price: integer("price").notNull().default(0),
+        /**
+         * Indipendente dal mezzo di pagamento: dice se per questo report va emessa fattura.
+         * Come per gli interventi il default è `false`. La colonna esisteva alle origini, fu tolta
+         * con la 0008 e torna con la 0048 su richiesta (CHANGELOG 2026-11-24).
+         */
+        toInvoice: boolean("to_invoice").notNull().default(false),
         ...timestamps,
         deviceId: integer("device_id")
             .notNull()

@@ -177,13 +177,14 @@ cls("report", "Report", C1, 40, [
     "+ closed: boolean [1]",
     "+ payment_method: PaymentMethod [1]",
     "+ price: int [1]",
+    "+ to_invoice: boolean [1]",
     "+ created_at: datetime [1]",
     "+ updated_at: datetime",
     "+ device_id: int FK [1]",
     "+ issue_id: int FK [1]",
     "+ collaborator_id: int FK",
     "+ customer_id: int FK [1]",
-])
+], new_rows=(12,))
 cls("reptech", "ReportTechnician", C2, 40, [
     "+ report_id: int PK FK [1]",
     "+ technician_id: int FK [1]",

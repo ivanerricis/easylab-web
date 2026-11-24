@@ -97,6 +97,7 @@ const buildReport = (overrides: Partial<ReportPrintData> = {}): ReportPrintData 
     dataBackup: false,
     charger: false,
     alerted: false,
+    toInvoice: false,
     totalPrice: 120,
     createdAtLabel: "10/09/2026",
     ...overrides,
@@ -248,6 +249,25 @@ describe("createReportPdfBuffer", () => {
 
         expect(countSi(nonAvvisato)).toBe(0);
         expect(countSi(avvisato)).toBe(1);
+    });
+});
+
+describe("riquadro PAGAMENTO della ricevuta", () => {
+    it("ha tre caselle (Contanti, Carta, Da fatturare) e mette in evidenza Da fatturare solo se il report lo e'", async () => {
+        const daFatturare = JSON.stringify(await captureFinalReportDoc(buildReport({ toInvoice: true })));
+        const normale = JSON.stringify(await captureFinalReportDoc(buildReport({ toInvoice: false })));
+
+        for (const serialized of [daFatturare, normale]) {
+            expect(serialized).toContain("Contanti");
+            expect(serialized).toContain("Carta");
+            expect(serialized).toContain("Da fatturare");
+        }
+
+        // La casella evidenziata ha il grassetto sull'etichetta e lo sfondo di sezione.
+        const evidenziata = (json: string) => (json.match(/"text":"Da fatturare"[^}]*"bold":true/g) ?? []).length;
+
+        expect(evidenziata(daFatturare)).toBe(1);
+        expect(evidenziata(normale)).toBe(0);
     });
 });
 

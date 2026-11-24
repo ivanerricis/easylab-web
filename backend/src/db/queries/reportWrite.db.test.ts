@@ -130,6 +130,21 @@ describe("getReportDetailById: totalPrice e issueText", () => {
     });
 });
 
+describe("toInvoice (migration 0048_report_to_invoice)", () => {
+    it("un report nasce non da fatturare e si può segnare e togliere", async () => {
+        const report = await insertReport();
+
+        expect(report.toInvoice).toBe(false);
+
+        const [marked] = await updateReportById(report.id, { toInvoice: true });
+        expect(marked.toInvoice).toBe(true);
+        expect((await getReportDetailById(report.id))[0].toInvoice).toBe(true);
+
+        const [unmarked] = await updateReportById(report.id, { toInvoice: false });
+        expect(unmarked.toInvoice).toBe(false);
+    });
+});
+
 describe("deleteReportById", () => {
     // Il difetto trovato nella revisione del 2026-09-18: la chiave esterna era "no action", e
     // un report con un tecnico non si poteva eliminare. Migration 0032.

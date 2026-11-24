@@ -16,6 +16,8 @@ export type ReportDto = {
     pickedUp: boolean;
     paymentMethod: PaymentMethod;
     price: number;
+    /** Se per il report va emessa fattura: indipendente da come e se è stato pagato. */
+    toInvoice: boolean;
     customer: string;
     customerPhone: string | null;
     device: string;

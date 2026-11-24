@@ -16,6 +16,7 @@ import { Pencil, Printer } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { formatReportStatus, paymentMethodLabels, reportStatusColor } from "@/lib/reports";
+import { formatToInvoiceStatus } from "@/lib/interventions";
 
 const ReportPage = () => {
     const { id } = useParams();
@@ -175,6 +176,7 @@ const ReportPage = () => {
                             <DetailItem label="Backup dati" value={formatYesNo(report.dataBackup)} />
                             <DetailItem label="Avvisato" value={formatYesNo(report.alerted)} />
                             <DetailItem label="Ritirato" value={formatYesNo(report.pickedUp)} />
+                            <DetailItem label="Da fatturare" value={formatToInvoiceStatus(report.toInvoice)} />
                             <DetailItem label="Creato il" value={formatDateTime(report.created_at)} />
                             <DetailItem
                                 label="Ultimo aggiornamento"

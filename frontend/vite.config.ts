@@ -14,6 +14,20 @@ export default defineConfig({
         watch: {
             usePolling: true,
         },
+        // Il bind mount di Windows rende lenta la prima trasformazione di ogni file: senza
+        // warmup il primo accesso dopo un riavvio del container aspettava secondi per pagina
+        // (login, poi dashboard). Così Vite le prepara appena parte, prima che servano.
+        warmup: {
+            clientFiles: [
+                "./src/main.tsx",
+                "./src/pages/auth/LoginPage.tsx",
+                "./src/pages/MainLayout.tsx",
+                "./src/pages/dashboard/DashboardPage.tsx",
+                "./src/pages/reports/ReportsPage.tsx",
+                "./src/pages/interventions/InterventionsPage.tsx",
+                "./src/pages/customers/CustomersPage.tsx",
+            ],
+        },
     },
     build: {
         assetsDir: "static",

@@ -184,6 +184,7 @@ export const listReports = async ({
             pickedUp: reportTable.pickedUp,
             paymentMethod: reportTable.paymentMethod,
             price: reportTable.price,
+            toInvoice: reportTable.toInvoice,
             customer: customerSortExpr,
             customerPhone: sql<
                 string | null

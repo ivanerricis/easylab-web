@@ -3,6 +3,7 @@ import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import {
     collaboratorTable,
+    customerDeviceTable,
     customerTable,
     interventionTable,
     type InterventionStatus,
@@ -267,10 +268,15 @@ export const getInterventionDetailById = (id: number) =>
             customerPhoneSecondary: customerTable.phoneNumberSecondary,
             customerEmail: customerTable.email,
             collaboratorName: personName(collaboratorTable.firstName, collaboratorTable.lastName),
+            deviceType: customerDeviceTable.type,
+            deviceName: customerDeviceTable.name,
+            deviceSerialNumber: customerDeviceTable.serialNumber,
+            deviceModel: customerDeviceTable.model,
         })
         .from(interventionTable)
         .innerJoin(customerTable, eq(customerTable.id, interventionTable.customerId))
         .innerJoin(collaboratorTable, eq(collaboratorTable.id, interventionTable.collaboratorId))
+        .leftJoin(customerDeviceTable, eq(customerDeviceTable.id, interventionTable.customerDeviceId))
         .where(eq(interventionTable.id, id));
 
 export const createIntervention = (data: NewIntervention) => db.insert(interventionTable).values(data).returning();

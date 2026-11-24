@@ -22,6 +22,10 @@ vi.mock("../db/queries/contract", () => ({
     getContractById: vi.fn(),
 }));
 
+vi.mock("../db/queries/customerDevice", () => ({
+    listContractDeviceIds: vi.fn(),
+}));
+
 vi.mock("../services/assistanceHours", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../services/assistanceHours")>()),
     recheckAssistanceHours: vi.fn(),
@@ -58,6 +62,7 @@ import {
     updateInterventionById,
 } from "../db/queries/intervention";
 import { getContractById } from "../db/queries/contract";
+import { listContractDeviceIds } from "../db/queries/customerDevice";
 import { recheckAssistanceHours } from "../services/assistanceHours";
 import { getLabConfig } from "../config/lab";
 import { createInterventionPdfBuffer } from "../services/interventionPdf";
@@ -887,6 +892,129 @@ describe("interventions router", () => {
         beforeEach(() => {
             vi.mocked(getContractById).mockResolvedValue([contract] as never);
             vi.mocked(createIntervention).mockResolvedValue([linkedStored] as never);
+        });
+
+        describe("dispositivo del contratto", () => {
+            beforeEach(() => {
+                vi.mocked(listContractDeviceIds).mockResolvedValue([11, 12]);
+            });
+
+            it("POST accetta un dispositivo fra quelli del contratto", async () => {
+                const response = await request(buildApp())
+                    .post("/api/interventions")
+                    .send({ ...linkedBody, customerDeviceId: 11 });
+
+                expect(response.status).toBe(201);
+                expect(listContractDeviceIds).toHaveBeenCalledWith(5);
+                expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ customerDeviceId: 11 }));
+            });
+
+            it("POST rifiuta un dispositivo che non è del contratto", async () => {
+                const response = await request(buildApp())
+                    .post("/api/interventions")
+                    .send({ ...linkedBody, customerDeviceId: 99 });
+
+                expect(response.status).toBe(400);
+                expect(response.body).toEqual({
+                    message: "Il dispositivo selezionato non è fra quelli del contratto",
+                    field: "customerDeviceId",
+                });
+                expect(createIntervention).not.toHaveBeenCalled();
+            });
+
+            it("POST rifiuta un dispositivo senza contratto", async () => {
+                const response = await request(buildApp())
+                    .post("/api/interventions")
+                    .send({ ...linkedBody, contractId: null, customerDeviceId: 11 });
+
+                expect(response.status).toBe(400);
+                expect(response.body.field).toBe("customerDeviceId");
+                expect(createIntervention).not.toHaveBeenCalled();
+            });
+
+            it("POST senza dispositivo non interroga i dispositivi del contratto", async () => {
+                const response = await request(buildApp()).post("/api/interventions").send(linkedBody);
+
+                expect(response.status).toBe(201);
+                expect(listContractDeviceIds).not.toHaveBeenCalled();
+                expect(createIntervention).toHaveBeenCalledWith(expect.objectContaining({ customerDeviceId: null }));
+            });
+
+            it("PUT cambiando contratto rifiuta il dispositivo di prima se non è del nuovo contratto", async () => {
+                vi.mocked(getInterventionById).mockResolvedValue([
+                    { ...linkedStored, contractId: 4, customerDeviceId: 31 },
+                ] as never);
+
+                const response = await request(buildApp()).put("/api/interventions/1").send({ contractId: 5 });
+
+                expect(response.status).toBe(400);
+                expect(response.body.field).toBe("customerDeviceId");
+                expect(updateInterventionById).not.toHaveBeenCalled();
+            });
+
+            it("PUT cambiando contratto e dispositivo insieme accetta quello del nuovo contratto", async () => {
+                vi.mocked(getInterventionById).mockResolvedValue([
+                    { ...linkedStored, contractId: 4, customerDeviceId: 31 },
+                ] as never);
+                vi.mocked(updateInterventionById).mockResolvedValue([linkedStored] as never);
+
+                const response = await request(buildApp())
+                    .put("/api/interventions/1")
+                    .send({ contractId: 5, customerDeviceId: 12 });
+
+                expect(response.status).toBe(200);
+                expect(updateInterventionById).toHaveBeenCalledWith(
+                    1,
+                    expect.objectContaining({ contractId: 5, customerDeviceId: 12 })
+                );
+            });
+
+            it("PUT scollegando il contratto senza togliere il dispositivo è rifiutato; con null va bene", async () => {
+                vi.mocked(getInterventionById).mockResolvedValue([{ ...linkedStored, customerDeviceId: 11 }] as never);
+                vi.mocked(updateInterventionById).mockResolvedValue([linkedStored] as never);
+
+                const rejected = await request(buildApp()).put("/api/interventions/1").send({ contractId: null });
+                const accepted = await request(buildApp())
+                    .put("/api/interventions/1")
+                    .send({ contractId: null, customerDeviceId: null });
+
+                expect(rejected.status).toBe(400);
+                expect(accepted.status).toBe(200);
+            });
+
+            it("PUT di un campo estraneo non ricontrolla il dispositivo", async () => {
+                vi.mocked(getInterventionById).mockResolvedValue([{ ...linkedStored, customerDeviceId: 11 }] as never);
+                vi.mocked(updateInterventionById).mockResolvedValue([linkedStored] as never);
+
+                const response = await request(buildApp()).put("/api/interventions/1").send({ note: "x" });
+
+                expect(response.status).toBe(200);
+                expect(listContractDeviceIds).not.toHaveBeenCalled();
+            });
+
+            it("il dettaglio restituisce il dispositivo ripiegato in `customerDevice`", async () => {
+                vi.mocked(getInterventionDetailById).mockResolvedValue([
+                    {
+                        ...linkedStored,
+                        customerDeviceId: 11,
+                        deviceType: "server",
+                        deviceName: "NAS",
+                        deviceSerialNumber: "SN-1",
+                        deviceModel: null,
+                    },
+                ] as never);
+
+                const response = await request(buildApp()).get("/api/interventions/1");
+
+                expect(response.body.customerDevice).toEqual({
+                    id: 11,
+                    type: "server",
+                    name: "NAS",
+                    serialNumber: "SN-1",
+                    model: null,
+                });
+                expect(response.body).not.toHaveProperty("deviceName");
+            });
         });
 
         it("la lista inoltra il filtro per contratto", async () => {

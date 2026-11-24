@@ -8,6 +8,8 @@ import {
     updateProviderById,
 } from "../db/queries/provider";
 import { listContracts } from "../db/queries/contract";
+import { listDevicesOfContracts } from "../db/queries/customerDevice";
+import { formatDeviceLine } from "../services/customerDeviceLabels";
 import { personDisplayName } from "../db/queries/personName";
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { createCustomerContractsPdfBuffer } from "../services/contractPdf";
@@ -72,6 +74,7 @@ const providersRouter = createCrudRouter({
             const rows = Array.isArray(result) ? result : result.items;
             // Dal più recente, come l'elenco dei contratti.
             const contracts = [...rows].sort((a, b) => b.id - a.id);
+            const devicesByContract = await listDevicesOfContracts(contracts.map((contract) => contract.id));
             const contactName = personDisplayName(provider.firstName ?? "", provider.lastName ?? "").trim();
 
             const pdfBuffer = await createCustomerContractsPdfBuffer({
@@ -89,7 +92,7 @@ const providersRouter = createCrudRouter({
                     status: contract.effectiveStatus,
                     providerName: contract.providerName,
                     customerName: contract.customerName ?? "-",
-                    device: contract.device,
+                    devices: (devicesByContract.get(contract.id) ?? []).map(formatDeviceLine),
                     assistance:
                         contract.package && contract.includedHours !== null && contract.priceCents !== null
                             ? {

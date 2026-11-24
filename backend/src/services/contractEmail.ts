@@ -9,8 +9,8 @@ import { collectLabContacts, escapeHtml, renderLabEmailHtml, type LabContacts } 
 export type ContractEmailData = LabContacts & {
     customerName: string;
     type: ContractType;
-    /** Il bene coperto dal contratto, così come scritto nel contratto. */
-    device: string;
+    /** I nomi dei dispositivi coperti dal contratto; vuoto se non ne ha (la frase non nomina nulla). */
+    deviceNames: string[];
     /** La data di inizio come YYYY-MM-DD: la usa anche la rotta per il nome dell'allegato. */
     startDate: string;
     /** Identificativo dell'immagine allegata inline: null quando il logo non è disponibile. */
@@ -35,14 +35,14 @@ export const signedContractAttachmentName = (startDate: string) => `contratto-fi
 export const buildContractEmail = (data: ContractEmailData) => {
     const contractName = contractNameByType[data.type];
     const startLabel = formatDay(data.startDate);
-    const device = data.device.trim();
+    const devices = data.deviceNames.map((name) => name.trim()).filter(Boolean).join(", ");
     const contacts = collectLabContacts(data);
 
     const subject = `${capitalize(contractName)} firmato - ${data.labName}`;
 
     const text = [
         `Gentile ${data.customerName},`,
-        `in allegato trova la copia firmata del ${contractName} per ${device}, in vigore dal ${startLabel}. Le consigliamo di conservarla.`,
+        `in allegato trova la copia firmata del ${contractName}${devices ? ` per ${devices}` : ""}, in vigore dal ${startLabel}. Le consigliamo di conservarla.`,
         "Per qualsiasi domanda può rispondere a questa email o contattarci ai recapiti qui sotto.",
         "Grazie per la fiducia.",
         `Cordiali saluti,\n${data.labName}`,
@@ -56,7 +56,7 @@ export const buildContractEmail = (data: ContractEmailData) => {
         logoCid: data.logoCid,
         paragraphsHtml: [
             `Gentile <strong>${escapeHtml(data.customerName)}</strong>,`,
-            `in allegato trova la copia firmata del ${contractName} per <strong>${escapeHtml(device)}</strong>, in vigore dal <strong>${escapeHtml(startLabel)}</strong>. Le consigliamo di conservarla.`,
+            `in allegato trova la copia firmata del ${contractName}${devices ? ` per <strong>${escapeHtml(devices)}</strong>` : ""}, in vigore dal <strong>${escapeHtml(startLabel)}</strong>. Le consigliamo di conservarla.`,
             "Per qualsiasi domanda può rispondere a questa email o contattarci ai recapiti qui sotto.",
             "Grazie per la fiducia.",
             `Cordiali saluti,<br /><strong>${escapeHtml(data.labName)}</strong>`,

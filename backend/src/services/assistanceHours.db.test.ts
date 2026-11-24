@@ -6,8 +6,10 @@ import {
     insertAssistanceContract,
     insertCollaborator,
     insertCustomer,
+    insertCustomerDevice,
     insertIntervention,
     insertProvider,
+    linkContractDevice,
 } from "../test/db/fixtures";
 import type { NewIntervention } from "../db/types";
 
@@ -243,7 +245,9 @@ describe("checkAssistanceThresholds", () => {
     });
 
     it("all'80% manda l'avviso al fornitore, con i dati del contratto", async () => {
-        const contract = await createContract(pack("remote_20"), { device: "Server NAS" });
+        const contract = await createContract(pack("remote_20"));
+        const device = await insertCustomerDevice({ customerId: contract.customerId, name: "Server NAS" });
+        await linkContractDevice(contract.id, device.id, contract.customerId);
 
         await addIntervention(contract, { hours: 16 });
         await checkAssistanceThresholds(contract.id, "2026-10");

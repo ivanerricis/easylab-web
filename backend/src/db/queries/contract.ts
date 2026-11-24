@@ -3,7 +3,9 @@ import { union } from "drizzle-orm/pg-core";
 import { db } from "../index";
 import {
     assistanceTable,
+    contractDeviceTable,
     contractTable,
+    customerDeviceTable,
     customerTable,
     interventionTable,
     providerTable,
@@ -14,6 +16,7 @@ import {
 import type { NewAssistance, NewContract, UpdateContract } from "../types";
 import { takeUnpaginated } from "./pagination";
 import { personName } from "./personName";
+import { linkContractDevices, unlinkContractDevices } from "./customerDevice";
 import { containsText, parseIdSearch } from "./search";
 import { currentLocalDay } from "./timeZone";
 
@@ -56,6 +59,7 @@ export const contractDerivedColumns = (timeZone: string) => {
  * Gli id dei contratti che corrispondono alla ricerca libera: una query per tabella, unite,
  * come `matchingInterventionIds` in `intervention.ts` (lì il perché: un solo ramo non
  * indicizzato in un OR farebbe rinunciare Postgres agli indici trigram degli altri).
+ * Il ramo dei dispositivi cerca nome, seriale e modello di quelli collegati.
  * Il ramo del cliente confronta anche il nome intero, così "Mario Rossi" trova Mario Rossi.
  */
 const matchingContractIds = (search: string) => {
@@ -67,10 +71,19 @@ const matchingContractIds = (search: string) => {
         contractIds().where(
             or(
                 idSearch != null ? eq(contractTable.id, idSearch) : undefined,
-                containsText(contractTable.device, pattern),
                 containsText(contractTable.note, pattern)
             )
         ),
+        contractIds()
+            .innerJoin(contractDeviceTable, eq(contractDeviceTable.contractId, contractTable.id))
+            .innerJoin(customerDeviceTable, eq(customerDeviceTable.id, contractDeviceTable.customerDeviceId))
+            .where(
+                or(
+                    containsText(customerDeviceTable.name, pattern),
+                    containsText(customerDeviceTable.serialNumber, pattern),
+                    containsText(customerDeviceTable.model, pattern)
+                )
+            ),
         contractIds()
             .innerJoin(customerTable, eq(customerTable.id, contractTable.customerId))
             .where(
@@ -101,7 +114,6 @@ const selectContracts = (timeZone: string) => {
             effectiveStatus,
             termMonths: contractTable.termMonths,
             billingMonths: contractTable.billingMonths,
-            device: contractTable.device,
             note: contractTable.note,
             startDate: contractTable.startDate,
             endDate,
@@ -198,7 +210,8 @@ export const getContractById = (id: number, timeZone: string) =>
  */
 export const createContract = (
     data: NewContract,
-    assistance?: Pick<NewAssistance, "package" | "includedHours" | "priceCents">
+    assistance?: Pick<NewAssistance, "package" | "includedHours" | "priceCents">,
+    deviceIds: number[] = []
 ) =>
     db.transaction(async (tx) => {
         const [contract] = await tx.insert(contractTable).values(data).returning();
@@ -206,6 +219,8 @@ export const createContract = (
         if (assistance) {
             await tx.insert(assistanceTable).values({ ...assistance, contractId: contract.id });
         }
+
+        await linkContractDevices(tx, contract.id, contract.customerId, deviceIds);
 
         return contract;
     });
@@ -218,9 +233,18 @@ export const createContract = (
 export const updateContractById = (
     id: number,
     data: UpdateContract,
-    assistance?: Partial<Pick<NewAssistance, "package" | "includedHours" | "priceCents">>
+    assistance?: Partial<Pick<NewAssistance, "package" | "includedHours" | "priceCents">>,
+    /** Se presente, l'elenco completo dei dispositivi (di `data.customerId` o del cliente attuale) che sostituisce quello di prima. */
+    deviceIds?: number[]
 ) =>
     db.transaction(async (tx) => {
+        // Prima si tolgono i collegamenti: con un altro cliente la chiave composta
+        // (customer_id, contract_id) vieta di aggiornare un contratto che ne ha ancora, quindi
+        // quelli vecchi vanno via tutti e i nuovi si aggiungono dopo l'aggiornamento.
+        if (deviceIds) {
+            await unlinkContractDevices(tx, id, data.customerId === undefined ? deviceIds : []);
+        }
+
         const [contract] = await tx
             .update(contractTable)
             .set(Object.keys(data).length > 0 ? data : { updated_at: new Date() })
@@ -229,6 +253,10 @@ export const updateContractById = (
 
         if (contract && assistance && Object.keys(assistance).length > 0) {
             await tx.update(assistanceTable).set(assistance).where(eq(assistanceTable.contractId, id));
+        }
+
+        if (contract && deviceIds) {
+            await linkContractDevices(tx, id, contract.customerId, deviceIds);
         }
 
         return contract;

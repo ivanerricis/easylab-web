@@ -33,7 +33,7 @@ const buildItem = (id: number): CustomerContractSummaryItem => ({
     status: (["active", "draft", "expired", "cancelled"] as const)[id % 4],
     providerName: "Fornitore con un nome piuttosto lungo Srl",
     customerName: "Mario Bianchi",
-    device: "Server di produzione nella sala macchine del secondo piano",
+    devices: ["Server di produzione nella sala macchine – Server – S/N 123456", "Firewall – Firewall – S/N FW-1"],
     assistance: id % 3 === 0 ? null : { package: "ready_20", includedHours: 20, priceCents: 50000 },
     startDateLabel: "1 ott 2026",
     endDateLabel: "1 ott 2027",

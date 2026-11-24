@@ -24,6 +24,11 @@ import {
 import { getAppTimeZone, getLabConfig } from "../config/lab";
 import { currentMonthKey } from "../db/queries/timeZone";
 import { getCustomerById } from "../db/queries/customer";
+import {
+    findCustomerDeviceIdsOfCustomer,
+    listDevicesOfContracts,
+    type ContractDevice,
+} from "../db/queries/customerDevice";
 import { getProviderById } from "../db/queries/provider";
 import {
     consumingInterventionTypes,
@@ -50,6 +55,7 @@ import {
     formatPriority,
 } from "../services/contractLabels";
 import { buildContractEmail, signedContractAttachmentName } from "../services/contractEmail";
+import { formatDeviceLine } from "../services/customerDeviceLabels";
 import { createContractPdfBuffer, type ContractPrintData } from "../services/contractPdf";
 import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot } from "../services/emailSendRateLimit";
@@ -95,6 +101,7 @@ export const cleanUploadedFileName = (originalName: string) => {
     return (cleaned || "contratto-firmato.pdf").slice(0, 255);
 };
 const supportTermMessage = "Il pacchetto Supporto dura sempre 12 mesi";
+const deviceNotOfCustomerMessage = "Uno o più dispositivi non esistono o non sono del cliente del contratto";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -122,13 +129,21 @@ const assistanceBodySchema = z.object({ package: z.enum(assistancePackageKeys) }
 
 const monthsSchema = z.coerce.number().int().min(contractTermMonthsRange.min).max(contractTermMonthsRange.max);
 
+const maxContractDevices = 50;
+
 const contractBodyShape = {
     type: z.enum(contractTypes),
     status: z.enum(contractStoredStatuses).optional(),
     termMonths: monthsSchema,
     // Solo per il noleggio (lo impone `superRefine`); stessa scala della durata.
     billingMonths: monthsSchema.optional(),
-    device: z.string().trim().min(1).max(255),
+    // I dispositivi del cliente coperti dal contratto, facoltativi. Nella modifica, se presente,
+    // l'elenco sostituisce quello di prima (anche vuoto: li toglie tutti).
+    deviceIds: z
+        .array(z.coerce.number().int().positive())
+        .max(maxContractDevices)
+        .refine((ids) => new Set(ids).size === ids.length, { message: "Un dispositivo è indicato più volte" })
+        .optional(),
     note: z.string().trim().max(4000).nullable().optional(),
     startDate: z.string().regex(dateRegex).refine(isRealDay, { message: "La data di inizio non è valida" }),
     customerId: z.coerce.number().int().positive(),
@@ -189,20 +204,24 @@ const contractUpdateBodySchema = z
  * Il JSON della API per un contratto. Parte dalla riga piatta delle query e la ripiega in
  * `assistance`, con nome, periodo, priorità e tipologia presi dal listino per chiave.
  */
-export const toContractDto = ({
-    package: assistancePackage,
-    includedHours,
-    priceCents,
-    signedFileName,
-    signedSizeBytes,
-    signedUploadedAt,
-    ...row
-}: ContractRow) => {
+export const toContractDto = (
+    {
+        package: assistancePackage,
+        includedHours,
+        priceCents,
+        signedFileName,
+        signedSizeBytes,
+        signedUploadedAt,
+        ...row
+    }: ContractRow,
+    devices: ContractDevice[]
+) => {
     const info = assistancePackage ? getPackageInfo(assistancePackage) : null;
 
     return {
         ...row,
         customerName: row.customerName ?? "",
+        devices,
         assistance:
             info && includedHours !== null && priceCents !== null
                 ? {
@@ -223,6 +242,11 @@ export const toContractDto = ({
     };
 };
 
+/** Se tutti i dispositivi indicati esistono e sono di quel cliente (l'elenco è già senza doppioni). */
+const areDevicesOfCustomer = async (customerId: number, deviceIds: number[]) =>
+    deviceIds.length === 0 ||
+    (await findCustomerDeviceIdsOfCustomer(customerId, deviceIds)).length === deviceIds.length;
+
 /** Il pacchetto di una riga contratto, se è un'assistenza con tutti i dati (ore e prezzo non nulli). */
 const assistanceOf = (contract: ContractRow) =>
     contract.package && contract.includedHours !== null && contract.priceCents !== null
@@ -238,12 +262,14 @@ contractsRouter.get("/", validate({ query: contractListQuerySchema }), async (re
         type: query.type ?? "all",
         timeZone: await getAppTimeZone(),
     });
+    // I dispositivi di tutta la pagina in una query sola (una per riga sarebbe un N+1).
+    const rows = Array.isArray(contracts) ? contracts : contracts.items;
+    const devicesByContract = await listDevicesOfContracts(rows.map((row) => row.id));
+    const toDto = (row: ContractRow) => toContractDto(row, devicesByContract.get(row.id) ?? []);
 
     sendListResponse(
         res,
-        Array.isArray(contracts)
-            ? contracts.map(toContractDto)
-            : { ...contracts, items: contracts.items.map(toContractDto) },
+        Array.isArray(contracts) ? contracts.map(toDto) : { ...contracts, items: contracts.items.map(toDto) },
         query.page,
         query.pageSize
     );
@@ -305,12 +331,13 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
 
     const kind = contract.effectiveStatus === "draft" ? "quote" : "contract";
     const pack = assistanceOf(contract);
-    const [[customer], [provider], hoursSummary] = await Promise.all([
+    const [[customer], [provider], hoursSummary, devicesByContract] = await Promise.all([
         getCustomerById(contract.customerId),
         getProviderById(contract.providerId),
         pack
             ? getContractHoursSummary(id, pack.package, pack.includedHours, currentMonthKey(timeZone))
             : Promise.resolve(null),
+        listDevicesOfContracts([id]),
     ]);
     const providerContact = [provider.firstName, provider.lastName].filter(Boolean).join(" ");
 
@@ -331,7 +358,7 @@ const loadContractPrintData = async (id: number): Promise<ContractPrintData | nu
         providerEmail: provider.email,
         providerPhone: formatPhoneLabel(provider.phoneNumber),
         type: contract.type,
-        device: contract.device,
+        devices: (devicesByContract.get(id) ?? []).map(formatDeviceLine),
         termLabel: formatContractTerm(contract.termMonths),
         billingLabel: contract.billingMonths ? formatBillingPeriod(contract.billingMonths) : null,
         // Date "solo giorno" (YYYY-MM-DD): niente fuso, quindi `formatDayLabel`. La data di fine è
@@ -474,7 +501,11 @@ contractsRouter.post(
             return;
         }
 
-        const [[customer], signed] = await Promise.all([getCustomerById(contract.customerId), getSignedContract(id)]);
+        const [[customer], signed, devicesByContract] = await Promise.all([
+            getCustomerById(contract.customerId),
+            getSignedContract(id),
+            listDevicesOfContracts([id]),
+        ]);
         const customerEmail = customer?.email?.trim();
         const content = signed ? await readSignedContractFile(id) : null;
 
@@ -499,7 +530,7 @@ contractsRouter.post(
             labAddress,
             labPhone,
             type: contract.type,
-            device: contract.device,
+            deviceNames: (devicesByContract.get(id) ?? []).map((device) => device.name),
             startDate: contract.startDate,
             logoCid: logo ? logoContentId : null,
         });
@@ -545,7 +576,9 @@ contractsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, re
         ? await getContractHoursSummary(id, pack.package, pack.includedHours, currentMonthKey(timeZone))
         : { hours: null, monthlyHours: [] };
 
-    res.json({ ...toContractDto(contract), ...hours });
+    const devicesByContract = await listDevicesOfContracts([id]);
+
+    res.json({ ...toContractDto(contract, devicesByContract.get(id) ?? []), ...hours });
 });
 
 contractsRouter.post(
@@ -553,11 +586,16 @@ contractsRouter.post(
     auditAs("creato contratto"),
     validate({ body: contractCreateBodySchema }),
     async (req, res) => {
-        const { assistance, ...data } = req.body as z.infer<typeof contractCreateBodySchema>;
+        const { assistance, deviceIds, ...data } = req.body as z.infer<typeof contractCreateBodySchema>;
 
         // Il Supporto dura sempre 12 mesi: l'unico vincolo fra pacchetto e durata.
         if (assistance && isContractPeriodPackage(assistance.package) && data.termMonths !== supportTermMonths) {
             res.status(400).json({ message: supportTermMessage, field: "termMonths" });
+            return;
+        }
+
+        if (deviceIds && !(await areDevicesOfCustomer(data.customerId, deviceIds))) {
+            res.status(400).json({ message: deviceNotOfCustomerMessage, field: "deviceIds" });
             return;
         }
 
@@ -566,12 +604,14 @@ contractsRouter.post(
         const created = await createContract(
             data,
             // Ore e prezzo non arrivano dal client: le copia il server dal listino (snapshot).
-            assistance ? { package: assistance.package, ...packageSnapshot(assistance.package) } : undefined
+            assistance ? { package: assistance.package, ...packageSnapshot(assistance.package) } : undefined,
+            deviceIds
         );
         const [contract] = await getContractById(created.id, await getAppTimeZone());
+        const devicesByContract = await listDevicesOfContracts([contract.id]);
 
         setAuditSubject(res, describeSubject(contract.id));
-        res.status(201).json(toContractDto(contract));
+        res.status(201).json(toContractDto(contract, devicesByContract.get(contract.id) ?? []));
     }
 );
 
@@ -581,7 +621,7 @@ contractsRouter.put(
     validate({ params: idParamsSchema, body: contractUpdateBodySchema }),
     async (req, res) => {
         const { id } = req.params as unknown as { id: number };
-        const { assistance, ...data } = req.body as z.infer<typeof contractUpdateBodySchema>;
+        const { assistance, deviceIds, ...data } = req.body as z.infer<typeof contractUpdateBodySchema>;
         const timeZone = await getAppTimeZone();
         const [current] = await getContractById(id, timeZone);
 
@@ -614,6 +654,24 @@ contractsRouter.put(
             return;
         }
 
+        // I dispositivi sono del cliente: cambiandolo quelli di prima non valgono più. Si accetta solo
+        // se la richiesta indica anche l'elenco per il nuovo cliente (anche vuoto).
+        const customerChanged = data.customerId !== undefined && data.customerId !== current.customerId;
+        const resultingCustomerId = data.customerId ?? current.customerId;
+
+        if (customerChanged && deviceIds === undefined && (await listDevicesOfContracts([id])).has(id)) {
+            res.status(400).json({
+                message: "Il cliente non si può cambiare senza indicare i dispositivi del nuovo cliente",
+                field: "customerId",
+            });
+            return;
+        }
+
+        if (deviceIds && !(await areDevicesOfCustomer(resultingCustomerId, deviceIds))) {
+            res.status(400).json({ message: deviceNotOfCustomerMessage, field: "deviceIds" });
+            return;
+        }
+
         if (assistance && current.type !== "assistance") {
             res.status(400).json({ message: "Solo un contratto di assistenza ha dati di assistenza" });
             return;
@@ -638,8 +696,9 @@ contractsRouter.put(
         // `type` è già uguale a quello attuale (controllo qui sopra): non si riscrive.
         const { type: _type, ...changes } = data;
 
-        await updateContractById(id, changes, assistanceChanges);
+        await updateContractById(id, changes, assistanceChanges, deviceIds);
         const [updated] = await getContractById(id, timeZone);
+        const devicesByContract = await listDevicesOfContracts([id]);
 
         // Con un altro pacchetto le soglie sono altre: via tutti gli avvisi, poi si ricontrolla. Anche
         // lo spostamento della data di inizio di un Supporto cambia la chiave fissa dei suoi avvisi.
@@ -654,7 +713,7 @@ contractsRouter.put(
         }
 
         setAuditSubject(res, describeSubject(updated.id));
-        res.json(toContractDto(updated));
+        res.json(toContractDto(updated, devicesByContract.get(id) ?? []));
     }
 );
 

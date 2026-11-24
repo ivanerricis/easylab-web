@@ -16,6 +16,13 @@ vi.mock("../db/queries/contract", () => ({
     deleteSignedContract: vi.fn(),
 }));
 
+// Collegamenti ai dispositivi: le query vere (differenza, chiavi composte) le prova
+// `db/queries/customerDevice.db.test.ts`.
+vi.mock("../db/queries/customerDevice", () => ({
+    listDevicesOfContracts: vi.fn(),
+    findCustomerDeviceIdsOfCustomer: vi.fn(),
+}));
+
 vi.mock("../services/emailManager", () => ({ sendEmail: vi.fn() }));
 vi.mock("../services/logoManager", () => ({ loadPrintableLogo: vi.fn() }));
 
@@ -55,6 +62,7 @@ import {
     saveSignedContract,
     updateContractById,
 } from "../db/queries/contract";
+import { findCustomerDeviceIdsOfCustomer, listDevicesOfContracts } from "../db/queries/customerDevice";
 import { sendEmail } from "../services/emailManager";
 import { consumeEmailSendSlot, emailSendMaxPerWindow, resetEmailSendRateLimit } from "../services/emailSendRateLimit";
 import { loadPrintableLogo } from "../services/logoManager";
@@ -86,7 +94,6 @@ const flatRow = {
     effectiveStatus: "active",
     termMonths: 12,
     billingMonths: null,
-    device: "Server NAS",
     note: null,
     startDate: "2026-10-01",
     endDate: "2027-10-01",
@@ -111,7 +118,6 @@ const dto = {
     effectiveStatus: "active",
     termMonths: 12,
     billingMonths: null,
-    device: "Server NAS",
     note: null,
     startDate: "2026-10-01",
     endDate: "2027-10-01",
@@ -119,6 +125,7 @@ const dto = {
     customerName: "Mario Rossi",
     providerId: 2,
     providerName: "Acme Srl",
+    devices: [],
     assistance: {
         package: "ready_20",
         name: "Pronti Via 20",
@@ -148,7 +155,6 @@ const supportRow = { ...flatRow, package: "support_base", includedHours: 80, pri
 const assistanceBody = {
     type: "assistance",
     termMonths: 12,
-    device: "Server NAS",
     startDate: "2026-10-01",
     customerId: 3,
     providerId: 2,
@@ -167,6 +173,8 @@ describe("contracts router", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(getContractHoursSummary).mockResolvedValue(hoursSummary as never);
+        vi.mocked(listDevicesOfContracts).mockResolvedValue(new Map());
+        vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([]);
     });
 
     describe("lettura", () => {
@@ -397,7 +405,7 @@ describe("contracts router", () => {
                 providerEmail: "info@acme.it",
                 providerPhone: "011222333",
                 type: "assistance",
-                device: "Server NAS",
+                devices: [],
                 termLabel: "12 mesi",
                 startDateLabel: "1 ott 2026",
                 endDateLabel: "1 ott 2027",
@@ -516,13 +524,14 @@ describe("contracts router", () => {
                 {
                     type: "assistance",
                     termMonths: 12,
-                    device: "Server NAS",
                     startDate: "2026-10-01",
                     customerId: 3,
                     providerId: 2,
                 },
                 // Ore e prezzo li copia il server dal listino: il corpo ha solo la chiave.
-                { package: "ready_20", includedHours: 20, priceCents: 50000 }
+                { package: "ready_20", includedHours: 20, priceCents: 50000 },
+                // Senza `deviceIds` nel corpo: nessun dispositivo.
+                undefined
             );
         });
 
@@ -535,11 +544,11 @@ describe("contracts router", () => {
                 .send({ ...assistanceBody, assistance: { package: "support_base" } });
 
             expect(response.status).toBe(201);
-            expect(createContract).toHaveBeenCalledWith(expect.anything(), {
-                package: "support_base",
-                includedHours: 80,
-                priceCents: 160000,
-            });
+            expect(createContract).toHaveBeenCalledWith(
+                expect.anything(),
+                { package: "support_base", includedHours: 80, priceCents: 160000 },
+                undefined
+            );
         });
 
         it.each(["support_base", "support_plus"])("un %s con durata diversa da 12 mesi è rifiutato", async (key) => {
@@ -564,11 +573,11 @@ describe("contracts router", () => {
                 .send({ ...assistanceBody, termMonths: 7, assistance: { package: "remote_40" } });
 
             expect(response.status).toBe(201);
-            expect(createContract).toHaveBeenCalledWith(expect.anything(), {
-                package: "remote_40",
-                includedHours: 40,
-                priceCents: 72000,
-            });
+            expect(createContract).toHaveBeenCalledWith(
+                expect.anything(),
+                { package: "remote_40", includedHours: 40, priceCents: 72000 },
+                undefined
+            );
         });
 
         it("crea un noleggio senza dati di assistenza", async () => {
@@ -581,6 +590,7 @@ describe("contracts router", () => {
             expect(response.status).toBe(201);
             expect(createContract).toHaveBeenCalledWith(
                 expect.objectContaining({ type: "rental", billingMonths: 3 }),
+                undefined,
                 undefined
             );
         });
@@ -637,7 +647,9 @@ describe("contracts router", () => {
             ["una durata non intera", { termMonths: 1.5 }],
             ["un periodo di fatturazione su un'assistenza", { billingMonths: 3 }],
             ["lo stato scaduto", { status: "expired" }],
-            ["un dispositivo vuoto", { device: " " }],
+            ["il vecchio campo dispositivo", { device: "Server NAS" }],
+            ["un dispositivo indicato due volte", { deviceIds: [5, 5] }],
+            ["un id di dispositivo non valido", { deviceIds: [0] }],
             ["un campo sconosciuto", { price: 1 }],
         ])("rifiuta %s", async (_label, override) => {
             const response = await request(buildApp())
@@ -659,7 +671,12 @@ describe("contracts router", () => {
                 .send({ status: "cancelled", note: "Disdetto" });
 
             expect(response.status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(7, { status: "cancelled", note: "Disdetto" }, undefined);
+            expect(updateContractById).toHaveBeenCalledWith(
+                7,
+                { status: "cancelled", note: "Disdetto" },
+                undefined,
+                undefined
+            );
             // Il pacchetto non è cambiato: nessun motivo di azzerare gli avvisi.
             expect(resetAssistanceAlerts).not.toHaveBeenCalled();
         });
@@ -676,7 +693,8 @@ describe("contracts router", () => {
             expect(updateContractById).toHaveBeenCalledWith(
                 7,
                 {},
-                { package: "ready_40", includedHours: 40, priceCents: 90000 }
+                { package: "ready_40", includedHours: 40, priceCents: 90000 },
+                undefined
             );
             expect(resetAssistanceAlerts).toHaveBeenCalledWith(7, expect.stringMatching(/^\d{4}-\d{2}$/));
         });
@@ -690,7 +708,7 @@ describe("contracts router", () => {
                 .send({ assistance: { package: "ready_20" }, note: "x" });
 
             expect(response.status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(7, { note: "x" }, undefined);
+            expect(updateContractById).toHaveBeenCalledWith(7, { note: "x" }, undefined, undefined);
             expect(resetAssistanceAlerts).not.toHaveBeenCalled();
         });
 
@@ -706,7 +724,8 @@ describe("contracts router", () => {
             expect(updateContractById).toHaveBeenCalledWith(
                 7,
                 { termMonths: 12 },
-                { package: "support_plus", includedHours: 150, priceCents: 250000 }
+                { package: "support_plus", includedHours: 150, priceCents: 250000 },
+                undefined
             );
         });
 
@@ -761,7 +780,8 @@ describe("contracts router", () => {
             expect(updateContractById).toHaveBeenCalledWith(
                 7,
                 { termMonths: 6 },
-                { package: "remote_20", includedHours: 20, priceCents: 40000 }
+                { package: "remote_20", includedHours: 20, priceCents: 40000 },
+                undefined
             );
         });
 
@@ -771,10 +791,10 @@ describe("contracts router", () => {
 
             const response = await request(buildApp())
                 .put("/api/contracts/7")
-                .send({ type: "assistance", device: "NAS" });
+                .send({ type: "assistance", note: "Nota" });
 
             expect(response.status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(7, { device: "NAS" }, undefined);
+            expect(updateContractById).toHaveBeenCalledWith(7, { note: "Nota" }, undefined, undefined);
         });
 
         it("rifiuta di cambiare il cliente se ci sono interventi collegati, con un messaggio sulla modifica", async () => {
@@ -797,7 +817,7 @@ describe("contracts router", () => {
             vi.mocked(hasLinkedInterventions).mockResolvedValue(false);
 
             expect((await request(buildApp()).put("/api/contracts/7").send({ customerId: 4 })).status).toBe(200);
-            expect(updateContractById).toHaveBeenCalledWith(7, { customerId: 4 }, undefined);
+            expect(updateContractById).toHaveBeenCalledWith(7, { customerId: 4 }, undefined, undefined);
 
             vi.mocked(hasLinkedInterventions).mockClear();
             // Lo stesso cliente non è un cambio: niente query in più.
@@ -851,7 +871,128 @@ describe("contracts router", () => {
 
             vi.mocked(getContractById).mockResolvedValue([] as never);
 
-            expect((await request(buildApp()).put("/api/contracts/9").send({ device: "x" })).status).toBe(404);
+            expect((await request(buildApp()).put("/api/contracts/9").send({ note: "x" })).status).toBe(404);
+        });
+    });
+
+    describe("dispositivi", () => {
+        const nas = { id: 5, type: "server", name: "NAS ufficio", serialNumber: "SN-1", model: null };
+        const firewall = { id: 6, type: "firewall", name: "Firewall", serialNumber: "SN-2", model: "Fortigate" };
+
+        it("il dettaglio e la lista riportano i dispositivi collegati, la lista con una query sola", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(listContracts).mockResolvedValue([flatRow, { ...flatRow, id: 9 }] as never);
+            vi.mocked(listDevicesOfContracts).mockResolvedValue(new Map([[7, [nas, firewall]]]) as never);
+
+            const detail = await request(buildApp()).get("/api/contracts/7");
+            const list = await request(buildApp()).get("/api/contracts");
+
+            expect(detail.body.devices).toEqual([nas, firewall]);
+            expect(list.body[0].devices).toEqual([nas, firewall]);
+            expect(list.body[1].devices).toEqual([]);
+            expect(listDevicesOfContracts).toHaveBeenLastCalledWith([7, 9]);
+        });
+
+        it("la stampa elenca i dispositivi come `Nome – Tipo – S/N xxx`", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(getCustomerById).mockResolvedValue([
+                { id: 3, phoneNumber: "1", email: null, city: null },
+            ] as never);
+            vi.mocked(getProviderById).mockResolvedValue([
+                { id: 2, providerName: "Acme", email: "a@a.it", phoneNumber: "2", logoDataUrl: null },
+            ] as never);
+            vi.mocked(createContractPdfBuffer).mockResolvedValue(Buffer.from("pdf"));
+            vi.mocked(listDevicesOfContracts).mockResolvedValue(new Map([[7, [nas, firewall]]]) as never);
+
+            await request(buildApp()).get("/api/contracts/7/print");
+
+            expect(vi.mocked(createContractPdfBuffer).mock.calls[0][0].devices).toEqual([
+                "NAS ufficio – Server – S/N SN-1",
+                "Firewall – Firewall – S/N SN-2",
+            ]);
+        });
+
+        it("crea il contratto con i dispositivi del cliente", async () => {
+            vi.mocked(createContract).mockResolvedValue({ id: 7 } as never);
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([5, 6]);
+
+            const response = await request(buildApp())
+                .post("/api/contracts")
+                .send({ ...assistanceBody, deviceIds: [5, 6] });
+
+            expect(response.status).toBe(201);
+            expect(findCustomerDeviceIdsOfCustomer).toHaveBeenCalledWith(3, [5, 6]);
+            expect(createContract).toHaveBeenCalledWith(expect.anything(), expect.anything(), [5, 6]);
+        });
+
+        it("rifiuta alla creazione un dispositivo di un altro cliente (o inesistente)", async () => {
+            vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([5]);
+
+            const response = await request(buildApp())
+                .post("/api/contracts")
+                .send({ ...assistanceBody, deviceIds: [5, 99] });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({
+                message: "Uno o più dispositivi non esistono o non sono del cliente del contratto",
+                field: "deviceIds",
+            });
+            expect(createContract).not.toHaveBeenCalled();
+        });
+
+        it("alla modifica l'elenco sostituisce quello di prima, e vuoto li toglie tutti", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+            vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([6]);
+
+            await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ deviceIds: [6] });
+            await request(buildApp()).put("/api/contracts/7").send({ deviceIds: [] });
+
+            expect(findCustomerDeviceIdsOfCustomer).toHaveBeenCalledWith(3, [6]);
+            expect(updateContractById).toHaveBeenNthCalledWith(1, 7, {}, undefined, [6]);
+            expect(updateContractById).toHaveBeenNthCalledWith(2, 7, {}, undefined, []);
+        });
+
+        it("alla modifica rifiuta un dispositivo di un altro cliente", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([]);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ deviceIds: [42] });
+
+            expect(response.status).toBe(400);
+            expect(response.body.field).toBe("deviceIds");
+            expect(updateContractById).not.toHaveBeenCalled();
+        });
+
+        it("cambiando cliente i dispositivi si controllano sul nuovo cliente", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(updateContractById).mockResolvedValue({ id: 7 } as never);
+            vi.mocked(hasLinkedInterventions).mockResolvedValue(false);
+            vi.mocked(findCustomerDeviceIdsOfCustomer).mockResolvedValue([8]);
+
+            const response = await request(buildApp())
+                .put("/api/contracts/7")
+                .send({ customerId: 4, deviceIds: [8] });
+
+            expect(response.status).toBe(200);
+            expect(findCustomerDeviceIdsOfCustomer).toHaveBeenCalledWith(4, [8]);
+        });
+
+        it("cambiando cliente senza indicare i dispositivi nuovi è rifiutato se ne ha di collegati", async () => {
+            vi.mocked(getContractById).mockResolvedValue([flatRow] as never);
+            vi.mocked(hasLinkedInterventions).mockResolvedValue(false);
+            vi.mocked(listDevicesOfContracts).mockResolvedValue(new Map([[7, [nas]]]) as never);
+
+            const response = await request(buildApp()).put("/api/contracts/7").send({ customerId: 4 });
+
+            expect(response.status).toBe(400);
+            expect(response.body.field).toBe("customerId");
+            expect(updateContractById).not.toHaveBeenCalled();
         });
     });
 
@@ -1055,6 +1196,28 @@ describe("contracts router", () => {
                         ],
                     })
                 );
+            });
+
+            it("nomina i dispositivi nel testo dell'email, e senza dispositivi non nomina nulla", async () => {
+                vi.mocked(listDevicesOfContracts).mockResolvedValueOnce(
+                    new Map([
+                        [
+                            7,
+                            [
+                                { id: 5, type: "server", name: "NAS ufficio", serialNumber: "SN-1", model: null },
+                                { id: 6, type: "firewall", name: "Firewall", serialNumber: "SN-2", model: null },
+                            ],
+                        ],
+                    ]) as never
+                );
+
+                await request(buildApp()).post("/api/contracts/7/send-email");
+                await request(buildApp()).post("/api/contracts/7/send-email");
+
+                const [withDevices, withoutDevices] = vi.mocked(sendEmail).mock.calls.map(([mail]) => mail.text);
+
+                expect(withDevices).toContain("contratto di assistenza per NAS ufficio, Firewall, in vigore dal");
+                expect(withoutDevices).toContain("contratto di assistenza, in vigore dal");
             });
 
             it("allega il logo inline quando c'è", async () => {

@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setStoredHiddenColumns } from "@/lib/theme";
 
 const navigate = vi.fn();
 
@@ -203,17 +204,21 @@ const submitEdit = async (values: Record<string, unknown>) => {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // I pulsanti di riga sono nascosti di serie (vedi `useHiddenColumns`): questi test li usano, quindi
+    // si parte con la colonna Azioni mostrata. Quelli sulle colonne nascoste svuotano la preferenza.
+    setStoredHiddenColumns("reports", ["closed", "!actions"]);
     api.listReports.mockResolvedValue(page([buildReport(1), buildReport(2, { closed: true })]));
     api.updateReport.mockResolvedValue({});
 });
 
 describe("ReportsPage", () => {
-    it("mostra di default i report aperti, con la colonna Stato nascosta", async () => {
+    it("mostra di default i report aperti, con le colonne Stato e Azioni nascoste", async () => {
+        localStorage.clear();
         await renderPage();
 
         expect(api.listReports).toHaveBeenCalledWith(expect.objectContaining({ visibility: "open" }));
         expect(within(table()).queryByRole("columnheader", { name: "Stato" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Colonne, 1 nascoste" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 2 nascoste" })).toBeInTheDocument();
     });
 
     it("la colonna Stato si mostra dal menu, e lo stato di ogni riga è scritto", async () => {
@@ -459,6 +464,7 @@ describe("ReportsPage", () => {
     });
 
     it("nasconde le colonne scelte dal menu, e se lo ricorda", async () => {
+        localStorage.clear();
         const { unmount } = renderWithProviders(<ReportsPage />, { route: "/reports" });
         await within(table()).findByText("Cliente 1");
 
@@ -471,7 +477,7 @@ describe("ReportsPage", () => {
 
         expect(within(table()).queryByRole("columnheader", { name: "Password" })).not.toBeInTheDocument();
         expect(within(table()).queryByRole("columnheader", { name: "Backup dati" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Colonne, 3 nascoste" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Colonne, 4 nascoste" })).toBeInTheDocument();
         unmount();
 
         renderWithProviders(<ReportsPage />, { route: "/reports" });

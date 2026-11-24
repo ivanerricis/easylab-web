@@ -117,8 +117,7 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
     },
     // Chiave composta (contract_id, customer_device_id) verso i dispositivi del contratto.
     intervention_contract_device_fk: {
-        onDeleteParent:
-            "Impossibile togliere il dispositivo dal contratto: è ancora indicato in uno o più interventi.",
+        onDeleteParent: "Impossibile togliere il dispositivo dal contratto: è ancora indicato in uno o più interventi.",
         onInvalidReference: "Il dispositivo selezionato non è fra quelli del contratto dell'intervento.",
     },
     assistance_hours_alert_contract_id_assistance_contract_id_fk: {

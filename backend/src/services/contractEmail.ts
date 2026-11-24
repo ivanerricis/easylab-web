@@ -35,7 +35,10 @@ export const signedContractAttachmentName = (startDate: string) => `contratto-fi
 export const buildContractEmail = (data: ContractEmailData) => {
     const contractName = contractNameByType[data.type];
     const startLabel = formatDay(data.startDate);
-    const devices = data.deviceNames.map((name) => name.trim()).filter(Boolean).join(", ");
+    const devices = data.deviceNames
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .join(", ");
     const contacts = collectLabContacts(data);
 
     const subject = `${capitalize(contractName)} firmato - ${data.labName}`;

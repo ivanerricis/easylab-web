@@ -194,7 +194,12 @@ const buildContractDataSection = (contract: ContractPrintData) => {
                 sectionBarRow(isQuote ? "DATI DEL PREVENTIVO" : "DATI DEL CONTRATTO", 4),
                 dualFieldRow("Codice", `#${contract.id}`, "Tipo", formatContractType(contract.type)),
                 ...(contract.devices.length > 0
-                    ? [singleValueRow(contract.devices.length === 1 ? "Dispositivo" : "Dispositivi", contract.devices.join("\n"))]
+                    ? [
+                          singleValueRow(
+                              contract.devices.length === 1 ? "Dispositivo" : "Dispositivi",
+                              contract.devices.join("\n")
+                          ),
+                      ]
                     : []),
                 isQuote
                     ? dualFieldRow("Decorrenza", contract.startDateLabel, "Durata", contract.termLabel)

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { db } from "../index";
+import { db, pool } from "../index";
 import { contractDeviceTable, customerDeviceTable, interventionTable } from "../schema";
 import {
     insertContract,
@@ -192,9 +192,7 @@ describe("createContract / updateContractById con i dispositivi", () => {
 
         await expect(createContract(data, undefined, [mine.id, foreign.id])).rejects.toBeDefined();
         // Il contratto del tentativo fallito non è rimasto: solo `base` e `created`.
-        const { rows } = await import("../index").then(({ pool }) =>
-            pool.query("select count(*)::int as total from contract")
-        );
+        const { rows } = await pool.query("select count(*)::int as total from contract");
         expect(rows[0].total).toBe(2);
     });
 

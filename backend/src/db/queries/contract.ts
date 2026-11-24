@@ -69,10 +69,7 @@ const matchingContractIds = (search: string) => {
 
     return union(
         contractIds().where(
-            or(
-                idSearch != null ? eq(contractTable.id, idSearch) : undefined,
-                containsText(contractTable.note, pattern)
-            )
+            or(idSearch != null ? eq(contractTable.id, idSearch) : undefined, containsText(contractTable.note, pattern))
         ),
         contractIds()
             .innerJoin(contractDeviceTable, eq(contractDeviceTable.contractId, contractTable.id))

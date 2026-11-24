@@ -67,7 +67,8 @@ export const listCustomerDevices = async ({
 export const getCustomerDeviceById = (id: number) =>
     db.select().from(customerDeviceTable).where(eq(customerDeviceTable.id, id));
 
-export const createCustomerDevice = (data: NewCustomerDevice) => db.insert(customerDeviceTable).values(data).returning();
+export const createCustomerDevice = (data: NewCustomerDevice) =>
+    db.insert(customerDeviceTable).values(data).returning();
 
 // Il cliente non si cambia (lo impone la rotta, e `UpdateCustomerDevice` non lo contiene): i
 // collegamenti ai contratti sono vincolati al cliente del dispositivo.
@@ -139,7 +140,6 @@ export type ContractDevice = Pick<
     typeof customerDeviceTable.$inferSelect,
     "id" | "type" | "name" | "serialNumber" | "model"
 >;
-
 
 /**
  * Toglie dal contratto i dispositivi che non sono in `keepIds` (dentro la transazione di chi la

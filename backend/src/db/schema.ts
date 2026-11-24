@@ -447,7 +447,10 @@ export const customerDeviceTable = pgTable(
         index("customer_device_customer_id_idx").on(table.customerId),
         // Lo stesso numero di serie non si inserisce due volte per lo stesso cliente (senza
         // maiuscole); due clienti diversi possono avere seriali uguali (apparecchi di serie).
-        uniqueIndex("customer_device_customer_serial_lower_idx").on(table.customerId, sql`lower(${table.serialNumber})`),
+        uniqueIndex("customer_device_customer_serial_lower_idx").on(
+            table.customerId,
+            sql`lower(${table.serialNumber})`
+        ),
         index("customer_device_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
         index("customer_device_serial_number_trgm_idx").using("gin", sql`${table.serialNumber} gin_trgm_ops`),
         // Bersaglio delle chiavi composte (customer_id, id): ridondante con la chiave primaria, ma

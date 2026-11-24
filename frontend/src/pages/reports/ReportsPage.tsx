@@ -82,7 +82,7 @@ const ReportsPage = () => {
             onPageOutOfRange: setCurrentPage,
         });
     // Modifica, stampa ed eliminazione sono le stesse della scheda del cliente.
-    const { renderRowActions, dialogs: rowActionDialogs } = useReportRowActions({ onChanged: loadReports });
+    const { getRowActions, dialogs: rowActionDialogs } = useReportRowActions({ onChanged: loadReports });
 
     usePrefetchWhenIdle(prefetchReportDialogs);
 
@@ -188,7 +188,7 @@ const ReportsPage = () => {
                             loadError={loadError}
                             onRetry={() => void loadReports()}
                             onOpenReport={handleOpenReport}
-                            renderRowActions={renderRowActions}
+                            getRowActions={getRowActions}
                         />
                     </div>
                     <TablePagination

@@ -7,7 +7,8 @@ import { entityPaths } from "@/lib/entityPaths";
 import { contractColumnsWithout } from "@/pages/contracts/components/contract-columns";
 import type { ContractDto } from "@/types/dtos";
 import { ListFilter } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import type { RowAction } from "@/components/row-actions";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -31,10 +32,10 @@ export const CustomerContractsFilter = ({ contracts }: { contracts: CustomerCont
 type CustomerContractsTableProps = {
     contracts: CustomerContractsList;
     /** I pulsanti di riga (`useContractRowActions`): modifica, stampa, eliminazione. */
-    renderRowActions: (contract: ContractDto) => ReactNode;
+    getRowActions: (contract: ContractDto) => RowAction[];
 };
 
-export const CustomerContractsTable = ({ contracts, renderRowActions }: CustomerContractsTableProps) => {
+export const CustomerContractsTable = ({ contracts, getRowActions }: CustomerContractsTableProps) => {
     const navigate = useNavigate();
     // La colonna del cliente no: nella sua scheda sarebbe sempre lo stesso nome.
     const columns = useMemo(() => contractColumnsWithout("customerName"), []);
@@ -50,7 +51,7 @@ export const CustomerContractsTable = ({ contracts, renderRowActions }: Customer
                     getRowKey={(row) => row.id}
                     getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}
                     emptyMessage="Nessun contratto associato a questo cliente."
-                    renderRowActions={renderRowActions}
+                    getRowActions={getRowActions}
                     onRowOpen={(row) => void navigate(entityPaths.contract(row.id))}
                     isInitialLoading={contracts.isInitialLoading}
                     isRefetching={contracts.isRefetching}

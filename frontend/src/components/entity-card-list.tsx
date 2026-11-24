@@ -145,6 +145,7 @@ const EntityCardImpl = <T,>({
     const actionsNode = useMemo(() => renderActions?.(row), [row]);
     const [isExpanded, setIsExpanded] = useState(false);
     const detailsId = useId();
+    const titleId = useId();
     const hiddenCount = detailColumns.filter((column) => column.cardCollapsed).length;
     const visibleDetailColumns = (
         isExpanded ? detailColumns : detailColumns.filter((column) => !column.cardCollapsed)
@@ -186,27 +187,33 @@ const EntityCardImpl = <T,>({
                     ) : null}
                     {/* `h2` e non `h3`: nelle liste il titolo sopra è l'`h1` della pagina, e un
                         salto di livello fa credere a chi naviga per titoli che manchi un pezzo. */}
-                    {/* Con `onRowOpen` il titolo è un vero pulsante, steso su tutta la scheda con
-                        `after:absolute after:inset-0` (la scheda è `relative`): l'`onClick` sull'`article`
-                        non si raggiungeva da tastiera né con i comandi a scansione, e un tap
-                        qualunque sulla scheda continua ad aprirla. Gli elementi interattivi
-                        dentro la scheda (azioni, "Altri dettagli", link nei dettagli) stanno
-                        sopra con `relative z-10`, così il pulsante steso non li copre. Il focus
-                        è disegnato sul pseudo-elemento, con l'offset negativo: la scheda ha
-                        `overflow-hidden` e un contorno esterno verrebbe tagliato. */}
-                    <h2 className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">
-                        {onRowOpen ? (
-                            <button
-                                type="button"
-                                onClick={() => onRowOpen(row)}
-                                className="cursor-pointer text-left outline-none after:absolute after:inset-0 focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--focus-ring)"
-                            >
-                                {renderTitle()}
-                            </button>
-                        ) : (
-                            renderTitle()
-                        )}
+                    {/* Con `onRowOpen` la scheda si apre da un vero pulsante, steso su tutta la
+                        scheda (la scheda è `relative`): l'`onClick` sull'`article` non si
+                        raggiungeva da tastiera né con i comandi a scansione, e un tap qualunque
+                        sulla scheda continua ad aprirla. Il pulsante è un fratello del titolo e
+                        prende il nome da lui (`aria-labelledby`), invece di contenerlo: prima il
+                        titolo stava dentro il pulsante, e un titolo con qualcosa di cliccabile (il
+                        nome del cliente come link, il tipo di intervento con il dettaglio a
+                        comparsa) diventava un link o un pulsante dentro un pulsante, HTML non
+                        valido che React segnalava. Gli elementi interattivi della scheda (link e
+                        pulsanti del titolo, azioni, "Altri dettagli", link nei dettagli) stanno
+                        sopra con `relative z-10`, così il pulsante steso non li copre. Il focus è
+                        disegnato con l'offset negativo: la scheda ha `overflow-hidden` e un
+                        contorno esterno verrebbe tagliato. */}
+                    <h2
+                        id={titleId}
+                        className="text-base leading-snug font-semibold [overflow-wrap:anywhere] [&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10"
+                    >
+                        {renderTitle()}
                     </h2>
+                    {onRowOpen ? (
+                        <button
+                            type="button"
+                            aria-labelledby={titleId}
+                            onClick={() => onRowOpen(row)}
+                            className="absolute inset-0 cursor-pointer outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--focus-ring)"
+                        />
+                    ) : null}
                 </div>
                 {badgeColumn ? (
                     <StatusBadge color={isStatusColor(statusColor) ? statusColor : undefined}>

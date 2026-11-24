@@ -600,6 +600,46 @@ describe("EntityCardList", () => {
             />
         );
 
+    /**
+     * Il pulsante che apre la scheda conteneva il titolo: un titolo con un link (il cliente) o un
+     * pulsante (il tipo di intervento con il dettaglio a comparsa) finiva annidato in un pulsante,
+     * HTML non valido che React segnalava in console. Ora è un fratello che prende il nome dal titolo.
+     */
+    it("non annida link e pulsanti del titolo nel pulsante che apre la scheda", async () => {
+        const onRowOpen = vi.fn();
+        const onTitleButton = vi.fn();
+        renderCards({
+            onRowOpen,
+            columns: [
+                {
+                    key: "firstName",
+                    header: "Nome",
+                    cardSlot: "title",
+                    render: (row) => (
+                        <button type="button" onClick={onTitleButton}>
+                            {row.firstName}
+                        </button>
+                    ),
+                },
+                { key: "email", header: "Email", render: (row) => row.email },
+            ],
+        });
+        const [mario] = screen.getAllByRole("article");
+
+        expect(mario.querySelector("button button")).toBeNull();
+        // Due pulsanti "Mario": quello del titolo e quello che apre la scheda, col nome preso dal titolo.
+        const [titleButton, open] = within(mario).getAllByRole("button", { name: "Mario" });
+        expect(titleButton).toHaveTextContent("Mario");
+        expect(open).toHaveAttribute("aria-labelledby", within(mario).getByRole("heading").id);
+
+        await userEvent.click(within(mario).getByText("Mario"));
+        expect(onTitleButton).toHaveBeenCalledTimes(1);
+        expect(onRowOpen).not.toHaveBeenCalled();
+
+        await userEvent.click(open);
+        expect(onRowOpen).toHaveBeenCalledWith(rows[0]);
+    });
+
     it("compone il titolo con le colonne 'title' e mette l'ID sopra", () => {
         renderCards();
         const [mario, anna] = screen.getAllByRole("article");

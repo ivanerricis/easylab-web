@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-24 — Schede su telefono: niente più link o pulsanti dentro il pulsante del titolo](changelog/2026-11.md#2026-11-24-schede-su-telefono-niente-più-link-o-pulsanti-dentro-il-pulsante-del-titolo)
 - [2026-11-24 — Sviluppo: Vite prepara le pagine principali appena parte](changelog/2026-11.md#2026-11-24-sviluppo-vite-prepara-le-pagine-principali-appena-parte)
 - [2026-11-24 — Codice di verifica: parte da solo alla sesta cifra, errore sopra le caselle](changelog/2026-11.md#2026-11-24-codice-di-verifica-parte-da-solo-alla-sesta-cifra-errore-sopra-le-caselle)
 - [2026-11-24 — Dispositivi del cliente: collegati ai contratti e, facoltativi, agli interventi](changelog/2026-11.md#2026-11-24-dispositivi-del-cliente-collegati-ai-contratti-e-facoltativi-agli-interventi)

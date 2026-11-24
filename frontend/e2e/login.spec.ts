@@ -70,8 +70,8 @@ test.describe("accesso", () => {
         // Il secondo passo non ha ancora aperto nessuna pagina dell'app.
         await expect(page).toHaveURL(/\/login$/);
 
+        // Alla sesta cifra la verifica parte da sola: nessun clic su "Verifica".
         await page.locator("#loginCode").fill("123456");
-        await page.getByRole("button", { name: "Verifica" }).click();
 
         await expect(page).toHaveURL(/\/dashboard$/);
         expect(api.calls("POST /api/auth/login/2fa")).toEqual([{ challengeId: "sfida-1", code: "123456" }]);

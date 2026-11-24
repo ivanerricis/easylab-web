@@ -104,11 +104,30 @@ describe("LoginPage", () => {
         await submitCredentials();
 
         await userEvent.type(await screen.findByLabelText("Codice di verifica"), "123456");
-        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
 
         await waitFor(() => {
             expect(verifyTwoFactorLogin).toHaveBeenCalledWith("abc123", "123456");
         });
+        expect(navigate).toHaveBeenCalledWith("/dashboard", { replace: true });
+    });
+
+    it("verifica da solo alla sesta cifra, senza Invio né clic su Verifica", async () => {
+        login.mockResolvedValue({ status: "twoFactorRequired", challengeId: "abc123" });
+        verifyTwoFactorLogin.mockResolvedValue(user);
+
+        renderLoginPage();
+        await submitCredentials();
+
+        const codeInput = await screen.findByLabelText("Codice di verifica");
+        await userEvent.type(codeInput, "12345");
+        expect(verifyTwoFactorLogin).not.toHaveBeenCalled();
+
+        await userEvent.type(codeInput, "6");
+
+        await waitFor(() => {
+            expect(verifyTwoFactorLogin).toHaveBeenCalledWith("abc123", "123456");
+        });
+        expect(verifyTwoFactorLogin).toHaveBeenCalledTimes(1);
         expect(navigate).toHaveBeenCalledWith("/dashboard", { replace: true });
     });
 
@@ -120,7 +139,6 @@ describe("LoginPage", () => {
         await submitCredentials();
 
         await userEvent.type(await screen.findByLabelText("Codice di verifica"), "000000");
-        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
 
         await waitFor(() => {
             expect(screen.getByLabelText("Codice di verifica")).toHaveValue("");
@@ -141,7 +159,6 @@ describe("LoginPage", () => {
         await submitCredentials();
 
         await userEvent.type(await screen.findByLabelText("Codice di verifica"), "000000");
-        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
 
         expect(await screen.findByLabelText("Nome utente")).toBeInTheDocument();
         expect(screen.queryByLabelText("Codice di verifica")).not.toBeInTheDocument();
@@ -220,7 +237,6 @@ describe("LoginPage", () => {
         await submitCredentials();
 
         await userEvent.type(await screen.findByLabelText("Codice di verifica"), "000000");
-        await userEvent.click(screen.getByRole("button", { name: /Verifica/ }));
 
         await waitFor(() => {
             expect(screen.getByLabelText("Codice di verifica")).toHaveFocus();

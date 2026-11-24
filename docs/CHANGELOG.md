@@ -25,6 +25,7 @@ data porta alla voce da qui.
 ## Novembre 2026
 
 - [2026-11-24 — Sviluppo: Vite prepara le pagine principali appena parte](changelog/2026-11.md#2026-11-24-sviluppo-vite-prepara-le-pagine-principali-appena-parte)
+- [2026-11-24 — Codice di verifica: parte da solo alla sesta cifra, errore sopra le caselle](changelog/2026-11.md#2026-11-24-codice-di-verifica-parte-da-solo-alla-sesta-cifra-errore-sopra-le-caselle)
 - [2026-11-24 — Dispositivi del cliente: collegati ai contratti e, facoltativi, agli interventi](changelog/2026-11.md#2026-11-24-dispositivi-del-cliente-collegati-ai-contratti-e-facoltativi-agli-interventi)
 - [2026-11-24 — Menu col tasto destro sulle righe e colonna Azioni nascosta di serie](changelog/2026-11.md#2026-11-24-menu-col-tasto-destro-sulle-righe-e-colonna-azioni-nascosta-di-serie)
 - [2026-11-24 — Report da fatturare, ricevuta con tre caselle di pagamento, testo del lavoro eseguito leggibile](changelog/2026-11.md#2026-11-24-report-da-fatturare-ricevuta-con-tre-caselle-di-pagamento-testo-del-lavoro-eseguito-leggibile)

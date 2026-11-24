@@ -119,12 +119,14 @@ const LoginPage = () => {
         }
     };
 
-    const handleCodeSubmit = async () => {
+    // `value` arriva da `onComplete` del codice OTP: in quel momento lo stato `code` non contiene
+    // ancora l'ultima cifra appena digitata.
+    const handleCodeSubmit = async (value: string = code) => {
         if (isSubmitting || !challengeId) {
             return;
         }
 
-        if (!code.trim()) {
+        if (!value.trim()) {
             setCodeError(isUsingRecoveryCode ? "Inserisci un codice di recupero" : "Inserisci il codice di verifica");
             codeInputRef.current?.focus();
             return;
@@ -132,7 +134,7 @@ const LoginPage = () => {
 
         try {
             setIsSubmitting(true);
-            await completeTwoFactorLogin(challengeId, code.trim());
+            await completeTwoFactorLogin(challengeId, value.trim());
             goToApp();
         } catch (error) {
             const message = getApiErrorMessage(error, "Verifica non riuscita");
@@ -214,6 +216,8 @@ const LoginPage = () => {
                                             setCode(value);
                                             setCodeError(undefined);
                                         }}
+                                        // Alla sesta cifra la verifica parte da sola, senza Invio.
+                                        onComplete={(value: string) => void handleCodeSubmit(value)}
                                     >
                                         <InputOTPGroup>
                                             {/* Le caselle sono `div` disegnati sopra l'input vero,

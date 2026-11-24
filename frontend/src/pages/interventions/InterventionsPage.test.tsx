@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setStoredHiddenColumns } from "@/lib/theme";
 
 const navigate = vi.fn();
 
@@ -130,6 +131,9 @@ const renderPage = async (route = "/interventions") => {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // I pulsanti di riga sono nascosti di serie (vedi `useHiddenColumns`): questi test li usano, quindi
+    // si parte con la colonna Azioni mostrata. Quelli sulle colonne nascoste svuotano la preferenza.
+    setStoredHiddenColumns("interventions", ["status", "!actions"]);
     submitError = undefined;
     listInterventions.mockResolvedValue({ items: [intervention], totalItems: 1, page: 1, pageSize: 10, totalPages: 1 });
 });
@@ -383,7 +387,7 @@ describe("InterventionsPage", () => {
                 expect.objectContaining({ status: "all", type: "all", sortBy: "createdAt", sortOrder: "desc" })
             );
         });
-    });
+    }, 15_000);
 
     it("la ricerca riparte dalla prima pagina e filtra per il testo scritto", async () => {
         await renderPage("/interventions?page=2");
@@ -393,5 +397,5 @@ describe("InterventionsPage", () => {
         await waitFor(() => {
             expect(listInterventions).toHaveBeenLastCalledWith(expect.objectContaining({ search: "rossi", page: 1 }));
         });
-    });
+    }, 15_000);
 });

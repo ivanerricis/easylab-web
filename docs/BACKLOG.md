@@ -51,7 +51,8 @@ qui sotto le raccoglie; quelle con una sezione propria sono spiegate più in bas
     tastiera a schermo aperta nei dialoghi (restringe `dvh`), Indietro di Android con un dialogo
     aperto, maiuscole di iOS su "ELIMINA". Gli screenshot erano Playwright + Edge in emulazione.
 - [Rimandati dalla revisione visiva del 2026-09-25](#rimandati-dalla-revisione-visiva-del-2026-09-25):
-  colonna Azioni fuori vista nelle tabelle larghe, alcune proposte non ancora decise.
+  alcune proposte non ancora decise. (La colonna Azioni fuori vista è risolta: menu col tasto destro
+  e colonna nascosta di serie, vedi CHANGELOG 2026-11-24.)
 - Tabelle di Impostazioni (utenti, tentativi falliti, log, dump) ancora scritte a mano fuori da
   `EntityTable`: niente colonne ridimensionabili (CHANGELOG del 2026-09-08). Dal 2026-09-28 le
   loro schede su telefono sono già `EntityCardList`; per passare anche le tabelle serve prima
@@ -292,11 +293,6 @@ un campo `audience` sulla tabella.
 *Le correzioni fatte sono nel CHANGELOG dello stesso giorno. Queste sono rimaste fuori per
 scelta.*
 
-- **Colonna Azioni fuori vista nelle tabelle larghe.** Con la barra laterale aperta, report e
-  interventi sono più larghi del contenitore anche a 1440px (report: 1623px in 1160), e i
-  pulsanti di riga stanno in fondo allo scorrimento orizzontale. Una colonna Azioni fissa a
-  destra (`sticky`) è stata provata e tolta: non convinceva. Restano da valutare colonne
-  nascoste di serie (password, backup dati, alimentatore) o le azioni in un menu "⋯".
 - **Proposte non ancora decise:**
   - ricerca globale e suggerimenti del cliente ordinati per rilevanza, mostrando il campo che
     corrisponde (oggi con "rossi" escono prima clienti che corrispondono solo per l'email);

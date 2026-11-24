@@ -22,7 +22,6 @@ import { useGoBack } from "@/hooks/useGoBack";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import { useEntityDetail } from "@/hooks/useEntityDetail";
 import { entityPaths } from "@/lib/entityPaths";
-import TableActionButton from "@/components/table-action-button";
 import { usePaginatedRows } from "@/hooks/usePaginatedRows";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import { useTableRowsPerPage } from "@/hooks/useTableRowsPerPage";
@@ -220,19 +219,15 @@ const TechnicianPage = () => {
                         })}
                         loadError={reportsLoadError}
                         onRetry={() => void reloadReports()}
-                        renderRowActions={(row) => (
-                            <>
-                                <TableActionButton
-                                    variant="default"
-                                    size="icon-lg"
-                                    className="bg-muted hover:bg-primary/20"
-                                    onClick={() => handleOpenEditDialog(row)}
-                                    aria-label={`Modifica report ${row.id}`}
-                                >
-                                    <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-                                </TableActionButton>
-                            </>
-                        )}
+                        getRowActions={(row) => [
+                            {
+                                key: "edit",
+                                label: "Modifica",
+                                ariaLabel: `Modifica report ${row.id}`,
+                                icon: Pencil,
+                                onSelect: () => handleOpenEditDialog(row),
+                            },
+                        ]}
                         getRowStatusColor={(row) => reportStatusColor(row.closed)}
                         onRowOpen={(row) => handleOpenReport(row.id)}
                         isInitialLoading={areReportsInitialLoading}

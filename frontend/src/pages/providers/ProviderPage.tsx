@@ -86,7 +86,7 @@ const ProviderPage = () => {
     }, [reloadProvider, reloadContracts]);
 
     // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i dati del fornitore.
-    const { renderRowActions: renderContractActions, dialogs: contractActionDialogs } = useContractRowActions({
+    const { getRowActions: getContractActions, dialogs: contractActionDialogs } = useContractRowActions({
         onChanged: handleRefresh,
     });
 
@@ -191,7 +191,7 @@ const ProviderPage = () => {
                         tableKey="provider-contracts"
                         columns={columns}
                         rows={contracts}
-                        renderRowActions={renderContractActions}
+                        getRowActions={getContractActions}
                         getRowKey={(row) => row.id}
                         getRowStatusColor={(row) => contractStatusColor(row.effectiveStatus)}
                         emptyMessage={resolveEmptyListMessage({

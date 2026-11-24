@@ -28,7 +28,7 @@ type ColumnVisibilityMenuProps = {
     isCustomOrder?: boolean;
 };
 
-/** La colonna dei pulsanti di riga non è un dato: non si nasconde e non compare nel menu. */
+/** La colonna dei pulsanti di riga: si mostra o si nasconde, ma resta sempre in fondo e non si sposta. */
 const actionsColumnKey = "actions";
 
 /**
@@ -50,8 +50,8 @@ const ColumnVisibilityMenu = ({
     onResetOrder,
     isCustomOrder = false,
 }: ColumnVisibilityMenuProps) => {
-    const listedColumns = columns.filter((column) => column.key !== actionsColumnKey);
-    const hiddenCount = listedColumns.filter((column) => hiddenColumnKeys.includes(column.key)).length;
+    const hiddenCount = columns.filter((column) => hiddenColumnKeys.includes(column.key)).length;
+    const movableColumnCount = columns.filter((column) => column.key !== actionsColumnKey).length;
 
     return (
         <DropdownMenu>
@@ -77,7 +77,7 @@ const ColumnVisibilityMenu = ({
             <DropdownMenuContent align="end" className="min-w-52">
                 <DropdownMenuLabel>Colonne visibili</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {listedColumns.map((column, index) => (
+                {columns.map((column, index) => (
                     // I pulsanti stanno accanto alla voce e non dentro: in un
                     // `DropdownMenuCheckboxItem` ogni clic cambierebbe anche la spunta. Sono voci
                     // di menu a loro volta, così le frecce della tastiera ci arrivano.
@@ -92,7 +92,7 @@ const ColumnVisibilityMenu = ({
                         >
                             {column.header}
                         </DropdownMenuCheckboxItem>
-                        {onColumnMoveBy ? (
+                        {onColumnMoveBy && column.key !== actionsColumnKey ? (
                             <>
                                 <DropdownMenuItem
                                     className="size-8 shrink-0 justify-center p-0"
@@ -108,7 +108,7 @@ const ColumnVisibilityMenu = ({
                                 <DropdownMenuItem
                                     className="size-8 shrink-0 justify-center p-0"
                                     aria-label={`Sposta ${column.header} giù`}
-                                    disabled={index === listedColumns.length - 1}
+                                    disabled={index === movableColumnCount - 1}
                                     onSelect={(event) => {
                                         event.preventDefault();
                                         onColumnMoveBy(column.key, 1);

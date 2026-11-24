@@ -103,7 +103,7 @@ const InterventionsPage = () => {
         onPageOutOfRange: setCurrentPage,
     });
 
-    const { renderRowActions, dialogs: rowActionDialogs } = useInterventionRowActions({
+    const { getRowActions, dialogs: rowActionDialogs } = useInterventionRowActions({
         onChanged: loadInterventions,
     });
 
@@ -213,7 +213,7 @@ const InterventionsPage = () => {
                                 statusFilter !== "all" || typeFilter !== "all" || dateFrom != null || dateTo != null
                             }
                             onOpenIntervention={handleOpenIntervention}
-                            renderRowActions={renderRowActions}
+                            getRowActions={getRowActions}
                         />
                     </div>
                     <TablePagination

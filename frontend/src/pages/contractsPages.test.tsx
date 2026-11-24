@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setStoredHiddenColumns } from "@/lib/theme";
 
 const navigate = vi.fn();
 
@@ -113,6 +114,9 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // I pulsanti di riga sono nascosti di serie (vedi `useHiddenColumns`): questi test li usano, quindi
+    // si parte con la colonna Azioni mostrata. Quelli sulle colonne nascoste svuotano la preferenza.
+    setStoredHiddenColumns("contracts", ["!actions"]);
     api.listContracts.mockResolvedValue(
         page([contract(), contract({ id: 22, effectiveStatus: "expired", device: "Firewall" })])
     );

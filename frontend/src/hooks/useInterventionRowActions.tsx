@@ -2,7 +2,7 @@ import type { EntityColumn } from "@/components/entity-table";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import CustomDialog from "@/components/dialogs/customDialog";
 import type { EditInterventionSubmitValues } from "@/components/dialogs/edit/editInterventionDialog";
-import TableActionButton from "@/components/table-action-button";
+import type { RowAction } from "@/components/row-actions";
 import { usePendingAction } from "@/hooks/usePendingAction";
 import { deleteIntervention, getInterventionPrintUrl, sendInterventionEmail, updateIntervention } from "@/lib/api";
 import { toInterventionUpdatePayload } from "@/lib/interventionForm";
@@ -10,7 +10,7 @@ import { lazyWithPrefetch, useHasBeenOpen } from "@/lib/lazyDialog";
 import { openPrintWindow } from "@/lib/utils";
 import type { InterventionDto } from "@/types/dtos";
 import { Mail, Pencil, Printer, Trash2 } from "lucide-react";
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useState } from "react";
 
 const { Component: EditInterventionDialog, prefetch: prefetchEditInterventionDialog } = lazyWithPrefetch(
     () => import("@/components/dialogs/edit/editInterventionDialog")
@@ -40,7 +40,7 @@ type InterventionRowActionsOptions = {
  * contratto e quella del cliente. Prima c'erano solo nella lista principale, e nelle schede per
  * correggere un intervento bisognava prima aprirlo.
  *
- * Restituisce `renderRowActions` per `EntityTable` e `dialogs`, da mettere una volta nella
+ * Restituisce `getRowActions` per `EntityTable` e `dialogs`, da mettere una volta nella
  * pagina. Il dialogo di modifica si scarica solo alla prima apertura (`lazyWithPrefetch`).
  */
 export const useInterventionRowActions = ({ onChanged }: InterventionRowActionsOptions) => {
@@ -68,46 +68,40 @@ export const useInterventionRowActions = ({ onChanged }: InterventionRowActionsO
         await onChanged();
     };
 
-    const renderRowActions = (row: InterventionDto): ReactNode => (
-        <>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-primary/20"
-                onClick={() => setInterventionToEdit(row)}
-                onPointerEnter={prefetchEditInterventionDialog}
-                aria-label={`Modifica intervento ${row.id}`}
-            >
-                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-print/20"
-                onClick={() => openPrintWindow(getInterventionPrintUrl(row.id))}
-                aria-label={`Stampa intervento ${row.id}`}
-            >
-                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-email/20"
-                onClick={() => emailAction.open(row.id)}
-                aria-label={`Invia email intervento ${row.id}`}
-            >
-                <Mail className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-email" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => deleteAction.open(row)}
-                aria-label={`Elimina intervento ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
-        </>
-    );
+    const getRowActions = (row: InterventionDto): RowAction[] => [
+        {
+            key: "edit",
+            label: "Modifica",
+            ariaLabel: `Modifica intervento ${row.id}`,
+            icon: Pencil,
+            onSelect: () => setInterventionToEdit(row),
+            onPointerEnter: prefetchEditInterventionDialog,
+        },
+        {
+            key: "print",
+            label: "Stampa",
+            ariaLabel: `Stampa intervento ${row.id}`,
+            icon: Printer,
+            tone: "print",
+            onSelect: () => openPrintWindow(getInterventionPrintUrl(row.id)),
+        },
+        {
+            key: "email",
+            label: "Invia email",
+            ariaLabel: `Invia email intervento ${row.id}`,
+            icon: Mail,
+            tone: "email",
+            onSelect: () => emailAction.open(row.id),
+        },
+        {
+            key: "delete",
+            label: "Elimina",
+            ariaLabel: `Elimina intervento ${row.id}`,
+            icon: Trash2,
+            variant: "destructive",
+            onSelect: () => deleteAction.open(row),
+        },
+    ];
 
     const dialogs = (
         <>
@@ -156,5 +150,5 @@ export const useInterventionRowActions = ({ onChanged }: InterventionRowActionsO
         </>
     );
 
-    return { renderRowActions, dialogs };
+    return { getRowActions, dialogs };
 };

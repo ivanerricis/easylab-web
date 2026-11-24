@@ -2,7 +2,7 @@ import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
 import type { ReportDto } from "@/types/dtos";
-import type { ReactNode } from "react";
+import type { RowAction } from "@/components/row-actions";
 import type { ReportColumn } from "./report-columns";
 import { reportStatusColor } from "@/lib/reports";
 
@@ -11,7 +11,7 @@ type ReportsTableProps = {
     rows: ReportDto[];
     onOpenReport: (id: number) => void;
     /** I pulsanti di riga (`useReportRowActions`): modifica, stampa, eliminazione. */
-    renderRowActions: (report: ReportDto) => ReactNode;
+    getRowActions: (report: ReportDto) => RowAction[];
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
@@ -45,7 +45,7 @@ const ReportsTable = ({
     columns,
     rows,
     onOpenReport,
-    renderRowActions,
+    getRowActions,
     isInitialLoading,
     isRefetching,
     loadError,
@@ -70,7 +70,7 @@ const ReportsTable = ({
                 hasActiveFilters,
                 filteredMessage: "Nessun report corrisponde ai filtri.",
             })}
-            renderRowActions={renderRowActions}
+            getRowActions={getRowActions}
             getRowStatusColor={getStatusColor}
             onRowOpen={(row) => onOpenReport(row.id)}
             isInitialLoading={isInitialLoading}

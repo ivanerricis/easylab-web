@@ -1,7 +1,7 @@
 import type { EntityColumn } from "@/components/entity-table";
 import ConfirmDeleteDialog from "@/components/dialogs/delete/confirmDeleteDialog";
 import type { EditReportSubmitValues } from "@/components/dialogs/edit/editReportDialog";
-import TableActionButton from "@/components/table-action-button";
+import type { RowAction } from "@/components/row-actions";
 import { usePendingAction } from "@/hooks/usePendingAction";
 import { deleteReport, getReportPrintUrl, updateReport } from "@/lib/api";
 import { lazyWithPrefetch, useHasBeenOpen } from "@/lib/lazyDialog";
@@ -9,7 +9,7 @@ import { toReportUpdatePayload } from "@/lib/reportForm";
 import { openPrintWindow } from "@/lib/utils";
 import type { ReportDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useState } from "react";
 
 const { Component: EditReportDialog, prefetch: prefetchEditReportDialog } = lazyWithPrefetch(
     () => import("@/components/dialogs/edit/editReportDialog")
@@ -38,7 +38,7 @@ type ReportRowActionsOptions = {
  * ovunque compaia una lista di report: la lista principale e la scheda del cliente. Nella scheda
  * prima si poteva solo aprire il report.
  *
- * Restituisce `renderRowActions` per `EntityTable` e `dialogs`, da mettere una volta nella
+ * Restituisce `getRowActions` per `EntityTable` e `dialogs`, da mettere una volta nella
  * pagina. Il dialogo di modifica si scarica solo alla prima apertura (`lazyWithPrefetch`).
  */
 export const useReportRowActions = ({ onChanged }: ReportRowActionsOptions) => {
@@ -61,37 +61,32 @@ export const useReportRowActions = ({ onChanged }: ReportRowActionsOptions) => {
         await onChanged();
     };
 
-    const renderRowActions = (row: ReportDto): ReactNode => (
-        <>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-primary/20"
-                onClick={() => setReportToEdit(row)}
-                onPointerEnter={prefetchEditReportDialog}
-                aria-label={`Modifica report ${row.id}`}
-            >
-                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-print/20"
-                onClick={() => openPrintWindow(getReportPrintUrl(row.id))}
-                aria-label={`Stampa report ${row.id}`}
-            >
-                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => deleteAction.open(row)}
-                aria-label={`Elimina report ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
-        </>
-    );
+    const getRowActions = (row: ReportDto): RowAction[] => [
+        {
+            key: "edit",
+            label: "Modifica",
+            ariaLabel: `Modifica report ${row.id}`,
+            icon: Pencil,
+            onSelect: () => setReportToEdit(row),
+            onPointerEnter: prefetchEditReportDialog,
+        },
+        {
+            key: "print",
+            label: "Stampa",
+            ariaLabel: `Stampa report ${row.id}`,
+            icon: Printer,
+            tone: "print",
+            onSelect: () => openPrintWindow(getReportPrintUrl(row.id)),
+        },
+        {
+            key: "delete",
+            label: "Elimina",
+            ariaLabel: `Elimina report ${row.id}`,
+            icon: Trash2,
+            variant: "destructive",
+            onSelect: () => deleteAction.open(row),
+        },
+    ];
 
     const dialogs = (
         <>
@@ -126,5 +121,5 @@ export const useReportRowActions = ({ onChanged }: ReportRowActionsOptions) => {
         </>
     );
 
-    return { renderRowActions, dialogs };
+    return { getRowActions, dialogs };
 };

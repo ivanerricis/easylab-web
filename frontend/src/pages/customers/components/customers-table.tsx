@@ -1,7 +1,7 @@
 import EntityTable from "@/components/entity-table";
 import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
-import TableActionButton from "@/components/table-action-button";
+import type { RowAction } from "@/components/row-actions";
 import type { CustomerDto } from "@/types/dtos";
 import { Pencil, Printer, Trash2 } from "lucide-react";
 import type { CustomerColumn } from "./customer-columns";
@@ -51,36 +51,31 @@ const CustomersTable = ({
     onColumnMove,
     searchText,
 }: CustomersTableProps) => {
-    const renderRowActions = (row: CustomerDto) => (
-        <>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-action-print/20"
-                onClick={() => onPrintCustomer(row.id)}
-                aria-label={`Stampa resoconto cliente ${row.id}`}
-            >
-                <Printer className="size-5 text-muted-foreground transition-colors group-hover/button:text-action-print" />
-            </TableActionButton>
-            <TableActionButton
-                variant="default"
-                size="icon-lg"
-                className="bg-muted hover:bg-primary/20"
-                onClick={() => onEditCustomer(row.id)}
-                aria-label={`Modifica cliente ${row.id}`}
-            >
-                <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-            </TableActionButton>
-            <TableActionButton
-                variant="destructive"
-                size="icon-lg"
-                onClick={() => onDeleteCustomer(row)}
-                aria-label={`Elimina cliente ${row.id}`}
-            >
-                <Trash2 className="size-5" />
-            </TableActionButton>
-        </>
-    );
+    const getRowActions = (row: CustomerDto): RowAction[] => [
+        {
+            key: "print",
+            label: "Stampa resoconto",
+            ariaLabel: `Stampa resoconto cliente ${row.id}`,
+            icon: Printer,
+            tone: "print",
+            onSelect: () => onPrintCustomer(row.id),
+        },
+        {
+            key: "edit",
+            label: "Modifica",
+            ariaLabel: `Modifica cliente ${row.id}`,
+            icon: Pencil,
+            onSelect: () => onEditCustomer(row.id),
+        },
+        {
+            key: "delete",
+            label: "Elimina",
+            ariaLabel: `Elimina cliente ${row.id}`,
+            icon: Trash2,
+            variant: "destructive",
+            onSelect: () => onDeleteCustomer(row),
+        },
+    ];
 
     return (
         <EntityTable
@@ -89,7 +84,7 @@ const CustomersTable = ({
             rows={rows}
             getRowKey={(row) => row.id}
             emptyMessage={resolveEmptyListMessage({ emptyMessage: "Nessun cliente disponibile.", searchText })}
-            renderRowActions={renderRowActions}
+            getRowActions={getRowActions}
             onRowOpen={(row) => onOpenCustomer(row.id)}
             isInitialLoading={isInitialLoading}
             isRefetching={isRefetching}

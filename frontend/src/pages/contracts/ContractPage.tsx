@@ -111,8 +111,9 @@ const ContractPage = () => {
     };
 
     // Dopo una modifica o un'eliminazione si ricarica anche il contratto: le ore usate cambiano.
-    const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
-        useInterventionRowActions({ onChanged: handleRefresh });
+    const { getRowActions: getInterventionActions, dialogs: interventionActionDialogs } = useInterventionRowActions({
+        onChanged: handleRefresh,
+    });
 
     const handleEditContract = async (values: ContractSubmitValues) => {
         if (!contract) {
@@ -389,7 +390,7 @@ const ContractPage = () => {
                             <EntityTable
                                 tableKey="contract-interventions"
                                 columns={contractInterventionColumns}
-                                renderRowActions={renderInterventionActions}
+                                getRowActions={getInterventionActions}
                                 rows={interventions.rows}
                                 getRowKey={(row) => row.id}
                                 emptyMessage="Nessun intervento collegato a questo contratto."

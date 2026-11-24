@@ -26,7 +26,7 @@ const renderMenu = (props: Partial<Parameters<typeof ColumnVisibilityMenu>[0]> =
 const openMenu = () => userEvent.click(screen.getByRole("button", { name: /^Colonne/ }));
 
 describe("ColumnVisibilityMenu: ordine delle colonne", () => {
-    it("elenca le voci nell'ordine ricevuto, senza le azioni", async () => {
+    it("elenca le voci nell'ordine ricevuto, con le azioni in fondo e senza frecce", async () => {
         renderMenu();
         await openMenu();
 
@@ -34,7 +34,20 @@ describe("ColumnVisibilityMenu: ordine delle colonne", () => {
             "ID",
             "Cliente",
             "Dispositivo",
+            "Azioni",
         ]);
+        expect(screen.queryByRole("menuitem", { name: /Sposta Azioni/ })).not.toBeInTheDocument();
+    });
+
+    it("le azioni si mostrano e si nascondono come le altre colonne", async () => {
+        const { onColumnVisibleChange } = renderMenu({ hiddenColumnKeys: ["actions"] });
+
+        await openMenu();
+        const actions = screen.getByRole("menuitemcheckbox", { name: "Azioni" });
+        expect(actions).toHaveAttribute("aria-checked", "false");
+        await userEvent.click(actions);
+
+        expect(onColumnVisibleChange).toHaveBeenCalledWith("actions", true);
     });
 
     it("sposta una voce con le frecce senza toccare la spunta, e il menu resta aperto", async () => {

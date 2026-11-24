@@ -114,3 +114,57 @@ describe("useHiddenColumns: mostrare e nascondere", () => {
         });
     });
 });
+
+describe("useHiddenColumns: colonna dei pulsanti di riga", () => {
+    const withActions = [...columns, { key: "actions" }];
+
+    it("è nascosta di default", () => {
+        const { result } = renderHook(() => useHiddenColumns("reports", withActions));
+
+        expect(result.current.hiddenColumnKeys).toEqual(["actions"]);
+    });
+
+    it("una preferenza salvata prima, che non la nomina, la lascia nascosta", () => {
+        setStoredHiddenColumns("reports", ["password"]);
+
+        const { result } = renderHook(() => useHiddenColumns("reports", withActions));
+
+        expect(result.current.hiddenColumnKeys).toEqual(["password", "actions"]);
+    });
+
+    it("mostrarla si ricorda al ricaricamento, e nasconderla di nuovo toglie la scelta", () => {
+        const first = renderHook(() => useHiddenColumns("reports", withActions));
+
+        act(() => {
+            first.result.current.setColumnVisible("actions", true);
+        });
+        expect(first.result.current.hiddenColumnKeys).toEqual([]);
+        first.unmount();
+
+        const second = renderHook(() => useHiddenColumns("reports", withActions));
+        expect(second.result.current.hiddenColumnKeys).toEqual([]);
+
+        act(() => {
+            second.result.current.setColumnVisible("actions", false);
+        });
+        expect(localStorage.length).toBe(0);
+    });
+
+    it('"Mostra tutte" la mostra, e la scelta resta', () => {
+        const first = renderHook(() => useHiddenColumns("reports", withActions));
+
+        act(() => {
+            first.result.current.showAllColumns();
+        });
+        first.unmount();
+
+        const second = renderHook(() => useHiddenColumns("reports", withActions));
+        expect(second.result.current.hiddenColumnKeys).toEqual([]);
+    });
+
+    it("senza la colonna nelle colonne non cambia niente", () => {
+        const { result } = renderHook(() => useHiddenColumns("reports", columns));
+
+        expect(result.current.hiddenColumnKeys).toEqual([]);
+    });
+});

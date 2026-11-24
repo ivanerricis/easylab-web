@@ -65,6 +65,9 @@ const renderPage = async () => {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // I pulsanti di riga sono nascosti di serie (vedi `useHiddenColumns`): questi test li usano, quindi
+    // si parte con la colonna Azioni mostrata. Quelli sulle colonne nascoste svuotano la preferenza.
+    setStoredHiddenColumns("customers", ["!actions"]);
     api.listCustomers.mockResolvedValue({ items: [customer], totalItems: 1, page: 1, pageSize: 10, totalPages: 1 });
     api.createCustomer.mockResolvedValue({});
     api.updateCustomer.mockResolvedValue({});
@@ -90,8 +93,8 @@ describe("CustomersPage", () => {
 
         expect(within(table()).getByRole("columnheader", { name: "Nome" })).toBeInTheDocument();
         expect(within(table()).queryByRole("columnheader", { name: "Email" })).not.toBeInTheDocument();
-        // Il menu "Colonne" conta solo l'email come nascosta.
-        expect(screen.getByRole("button", { name: "Colonne, 1 nascoste" })).toBeInTheDocument();
+        // Il menu "Colonne" conta come nascoste l'email e le azioni (la preferenza vecchia non le nomina).
+        expect(screen.getByRole("button", { name: "Colonne, 2 nascoste" })).toBeInTheDocument();
     });
 
     it("ordina per nome di default", async () => {

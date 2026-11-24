@@ -21,6 +21,32 @@ export const withoutLockedColumns = (
     return hiddenColumnKeys.filter((key) => !lockedKeys.has(key));
 };
 
+const actionsColumnKey = "actions";
+
+/**
+ * Nelle preferenze salvate i pulsanti di riga sono nascosti di default: le liste salvate prima che
+ * si potessero nascondere non nominano `actions`, e valgono "nascosta" invece di forzarla visibile.
+ * Per ricordare la scelta contraria (la colonna mostrata) si salva questo segnaposto al suo posto.
+ */
+const actionsShownMarker = "!actions";
+
+/** Dalle chiavi salvate alle colonne nascoste davvero (con `actions` se non è segnata come mostrata). */
+const decodeActionsVisibility = (storedKeys: string[], hasActionsColumn: boolean): string[] => {
+    if (!hasActionsColumn) {
+        return storedKeys.filter((key) => key !== actionsShownMarker);
+    }
+
+    const withoutMarker = storedKeys.filter((key) => key !== actionsShownMarker);
+
+    return storedKeys.includes(actionsShownMarker) || withoutMarker.includes(actionsColumnKey)
+        ? withoutMarker
+        : [...withoutMarker, actionsColumnKey];
+};
+
+/** L'inverso di `decodeActionsVisibility`, per salvare. */
+const encodeActionsVisibility = (hiddenKeys: string[], hasActionsColumn: boolean): string[] =>
+    hasActionsColumn && !hiddenKeys.includes(actionsColumnKey) ? [...hiddenKeys, actionsShownMarker] : hiddenKeys;
+
 /**
  * Le colonne che l'utente ha nascosto in una tabella, ricordate per tabella come le larghezze
  * e le righe per pagina (`tableKey` è la stessa chiave).
@@ -31,13 +57,19 @@ export const withoutLockedColumns = (
  * prossima modifica. Facoltativo: senza, si comporta come prima.
  */
 export const useHiddenColumns = (tableKey: string, columns?: readonly HideableColumn[]) => {
-    // Le colonne nascoste finché l'utente non sceglie diversamente (`hiddenByDefault`).
+    const hasActionsColumn = (columns ?? []).some((column) => column.key === actionsColumnKey);
+    // Le colonne nascoste finché l'utente non sceglie diversamente (`hiddenByDefault`), più i
+    // pulsanti di riga: ci sono già nel menu col tasto destro, e a destra nelle tabelle larghe
+    // finivano fuori vista (vedi `actionsShownMarker`).
     const defaultHiddenKeys = useMemo(
-        () => (columns ?? []).filter((column) => column.hiddenByDefault).map((column) => column.key),
-        [columns]
+        () => [
+            ...(columns ?? []).filter((column) => column.hiddenByDefault).map((column) => column.key),
+            ...(hasActionsColumn ? [actionsColumnKey] : []),
+        ],
+        [columns, hasActionsColumn]
     );
     const [storedHiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>(() =>
-        getStoredHiddenColumns(tableKey, defaultHiddenKeys)
+        decodeActionsVisibility(getStoredHiddenColumns(tableKey, defaultHiddenKeys), hasActionsColumn)
     );
     const hiddenColumnKeys = useMemo(
         () => (columns ? withoutLockedColumns(storedHiddenColumnKeys, columns) : storedHiddenColumnKeys),
@@ -54,17 +86,17 @@ export const useHiddenColumns = (tableKey: string, columns?: readonly HideableCo
                       ? current
                       : [...current, columnKey];
 
-                setStoredHiddenColumns(tableKey, next, defaultHiddenKeys);
+                setStoredHiddenColumns(tableKey, encodeActionsVisibility(next, hasActionsColumn), defaultHiddenKeys);
                 return next;
             });
         },
-        [columns, defaultHiddenKeys, tableKey]
+        [columns, defaultHiddenKeys, hasActionsColumn, tableKey]
     );
 
     const showAllColumns = useCallback(() => {
-        setStoredHiddenColumns(tableKey, [], defaultHiddenKeys);
+        setStoredHiddenColumns(tableKey, encodeActionsVisibility([], hasActionsColumn), defaultHiddenKeys);
         setHiddenColumnKeys([]);
-    }, [defaultHiddenKeys, tableKey]);
+    }, [defaultHiddenKeys, hasActionsColumn, tableKey]);
 
     return { hiddenColumnKeys, setColumnVisible, showAllColumns };
 };

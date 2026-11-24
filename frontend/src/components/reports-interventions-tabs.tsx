@@ -9,6 +9,7 @@ import { interventionStatusColor, interventionStatusOptions } from "@/lib/interv
 import { reportStatusColor, reportVisibilityOptions } from "@/lib/reports";
 import type { InterventionDto, ReportDto } from "@/types/dtos";
 import { ListFilter } from "lucide-react";
+import type { RowAction } from "@/components/row-actions";
 import { useMemo, type ReactNode } from "react";
 
 export type ReportsInterventionsTab = "reports" | "interventions" | "contracts";
@@ -29,12 +30,12 @@ type ReportsInterventionsTabsProps = {
      * I pulsanti di riga degli interventi (`useInterventionRowActions`). Con questa la tabella
      * ha in più la colonna delle azioni; senza, come nella scheda del collaboratore, no.
      */
-    renderInterventionActions?: (intervention: InterventionDto) => ReactNode;
+    getInterventionActions?: (intervention: InterventionDto) => RowAction[];
     /**
      * I pulsanti di riga dei report (`useReportRowActions`), con la stessa regola degli
      * interventi: senza, come nella scheda del collaboratore, la tabella non ha la colonna azioni.
      */
-    renderReportActions?: (report: ReportDto) => ReactNode;
+    getReportActions?: (report: ReportDto) => RowAction[];
     /**
      * La terza tab, solo nella scheda del cliente: il filtro (sulla riga delle tab, come gli altri
      * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
@@ -56,14 +57,14 @@ const ReportsInterventionsTabs = ({
     ownerNoun,
     onOpenReport,
     onOpenIntervention,
-    renderInterventionActions,
-    renderReportActions,
+    getInterventionActions,
+    getReportActions,
     contractsTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
     // Memorizzate: un array nuovo a ogni render farebbe ridisegnare tutte le righe (`memo`).
-    const hasInterventionActions = renderInterventionActions != null;
-    const hasReportActions = renderReportActions != null;
+    const hasInterventionActions = getInterventionActions != null;
+    const hasReportActions = getReportActions != null;
     const reportTableColumns = useMemo(
         () => (hasReportActions ? [...reportColumns, reportActionsColumn] : reportColumns),
         [reportColumns, hasReportActions]
@@ -131,7 +132,7 @@ const ReportsInterventionsTabs = ({
                         tableKey={`${tableKeyPrefix}-reports`}
                         columns={reportTableColumns}
                         rows={reports.rows}
-                        renderRowActions={renderReportActions}
+                        getRowActions={getReportActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun report associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => reportStatusColor(row.closed)}
@@ -160,7 +161,7 @@ const ReportsInterventionsTabs = ({
                         tableKey={`${tableKeyPrefix}-interventions`}
                         columns={interventionTableColumns}
                         rows={interventions.rows}
-                        renderRowActions={renderInterventionActions}
+                        getRowActions={getInterventionActions}
                         getRowKey={(row) => row.id}
                         emptyMessage={`Nessun intervento associato a questo ${ownerNoun}.`}
                         getRowStatusColor={(row) => interventionStatusColor[row.status]}

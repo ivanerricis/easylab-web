@@ -1,6 +1,6 @@
 import EntityTable, { type EntityColumn } from "@/components/entity-table";
 import { useColumnOrder } from "@/hooks/useColumnOrder";
-import TableActionButton from "@/components/table-action-button";
+import type { RowAction } from "@/components/row-actions";
 import { Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -71,31 +71,26 @@ const EntityCrudTable = <TRow extends { id: number }>({
     // Senza menu "Colonne" qui l'ordine si cambia solo trascinando le intestazioni.
     const { orderedColumns, moveColumn } = useColumnOrder(tableKey, columns);
 
-    const renderRowActions = (row: TRow) => (
-        <>
-            {isRowLocked?.(row) ? null : (
-                <>
-                    <TableActionButton
-                        variant="default"
-                        size="icon-lg"
-                        className="bg-muted hover:bg-primary/20"
-                        onClick={() => onEdit(row.id)}
-                        aria-label={`Modifica ${entityLabel} ${row.id}`}
-                    >
-                        <Pencil className="size-5 text-muted-foreground transition-colors group-hover/button:text-primary" />
-                    </TableActionButton>
-                    <TableActionButton
-                        variant="destructive"
-                        size="icon-lg"
-                        onClick={() => onDelete(row)}
-                        aria-label={`Elimina ${entityLabel} ${row.id}`}
-                    >
-                        <Trash2 className="size-5" />
-                    </TableActionButton>
-                </>
-            )}
-        </>
-    );
+    const getRowActions = (row: TRow): RowAction[] =>
+        isRowLocked?.(row)
+            ? []
+            : [
+                  {
+                      key: "edit",
+                      label: "Modifica",
+                      ariaLabel: `Modifica ${entityLabel} ${row.id}`,
+                      icon: Pencil,
+                      onSelect: () => onEdit(row.id),
+                  },
+                  {
+                      key: "delete",
+                      label: "Elimina",
+                      ariaLabel: `Elimina ${entityLabel} ${row.id}`,
+                      icon: Trash2,
+                      variant: "destructive",
+                      onSelect: () => onDelete(row),
+                  },
+              ];
 
     return (
         <EntityTable
@@ -105,7 +100,7 @@ const EntityCrudTable = <TRow extends { id: number }>({
             rows={rows}
             getRowKey={(row) => row.id}
             emptyMessage={emptyMessage}
-            renderRowActions={renderRowActions}
+            getRowActions={getRowActions}
             // Il doppio click sulla riga apriva la scheda su report e interventi ma non qui,
             // perché questo componente non inoltrava `onRowOpen`: lo stesso gesto funzionava su
             // due tabelle su sette. Resta un'aggiunta per il mouse — da tastiera la scheda si

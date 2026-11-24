@@ -72,7 +72,7 @@ const ContractsPage = () => {
         onPageOutOfRange: setCurrentPage,
     });
     // Modifica, stampa ed eliminazione sono le stesse delle schede di cliente e fornitore.
-    const { renderRowActions, dialogs: rowActionDialogs } = useContractRowActions({ onChanged: loadContracts });
+    const { getRowActions, dialogs: rowActionDialogs } = useContractRowActions({ onChanged: loadContracts });
 
     const handleSortOptionChange = (value: ContractSortOption) =>
         updateParams({ [listUrlParams.sort]: value === DEFAULT_CONTRACT_SORT_OPTION ? null : value });
@@ -155,7 +155,7 @@ const ContractsPage = () => {
                             hasActiveFilters: typeFilter !== "all" || statusFilter !== "all",
                             filteredMessage: "Nessun contratto corrisponde ai filtri.",
                         })}
-                        renderRowActions={renderRowActions}
+                        getRowActions={getRowActions}
                         onRowOpen={(row) => void navigate(entityPaths.contract(row.id))}
                         isInitialLoading={isInitialLoading}
                         isRefetching={isRefetching}

@@ -180,12 +180,13 @@ const CustomerPage = () => {
     }, [reloadCustomer, reloadInterventions, reloadReports, reloadContracts]);
 
     // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i contatori.
-    const { renderRowActions: renderInterventionActions, dialogs: interventionActionDialogs } =
-        useInterventionRowActions({ onChanged: handleRefresh });
-    const { renderRowActions: renderReportActions, dialogs: reportActionDialogs } = useReportRowActions({
+    const { getRowActions: getInterventionActions, dialogs: interventionActionDialogs } = useInterventionRowActions({
         onChanged: handleRefresh,
     });
-    const { renderRowActions: renderContractActions, dialogs: contractActionDialogs } = useContractRowActions({
+    const { getRowActions: getReportActions, dialogs: reportActionDialogs } = useReportRowActions({
+        onChanged: handleRefresh,
+    });
+    const { getRowActions: getContractActions, dialogs: contractActionDialogs } = useContractRowActions({
         onChanged: handleRefresh,
     });
 
@@ -346,11 +347,11 @@ const CustomerPage = () => {
                 ownerNoun="cliente"
                 onOpenReport={handleOpenReport}
                 onOpenIntervention={handleOpenIntervention}
-                renderInterventionActions={renderInterventionActions}
-                renderReportActions={renderReportActions}
+                getInterventionActions={getInterventionActions}
+                getReportActions={getReportActions}
                 contractsTab={{
                     filter: <CustomerContractsFilter contracts={contracts} />,
-                    content: <CustomerContractsTable contracts={contracts} renderRowActions={renderContractActions} />,
+                    content: <CustomerContractsTable contracts={contracts} getRowActions={getContractActions} />,
                 }}
             />
         </div>

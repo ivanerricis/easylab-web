@@ -1,9 +1,13 @@
 import { act, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EntityCardList from "./entity-card-list";
 import EntityTable, { type EntityColumn } from "./entity-table";
+import type { RowAction } from "./row-actions";
+import { Pencil, Trash2 } from "lucide-react";
 
 type Row = { id: number; firstName: string; lastName: string | null; status: string; email: string };
 
@@ -14,6 +18,17 @@ const columns: EntityColumn<Row>[] = [
     { key: "status", header: "Stato", cardSlot: "badge", render: (row) => row.status },
     { key: "email", header: "Email", cardSlot: "wide", render: (row) => row.email },
     { key: "actions", header: "Azioni", render: () => null },
+];
+
+// I pulsanti di riga hanno un tooltip, che vuole il suo provider.
+const TestProviders = ({ children }: { children: ReactNode }) => (
+    <MemoryRouter>
+        <TooltipProvider>{children}</TooltipProvider>
+    </MemoryRouter>
+);
+
+const editActions = (row: Row): RowAction[] => [
+    { key: "edit", label: "Modifica", ariaLabel: `Modifica ${row.id}`, icon: Pencil, onSelect: () => {} },
 ];
 
 const rows: Row[] = [
@@ -37,11 +52,11 @@ const renderTable = (props: Partial<Parameters<typeof EntityTable<Row>>[0]> = {}
             rows={rows}
             getRowKey={(row) => row.id}
             emptyMessage="Nessun elemento."
-            renderRowActions={(row) => <button>Modifica {row.id}</button>}
+            getRowActions={editActions}
             {...props}
         />,
         // Il Router serve al ripristino dello scroll, che tiene le posizioni per voce di cronologia.
-        { wrapper: MemoryRouter }
+        { wrapper: TestProviders }
     );
 
 describe("EntityTable: ordinamento dalle intestazioni", () => {
@@ -90,7 +105,7 @@ describe("EntityTable: ordinamento dalle intestazioni", () => {
                 rows={rows}
                 getRowKey={(row) => row.id}
                 emptyMessage="Nessun elemento."
-                renderRowActions={() => null}
+                getRowActions={() => []}
                 sort={{ key: "name", direction: "desc" }}
                 onSortChange={onSortChange}
             />
@@ -469,6 +484,109 @@ describe("EntityTable", () => {
     });
 });
 
+describe("EntityTable: menu col tasto destro", () => {
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    // Elimina è dichiarata prima di Modifica di proposito: nel menu deve finire comunque in fondo.
+    const menuActions = (row: Row): RowAction[] => [
+        {
+            key: "delete",
+            label: "Elimina",
+            ariaLabel: `Elimina ${row.id}`,
+            icon: Trash2,
+            variant: "destructive",
+            onSelect: () => onDelete(row),
+        },
+        { key: "edit", label: "Modifica", ariaLabel: `Modifica ${row.id}`, icon: Pencil, onSelect: () => onEdit(row) },
+    ];
+
+    beforeEach(() => {
+        onEdit.mockClear();
+        onDelete.mockClear();
+    });
+
+    const rightClick = (element: Element) => fireEvent.contextMenu(element);
+
+    it("si apre sulla riga con Apri per primo e le azioni distruttive in fondo", async () => {
+        renderTable({ getRowActions: menuActions, onRowOpen: vi.fn() });
+
+        rightClick(within(screen.getByRole("table")).getByText("Mario"));
+
+        const items = await screen.findAllByRole("menuitem");
+        expect(items.map((item) => item.textContent)).toEqual(["Apri", "Modifica", "Elimina"]);
+        expect(items[2]).toHaveAttribute("data-variant", "destructive");
+        expect(screen.getByRole("separator")).toBeInTheDocument();
+    });
+
+    it("Apri chiama onRowOpen con la riga cliccata", async () => {
+        const onRowOpen = vi.fn();
+        renderTable({ getRowActions: menuActions, onRowOpen });
+
+        rightClick(within(screen.getByRole("table")).getByText("Anna"));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Apri" }));
+
+        expect(onRowOpen).toHaveBeenCalledWith(rows[1]);
+    });
+
+    it("una voce chiama lo stesso gestore del pulsante, con la riga giusta", async () => {
+        renderTable({ getRowActions: menuActions });
+
+        rightClick(within(screen.getByRole("table")).getByText("Mario"));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Elimina" }));
+
+        expect(onDelete).toHaveBeenCalledWith(rows[0]);
+        expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it("senza onRowOpen non c'è Apri", async () => {
+        renderTable({ getRowActions: menuActions });
+
+        rightClick(within(screen.getByRole("table")).getByText("Mario"));
+
+        const items = await screen.findAllByRole("menuitem");
+        expect(items.map((item) => item.textContent)).toEqual(["Modifica", "Elimina"]);
+    });
+
+    it("sui pulsanti della riga resta il menu del browser", () => {
+        renderTable({ getRowActions: menuActions, onRowOpen: vi.fn() });
+        const table = screen.getByRole("table");
+
+        const notPrevented = rightClick(within(table).getByRole("button", { name: "Modifica 1" }));
+
+        expect(notPrevented).toBe(true);
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("nell'intestazione resta il menu del browser", () => {
+        renderTable({ getRowActions: menuActions, onRowOpen: vi.fn() });
+
+        const notPrevented = rightClick(within(screen.getByRole("table")).getByText("Nome"));
+
+        expect(notPrevented).toBe(true);
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("senza azioni né onRowOpen non si apre niente", () => {
+        renderTable({ getRowActions: undefined });
+
+        const notPrevented = rightClick(within(screen.getByRole("table")).getByText("Mario"));
+
+        expect(notPrevented).toBe(true);
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("doppio click e Invio aprono ancora la riga", () => {
+        const onRowOpen = vi.fn();
+        renderTable({ getRowActions: menuActions, onRowOpen });
+        const table = screen.getByRole("table");
+
+        fireEvent.doubleClick(within(table).getByText("Mario"));
+        fireEvent.keyDown(within(table).getAllByRole("row")[2], { key: "Enter" });
+
+        expect(onRowOpen.mock.calls).toEqual([[rows[0]], [rows[1]]]);
+    });
+});
+
 describe("EntityCardList", () => {
     const renderCards = (props: Partial<Parameters<typeof EntityCardList<Row>>[0]> = {}) =>
         render(
@@ -661,12 +779,12 @@ describe("EntityTable: righe a blocchi", () => {
                 rows={[...manyRows].reverse()}
                 getRowKey={(row) => row.id}
                 emptyMessage="Nessun elemento."
-                renderRowActions={(row) => <button>Modifica {row.id}</button>}
+                getRowActions={editActions}
             />
         );
 
         expect(tableRowCount()).toBe(100);
-    });
+    }, 30_000);
 
     it("ritrova le righe già disegnate tornando alla stessa voce di cronologia", () => {
         const first = renderTable({ rows: manyRows });

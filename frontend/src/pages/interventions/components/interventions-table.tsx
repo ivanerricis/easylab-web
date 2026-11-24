@@ -3,7 +3,7 @@ import { resolveEmptyListMessage } from "@/lib/emptyListMessage";
 import type { TableSort } from "@/lib/tableSort";
 import { interventionStatusColor } from "@/lib/interventions";
 import type { InterventionDto } from "@/types/dtos";
-import type { ReactNode } from "react";
+import type { RowAction } from "@/components/row-actions";
 import type { InterventionColumn } from "./intervention-columns";
 
 type InterventionsTableProps = {
@@ -11,7 +11,7 @@ type InterventionsTableProps = {
     rows: InterventionDto[];
     onOpenIntervention: (id: number) => void;
     /** I pulsanti di riga: vedi `useInterventionRowActions`, condiviso con le schede. */
-    renderRowActions: (intervention: InterventionDto) => ReactNode;
+    getRowActions: (intervention: InterventionDto) => RowAction[];
     /** Stati di caricamento della lista: vedi `EntityTable`. */
     isInitialLoading?: boolean;
     isRefetching?: boolean;
@@ -45,7 +45,7 @@ const InterventionsTable = ({
     columns,
     rows,
     onOpenIntervention,
-    renderRowActions,
+    getRowActions,
     isInitialLoading,
     isRefetching,
     loadError,
@@ -70,7 +70,7 @@ const InterventionsTable = ({
                 hasActiveFilters,
                 filteredMessage: "Nessun intervento corrisponde ai filtri.",
             })}
-            renderRowActions={renderRowActions}
+            getRowActions={getRowActions}
             getRowStatusColor={(row) => interventionStatusColor[row.status]}
             onRowOpen={(row) => onOpenIntervention(row.id)}
             isInitialLoading={isInitialLoading}

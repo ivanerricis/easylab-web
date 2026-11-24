@@ -100,7 +100,7 @@ describe("contratti", () => {
             type: "rental" as const,
             termMonths: 3,
             billingMonths: 3,
-            device: "PC",
+            deviceIds: [5],
             startDate: "2026-10-05",
             customerId: 3,
             providerId: 8,
@@ -108,8 +108,8 @@ describe("contratti", () => {
 
         expect(await createContract(payload)).toEqual(mapped);
         expect(post).toHaveBeenCalledWith("/contracts", payload);
-        expect(await updateContract(1, { device: "Server" })).toEqual(mapped);
-        expect(put).toHaveBeenCalledWith("/contracts/1", { device: "Server" });
+        expect(await updateContract(1, { deviceIds: [] })).toEqual(mapped);
+        expect(put).toHaveBeenCalledWith("/contracts/1", { deviceIds: [] });
         await deleteContract(1);
         expect(del).toHaveBeenCalledWith("/contracts/1");
     });

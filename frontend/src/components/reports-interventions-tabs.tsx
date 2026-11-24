@@ -12,7 +12,7 @@ import { ListFilter } from "lucide-react";
 import type { RowAction } from "@/components/row-actions";
 import { useMemo, type ReactNode } from "react";
 
-export type ReportsInterventionsTab = "reports" | "interventions" | "contracts";
+export type ReportsInterventionsTab = "reports" | "interventions" | "contracts" | "devices";
 
 type ReportsInterventionsTabsProps = {
     activeTab: ReportsInterventionsTab;
@@ -41,6 +41,8 @@ type ReportsInterventionsTabsProps = {
      * due) e il contenuto. Senza, le tab restano due, come nella scheda del collaboratore.
      */
     contractsTab?: { filter: ReactNode; content: ReactNode };
+    /** La quarta tab, solo nella scheda del cliente: i suoi dispositivi, senza filtro. */
+    devicesTab?: { content: ReactNode };
 };
 
 /**
@@ -60,6 +62,7 @@ const ReportsInterventionsTabs = ({
     getInterventionActions,
     getReportActions,
     contractsTab,
+    devicesTab,
 }: ReportsInterventionsTabsProps) => {
     const { reports, interventions } = lists;
     // Memorizzate: un array nuovo a ogni render farebbe ridisegnare tutte le righe (`memo`).
@@ -96,8 +99,13 @@ const ReportsInterventionsTabs = ({
                             Contratti
                         </TabsTrigger>
                     ) : null}
+                    {devicesTab ? (
+                        <TabsTrigger value="devices" className="px-2 sm:px-3">
+                            Dispositivi
+                        </TabsTrigger>
+                    ) : null}
                 </TabsList>
-                {activeTab === "contracts" && contractsTab ? (
+                {activeTab === "devices" ? null : activeTab === "contracts" && contractsTab ? (
                     contractsTab.filter
                 ) : activeTab === "interventions" ? (
                     <FilterSelect
@@ -187,6 +195,12 @@ const ReportsInterventionsTabs = ({
             {contractsTab ? (
                 <TabsContent value="contracts" aria-label={`Contratti del ${ownerNoun}`} className="min-h-0 flex-1">
                     {contractsTab.content}
+                </TabsContent>
+            ) : null}
+
+            {devicesTab ? (
+                <TabsContent value="devices" aria-label={`Dispositivi del ${ownerNoun}`} className="min-h-0 flex-1">
+                    {devicesTab.content}
                 </TabsContent>
             ) : null}
         </Tabs>

@@ -22,6 +22,7 @@ import { toCustomerPayload } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import {
     createContract,
+    createCustomerDevice,
     deleteCustomer,
     getCustomer,
     getCustomerContractsPrintUrl,
@@ -31,7 +32,7 @@ import {
 } from "@/lib/api";
 import { formatDateTime, openPrintWindow } from "@/lib/utils";
 import { useCallback, useState } from "react";
-import { ClipboardList, FileSignature, HardHat, Pencil, Plus, Printer } from "lucide-react";
+import { ClipboardList, FileSignature, HardHat, Monitor, Pencil, Plus, Printer } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { customerInterventionColumns, customerReportColumns } from "./components/customer-detail-columns";
 import ReportsInterventionsTabs, { type ReportsInterventionsTab } from "@/components/reports-interventions-tabs";
@@ -44,6 +45,12 @@ import CreateContractDialog, { type ContractSubmitValues } from "@/components/di
 import { CustomerContractsFilter, CustomerContractsTable } from "./components/customer-contracts-section";
 import { useCustomerContracts } from "@/hooks/useCustomerContracts";
 import { toContractCreatePayload } from "@/lib/contractForm";
+import CreateCustomerDeviceDialog, {
+    type CustomerDeviceSubmitValues,
+} from "@/components/dialogs/create/createCustomerDeviceDialog";
+import { CustomerDevicesTable } from "./components/customer-devices-section";
+import { useCustomerDevices } from "@/hooks/useCustomerDevices";
+import { useCustomerDeviceRowActions } from "@/hooks/useCustomerDeviceRowActions";
 
 /**
  * La scheda del cliente: i suoi dati, i suoi report e i suoi interventi.
@@ -75,7 +82,9 @@ const CustomerPage = () => {
         ? "interventions"
         : location.pathname.endsWith("/contracts")
           ? "contracts"
-          : "reports";
+          : location.pathname.endsWith("/devices")
+            ? "devices"
+            : "reports";
 
     const {
         data: customer,
@@ -94,7 +103,9 @@ const CustomerPage = () => {
             ? `Interventi di ${customerName}`
             : activeTab === "contracts"
               ? `Contratti di ${customerName}`
-              : customerName
+              : activeTab === "devices"
+                ? `Dispositivi di ${customerName}`
+                : customerName
     );
 
     const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -103,6 +114,7 @@ const CustomerPage = () => {
     const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState(false);
     const [isCreateInterventionDialogOpen, setIsCreateInterventionDialogOpen] = useState(false);
     const [isCreateContractDialogOpen, setIsCreateContractDialogOpen] = useState(false);
+    const [isCreateDeviceDialogOpen, setIsCreateDeviceDialogOpen] = useState(false);
 
     const handleBack = useGoBack("/clients");
 
@@ -155,6 +167,8 @@ const CustomerPage = () => {
 
     const contracts = useCustomerContracts(customerId);
     const { reload: reloadContracts } = contracts;
+    const devices = useCustomerDevices(customerId);
+    const { reload: reloadDevices } = devices;
 
     // Prima i dati si potevano cambiare solo dall'elenco clienti: dalla scheda bisognava
     // tornare indietro, ritrovare il cliente e aprire lì il dialogo. Il nome nell'intestazione
@@ -175,9 +189,21 @@ const CustomerPage = () => {
         await reloadContracts();
     };
 
+    // Il cliente è quello della scheda: il dialogo non lo chiede.
+    const handleCreateDevice = async (values: CustomerDeviceSubmitValues) => {
+        await createCustomerDevice({ ...values, customerId });
+        await reloadDevices();
+    };
+
     const handleRefresh = useCallback(async () => {
-        await Promise.all([reloadCustomer(), reloadReports(), reloadInterventions(), reloadContracts()]);
-    }, [reloadCustomer, reloadInterventions, reloadReports, reloadContracts]);
+        await Promise.all([
+            reloadCustomer(),
+            reloadReports(),
+            reloadInterventions(),
+            reloadContracts(),
+            reloadDevices(),
+        ]);
+    }, [reloadCustomer, reloadInterventions, reloadReports, reloadContracts, reloadDevices]);
 
     // Dopo una modifica o un'eliminazione si ricarica tutta la scheda: anche i contatori.
     const { getRowActions: getInterventionActions, dialogs: interventionActionDialogs } = useInterventionRowActions({
@@ -189,6 +215,11 @@ const CustomerPage = () => {
     const { getRowActions: getContractActions, dialogs: contractActionDialogs } = useContractRowActions({
         onChanged: handleRefresh,
     });
+    const {
+        getRowActions: getDeviceActions,
+        openEdit: openEditDevice,
+        dialogs: deviceActionDialogs,
+    } = useCustomerDeviceRowActions({ customerName, onChanged: handleRefresh });
 
     // Il caricamento a tutta pagina solo senza dati: su "Aggiorna" la scheda resta, con la card
     // dei dati attenuata (`isBusy`), invece di sparire e ricomparire. Vedi `ReportPage`.
@@ -238,6 +269,13 @@ const CustomerPage = () => {
                 initialCustomer={customer}
             />
 
+            <CreateCustomerDeviceDialog
+                open={isCreateDeviceDialogOpen}
+                onOpenChange={setIsCreateDeviceDialogOpen}
+                onSubmit={handleCreateDevice}
+                customerName={customerName}
+            />
+
             {isEditDialogOpen && customer ? (
                 <CreateCustomerDialog
                     open={isEditDialogOpen}
@@ -259,7 +297,11 @@ const CustomerPage = () => {
                     più non starebbero nell'intestazione su un telefono. */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="lg" aria-label="Nuovo report, intervento o contratto">
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            aria-label="Nuovo report, intervento, contratto o dispositivo"
+                        >
                             <Plus className="size-5" />
                             {/* A 14px come le altre azioni dell'intestazione: vedi `DetailHeaderAction`. */}
                             <span className="hidden lg:inline">Nuovo</span>
@@ -280,6 +322,10 @@ const CustomerPage = () => {
                             <FileSignature />
                             Nuovo contratto
                         </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setIsCreateDeviceDialogOpen(true)}>
+                            <Monitor />
+                            Nuovo dispositivo
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -291,8 +337,10 @@ const CustomerPage = () => {
                     aria-label="Modifica cliente"
                 />
 
-                {/* La stampa segue il tab (vedi `handlePrint`). */}
-                <DetailHeaderAction icon={Printer} text="Stampa" onClick={handlePrint} aria-label={printTitle} />
+                {/* La stampa segue il tab (vedi `handlePrint`); i dispositivi non hanno un resoconto. */}
+                {activeTab === "devices" ? null : (
+                    <DetailHeaderAction icon={Printer} text="Stampa" onClick={handlePrint} aria-label={printTitle} />
+                )}
 
                 <DetailDeleteButton
                     label="Elimina cliente"
@@ -336,6 +384,7 @@ const CustomerPage = () => {
             {interventionActionDialogs}
             {reportActionDialogs}
             {contractActionDialogs}
+            {deviceActionDialogs}
 
             <ReportsInterventionsTabs
                 activeTab={activeTab}
@@ -352,6 +401,15 @@ const CustomerPage = () => {
                 contractsTab={{
                     filter: <CustomerContractsFilter contracts={contracts} />,
                     content: <CustomerContractsTable contracts={contracts} getRowActions={getContractActions} />,
+                }}
+                devicesTab={{
+                    content: (
+                        <CustomerDevicesTable
+                            devices={devices}
+                            getRowActions={getDeviceActions}
+                            onEdit={openEditDevice}
+                        />
+                    ),
                 }}
             />
         </div>

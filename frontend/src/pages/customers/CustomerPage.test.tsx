@@ -26,6 +26,10 @@ const api = vi.hoisted(() => ({
     sendInterventionEmail: vi.fn(),
     deleteContract: vi.fn(),
     deleteReport: vi.fn(),
+    listCustomerDevices: vi.fn(),
+    createCustomerDevice: vi.fn(),
+    updateCustomerDevice: vi.fn(),
+    deleteCustomerDevice: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -48,6 +52,10 @@ vi.mock("@/lib/api", async () => {
         sendInterventionEmail: (...args: unknown[]) => api.sendInterventionEmail(...args),
         deleteContract: (...args: unknown[]) => api.deleteContract(...args),
         deleteReport: (...args: unknown[]) => api.deleteReport(...args),
+        listCustomerDevices: (...args: unknown[]) => api.listCustomerDevices(...args),
+        createCustomerDevice: (...args: unknown[]) => api.createCustomerDevice(...args),
+        updateCustomerDevice: (...args: unknown[]) => api.updateCustomerDevice(...args),
+        deleteCustomerDevice: (...args: unknown[]) => api.deleteCustomerDevice(...args),
         getReportPrintUrl: (id: number) => `/api/reports/${id}/print`,
         getInterventionPrintUrl: (id: number) => `/api/interventions/${id}/print`,
         getContractPrintUrl: (id: number) => `/api/contracts/${id}/print`,
@@ -86,6 +94,21 @@ beforeEach(() => {
     api.listCollaborators.mockResolvedValue([]);
     api.listCustomers.mockResolvedValue(page([]));
     api.listContractPackages.mockResolvedValue([]);
+    api.listCustomerDevices.mockResolvedValue(
+        page([
+            {
+                id: 5,
+                type: "server",
+                name: "Server NAS",
+                serialNumber: "SN-1",
+                model: "Synology DS220",
+                note: "Sala server",
+                customerId: 3,
+                createdAt: "2026-06-01T10:00:00.000Z",
+                updatedAt: null,
+            },
+        ])
+    );
     api.listContracts.mockResolvedValue(
         page([
             {
@@ -95,7 +118,7 @@ beforeEach(() => {
                 effectiveStatus: "active",
                 termMonths: 12,
                 billingMonths: null,
-                device: "Server NAS",
+                devices: [{ id: 5, type: "server", name: "Server NAS", serialNumber: "SN-1", model: null }],
                 note: null,
                 startDate: "2026-06-01",
                 endDate: "2027-06-01",
@@ -277,7 +300,9 @@ describe("CustomerPage", () => {
     ])('"%s" apre il dialogo con il cliente già compilato', async (item, dialogTitle) => {
         await renderPage("/clients/3", "/clients/:id");
 
-        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
+        await userEvent.click(
+            screen.getByRole("button", { name: "Nuovo report, intervento, contratto o dispositivo" })
+        );
         await userEvent.click(await screen.findByRole("menuitem", { name: item }));
 
         const dialog = await screen.findByRole("dialog", { name: dialogTitle });
@@ -288,6 +313,113 @@ describe("CustomerPage", () => {
         await waitFor(() => {
             expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
         });
+    });
+
+    it("elenca i dispositivi del cliente nella quarta tab, senza il pulsante di stampa", async () => {
+        await renderPage("/clients/3/devices", "/clients/:id/devices");
+
+        expect(screen.getByRole("tab", { name: "Dispositivi" })).toHaveAttribute("aria-selected", "true");
+        expect(document.title).toBe("Dispositivi di Mario Rossi · EasyLab");
+        expect(api.listCustomerDevices).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3 }));
+        const table = within(screen.getByRole("tabpanel")).getByRole("table");
+        expect(await within(table).findByText("Server NAS")).toBeInTheDocument();
+        expect(within(table).getByText("Server")).toBeInTheDocument();
+        expect(within(table).getByText("Synology DS220")).toBeInTheDocument();
+        expect(within(table).getByText("SN-1")).toBeInTheDocument();
+        expect(within(table).getByText("Sala server")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Stampa/ })).not.toBeInTheDocument();
+    });
+
+    it("la tab Dispositivi cambia l'indirizzo senza aggiungere voci alla cronologia", async () => {
+        await renderPage("/clients/3", "/clients/:id");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Dispositivi" }));
+
+        expect(navigate).toHaveBeenCalledWith("/clients/3/devices", { replace: true });
+    });
+
+    it('"Nuovo dispositivo" crea un dispositivo del cliente della scheda e ricarica la lista', async () => {
+        api.createCustomerDevice.mockResolvedValue({ id: 8 });
+        await renderPage("/clients/3/devices", "/clients/:id/devices");
+
+        await userEvent.click(
+            screen.getByRole("button", { name: "Nuovo report, intervento, contratto o dispositivo" })
+        );
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Nuovo dispositivo" }));
+        const dialog = await screen.findByRole("dialog", { name: "Nuovo dispositivo" });
+
+        // Nome, tipo e numero di serie sono obbligatori.
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+        expect(await within(dialog).findByText("Il nome del dispositivo non può essere vuoto")).toBeInTheDocument();
+        expect(within(dialog).getByText("Seleziona il tipo di dispositivo")).toBeInTheDocument();
+        expect(within(dialog).getByText("Il numero di serie è obbligatorio")).toBeInTheDocument();
+        expect(api.createCustomerDevice).not.toHaveBeenCalled();
+
+        await userEvent.type(within(dialog).getByLabelText(/^Nome/), "Firewall sede");
+        await userEvent.click(within(dialog).getByRole("combobox", { name: /^Tipo/ }));
+        await userEvent.click(await screen.findByRole("option", { name: "Firewall" }));
+        await userEvent.type(within(dialog).getByLabelText(/^Numero di serie/), " FW-77 ");
+        const loads = api.listCustomerDevices.mock.calls.length;
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(api.createCustomerDevice).toHaveBeenCalledWith({
+                type: "firewall",
+                name: "Firewall sede",
+                serialNumber: "FW-77",
+                model: null,
+                note: null,
+                customerId: 3,
+            });
+        });
+        await waitFor(() => expect(api.listCustomerDevices.mock.calls.length).toBeGreaterThan(loads));
+    });
+
+    it("modifica un dispositivo dal pulsante di riga o con doppio click, senza poter cambiare il cliente", async () => {
+        api.updateCustomerDevice.mockResolvedValue({ id: 5 });
+        await renderPage("/clients/3/devices", "/clients/:id/devices");
+
+        const panel = screen.getByRole("tabpanel");
+        await userEvent.click(
+            (await within(panel).findAllByRole("button", { name: "Modifica dispositivo Server NAS" }))[0]
+        );
+        const dialog = await screen.findByRole("dialog", { name: "Modifica dispositivo" });
+        expect(within(dialog).getByLabelText(/^Numero di serie/)).toHaveValue("SN-1");
+        expect(within(dialog).getByLabelText(/^Marca e modello/)).toHaveValue("Synology DS220");
+        await userEvent.clear(within(dialog).getByLabelText(/^Note/));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+        await waitFor(() => {
+            expect(api.updateCustomerDevice).toHaveBeenCalledWith(5, {
+                type: "server",
+                name: "Server NAS",
+                serialNumber: "SN-1",
+                model: "Synology DS220",
+                note: null,
+            });
+        });
+    });
+
+    it("elimina un dispositivo solo dopo aver digitato ELIMINA, e un rifiuto del server lo mostra", async () => {
+        api.deleteCustomerDevice.mockRejectedValue({
+            isAxiosError: true,
+            response: {
+                data: { message: "Impossibile eliminare il dispositivo: è ancora collegato a uno o più contratti." },
+            },
+        });
+        await renderPage("/clients/3/devices", "/clients/:id/devices");
+
+        const panel = screen.getByRole("tabpanel");
+        await userEvent.click(
+            (await within(panel).findAllByRole("button", { name: "Elimina dispositivo Server NAS" }))[0]
+        );
+        const dialog = await screen.findByRole("dialog", { name: "Elimina dispositivo" });
+        expect(within(dialog).getByRole("button", { name: "Elimina" })).toBeDisabled();
+        await userEvent.type(within(dialog).getByRole("textbox"), "ELIMINA");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Elimina" }));
+
+        await waitFor(() => expect(api.deleteCustomerDevice).toHaveBeenCalledWith(5));
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
     });
 
     it("elimina il cliente e torna all'elenco", async () => {
@@ -323,8 +455,10 @@ describe("CustomerPage", () => {
         expect(screen.getByRole("tab", { name: "Contratti" })).toHaveAttribute("aria-selected", "true");
         expect(api.listContracts).toHaveBeenCalledWith(expect.objectContaining({ customerId: 3, status: "all" }));
         // Tabella e schede mobili mostrano la stessa riga: basta che ci sia.
-        expect((await screen.findAllByText("Server NAS")).length).toBeGreaterThan(0);
-        const contractRow = screen.getAllByRole("row").find((row) => within(row).queryByText("Server NAS") !== null);
+        expect((await screen.findAllByText("Server NAS – Server – S/N SN-1")).length).toBeGreaterThan(0);
+        const contractRow = screen
+            .getAllByRole("row")
+            .find((row) => within(row).queryByText("Server NAS – Server – S/N SN-1") !== null);
         fireEvent.keyDown(contractRow as HTMLElement, { key: "Enter" });
         expect(navigate).toHaveBeenCalledWith("/contracts/21");
         // La colonna del cliente non c'è: nella sua scheda sarebbe sempre lo stesso nome.
@@ -360,7 +494,9 @@ describe("CustomerPage", () => {
     it("crea un contratto dal menu Nuovo, partendo dal cliente della scheda", async () => {
         await renderPage("/clients/3", "/clients/:id");
 
-        await userEvent.click(screen.getByRole("button", { name: "Nuovo report, intervento o contratto" }));
+        await userEvent.click(
+            screen.getByRole("button", { name: "Nuovo report, intervento, contratto o dispositivo" })
+        );
         await userEvent.click(await screen.findByRole("menuitem", { name: "Nuovo contratto" }));
 
         expect(await screen.findByRole("dialog", { name: "Nuovo contratto" })).toBeInTheDocument();

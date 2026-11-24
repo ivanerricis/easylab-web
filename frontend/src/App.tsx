@@ -58,6 +58,7 @@ export function App() {
                                             <Route path="clients/:id/interventions" element={<CustomerPage />} />
                                             {/* E tab dei contratti. */}
                                             <Route path="clients/:id/contracts" element={<CustomerPage />} />
+                                            <Route path="clients/:id/devices" element={<CustomerPage />} />
                                             <Route path="collaborators" element={<CollaboratorsPage />} />
                                             <Route path="collaborators/:id" element={<CollaboratorPage />} />
                                             <Route path="technicians" element={<TechnicianPage />} />

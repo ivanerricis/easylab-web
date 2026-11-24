@@ -17,7 +17,8 @@ export type ContractCreateInput = {
     termMonths: number;
     /** Ogni quanti mesi si fattura: obbligatorio per il noleggio, vietato per l'assistenza. */
     billingMonths?: number;
-    device: string;
+    /** I dispositivi del cliente coperti, facoltativi. In modifica, se presente, sostituisce l'elenco di prima. */
+    deviceIds?: number[];
     note?: string | null;
     /** "AAAA-MM-GG"; la fine la calcola il server dalla durata. */
     startDate: string;

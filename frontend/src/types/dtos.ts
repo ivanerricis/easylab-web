@@ -72,6 +72,26 @@ export type DeviceDto = {
     updatedAt: string | null;
 };
 
+/** I tipi di dispositivo del cliente; le etichette italiane stanno in `lib/customerDevices.ts`. */
+export type CustomerDeviceType = "pc_desktop" | "server" | "copier" | "firewall" | "cash_register";
+
+/** Un dispositivo del cliente (non il catalogo `DeviceDto` dei report). */
+export type CustomerDeviceDto = {
+    id: number;
+    type: CustomerDeviceType;
+    name: string;
+    serialNumber: string;
+    /** Marca e modello, facoltativi. */
+    model: string | null;
+    note: string | null;
+    customerId: number;
+    createdAt: string;
+    updatedAt: string | null;
+};
+
+/** Il dispositivo come compare dentro un contratto o un intervento: senza note e timestamp. */
+export type LinkedDeviceDto = Pick<CustomerDeviceDto, "id" | "type" | "name" | "serialNumber" | "model">;
+
 export type IssueDto = {
     id: number;
     description: string;
@@ -175,7 +195,8 @@ export type ContractDto = {
     termMonths: number;
     /** Ogni quanti mesi si fattura: solo per il noleggio. */
     billingMonths: number | null;
-    device: string;
+    /** I dispositivi del cliente coperti dal contratto, per nome: zero o più. */
+    devices: LinkedDeviceDto[];
     note: string | null;
     startDate: string;
     endDate: string;

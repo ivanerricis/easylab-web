@@ -142,7 +142,7 @@ GREEN = "strokeColor=#82b366;strokeWidth=2;"
 COMPOSITION = "startArrow=diamondThin;startFill=1;startSize=14;"
 GENERALIZATION = "endArrow=block;endFill=0;endSize=14;"
 
-C0, C1, C2, C3, C4, C5 = 40, 420, 800, 1180, 1580, 1960
+CL, C0, C1, C2, C3, C4, C5 = -340, 40, 420, 800, 1180, 1580, 1960
 
 
 def mid(key):
@@ -240,7 +240,8 @@ cls("intervention", "Intervention", C2, 490, [
     "+ customer_id: int FK [1]",
     "+ collaborator_id: int FK [1]",
     "+ contract_id: int FK",
-], new_rows=(16,))
+    "+ customer_device_id: int FK",
+], new_rows=(16, 17))
 enum("inttype", "InterventionType", C3, 490, ["material_delivery", "customer_site", "remote", "lab"])
 enum("intstatus", "InterventionStatus", C3, 660, ["scheduled", "in_progress", "completed"])
 
@@ -256,21 +257,20 @@ cls("provider", "Provider", C0, 800, [
     "+ created_at: datetime [1]",
     "+ updated_at: datetime",
 ], color=NEW)
-cls("signed", "SignedContract", C0, 1040, [
+cls("signed", "SignedContract", C0, 1070, [
     "+ contract_id: int PK FK [1]",
     "+ file_name: text [1]",
     "+ size_bytes: int [1]  {> 0, al massimo 15 MB}",
     "+ uploaded_at: datetime [1]",
     "{il PDF: data/signed-contracts/[contract_id].pdf}",
 ], color=NEW)
-enum("cstatus", "ContractStatus", C0, 1210, ["draft", "active", "cancelled", "/expired  (derivato)"])
+enum("cstatus", "ContractStatus", C0, 1240, ["draft", "active", "cancelled", "/expired  (derivato)"])
 cls("contract", "Contract", C1, 800, [
     "+ id: int PK",
     "+ type: ContractType [1]",
     "+ status: ContractStatus [1]",
     "+ term_months: int [1]  {da 1 a 120}",
     "+ billing_months: int [0..1]  {solo noleggio, da 1 a 120}",
-    "+ device: text [1]",
     "+ note: text",
     "+ start_date: date [1]",
     "+ /end_date: date",
@@ -279,6 +279,24 @@ cls("contract", "Contract", C1, 800, [
     "+ updated_at: datetime",
     "+ customer_id: int FK [1]",
     "+ provider_id: int FK [1]",
+], color=NEW)
+# Dispositivi del cliente: a sinistra della colonna C0, in linea con Customer (y 490).
+cls("custdev", "CustomerDevice", CL, 490, [
+    "+ id: int PK",
+    "+ type: CustomerDeviceType [1]",
+    "+ name: text [1]",
+    "+ serial_number: text [1]  {UQ per cliente}",
+    "+ model: text  {marca e modello}",
+    "+ note: text",
+    "+ created_at: datetime [1]",
+    "+ updated_at: datetime",
+    "+ customer_id: int FK [1]  {UQ con id}",
+], color=NEW)
+enum("custdevtype", "CustomerDeviceType", CL, 1120, ["pc_desktop", "server", "copier", "firewall", "cash_register"])
+cls("contdev", "ContractDevice", CL, 980, [
+    "+ contract_id: int PK FK [1]",
+    "+ customer_device_id: int PK FK [1]",
+    "+ customer_id: int FK [1]",
 ], color=NEW)
 cls("rental", "Rental", C1, 1160, ["{nessuna tabella: contract.type = rental}", "{la fatturazione sta in contract.billing_months}"], color=NEW)
 enum("ctype", "ContractType", C1, 1250, ["assistance", "rental"])
@@ -332,6 +350,8 @@ note = (
     "/end_date = start_date + term_months&lt;br&gt;"
     "{expired derivato: active e oggi ≥ end_date, non salvato}&lt;br&gt;"
     "{intervention.customer_id = contract.customer_id}&lt;br&gt;"
+    "{intervention.customer_device_id: solo se c'è il contratto,&lt;br&gt;"
+    " e uno dei suoi dispositivi (contract_device)}&lt;br&gt;"
     "{intervention.type compatibile con package}&lt;br&gt;"
     "{contratto active e start_date ≤ intervention_date &lt; end_date}&lt;br&gt;"
     "{package support_*: term_months = 12}"
@@ -405,6 +425,9 @@ edge("collaborator", "bottom", "intervention", "top", mid("collaborator"), "1", 
 edge("customer", "right", "intervention", "left", 600, "1", "0..*")
 edge("customer", "bottom", "contract", "top", mid("customer"), "1", "0..*")
 edge("provider", "right", "contract", "left", 900, "1", "0..*")
+edge("customer", "left", "custdev", "right", 600, "1", "0..*")
+edge("custdev", "bottom", "contdev", "top", mid("custdev"), "1", "0..*")
+edge("contract", "left", "contdev", "right", 1044, "1", "0..*", style=COMPOSITION)
 edge("contract", "left", "signed", "right", 1085, "1", "0..1", style=COMPOSITION)
 edge("assistance", "top", "intervention", "bottom", C2 + 225, "0..1", "0..*", style=GREEN)
 edge("rental", "top", "contract", "bottom", mid("rental"), style=GENERALIZATION)

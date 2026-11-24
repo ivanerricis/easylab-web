@@ -1,4 +1,12 @@
 import EntityCardList, { LoadErrorState, type EntityCardSlot } from "@/components/entity-card-list";
+import { RowActionButtons, type RowAction } from "@/components/row-actions";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListScrollRestoration } from "@/hooks/useListScrollRestoration";
@@ -7,8 +15,17 @@ import { useProgressiveRows } from "@/hooks/useProgressiveRows";
 import { useResizableColumns } from "@/hooks/useResizableColumns";
 import type { SortDirection, TableSort } from "@/lib/tableSort";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { memo, useId, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink } from "lucide-react";
+import {
+    memo,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+    type DragEvent,
+    type MouseEvent as ReactMouseEvent,
+    type ReactNode,
+} from "react";
 
 export type EntityColumn<TRow> = {
     /** `"actions"` è speciale: quella colonna ospita i pulsanti di riga, non un valore. */
@@ -64,8 +81,13 @@ type EntityTableProps<TRow> = {
      */
     loadError?: string | null;
     onRetry?: () => void;
-    /** I pulsanti di riga, nella colonna `actions`. Facoltativi: la riga si apre da sé (`onRowOpen`). */
-    renderRowActions?: (row: TRow) => ReactNode;
+    /**
+     * Le azioni di riga: diventano i pulsanti della colonna `actions` e, su desktop, le voci del
+     * menu col tasto destro sulla riga (dopo "Apri", se c'è `onRowOpen`; quelle `destructive`
+     * in fondo). Una sola definizione per i due: vedi `RowAction`. Facoltative: la riga si apre
+     * da sé (`onRowOpen`).
+     */
+    getRowActions?: (row: TRow) => RowAction[];
     /**
      * Colora la riga in base allo stato (`data-status-color`, interpretato da index.css
      * insieme all'intensità scelta in Impostazioni > Tema). Quando è presente, la cella
@@ -174,7 +196,7 @@ type EntityTableRowProps<TRow> = {
     isResizable: boolean;
     getRowStatusColor?: (row: TRow) => string;
     onRowOpen?: (row: TRow) => void;
-    renderRowActions?: (row: TRow) => ReactNode;
+    getRowActions?: (row: TRow) => RowAction[];
 };
 
 /**
@@ -182,7 +204,7 @@ type EntityTableRowProps<TRow> = {
  * sostituiscono l'intero array a ogni ricarica, quindi una riga davvero cambiata (anche solo
  * modificata) arriva sempre con un riferimento nuovo — più `columns` e `isResizable`.
  *
- * `getRowStatusColor`, `onRowOpen` e `renderRowActions` restano fuori apposta: chi chiama
+ * `getRowStatusColor`, `onRowOpen` e `getRowActions` restano fuori apposta: chi chiama
  * `EntityTable` li passa quasi sempre come closure inline nel proprio corpo, quindi diversi a
  * ogni suo render anche quando la riga non c'entra (la ricerca che digita cambia la pagina, non
  * le righe). Confrontarli avrebbe vanificato `memo` a ogni battitura. Restano comunque corrette
@@ -214,7 +236,7 @@ const EntityTableRowImpl = <TRow,>({
     isResizable,
     getRowStatusColor,
     onRowOpen,
-    renderRowActions,
+    getRowActions,
 }: EntityTableRowProps<TRow>) => {
     // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
     // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti.
@@ -224,14 +246,17 @@ const EntityTableRowImpl = <TRow,>({
     // Calcolati una volta sola per `row`, non ricreati a ogni carattere digitato altrove nella
     // pagina: vedi il commento su `areRowPropsEqual`. La dipendenza è solo `row` di proposito —
     // quando la riga stessa non cambia si riusa il risultato precedente, quando cambia si
-    // richiama la versione di `getRowStatusColor`/`renderRowActions` in ambito in quel momento,
+    // richiama la versione di `getRowStatusColor`/`getRowActions` in ambito in quel momento,
     // mai una vecchia letta da un ref (che arriverebbe in ritardo di un render, sbagliando
     // proprio al primo montaggio della riga: coi dati appena caricati sarebbe ancora quella
     // dello scheletro, senza righe).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const statusColor = useMemo(() => getRowStatusColor?.(row), [row]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const actionsNode = useMemo(() => renderRowActions?.(row), [row]);
+    const actionsNode = useMemo(
+        () => (getRowActions ? <RowActionButtons actions={getRowActions(row)} /> : undefined),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [row]
+    );
 
     // I punti interattivi della riga (link, pulsanti, la cella delle azioni) gestiscono già da
     // sé il proprio doppio click: qui basta ignorarlo invece di fermarlo con `stopPropagation`
@@ -269,6 +294,8 @@ const EntityTableRowImpl = <TRow,>({
     return (
         <TableRow
             data-status-color={statusColor}
+            // Il menu col tasto destro (`EntityTable`) risale alla riga da questo attributo.
+            data-row-key={getRowActions || onRowOpen ? String(rowKey) : undefined}
             className={
                 onRowOpen
                     ? "cursor-pointer select-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -335,7 +362,7 @@ const EntityTable = <TRow,>({
     emptyMessage,
     loadError,
     onRetry,
-    renderRowActions,
+    getRowActions,
     getRowStatusColor,
     onRowOpen,
     isInitialLoading = false,
@@ -397,6 +424,34 @@ const EntityTable = <TRow,>({
         dataVersion: rows,
     });
     useListScrollRestoration({ anchorRef: tableRef, tableKey, isReady: !isInitialLoading && rows.length > 0 });
+
+    // Un solo menu per tutta la tabella e non uno per riga (con "Tutte" sono migliaia): si ricorda
+    // su quale riga si è cliccato, e le voci si calcolano all'apertura da `getRowActions`.
+    const [contextMenuRow, setContextMenuRow] = useState<TRow | null>(null);
+    const hasContextMenu = getRowActions != null || onRowOpen != null;
+
+    // In fase di cattura, prima del gestore di Radix: sui punti interattivi (link, pulsanti, campi)
+    // e fuori dalle righe il menu non si apre e resta quello del browser (copia link, ecc.).
+    const handleContextMenuCapture = (event: ReactMouseEvent<HTMLElement>) => {
+        const target = event.target;
+        const rowKey =
+            target instanceof Element && !target.closest("a, button, input, textarea, select, [role=button]")
+                ? target.closest<HTMLElement>("tr[data-row-key]")?.dataset.rowKey
+                : undefined;
+        const row =
+            rowKey === undefined ? undefined : rows.find((candidate) => String(getRowKey(candidate)) === rowKey);
+
+        if (row === undefined) {
+            event.stopPropagation();
+            return;
+        }
+
+        setContextMenuRow(row);
+    };
+
+    const contextMenuActions = contextMenuRow && getRowActions ? getRowActions(contextMenuRow) : [];
+    const regularContextMenuActions = contextMenuActions.filter((action) => action.variant !== "destructive");
+    const destructiveContextMenuActions = contextMenuActions.filter((action) => action.variant === "destructive");
 
     // Il troncamento vale solo dove il contenuto è testo: nella cella delle azioni
     // `overflow: hidden` taglierebbe i contorni di focus dei pulsanti. Questa versione serve
@@ -634,57 +689,90 @@ const EntityTable = <TRow,>({
                         })}
                     </TableRow>
                 </TableHeader>
-                <TableBody>
-                    {isInitialLoading ? (
-                        Array.from({ length: visibleSkeletonRows }, (_, rowIndex) => (
-                            <TableRow key={`skeleton-${rowIndex}`}>
-                                {columns.map((column) => (
-                                    <TableCell key={`skeleton-${rowIndex}-${column.key}`}>
-                                        {column.key === actionsColumnKey ? (
-                                            <Skeleton className="ml-auto h-8 w-24" />
-                                        ) : (
-                                            <Skeleton className="h-4 w-full" />
-                                        )}
+                <ContextMenu>
+                    <ContextMenuTrigger asChild disabled={!hasContextMenu}>
+                        <TableBody onContextMenuCapture={handleContextMenuCapture}>
+                            {isInitialLoading ? (
+                                Array.from({ length: visibleSkeletonRows }, (_, rowIndex) => (
+                                    <TableRow key={`skeleton-${rowIndex}`}>
+                                        {columns.map((column) => (
+                                            <TableCell key={`skeleton-${rowIndex}-${column.key}`}>
+                                                {column.key === actionsColumnKey ? (
+                                                    <Skeleton className="ml-auto h-8 w-24" />
+                                                ) : (
+                                                    <Skeleton className="h-4 w-full" />
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))
+                            ) : rows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={columns.length} className="py-6 text-muted-foreground">
+                                        {/* Centrato nella parte visibile, non su tutta la tabella: con le
+                                            colonne già misurate la tabella resta più larga del contenitore
+                                            e `text-center` metteva il messaggio fuori dallo schermo.
+                                            `left-1/2` di un elemento sticky si riferisce all'area che
+                                            scorre, e la traslazione lo riporta indietro di mezza larghezza. */}
+                                        <span className="sticky left-1/2 inline-block -translate-x-1/2">
+                                            {loadError ? (
+                                                <LoadErrorState message={loadError} onRetry={onRetry} />
+                                            ) : (
+                                                emptyMessage
+                                            )}
+                                        </span>
                                     </TableCell>
-                                ))}
-                            </TableRow>
-                        ))
-                    ) : rows.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={columns.length} className="py-6 text-muted-foreground">
-                                {/* Centrato nella parte visibile, non su tutta la tabella: con le
-                                    colonne già misurate la tabella resta più larga del contenitore
-                                    e `text-center` metteva il messaggio fuori dallo schermo.
-                                    `left-1/2` di un elemento sticky si riferisce all'area che
-                                    scorre, e la traslazione lo riporta indietro di mezza larghezza. */}
-                                <span className="sticky left-1/2 inline-block -translate-x-1/2">
-                                    {loadError ? (
-                                        <LoadErrorState message={loadError} onRetry={onRetry} />
-                                    ) : (
-                                        emptyMessage
-                                    )}
-                                </span>
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        rows.map((row) => {
-                            const rowKey = getRowKey(row);
+                                </TableRow>
+                            ) : (
+                                rows.map((row) => {
+                                    const rowKey = getRowKey(row);
 
-                            return (
-                                <EntityTableRow
-                                    key={rowKey}
-                                    row={row}
-                                    rowKey={rowKey}
-                                    columns={columns}
-                                    isResizable={isResizable}
-                                    getRowStatusColor={getRowStatusColor}
-                                    onRowOpen={onRowOpen}
-                                    renderRowActions={renderRowActions}
-                                />
-                            );
-                        })
-                    )}
-                </TableBody>
+                                    return (
+                                        <EntityTableRow
+                                            key={rowKey}
+                                            row={row}
+                                            rowKey={rowKey}
+                                            columns={columns}
+                                            isResizable={isResizable}
+                                            getRowStatusColor={getRowStatusColor}
+                                            onRowOpen={onRowOpen}
+                                            getRowActions={getRowActions}
+                                        />
+                                    );
+                                })
+                            )}
+                        </TableBody>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                        {onRowOpen && contextMenuRow ? (
+                            <ContextMenuItem onSelect={() => onRowOpen(contextMenuRow)}>
+                                <ExternalLink />
+                                Apri
+                            </ContextMenuItem>
+                        ) : null}
+                        {regularContextMenuActions.map((action) => (
+                            <ContextMenuItem key={action.key} disabled={action.disabled} onSelect={action.onSelect}>
+                                <action.icon />
+                                {action.label}
+                            </ContextMenuItem>
+                        ))}
+                        {destructiveContextMenuActions.length > 0 &&
+                        (onRowOpen || regularContextMenuActions.length > 0) ? (
+                            <ContextMenuSeparator />
+                        ) : null}
+                        {destructiveContextMenuActions.map((action) => (
+                            <ContextMenuItem
+                                key={action.key}
+                                variant="destructive"
+                                disabled={action.disabled}
+                                onSelect={action.onSelect}
+                            >
+                                <action.icon />
+                                {action.label}
+                            </ContextMenuItem>
+                        ))}
+                    </ContextMenuContent>
+                </ContextMenu>
             </Table>
 
             <EntityCardList
@@ -693,7 +781,7 @@ const EntityTable = <TRow,>({
                 rows={rows}
                 getRowKey={getRowKey}
                 getStatusColor={getRowStatusColor}
-                renderActions={renderRowActions}
+                renderActions={getRowActions ? (row) => <RowActionButtons actions={getRowActions(row)} /> : undefined}
                 onRowOpen={onRowOpen}
                 emptyMessage={emptyMessage}
                 loadError={loadError}

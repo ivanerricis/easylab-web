@@ -1,7 +1,7 @@
 import ContractLink from "@/components/contract-link";
 import DetailItem from "@/components/detail-item";
 import { getContract } from "@/lib/api";
-import { formatContractPackage } from "@/lib/contracts";
+import { formatContractPackage, formatDeviceNames } from "@/lib/contracts";
 import type { ContractDto } from "@/types/dtos";
 import { useEffect, useState } from "react";
 
@@ -41,7 +41,7 @@ const InterventionContractItem = ({ contractId }: { contractId: number }) => {
             value={
                 <ContractLink contractId={contractId}>
                     {shownContract
-                        ? `#${contractId} ${formatContractPackage(shownContract)} - ${shownContract.device}`
+                        ? `#${contractId} ${formatContractPackage(shownContract)}${formatDeviceNames(shownContract.devices, " - ")}`
                         : `Contratto #${contractId}`}
                 </ContractLink>
             }

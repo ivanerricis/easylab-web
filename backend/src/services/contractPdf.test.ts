@@ -42,7 +42,7 @@ const buildContract = (overrides: Partial<ContractPrintData> = {}): ContractPrin
     providerEmail: "info@acme.it",
     providerPhone: "011222333",
     type: "assistance",
-    device: "Server NAS",
+    devices: ["Server NAS – Server – S/N SN-1"],
     termLabel: "12 mesi",
     billingLabel: null,
     startDateLabel: "1 ott 2026",
@@ -105,6 +105,30 @@ describe("createContractPdfBuffer", () => {
 
         expect(doc.pageSize).toBe("A4");
         expect(doc.styles).toBe(pdfStyles);
+    });
+
+    describe("dispositivi", () => {
+        it("con un dispositivo la riga si chiama Dispositivo e riporta `Nome – Tipo – S/N`", async () => {
+            const text = allText(await captureDoc(buildContract()));
+
+            expect(text).toContain('"Dispositivo"');
+            expect(text).toContain("Server NAS – Server – S/N SN-1");
+        });
+
+        it("con più dispositivi la riga si chiama Dispositivi, uno per riga", async () => {
+            const text = allText(
+                await captureDoc(buildContract({ devices: ["NAS – Server – S/N 1", "FW – Firewall – S/N 2"] }))
+            );
+
+            expect(text).toContain('"Dispositivi"');
+            expect(text).toContain("NAS – Server – S/N 1\\nFW – Firewall – S/N 2");
+        });
+
+        it("senza dispositivi la riga non compare", async () => {
+            const text = allText(await captureDoc(buildContract({ devices: [] })));
+
+            expect(text).not.toContain("Dispositivo");
+        });
     });
 
     describe("contratto attivo", () => {

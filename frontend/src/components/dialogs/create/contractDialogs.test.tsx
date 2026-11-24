@@ -7,6 +7,8 @@ const listProviders = vi.fn();
 const createCustomer = vi.fn();
 const createProvider = vi.fn();
 const listContractPackages = vi.fn();
+const listCustomerDevices = vi.fn();
+const createCustomerDevice = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -19,6 +21,8 @@ vi.mock("@/lib/api", async () => {
         createCustomer: (...args: unknown[]) => createCustomer(...args),
         createProvider: (...args: unknown[]) => createProvider(...args),
         listContractPackages: (...args: unknown[]) => listContractPackages(...args),
+        listCustomerDevices: (...args: unknown[]) => listCustomerDevices(...args),
+        createCustomerDevice: (...args: unknown[]) => createCustomerDevice(...args),
     };
 });
 
@@ -113,6 +117,11 @@ const packagesList: ContractPackageDto[] = [
     },
 ];
 
+const clientDevices = [
+    { id: 5, type: "server", name: "Server NAS", serialNumber: "SN-1", model: null, note: null, customerId: 30 },
+    { id: 6, type: "firewall", name: "Firewall", serialNumber: "FW-1", model: "Fortigate", note: null, customerId: 30 },
+];
+
 const chooseOption = async (label: string | RegExp, option: string | RegExp) => {
     await userEvent.click(screen.getByRole("combobox", { name: label }));
     await userEvent.click(await screen.findByRole("option", { name: option }));
@@ -144,6 +153,10 @@ beforeEach(() => {
     );
     listProviders.mockResolvedValue(pageOf([{ id: 8, providerName: "Rossi Informatica" }]));
     listContractPackages.mockResolvedValue(packagesList);
+    // Mario Rossi (id 30) ha due dispositivi; il cliente del contratto in modifica (id 3) gli stessi due.
+    listCustomerDevices.mockImplementation(async ({ customerId }: { customerId: number }) =>
+        pageOf(customerId === 30 || customerId === 3 ? clientDevices : [])
+    );
 });
 
 describe("CreateProviderDialog", () => {
@@ -214,7 +227,6 @@ describe("CreateContractDialog", () => {
         expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
             "Seleziona un cliente",
             "Seleziona un fornitore",
-            "Indica il dispositivo",
         ]);
         expect(onSubmit).not.toHaveBeenCalled();
     });
@@ -224,7 +236,6 @@ describe("CreateContractDialog", () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
         await chooseOption("Durata", /^Altro/);
 
         const months = screen.getByRole("spinbutton", { name: /^Durata/ });
@@ -242,7 +253,6 @@ describe("CreateContractDialog", () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
         await chooseOption("Durata", /^Altro/);
         await userEvent.clear(screen.getByRole("spinbutton", { name: /^Durata/ }));
         await save();
@@ -261,7 +271,6 @@ describe("CreateContractDialog", () => {
         expect(screen.getByRole("combobox", { name: /^Periodo di fatturazione/ })).toHaveTextContent("3 mesi");
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Notebook");
         await chooseOption(/^Periodo di fatturazione/, /^Altro/);
         const billing = screen.getByRole("spinbutton", { name: /^Periodo di fatturazione/ });
         await userEvent.clear(billing);
@@ -283,6 +292,110 @@ describe("CreateContractDialog", () => {
 
         await chooseOption("Stato", "Bozza");
         expect(screen.getByText("Preventivo (bozza)")).toBeInTheDocument();
+    });
+
+    describe("dispositivi coperti", () => {
+        it("la scelta è spenta finché non c'è un cliente, poi elenca i suoi dispositivi", async () => {
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
+
+            expect(screen.getByText("Seleziona prima un cliente.")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Nuovo dispositivo" })).toBeDisabled();
+
+            await fillParties();
+
+            expect(await screen.findByRole("checkbox", { name: "Server NAS – Server – S/N SN-1" })).not.toBeChecked();
+            expect(screen.getByRole("checkbox", { name: "Firewall – Firewall – S/N FW-1" })).toBeInTheDocument();
+            expect(listCustomerDevices).toHaveBeenCalledWith(expect.objectContaining({ customerId: 30 }));
+            expect(screen.getByRole("button", { name: "Nuovo dispositivo" })).toBeEnabled();
+        });
+
+        it("è facoltativa: si salva anche senza dispositivi, e consegna quelli spuntati", async () => {
+            const onSubmit = vi.fn();
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+            await fillParties();
+            await userEvent.click(await screen.findByRole("checkbox", { name: /Server NAS/ }));
+            await userEvent.click(screen.getByRole("checkbox", { name: /Firewall/ }));
+            await save();
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ customerId: 30, deviceIds: [5, 6] }));
+            });
+        });
+
+        it("cambiando cliente la scelta riparte: i dispositivi dell'altro cliente non restano selezionati", async () => {
+            const onSubmit = vi.fn();
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+            await fillParties();
+            await userEvent.click(await screen.findByRole("checkbox", { name: /Server NAS/ }));
+            // Un secondo cliente, senza dispositivi.
+            listCustomers.mockResolvedValue(
+                pageOf([
+                    {
+                        id: 31,
+                        firstName: "Luca",
+                        lastName: "Verdi",
+                        phoneNumber: "444",
+                        phoneNumberSecondary: null,
+                        email: null,
+                        city: null,
+                    },
+                ])
+            );
+            await userEvent.clear(screen.getByLabelText(/^Cliente/));
+            await userEvent.type(screen.getByLabelText(/^Cliente/), "luca");
+            await userEvent.click(await screen.findByRole("option", { name: "Luca Verdi - 444" }, { timeout: 10_000 }));
+
+            expect(await screen.findByText("Il cliente non ha ancora dispositivi.")).toBeInTheDocument();
+            await save();
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ customerId: 31, deviceIds: [] }));
+            });
+        });
+
+        it("«Nuovo dispositivo» ne crea uno per il cliente scelto e lo seleziona", async () => {
+            const onSubmit = vi.fn();
+            createCustomerDevice.mockResolvedValue({
+                id: 9,
+                type: "copier",
+                name: "Ricoh sala",
+                serialNumber: "R-9",
+                model: null,
+                note: null,
+                customerId: 30,
+            });
+            renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
+
+            await fillParties();
+            await screen.findByRole("checkbox", { name: /Server NAS/ });
+            await userEvent.click(screen.getByRole("button", { name: "Nuovo dispositivo" }));
+
+            const dialog = await screen.findByRole("dialog", { name: "Nuovo dispositivo" });
+            await userEvent.type(within(dialog).getByLabelText(/^Nome/), "Ricoh sala");
+            await userEvent.click(within(dialog).getByRole("combobox", { name: /^Tipo/ }));
+            await userEvent.click(await screen.findByRole("option", { name: "Fotocopiatrice" }));
+            await userEvent.type(within(dialog).getByLabelText(/^Numero di serie/), "R-9");
+            await userEvent.click(within(dialog).getByRole("button", { name: "Salva" }));
+
+            await waitFor(() => {
+                expect(createCustomerDevice).toHaveBeenCalledWith({
+                    type: "copier",
+                    name: "Ricoh sala",
+                    serialNumber: "R-9",
+                    model: null,
+                    note: null,
+                    customerId: 30,
+                });
+            });
+            expect(await screen.findByRole("checkbox", { name: /Ricoh sala/ })).toBeChecked();
+
+            await save();
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ deviceIds: [9] }));
+            });
+        });
     });
 
     describe("su telefono, a passi", () => {
@@ -308,7 +421,6 @@ describe("CreateContractDialog", () => {
             expect(screen.getByText("Passo 1 di 4:")).toBeInTheDocument();
 
             await fillParties();
-            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
 
             expect(await screen.findByText("Passo 2 di 4:")).toBeInTheDocument();
@@ -318,7 +430,6 @@ describe("CreateContractDialog", () => {
 
             // L'ultimo passo riassume quello che si sta per salvare, e "Salva" sta solo lì.
             expect(await screen.findByText("Passo 4 di 4:")).toBeInTheDocument();
-            expect(screen.getByText("Server NAS", { exact: false })).toBeInTheDocument();
             expect(screen.getByText("Mario Rossi - 333")).toBeInTheDocument();
             await userEvent.click(screen.getByRole("button", { name: "Salva" }));
 
@@ -331,13 +442,12 @@ describe("CreateContractDialog", () => {
             renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={vi.fn()} />);
 
             await fillParties();
-            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
             await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
             await screen.findByText("Passo 2 di 4:");
             await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
 
             expect(await screen.findByText("Passo 1 di 4:")).toBeInTheDocument();
-            expect(screen.getByLabelText(/^Dispositivo/)).toHaveValue("Server NAS");
+            expect(screen.getByLabelText(/^Cliente/)).toHaveValue("Mario Rossi - 333");
         });
     });
 
@@ -407,7 +517,6 @@ describe("CreateContractDialog", () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
         await chooseOption("Pacchetto", "Pronti Via 60");
         await chooseOption("Durata", "6 mesi");
         await save();
@@ -418,7 +527,7 @@ describe("CreateContractDialog", () => {
                     type: "assistance",
                     termMonths: 6,
                     billingMonths: null,
-                    device: "Server NAS",
+                    deviceIds: [],
                     customerId: 30,
                     providerId: 8,
                     assistance: { package: "ready_60" },
@@ -432,7 +541,6 @@ describe("CreateContractDialog", () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
         await chooseOption("Durata", "3 mesi");
         await chooseOption("Pacchetto", "Supporto Plus");
         await save();
@@ -457,7 +565,6 @@ describe("CreateContractDialog", () => {
         renderWithProviders(<CreateContractDialog open onOpenChange={() => {}} onSubmit={onSubmit} />);
 
         await fillParties();
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
         await save();
 
         expect(await screen.findByText("Il pacchetto Supporto dura sempre 12 mesi")).toBeInTheDocument();
@@ -516,7 +623,6 @@ describe("CreateContractDialog", () => {
             await userEvent.click(
                 await screen.findByRole("option", { name: "Rossi Informatica" }, { timeout: 10_000 })
             );
-            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
             listCustomers.mockClear();
             await save();
 
@@ -545,7 +651,6 @@ describe("CreateContractDialog", () => {
             await userEvent.click(
                 await screen.findByRole("option", { name: "Mario Rossi - 333" }, { timeout: 10_000 })
             );
-            await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Server NAS");
             listProviders.mockClear();
             await save();
 
@@ -577,7 +682,10 @@ describe("CreateContractDialog", () => {
             effectiveStatus: "active",
             termMonths: 12,
             billingMonths: null,
-            device: "Server NAS",
+            devices: [
+                { id: 5, type: "server", name: "Server NAS", serialNumber: "SN-1", model: null },
+                { id: 6, type: "firewall", name: "Firewall", serialNumber: "FW-1", model: null },
+            ],
             note: null,
             startDate: "2026-06-01",
             endDate: "2027-06-01",
@@ -617,13 +725,16 @@ describe("CreateContractDialog", () => {
             expect(screen.getByRole("combobox", { name: "Pacchetto" })).toHaveTextContent("Pronti Via 40");
         });
 
-        await userEvent.clear(screen.getByLabelText(/^Dispositivo/));
-        await userEvent.type(screen.getByLabelText(/^Dispositivo/), "Firewall");
+        // I dispositivi collegati partono selezionati; togliendone uno, il salvataggio consegna l'altro.
+        const serverNas = await screen.findByRole("checkbox", { name: /Server NAS/ });
+        expect(serverNas).toBeChecked();
+        expect(screen.getByRole("checkbox", { name: /Firewall/ })).toBeChecked();
+        await userEvent.click(serverNas);
         await save();
 
         await waitFor(() => {
             expect(onSubmit).toHaveBeenCalledWith(
-                expect.objectContaining({ device: "Firewall", customerId: 3, providerId: 8 })
+                expect.objectContaining({ deviceIds: [6], customerId: 3, providerId: 8 })
             );
         });
         expect(toastSuccess).toHaveBeenCalledWith("Contratto aggiornato con successo");

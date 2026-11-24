@@ -95,6 +95,31 @@ const FK_MESSAGES: Record<string, { onDeleteParent: string; onInvalidReference: 
         onDeleteParent: "Impossibile eliminare il contratto: ha ancora dati di assistenza collegati.",
         onInvalidReference: "Il contratto selezionato non esiste o non è un contratto di assistenza.",
     },
+    customer_device_customer_id_customer_id_fk: {
+        onDeleteParent: "Impossibile eliminare il cliente: ha ancora dei dispositivi collegati.",
+        onInvalidReference: "Il cliente selezionato non esiste.",
+    },
+    // Chiave composta (customer_id, customer_device_id): oltre a un dispositivo inesistente, scatta
+    // quando il dispositivo è di un altro cliente rispetto a quello del contratto.
+    contract_device_customer_device_fk: {
+        onDeleteParent: "Impossibile eliminare il dispositivo: è ancora collegato a uno o più contratti.",
+        onInvalidReference: "Il dispositivo selezionato non esiste o non appartiene al cliente del contratto.",
+    },
+    // In cascata verso il contratto (l'eliminazione non la raggiunge mai): resta il cambio del
+    // cliente di un contratto con dispositivi, che la rotta rifiuta prima con un messaggio suo.
+    contract_device_contract_fk: {
+        onDeleteParent: "Il cliente del contratto non si può cambiare: ha dei dispositivi collegati.",
+        onInvalidReference: "Il contratto selezionato non esiste.",
+    },
+    intervention_customer_device_id_customer_device_id_fk: {
+        onDeleteParent: "Impossibile eliminare il dispositivo: è ancora indicato in uno o più interventi.",
+        onInvalidReference: "Il dispositivo selezionato non esiste.",
+    },
+    // Chiave composta (contract_id, customer_device_id) verso i dispositivi del contratto.
+    intervention_contract_device_fk: {
+        onDeleteParent: "Impossibile togliere il dispositivo dal contratto: è ancora indicato in uno o più interventi.",
+        onInvalidReference: "Il dispositivo selezionato non è fra quelli del contratto dell'intervento.",
+    },
     assistance_hours_alert_contract_id_assistance_contract_id_fk: {
         onDeleteParent: "Impossibile eliminare il contratto: ha ancora avvisi di ore collegati.",
         onInvalidReference: "Il contratto di assistenza selezionato non esiste.",
@@ -112,6 +137,7 @@ const UNIQUE_MESSAGES: Record<string, string> = {
     provider_provider_name_lower_idx: "Esiste già un fornitore con questo nome.",
     provider_email_unique: "Esiste già un fornitore con questa email.",
     provider_phone_number_unique: "Esiste già un fornitore con questo numero di telefono.",
+    customer_device_customer_serial_lower_idx: "Questo cliente ha già un dispositivo con questo numero di serie.",
 };
 
 const GENERIC_UNIQUE_MESSAGE = "Esiste già un elemento con questi dati.";
@@ -133,6 +159,8 @@ const CHECK_MESSAGES: Record<string, string> = {
     assistance_contract_type_check: "Il contratto non è un contratto di assistenza",
     assistance_package_check: "Pacchetto di ore non valido per questo tipo di assistenza",
     assistance_hours_alert_kind_check: "Tipo di avviso ore non valido",
+    customer_device_type_check: "Tipo di dispositivo non valido",
+    intervention_device_contract_check: "Il dispositivo si può indicare solo per un intervento con contratto",
 };
 
 const GENERIC_CHECK_MESSAGE = "I dati inseriti non sono validi.";

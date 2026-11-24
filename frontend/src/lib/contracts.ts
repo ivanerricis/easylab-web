@@ -221,4 +221,8 @@ export const explainNoLinkableContract = (
 
 /** Come un contratto compare nel menu dell'intervento: "#4 Pronti Via 20 - Notebook (fino al 01/12/2026)". */
 export const formatContractOption = (contract: ContractDto) =>
-    `#${contract.id} ${contract.assistance?.name ?? formatContractType(contract.type)} - ${contract.device} (fino al ${formatDate(contract.endDate)})`;
+    `#${contract.id} ${contract.assistance?.name ?? formatContractType(contract.type)}${formatDeviceNames(contract.devices, " - ")} (fino al ${formatDate(contract.endDate)})`;
+
+/** I nomi dei dispositivi coperti, separati da virgola, con un prefisso solo se ce n'è qualcuno. */
+export const formatDeviceNames = (devices: ContractDto["devices"], prefix = "") =>
+    devices.length > 0 ? `${prefix}${devices.map((device) => device.name).join(", ")}` : "";

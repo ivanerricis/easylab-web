@@ -7,17 +7,20 @@ import MonthsField from "@/components/months-field";
 import SegmentedControl from "@/components/segmented-control";
 import CreateCustomerDialog from "@/components/dialogs/create/createCustomerDialog";
 import CreateProviderDialog from "@/components/dialogs/create/createProviderDialog";
+import CreateCustomerDeviceDialog from "@/components/dialogs/create/createCustomerDeviceDialog";
+import DeviceMultiSelect from "@/components/device-multi-select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     createCustomer,
+    createCustomerDevice,
     createProvider,
     getApiErrorField,
     getApiErrorMessage,
     listContractPackages,
+    listCustomerDevices,
     listCustomers,
     listProviders,
 } from "@/lib/api";
@@ -43,7 +46,7 @@ import {
 } from "@/lib/contractForm";
 import { resolveCustomerId } from "@/lib/customerLookup";
 import { formatCustomerOption, toCustomerPayload } from "@/lib/customers";
-import { fieldErrorAria, fieldProps, hasFormChanged, reportFieldErrors } from "@/lib/formField";
+import { fieldErrorAria, hasFormChanged, reportFieldErrors } from "@/lib/formField";
 import { getTodayDateString } from "@/lib/interventions";
 import { toProviderPayload } from "@/lib/providers";
 import { cn, formatDate } from "@/lib/utils";
@@ -53,6 +56,7 @@ import type {
     ContractPackageDto,
     ContractStatus,
     ContractType,
+    CustomerDeviceDto,
     CustomerDto,
 } from "@/types/dtos";
 import { Plus, Save } from "lucide-react";
@@ -66,7 +70,8 @@ export type ContractSubmitValues = {
     termMonths: number;
     /** Solo per il noleggio: ogni quanti mesi si fattura; `null` per l'assistenza. */
     billingMonths: number | null;
-    device: string;
+    /** I dispositivi del cliente coperti, anche nessuno; in modifica sostituiscono l'elenco di prima. */
+    deviceIds: number[];
     note: string | null;
     startDate: string;
     customerId: number;
@@ -121,7 +126,7 @@ const toFormState = (contract: ContractDto): ContractFormState => ({
     status: contract.status,
     termMonths: String(contract.termMonths),
     billingMonths: contract.billingMonths != null ? String(contract.billingMonths) : "3",
-    device: contract.device,
+    deviceIds: contract.devices.map((device) => device.id),
     note: contract.note ?? "",
     startDate: contract.startDate,
     customer: contract.customerName,
@@ -152,6 +157,11 @@ const CreateContractDialog = ({
     // I dialoghi annidati per creare al volo un cliente o un fornitore, come in `CreateInterventionDialog`.
     const [isCreateCustomerDialogOpen, setIsCreateCustomerDialogOpen] = useState(false);
     const [isCreateProviderDialogOpen, setIsCreateProviderDialogOpen] = useState(false);
+    const [isCreateDeviceDialogOpen, setIsCreateDeviceDialogOpen] = useState(false);
+    // I dispositivi del cliente scelto, e di quale cliente sono: il modulo li tiene solo se il cliente
+    // risolto al salvataggio è lo stesso, altrimenti quelli scelti erano di un altro cliente.
+    const [customerDevices, setCustomerDevices] = useState<CustomerDeviceDto[]>([]);
+    const [devicesOwnerId, setDevicesOwnerId] = useState<number | null>(null);
     const isDirty = hasFormChanged(formValues, initialFormValues);
     const isEdit = mode === "edit";
     // Sotto `sm` il modulo diventa a passi, come il report e l'intervento; da `sm` in su è una colonna sola.
@@ -159,7 +169,7 @@ const CreateContractDialog = ({
     const [step, setStep] = useState(0);
     const pendingFocusRef = useRef<ContractFormField | null>(null);
     const contractSteps: { title: string; fields: readonly ContractFormField[] }[] = [
-        { title: "Parti", fields: ["customer", "provider", "device"] },
+        { title: "Parti", fields: ["customer", "provider"] },
         { title: "Condizioni", fields: ["termMonths", "billingMonths", "startDate"] },
         { title: formValues.type === "assistance" ? "Pacchetto" : "Note", fields: ["package"] },
         { title: "Riepilogo", fields: [] },
@@ -219,6 +229,39 @@ const CreateContractDialog = ({
 
         return () => controller.abort();
     }, [open, packagesAttempt]);
+
+    // Il cliente scelto fra i suggerimenti (o creato qui, o di partenza): senza, i dispositivi non hanno
+    // un proprietario e la scelta resta spenta. Un cliente scritto a mano si risolve solo al salvataggio.
+    const selectedCustomerId = customerIdByOption[formValues.customer] ?? null;
+
+    // Carica i dispositivi del cliente scelto. Cambiando cliente, quelli già selezionati che non sono del
+    // nuovo vanno via da soli (non compaiono nel nuovo elenco). Il cliente di partenza in modifica
+    // riporta i suoi, che nel nuovo elenco ci sono.
+    useEffect(() => {
+        if (!open || selectedCustomerId == null) {
+            return;
+        }
+
+        const controller = new AbortController();
+
+        listCustomerDevices({ customerId: selectedCustomerId, page: 1, pageSize: 1000, signal: controller.signal })
+            .then(({ items }) => {
+                setCustomerDevices(items);
+                setDevicesOwnerId(selectedCustomerId);
+                setFormValues((prev) => {
+                    const kept = prev.deviceIds.filter((id) => items.some((item) => item.id === id));
+
+                    return kept.length === prev.deviceIds.length ? prev : { ...prev, deviceIds: kept };
+                });
+            })
+            .catch((error) => {
+                if (!controller.signal.aborted) {
+                    toast.error(getApiErrorMessage(error, "Impossibile caricare i dispositivi del cliente"));
+                }
+            });
+
+        return () => controller.abort();
+    }, [open, selectedCustomerId]);
 
     /** Applica i campi cambiati e toglie l'errore a quelli toccati. */
     const handleChange = (patch: Partial<ContractFormState>) => {
@@ -378,7 +421,11 @@ const CreateContractDialog = ({
 
         try {
             setIsSubmitting(true);
-            await onSubmit(toContractSubmitValues(formValues, customerId, providerId));
+            // Solo i dispositivi davvero del cliente risolto: se si è cambiato cliente a mano senza
+            // sceglierlo dall'elenco, quelli scelti prima non valgono più.
+            const deviceIds = devicesOwnerId === customerId ? formValues.deviceIds : [];
+
+            await onSubmit(toContractSubmitValues(formValues, customerId, providerId, deviceIds));
             onOpenChange(false);
             toast.success(isEdit ? "Contratto aggiornato con successo" : "Contratto creato con successo");
         } catch (error) {
@@ -489,14 +536,18 @@ const CreateContractDialog = ({
         </FormField>
     );
 
+    const devicesLoaded = selectedCustomerId != null && devicesOwnerId === selectedCustomerId;
+
     const deviceField = (
-        <FormField id="device" label="Dispositivo" className="gap-1" required error={errors.device}>
-            <Input
-                {...fieldProps("device", { error: errors.device, required: true })}
-                autoComplete="off"
-                placeholder="Es. Server HP ProLiant"
-                value={formValues.device}
-                onChange={(event) => handleChange({ device: event.target.value })}
+        <FormField id="devices" label="Dispositivi coperti" className="gap-1">
+            <DeviceMultiSelect
+                aria-label="Dispositivi coperti dal contratto"
+                devices={devicesLoaded ? customerDevices : []}
+                selectedIds={formValues.deviceIds}
+                onChange={(deviceIds) => handleChange({ deviceIds })}
+                disabled={selectedCustomerId == null}
+                isLoading={selectedCustomerId != null && !devicesLoaded}
+                onCreate={() => setIsCreateDeviceDialogOpen(true)}
             />
         </FormField>
     );
@@ -650,8 +701,16 @@ const CreateContractDialog = ({
         { label: "Cliente", value: formValues.customer || "-" },
         { label: "Fornitore", value: formValues.provider || "-" },
         {
-            label: "Tipo e dispositivo",
-            value: `${contractTypeOptions.find((o) => o.value === formValues.type)?.label ?? ""} · ${formValues.device.trim() || "-"}`,
+            label: "Tipo",
+            value: contractTypeOptions.find((o) => o.value === formValues.type)?.label ?? "",
+        },
+        {
+            label: "Dispositivi",
+            value:
+                formValues.deviceIds
+                    .map((id) => customerDevices.find((device) => device.id === id)?.name)
+                    .filter(Boolean)
+                    .join(", ") || "-",
         },
         {
             label: "Periodo",
@@ -802,6 +861,23 @@ const CreateContractDialog = ({
 
                     setCustomerIdByOption((prev) => ({ ...prev, [customerOption]: createdCustomer.id }));
                     handleChange({ customer: customerOption });
+                }}
+            />
+
+            {/* Il dispositivo appena creato è del cliente scelto, ed è già selezionato nell'elenco. */}
+            <CreateCustomerDeviceDialog
+                open={isCreateDeviceDialogOpen}
+                onOpenChange={setIsCreateDeviceDialogOpen}
+                customerName={formValues.customer}
+                onSubmit={async (values) => {
+                    if (selectedCustomerId == null) {
+                        return;
+                    }
+
+                    const created = await createCustomerDevice({ ...values, customerId: selectedCustomerId });
+
+                    setCustomerDevices((prev) => [...prev, created]);
+                    handleChange({ deviceIds: [...formValues.deviceIds, created.id] });
                 }}
             />
 

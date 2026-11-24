@@ -37,7 +37,7 @@ const buildItem = (overrides: Partial<CustomerContractSummaryItem> = {}): Custom
     status: "active",
     providerName: "Acme Srl",
     customerName: "Luca Verdi",
-    device: "Server NAS",
+    devices: ["Server NAS – Server – S/N SN-1"],
     assistance: { package: "ready_20", includedHours: 20, priceCents: 50000 },
     startDateLabel: "1 ott 2026",
     endDateLabel: "1 ott 2027",
@@ -91,10 +91,7 @@ describe("createCustomerContractsPdfBuffer", () => {
 
     it("stampa una riga per contratto con tipo, fornitore, pacchetto e date, e ripete le intestazioni", async () => {
         const doc = await capture(
-            buildData([
-                buildItem({ id: 9 }),
-                buildItem({ id: 4, type: "rental", device: "Notebook", assistance: null }),
-            ])
+            buildData([buildItem({ id: 9 }), buildItem({ id: 4, type: "rental", devices: [], assistance: null })])
         );
         const { table } = tableOf(doc);
         const rows = dataRows(doc);
@@ -107,12 +104,13 @@ describe("createCustomerContractsPdfBuffer", () => {
             "Assistenza",
             "Attivo",
             "Acme Srl",
-            "Server NAS",
+            "Server NAS – Server – S/N SN-1",
             "Pronti Via 20 - 20 ore al mese - 500,00 € al mese + IVA",
             "1 ott 2026",
             "1 ott 2027",
         ]);
         expect(rows[1][1]).toBe("Noleggio");
+        expect(rows[1][4]).toBe("-");
         expect(rows[1][5]).toBe("-");
     });
 

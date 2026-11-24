@@ -97,7 +97,8 @@ const buildAlertContent = (input: {
     kind: AssistanceAlertKind;
     labName: string;
     customerName: string;
-    device: string;
+    /** I nomi dei dispositivi coperti dal contratto: vuoto se il contratto non ne ha. */
+    deviceNames: string[];
     contractId: number;
     package: AssistancePackage;
     month: string;
@@ -111,6 +112,7 @@ const buildAlertContent = (input: {
     const included = formatHours(input.includedHours);
     const pack = `${name} da ${included} ore ${perContract ? "in 12 mesi" : "al mese"}`;
     const exhausted = input.kind === "exhausted";
+    const devices = input.deviceNames.join(", ");
     // Il Supporto conta sull'intero contratto: niente mese nei testi.
     const when = perContract ? "nel contratto" : `a ${monthLabel}`;
 
@@ -126,7 +128,7 @@ const buildAlertContent = (input: {
           : `Nel mese di ${monthLabel} sono state usate ${used} ore su ${included}, oltre l'${warningPercent}% di quelle incluse.`;
     const text = [
         "Buongiorno,",
-        `le scriviamo a proposito del contratto di ${pack} di ${input.customerName}, per ${input.device}.`,
+        `le scriviamo a proposito del contratto di ${pack} di ${input.customerName}${devices ? `, per ${devices}` : ""}.`,
         outcome,
         `Cordiali saluti,\n${input.labName}`,
     ].join("\n\n");
@@ -137,7 +139,7 @@ const buildAlertContent = (input: {
         title: exhausted
             ? `Ore di assistenza esaurite: ${input.customerName}`
             : `Ore di assistenza all'${warningPercent}%: ${input.customerName}`,
-        message: `Contratto n. ${input.contractId} (${input.device}), ${perContract ? "ore del contratto" : monthLabel}: usate ${used} ore su ${included}.`,
+        message: `Contratto n. ${input.contractId}${devices ? ` (${devices})` : ""}, ${perContract ? "ore del contratto" : monthLabel}: usate ${used} ore su ${included}.`,
     };
 };
 
@@ -167,7 +169,7 @@ const notifyThreshold = async (input: {
             ...input,
             labName,
             customerName: context.customerName ?? "",
-            device: context.device,
+            deviceNames: context.deviceNames,
         });
         let failure: string;
 

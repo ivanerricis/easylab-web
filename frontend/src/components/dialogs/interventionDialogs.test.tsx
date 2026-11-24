@@ -175,6 +175,7 @@ describe("CreateInterventionDialog", () => {
                 customerId: 30,
                 collaboratorId: 40,
                 contractId: null,
+                customerDeviceId: null,
                 interventionDate: "2026-10-05",
                 startTime: null,
                 endTime: null,
@@ -624,7 +625,7 @@ describe("contratto di assistenza negli interventi", () => {
         effectiveStatus: "active",
         termMonths: 12,
         billingMonths: null,
-        device: `Dispositivo ${id}`,
+        devices: [],
         note: null,
         startDate: "2026-09-01",
         endDate: "2027-09-01",
@@ -867,6 +868,100 @@ describe("contratto di assistenza negli interventi", () => {
             expect(onSubmit).toHaveBeenCalled();
         });
         expect(onSubmit.mock.calls[0][0].contractId).toBeUndefined();
+    });
+
+    describe("dispositivo del contratto", () => {
+        const nas = { id: 11, type: "server", name: "NAS", serialNumber: "SN-1", model: null };
+        const firewall = { id: 12, type: "firewall", name: "Firewall", serialNumber: "FW-1", model: null };
+        const deviceSelect = () => screen.getByRole("combobox", { name: "Dispositivo" });
+
+        it("senza dispositivi nel contratto il campo non compare", async () => {
+            listContracts.mockResolvedValue(pageOf([contract(1, "remote_20")]));
+            await renderCreate();
+            await chooseOption("Tipo intervento", "Intervento da remoto");
+
+            await waitFor(() => {
+                expect(screen.getByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent("#1");
+            });
+            expect(screen.queryByRole("combobox", { name: "Dispositivo" })).not.toBeInTheDocument();
+        });
+
+        it("senza contratto il campo non compare, anche se il cliente ha contratti con dispositivi", async () => {
+            listContracts.mockResolvedValue(
+                pageOf([contract(1, "remote_20", { devices: [nas] }), contract(4, "remote_20", { devices: [nas] })])
+            );
+            await renderCreate();
+            await chooseOption("Tipo intervento", "Intervento da remoto");
+
+            expect(await screen.findByRole("combobox", { name: "Contratto di assistenza" })).toHaveTextContent(
+                "Nessun contratto"
+            );
+            expect(screen.queryByRole("combobox", { name: "Dispositivo" })).not.toBeInTheDocument();
+        });
+
+        it("con un solo dispositivo lo propone già, e togliendolo viaggia null", async () => {
+            listContracts.mockResolvedValue(pageOf([contract(1, "remote_20", { devices: [nas] })]));
+            const onSubmit = await renderCreate();
+            await chooseOption("Tipo intervento", "Intervento da remoto");
+            await userEvent.type(screen.getByLabelText(/^Problema/), "Rete");
+
+            await waitFor(() => {
+                expect(deviceSelect()).toHaveTextContent("NAS – Server – S/N SN-1");
+            });
+
+            await chooseOption("Dispositivo", "Nessun dispositivo");
+            expect(deviceSelect()).toHaveTextContent("Nessun dispositivo");
+            await save();
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(
+                    expect.objectContaining({ contractId: 1, customerDeviceId: null })
+                );
+            });
+        });
+
+        it("con più dispositivi non ne propone nessuno, e quello scelto viaggia come id", async () => {
+            listContracts.mockResolvedValue(pageOf([contract(1, "remote_20", { devices: [nas, firewall] })]));
+            const onSubmit = await renderCreate();
+            await chooseOption("Tipo intervento", "Intervento da remoto");
+            await userEvent.type(screen.getByLabelText(/^Problema/), "Rete");
+
+            await screen.findByRole("combobox", { name: "Dispositivo" });
+            expect(deviceSelect()).toHaveTextContent("Nessun dispositivo");
+
+            await chooseOption("Dispositivo", /Firewall – Firewall/);
+            await save();
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ customerDeviceId: 12 }));
+            });
+        });
+
+        it("cambiando contratto il dispositivo che non è del nuovo si toglie", async () => {
+            listContracts.mockResolvedValue(
+                pageOf([
+                    contract(1, "remote_20", { devices: [nas, firewall] }),
+                    contract(4, "remote_20", { devices: [] }),
+                ])
+            );
+            const onSubmit = await renderCreate();
+            await chooseOption("Tipo intervento", "Intervento da remoto");
+            await userEvent.type(screen.getByLabelText(/^Problema/), "Rete");
+            await chooseOption("Contratto di assistenza", /#1 /);
+            await chooseOption("Dispositivo", /NAS – Server/);
+
+            await chooseOption("Contratto di assistenza", /#4 /);
+            await waitFor(() => {
+                expect(screen.queryByRole("combobox", { name: "Dispositivo" })).not.toBeInTheDocument();
+            });
+            await save();
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalledWith(
+                    expect.objectContaining({ contractId: 4, customerDeviceId: null })
+                );
+            });
+        });
     });
 
     it("se il cliente ha contratti ma nessuno copre la data, spiega perché non c'è il menu", async () => {

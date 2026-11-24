@@ -38,6 +38,7 @@ import {
     formatPackagePriority,
     hoursUsagePercent,
 } from "@/lib/contracts";
+import { formatDeviceLine } from "@/lib/customerDevices";
 import { entityPaths } from "@/lib/entityPaths";
 import { interventionStatusColor } from "@/lib/interventions";
 import { getMonthLabel } from "@/lib/monthKey";
@@ -272,7 +273,21 @@ const ContractPage = () => {
                                     </Link>
                                 }
                             />
-                            <DetailItem label="Dispositivo" value={contract.device} />
+                            <DetailItem
+                                label={contract.devices.length === 1 ? "Dispositivo" : "Dispositivi"}
+                                longText
+                                value={
+                                    contract.devices.length > 0 ? (
+                                        <ul className="grid gap-1">
+                                            {contract.devices.map((device) => (
+                                                <li key={device.id}>{formatDeviceLine(device)}</li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        "-"
+                                    )
+                                }
+                            />
                         </DetailGrid>
                     </DetailSection>
 

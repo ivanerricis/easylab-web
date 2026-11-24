@@ -24,6 +24,7 @@ data porta alla voce da qui.
 
 ## Novembre 2026
 
+- [2026-11-24 — Dispositivi del cliente: collegati ai contratti e, facoltativi, agli interventi](changelog/2026-11.md#2026-11-24-dispositivi-del-cliente-collegati-ai-contratti-e-facoltativi-agli-interventi)
 - [2026-11-24 — Menu col tasto destro sulle righe e colonna Azioni nascosta di serie](changelog/2026-11.md#2026-11-24-menu-col-tasto-destro-sulle-righe-e-colonna-azioni-nascosta-di-serie)
 - [2026-11-24 — Report da fatturare, ricevuta con tre caselle di pagamento, testo del lavoro eseguito leggibile](changelog/2026-11.md#2026-11-24-report-da-fatturare-ricevuta-con-tre-caselle-di-pagamento-testo-del-lavoro-eseguito-leggibile)
 - [2026-11-17 — Ripristino dei backup bloccato dalla funzione della ricerca senza accenti](changelog/2026-11.md#2026-11-17-ripristino-dei-backup-bloccato-dalla-funzione-della-ricerca-senza-accenti)

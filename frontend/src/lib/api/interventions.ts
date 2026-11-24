@@ -1,6 +1,6 @@
 import { api, signalArgs } from "./client";
 import type { PaginatedResponse } from "./client";
-import type { InterventionDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import type { InterventionDto, InterventionStatus, InterventionType, LinkedDeviceDto } from "@/types/dtos";
 
 export type InterventionEntityDto = {
     id: number;
@@ -24,6 +24,8 @@ export type InterventionEntityDto = {
     collaboratorId: number;
     /** Il contratto di assistenza a cui sono imputate le ore, se c'è. */
     contractId: number | null;
+    /** Il dispositivo su cui si è intervenuti: uno di quelli del contratto, che c'è se c'è il contratto. */
+    customerDeviceId: number | null;
     created_at: string;
     updated_at: string | null;
 };
@@ -41,6 +43,8 @@ export type InterventionCreateInput = {
     collaboratorId: number;
     /** `null` scollega l'intervento dal contratto; assente lo lascia com'è. */
     contractId?: number | null;
+    /** `null` toglie il dispositivo; assente lo lascia com'è. Solo con un contratto che lo ha fra i suoi. */
+    customerDeviceId?: number | null;
     interventionDate?: string | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -113,6 +117,8 @@ export type InterventionDetailDto = InterventionEntityDto & {
     customerName: string | null;
     customerPhone: string | null;
     collaboratorName: string | null;
+    /** Il dispositivo su cui si è intervenuti, se indicato. */
+    customerDevice: LinkedDeviceDto | null;
 };
 
 export const getIntervention = async (id: number, signal?: AbortSignal) =>

@@ -21,6 +21,7 @@ import {
     sendInterventionEmail,
 } from "@/lib/api";
 import { cn, formatDate, formatDateTime, formatEuro, openPrintWindow } from "@/lib/utils";
+import { formatDeviceLine } from "@/lib/customerDevices";
 import { toInterventionUpdatePayload } from "@/lib/interventionForm";
 import {
     formatInterventionStatus,
@@ -199,6 +200,9 @@ const InterventionPage = () => {
                             />
                             {intervention.contractId != null ? (
                                 <InterventionContractItem contractId={intervention.contractId} />
+                            ) : null}
+                            {intervention.customerDevice ? (
+                                <DetailItem label="Dispositivo" value={formatDeviceLine(intervention.customerDevice)} />
                             ) : null}
                         </DetailGrid>
                     </DetailSection>

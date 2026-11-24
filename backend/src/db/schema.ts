@@ -420,6 +420,49 @@ export const providerTable = pgTable(
     ]
 );
 
+export const customerDeviceTypes = ["pc_desktop", "server", "copier", "firewall", "cash_register"] as const;
+export type CustomerDeviceType = (typeof customerDeviceTypes)[number];
+
+/**
+ * Un dispositivo del cliente, inserito a mano: diverso da `device`, che è il catalogo condiviso
+ * dei modelli usato solo dai report. Qui ogni riga è un apparecchio vero, di un cliente, col suo
+ * numero di serie. Il tipo è un `varchar` con CHECK come gli altri valori ammessi dello schema.
+ */
+export const customerDeviceTable = pgTable(
+    "customer_device",
+    {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        type: varchar("type", { length: 20 }).$type<CustomerDeviceType>().notNull(),
+        name: varchar("name", { length: 255 }).notNull(),
+        serialNumber: varchar("serial_number", { length: 255 }).notNull(),
+        /** Marca e modello, facoltativi. */
+        model: varchar("model", { length: 255 }),
+        note: text("note"),
+        ...timestamps,
+        customerId: integer("customer_id")
+            .notNull()
+            .references(() => customerTable.id),
+    },
+    (table) => [
+        index("customer_device_customer_id_idx").on(table.customerId),
+        // Lo stesso numero di serie non si inserisce due volte per lo stesso cliente (senza
+        // maiuscole); due clienti diversi possono avere seriali uguali (apparecchi di serie).
+        uniqueIndex("customer_device_customer_serial_lower_idx").on(
+            table.customerId,
+            sql`lower(${table.serialNumber})`
+        ),
+        index("customer_device_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
+        index("customer_device_serial_number_trgm_idx").using("gin", sql`${table.serialNumber} gin_trgm_ops`),
+        // Bersaglio delle chiavi composte (customer_id, id): ridondante con la chiave primaria, ma
+        // Postgres vuole un vincolo di unicità esatto sulle colonne referenziate.
+        unique("customer_device_customer_id_id_unique").on(table.customerId, table.id),
+        check(
+            "customer_device_type_check",
+            sql`${table.type} IN ('pc_desktop', 'server', 'copier', 'firewall', 'cash_register')`
+        ),
+    ]
+);
+
 export const contractTable = pgTable(
     "contract",
     {
@@ -431,8 +474,6 @@ export const contractTable = pgTable(
         termMonths: integer("term_months").notNull(),
         /** Ogni quanti mesi si fattura: solo per il noleggio (NULL per l'assistenza), stessa scala della durata. */
         billingMonths: integer("billing_months"),
-        /** Testo libero, di proposito non una chiave verso `device`: è il bene coperto dal contratto. */
-        device: varchar("device", { length: 255 }).notNull(),
         note: text("note"),
         startDate: date("start_date").notNull(),
         ...timestamps,
@@ -448,7 +489,6 @@ export const contractTable = pgTable(
         index("contract_provider_id_idx").on(table.providerId),
         index("contract_start_date_idx").on(table.startDate),
         index("contract_created_at_idx").on(table.created_at),
-        index("contract_device_trgm_idx").using("gin", sql`${table.device} gin_trgm_ops`),
         // Bersagli delle chiavi esterne composte: (id, type) tiene disgiunte le specializzazioni
         // (vedi `assistanceTable`), (customer_id, id) obbliga l'intervento a un contratto dello
         // stesso cliente. Sono ridondanti con la chiave primaria, ma Postgres vuole un vincolo
@@ -463,6 +503,34 @@ export const contractTable = pgTable(
             "contract_billing_months_check",
             sql`(${table.type} = 'rental') = (${table.billingMonths} IS NOT NULL) AND (${table.billingMonths} IS NULL OR ${table.billingMonths} BETWEEN 1 AND 120)`
         ),
+    ]
+);
+
+/**
+ * I dispositivi coperti da un contratto: zero o più, tutti dello stesso cliente del contratto.
+ * Le due chiavi composte con `customer_id` lo garantiscono dal database. Eliminare il contratto
+ * porta via i collegamenti (cascata); eliminare un dispositivo ancora collegato è rifiutato.
+ */
+export const contractDeviceTable = pgTable(
+    "contract_device",
+    {
+        contractId: integer("contract_id").notNull(),
+        customerDeviceId: integer("customer_device_id").notNull(),
+        customerId: integer("customer_id").notNull(),
+    },
+    (table) => [
+        primaryKey({ columns: [table.contractId, table.customerDeviceId] }),
+        foreignKey({
+            name: "contract_device_contract_fk",
+            columns: [table.customerId, table.contractId],
+            foreignColumns: [contractTable.customerId, contractTable.id],
+        }).onDelete("cascade"),
+        foreignKey({
+            name: "contract_device_customer_device_fk",
+            columns: [table.customerId, table.customerDeviceId],
+            foreignColumns: [customerDeviceTable.customerId, customerDeviceTable.id],
+        }),
+        index("contract_device_customer_device_id_idx").on(table.customerDeviceId),
     ]
 );
 
@@ -613,8 +681,25 @@ export const interventionTable = pgTable(
          * il contratto sia dello stesso cliente dell'intervento.
          */
         contractId: integer("contract_id"),
+        /**
+         * Il dispositivo su cui si è intervenuti, facoltativo. Deve essere uno di quelli del
+         * contratto dell'intervento (vedi `intervention_contract_device_fk`) e c'è solo se c'è
+         * il contratto (`intervention_device_contract_check`).
+         */
+        customerDeviceId: integer("customer_device_id").references(() => customerDeviceTable.id),
     },
     (table) => [
+        // MATCH SIMPLE: con `contract_id` o `customer_device_id` NULL non vincola nulla.
+        foreignKey({
+            name: "intervention_contract_device_fk",
+            columns: [table.contractId, table.customerDeviceId],
+            foreignColumns: [contractDeviceTable.contractId, contractDeviceTable.customerDeviceId],
+        }),
+        check(
+            "intervention_device_contract_check",
+            sql`${table.customerDeviceId} IS NULL OR ${table.contractId} IS NOT NULL`
+        ),
+        index("intervention_customer_device_id_idx").on(table.customerDeviceId),
         foreignKey({
             name: "intervention_customer_contract_fk",
             columns: [table.customerId, table.contractId],

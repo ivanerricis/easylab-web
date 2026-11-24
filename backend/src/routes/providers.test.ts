@@ -13,6 +13,10 @@ vi.mock("../db/queries/provider", () => ({
 vi.mock("../db/queries/contract", () => ({
     listContracts: vi.fn(),
 }));
+vi.mock("../db/queries/customerDevice", () => ({
+    listDevicesOfContracts: vi.fn(async () => new Map()),
+}));
+
 vi.mock("../services/contractPdf", () => ({
     createCustomerContractsPdfBuffer: vi.fn(),
 }));
@@ -167,7 +171,6 @@ describe("providers router", () => {
                     effectiveStatus: "active",
                     providerName: "Acme Srl",
                     customerName: "Mario Rossi",
-                    device: "NAS",
                     package: "ready_20",
                     includedHours: 20,
                     priceCents: 50000,
@@ -180,7 +183,6 @@ describe("providers router", () => {
                     effectiveStatus: "draft",
                     providerName: "Acme Srl",
                     customerName: "Luca Verdi",
-                    device: "Notebook",
                     package: null,
                     includedHours: null,
                     priceCents: null,

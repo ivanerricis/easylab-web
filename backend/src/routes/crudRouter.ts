@@ -60,18 +60,23 @@ export const sendListResponse = <TRow>(res: Response, result: ListResult<TRow>, 
     });
 };
 
-type CrudQueries<TRow, TCreate, TUpdate> = {
-    list: (params: ListParams) => PromiseLike<ListResult<TRow>>;
+type CrudQueries<TRow, TCreate, TUpdate, TList extends ListParams> = {
+    list: (params: TList) => PromiseLike<ListResult<TRow>>;
     getById: (id: number) => PromiseLike<TRow[]>;
     create: (data: TCreate) => PromiseLike<TRow[]>;
     update: (id: number, data: TUpdate) => PromiseLike<TRow[]>;
     remove: (id: number) => PromiseLike<TRow[]>;
 };
 
-type CreateCrudRouterOptions<TRow, TCreate, TUpdate> = {
+type CreateCrudRouterOptions<TRow, TCreate, TUpdate, TList extends ListParams> = {
     /** Messaggio 404 mostrato all'utente: va scritto in italiano, non tradotto altrove. */
     notFoundMessage: string;
-    queries: CrudQueries<TRow, TCreate, TUpdate>;
+    queries: CrudQueries<TRow, TCreate, TUpdate, TList>;
+    /**
+     * Lo schema della query di lista, se oltre a pagina, ricerca e ordinamento ha filtri propri
+     * (es. `customerId`): deve estendere `listQuerySchema`, e l'intero oggetto arriva a `list`.
+     */
+    listQuerySchema?: ZodType;
     createBodySchema: ZodType;
     updateBodySchema: ZodType;
     /**
@@ -88,20 +93,21 @@ type CreateCrudRouterOptions<TRow, TCreate, TUpdate> = {
     audit: { noun: string; describe: (row: TRow) => string };
 };
 
-export const createCrudRouter = <TRow, TCreate, TUpdate>({
+export const createCrudRouter = <TRow, TCreate, TUpdate, TList extends ListParams = ListParams>({
     notFoundMessage,
     queries,
+    listQuerySchema: customListQuerySchema = listQuerySchema,
     createBodySchema,
     updateBodySchema,
     extraRoutes,
     audit,
-}: CreateCrudRouterOptions<TRow, TCreate, TUpdate>): Router => {
+}: CreateCrudRouterOptions<TRow, TCreate, TUpdate, TList>): Router => {
     const router = Router();
 
-    router.get("/", validate({ query: listQuerySchema }), async (req, res) => {
-        const { page, pageSize, search, sortBy, sortOrder } = req.query as unknown as ListParams;
+    router.get("/", validate({ query: customListQuerySchema }), async (req, res) => {
+        const params = req.query as unknown as TList;
 
-        sendListResponse(res, await queries.list({ page, pageSize, search, sortBy, sortOrder }), page, pageSize);
+        sendListResponse(res, await queries.list(params), params.page, params.pageSize);
     });
 
     extraRoutes?.(router);

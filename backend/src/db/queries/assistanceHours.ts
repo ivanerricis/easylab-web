@@ -1,9 +1,11 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../index";
 import {
     assistanceHoursAlertTable,
     assistanceTable,
+    contractDeviceTable,
     contractTable,
+    customerDeviceTable,
     customerTable,
     interventionTable,
     providerTable,
@@ -150,7 +152,6 @@ export const deleteAllAlerts = async (contractId: number) => {
 export const getAlertContext = async (contractId: number) => {
     const [row] = await db
         .select({
-            device: contractTable.device,
             customerName: personName(customerTable.firstName, customerTable.lastName),
             providerEmail: providerTable.email,
             providerName: providerTable.providerName,
@@ -160,5 +161,17 @@ export const getAlertContext = async (contractId: number) => {
         .innerJoin(providerTable, eq(providerTable.id, contractTable.providerId))
         .where(eq(contractTable.id, contractId));
 
-    return row;
+    if (!row) {
+        return row;
+    }
+
+    // I dispositivi coperti, per nome: nell'email al fornitore servono a dire "per quale apparecchio".
+    const devices = await db
+        .select({ name: customerDeviceTable.name })
+        .from(contractDeviceTable)
+        .innerJoin(customerDeviceTable, eq(customerDeviceTable.id, contractDeviceTable.customerDeviceId))
+        .where(eq(contractDeviceTable.contractId, contractId))
+        .orderBy(asc(customerDeviceTable.name), asc(customerDeviceTable.id));
+
+    return { ...row, deviceNames: devices.map((device) => device.name) };
 };

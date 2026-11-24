@@ -51,7 +51,7 @@ const contract = (overrides: Partial<ContractDto> = {}): ContractDto => ({
     effectiveStatus: "active",
     termMonths: 6,
     billingMonths: null,
-    device: "NAS",
+    devices: [{ id: 5, type: "server", name: "NAS", serialNumber: "SN-1", model: null }],
     note: null,
     startDate: "2026-09-01",
     endDate: "2027-03-01",
@@ -232,7 +232,7 @@ describe("modulo del contratto", () => {
     const filled = {
         ...emptyContractFormState("2026-10-05", "Mario Rossi - 333"),
         provider: "Rossi Informatica",
-        device: "  NAS  ",
+        deviceIds: [5, 6],
         note: "  ",
     };
 
@@ -249,7 +249,6 @@ describe("modulo del contratto", () => {
             customer: "Seleziona un cliente",
             provider: "Seleziona un fornitore",
             startDate: "Seleziona la data di inizio",
-            device: "Indica il dispositivo",
         });
     });
 
@@ -268,18 +267,20 @@ describe("modulo del contratto", () => {
     it("costruisce i corpi di creazione e modifica", () => {
         const values = toContractSubmitValues(filled, 3, 8);
 
-        expect(values).toMatchObject({ device: "NAS", note: null, customerId: 3, providerId: 8 });
+        expect(values).toMatchObject({ deviceIds: [5, 6], note: null, customerId: 3, providerId: 8 });
         expect(toContractCreatePayload(values)).toEqual({
             type: "assistance",
             status: "active",
             termMonths: 12,
-            device: "NAS",
+            deviceIds: [5, 6],
             note: null,
             startDate: "2026-10-05",
             customerId: 3,
             providerId: 8,
             assistance: { package: "remote_20" },
         });
+        // I dispositivi di un altro cliente (già filtrati dal dialogo) sostituiscono quelli del modulo.
+        expect(toContractSubmitValues(filled, 3, 8, []).deviceIds).toEqual([]);
         // Il tipo non si cambia: in modifica non viaggia.
         expect(toContractUpdatePayload(values)).not.toHaveProperty("type");
     });

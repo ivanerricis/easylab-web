@@ -2,7 +2,9 @@ import { db } from "../../db";
 import {
     assistanceTable,
     collaboratorTable,
+    contractDeviceTable,
     contractTable,
+    customerDeviceTable,
     customerTable,
     deviceTable,
     interventionTable,
@@ -19,6 +21,7 @@ import type {
     NewCollaborator,
     NewContract,
     NewCustomer,
+    NewCustomerDevice,
     NewIntervention,
     NewProvider,
     NewReport,
@@ -149,6 +152,27 @@ export const insertProvider = async (values: Partial<NewProvider> = {}) => {
     return row;
 };
 
+/** Un dispositivo del cliente: cliente nuovo e seriale unico se il test non li passa. */
+export const insertCustomerDevice = async (values: Partial<NewCustomerDevice> = {}) => {
+    const suffix = next();
+    const [row] = await db
+        .insert(customerDeviceTable)
+        .values({
+            type: "server",
+            name: `Dispositivo cliente ${suffix}`,
+            serialNumber: `SN-${suffix}`,
+            customerId: values.customerId ?? (await insertCustomer()).id,
+            ...values,
+        })
+        .returning();
+    return row;
+};
+
+/** Collega un dispositivo a un contratto (il cliente va passato: è parte delle chiavi composte). */
+export const linkContractDevice = async (contractId: number, customerDeviceId: number, customerId: number) => {
+    await db.insert(contractDeviceTable).values({ contractId, customerDeviceId, customerId });
+};
+
 /** Un contratto di noleggio (nessuna riga figlia): cliente e fornitore nuovi se il test non li passa. */
 export const insertContract = async (values: Partial<NewContract> = {}) => {
     const [row] = await db
@@ -157,7 +181,6 @@ export const insertContract = async (values: Partial<NewContract> = {}) => {
             type: "rental",
             termMonths: 12,
             billingMonths: values.type === undefined || values.type === "rental" ? 3 : null,
-            device: `Dispositivo contratto ${next()}`,
             startDate: "2026-01-01",
             customerId: values.customerId ?? (await insertCustomer()).id,
             providerId: values.providerId ?? (await insertProvider()).id,

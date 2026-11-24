@@ -24,7 +24,7 @@ import {
     listInterventions,
     listReports,
 } from "@/lib/api";
-import { formatContractStatus, formatContractType } from "@/lib/contracts";
+import { formatContractStatus, formatContractType, formatDeviceNames } from "@/lib/contracts";
 import { isSearchable, parseGlobalQuery } from "@/lib/globalSearchQuery";
 import { entityPaths } from "@/lib/entityPaths";
 import { formatInterventionStatus, formatInterventionType } from "@/lib/interventions";
@@ -431,7 +431,10 @@ const GlobalSearch = () => {
                                                 {contract.customerName}
                                             </span>
                                             <span className="truncate text-xs text-muted-foreground">
-                                                {contract.device} · {formatContractType(contract.type)}
+                                                {contract.devices.length > 0
+                                                    ? `${formatDeviceNames(contract.devices)} · `
+                                                    : ""}
+                                                {formatContractType(contract.type)}
                                             </span>
                                         </div>
                                         <CommandShortcut className="tracking-normal">

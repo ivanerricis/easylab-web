@@ -11,6 +11,8 @@ import {
     updateInterventionById,
 } from "../db/queries/intervention";
 import { getContractById } from "../db/queries/contract";
+import { listContractDeviceIds } from "../db/queries/customerDevice";
+import { formatDeviceLine } from "../services/customerDeviceLabels";
 import { consumingInterventionTypes, recheckAssistanceHours } from "../services/assistanceHours";
 import type { AssistancePackage } from "../services/assistancePackages";
 import { sendEmail } from "../services/emailManager";
@@ -87,6 +89,9 @@ const interventionBodySchema = z
         // Il contratto di assistenza a cui imputare le ore: facoltativo. Le regole sul
         // collegamento (tipo, stato, periodo, cliente) stanno in `validateContractLink`.
         contractId: z.coerce.number().int().positive().nullable().optional(),
+        // Il dispositivo su cui si è intervenuti, facoltativo: solo se c'è il contratto e solo uno
+        // dei suoi dispositivi (regole in `validateDeviceLink`).
+        customerDeviceId: z.coerce.number().int().positive().nullable().optional(),
         interventionDate: z.string().regex(dateRegex).nullable().optional(),
         startTime: z.string().regex(timeRegex).nullable().optional(),
         endTime: z.string().regex(timeRegex).nullable().optional(),
@@ -116,7 +121,7 @@ type InterventionValidationRow = {
 };
 
 type InterventionValidationFailure = {
-    field: "interventionDate" | "description" | "problem" | "startTime" | "endTime" | "contractId";
+    field: "interventionDate" | "description" | "problem" | "startTime" | "endTime" | "contractId" | "customerDeviceId";
     message: string;
 };
 
@@ -228,6 +233,32 @@ const validateContractLink = (
     return null;
 };
 
+/**
+ * Il dispositivo dell'intervento deve essere uno di quelli del suo contratto, e senza contratto
+ * non ce ne può essere. Le stesse regole le fa rispettare il database (`intervention_contract_device_fk`
+ * e `intervention_device_contract_check`): qui si risponde con un 400 che dice cosa correggere.
+ */
+const validateDeviceLink = async (
+    contractId: number | null,
+    customerDeviceId: number | null
+): Promise<InterventionValidationFailure | null> => {
+    if (customerDeviceId == null) {
+        return null;
+    }
+
+    const fail = (message: string): InterventionValidationFailure => ({ field: "customerDeviceId", message });
+
+    if (contractId === null) {
+        return fail("Il dispositivo si può indicare solo per un intervento con contratto");
+    }
+
+    if (!(await listContractDeviceIds(contractId)).includes(customerDeviceId)) {
+        return fail("Il dispositivo selezionato non è fra quelli del contratto");
+    }
+
+    return null;
+};
+
 /** Il mese (`YYYY-MM`) di un giorno `YYYY-MM-DD`, la chiave su cui si contano le ore. */
 const monthOf = (day: string | null | undefined) => day?.slice(0, 7) ?? null;
 
@@ -316,6 +347,7 @@ const loadInterventionPrintContext = async (id: number) => {
     const customerName = intervention.customerName ?? "";
     const collaboratorName = intervention.collaboratorName ?? "";
     const { labName, labEmail, labAddress, labPhone } = await getLabConfig();
+    const { customerDevice } = toInterventionDetailDto(intervention);
     const customerPhoneLabel = formatPhoneLabel(intervention.customerPhoneNumber, intervention.customerPhoneSecondary);
 
     return {
@@ -347,6 +379,7 @@ const loadInterventionPrintContext = async (id: number) => {
             note: intervention.note,
             price: intervention.price,
             toInvoice: intervention.toInvoice,
+            deviceLine: customerDevice ? formatDeviceLine(customerDevice) : null,
             interventionDateLabel: formatDayLabel(intervention.interventionDate),
             startTime: intervention.startTime,
             endTime: intervention.endTime,
@@ -430,6 +463,27 @@ interventionsRouter.post("/:id/send-email", validate({ params: idParamsSchema })
     res.json({ message: "Email inviata con successo" });
 });
 
+/** Le colonne piatte del dispositivo (left join) ripiegate in `customerDevice`, o `null` senza dispositivo. */
+const toInterventionDetailDto = ({
+    deviceType,
+    deviceName,
+    deviceSerialNumber,
+    deviceModel,
+    ...intervention
+}: Awaited<ReturnType<typeof getInterventionDetailById>>[number]) => ({
+    ...intervention,
+    customerDevice:
+        intervention.customerDeviceId != null && deviceType && deviceName && deviceSerialNumber
+            ? {
+                  id: intervention.customerDeviceId,
+                  type: deviceType,
+                  name: deviceName,
+                  serialNumber: deviceSerialNumber,
+                  model: deviceModel,
+              }
+            : null,
+});
+
 /** L'intervento con i nomi di cliente e collaboratore: vedi `getInterventionDetailById`. */
 interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req, res) => {
     const { id } = req.params as unknown as { id: number };
@@ -440,7 +494,7 @@ interventionsRouter.get("/:id", validate({ params: idParamsSchema }), async (req
         return;
     }
 
-    res.json(intervention);
+    res.json(toInterventionDetailDto(intervention));
 });
 
 interventionsRouter.post(
@@ -471,6 +525,7 @@ interventionsRouter.post(
             customerId: req.body.customerId,
             collaboratorId: req.body.collaboratorId,
             contractId: req.body.contractId ?? null,
+            customerDeviceId: req.body.customerDeviceId ?? null,
             interventionDate: req.body.interventionDate ?? null,
             startTime: isOnSite ? (req.body.startTime ?? null) : null,
             endTime: isOnSite ? (req.body.endTime ?? null) : null,
@@ -491,6 +546,16 @@ interventionsRouter.post(
                 res.status(400).json({ message: linkFailure.message, field: linkFailure.field });
                 return;
             }
+        }
+
+        const deviceFailure = await validateDeviceLink(
+            normalizedIntervention.contractId,
+            normalizedIntervention.customerDeviceId
+        );
+
+        if (deviceFailure) {
+            res.status(400).json({ message: deviceFailure.message, field: deviceFailure.field });
+            return;
         }
 
         const createdIntervention = await createIntervention(normalizedIntervention);
@@ -530,6 +595,8 @@ interventionsRouter.put(
         const nextNote = "note" in req.body ? req.body.note || null : existing.note;
         const nextContractId = "contractId" in req.body ? (req.body.contractId ?? null) : existing.contractId;
         const nextCustomerId = req.body.customerId ?? existing.customerId;
+        const nextCustomerDeviceId =
+            "customerDeviceId" in req.body ? (req.body.customerDeviceId ?? null) : (existing.customerDeviceId ?? null);
 
         // La combinazione da validare nasce dall'unione del corpo parziale con la riga
         // esistente, appena calcolata qui sopra: `validateInterventionRow` applica le stesse
@@ -571,8 +638,20 @@ interventionsRouter.put(
             }
         }
 
+        // Come per il contratto: si ricontrolla solo se è cambiato contratto o dispositivo. Cambiando
+        // contratto senza indicare un altro dispositivo, quello di prima deve essere anche del nuovo.
+        if (nextContractId !== existing.contractId || nextCustomerDeviceId !== existing.customerDeviceId) {
+            const deviceFailure = await validateDeviceLink(nextContractId, nextCustomerDeviceId);
+
+            if (deviceFailure) {
+                res.status(400).json({ message: deviceFailure.message, field: deviceFailure.field });
+                return;
+            }
+        }
+
         const updatedIntervention = await updateInterventionById(id, {
             ...req.body,
+            customerDeviceId: nextCustomerDeviceId,
             interventionDate: nextInterventionDate,
             description: nextDescription,
             problem: isOnSite ? nextProblem : null,

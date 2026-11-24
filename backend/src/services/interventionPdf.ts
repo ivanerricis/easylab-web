@@ -39,6 +39,8 @@ export type InterventionPrintData = {
     price: number | null;
     /** Segnato "da fatturare": in stampa compare solo quando è vero. */
     toInvoice: boolean;
+    /** Il dispositivo su cui si è intervenuto ("Nome – Tipo – S/N xxx"): la riga compare solo se c'è. */
+    deviceLine?: string | null;
     /** Obbligatoria dalla migration 0037_intervention_date_not_null: mai più null. */
     interventionDateLabel: string;
     startTime: string | null;
@@ -184,6 +186,16 @@ const buildActivitySection = (intervention: InterventionPrintData) => ({
                 {},
                 {},
             ],
+            ...(intervention.deviceLine
+                ? [
+                      [
+                          { text: "Dispositivo", style: "label" },
+                          { text: intervention.deviceLine, style: "value", colSpan: 3 },
+                          {},
+                          {},
+                      ],
+                  ]
+                : []),
             ...buildPriceRows(intervention),
             // Il problema riscontrato esiste solo per gli interventi in sede o da remoto.
             ...(intervention.problem

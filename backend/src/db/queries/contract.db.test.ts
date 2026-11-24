@@ -4,8 +4,10 @@ import {
     insertAssistanceContract,
     insertContract,
     insertCustomer,
+    insertCustomerDevice,
     insertIntervention,
     insertProvider,
+    linkContractDevice,
 } from "../../test/db/fixtures";
 import {
     createContract,
@@ -165,11 +167,23 @@ describe("listContracts: filtri", () => {
 });
 
 describe("listContracts: ricerca libera", () => {
+    it("trova per la nota", async () => {
+        const target = await insertContract({ note: "Contratto zefiriano" });
+        await insertContract();
+
+        expect(await findIds({ search: "zefirian" })).toEqual([target.id]);
+    });
+
     it.each([
-        ["il dispositivo", { device: "Zefirotron 9000" }, "zefirotron"],
-        ["la nota", { device: "Altro", note: "Contratto zefiriano" }, "zefirian"],
-    ])("trova per %s", async (_label, values, text) => {
-        const target = await insertContract(values);
+        ["il nome del dispositivo", { name: "Zefirotron 9000" }, "zefirotron"],
+        ["il numero di serie", { serialNumber: "ZEF-0042" }, "zef-0042"],
+        ["il modello", { model: "Zefiro Pro" }, "zefiro pro"],
+    ])("trova per %s di un dispositivo collegato", async (_label, values, text) => {
+        const target = await insertContract();
+        const device = await insertCustomerDevice({ customerId: target.customerId, ...values });
+        await linkContractDevice(target.id, device.id, target.customerId);
+        // Un dispositivo con lo stesso nome ma non collegato a nessun contratto non conta.
+        await insertCustomerDevice({ ...values, serialNumber: "ALTRO-1" });
         await insertContract();
 
         expect(await findIds({ search: text })).toEqual([target.id]);
@@ -288,7 +302,6 @@ describe("createContract / updateContractById", () => {
             {
                 type: "assistance",
                 termMonths: 6,
-                device: "NAS",
                 startDate: "2026-10-01",
                 customerId: customer.id,
                 providerId: provider.id,
@@ -309,7 +322,6 @@ describe("createContract / updateContractById", () => {
                 {
                     type: "assistance",
                     termMonths: 6,
-                    device: "NAS",
                     startDate: "2026-10-01",
                     customerId: customer.id,
                     providerId: provider.id,
@@ -333,7 +345,7 @@ describe("createContract / updateContractById", () => {
     });
 
     it("restituisce undefined per un contratto che non esiste", async () => {
-        await expect(updateContractById(999, { device: "x" })).resolves.toBeUndefined();
+        await expect(updateContractById(999, { note: "x" })).resolves.toBeUndefined();
     });
 
     it("elimina il contratto e la sua assistenza", async () => {

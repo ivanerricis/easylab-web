@@ -28,7 +28,7 @@ const buildContract = (overrides: Partial<ContractPrintData> = {}): ContractPrin
     providerEmail: "info@acme.it",
     providerPhone: "011222333",
     type: "assistance",
-    device: "Server NAS",
+    devices: ["Server NAS – Server – S/N SN-1", "Firewall sede – Firewall – S/N FW-77"],
     termLabel: "12 mesi",
     billingLabel: null,
     startDateLabel: "1 ott 2026",

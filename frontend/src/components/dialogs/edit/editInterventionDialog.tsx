@@ -18,6 +18,7 @@ import {
     type InterventionFormState,
 } from "@/lib/interventionForm";
 import type { CollaboratorDto, InterventionStatus, InterventionType } from "@/types/dtos";
+import { useInterventionDeviceChoice } from "@/hooks/useInterventionDeviceChoice";
 import { useLinkableContracts } from "@/hooks/useLinkableContracts";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { toast } from "sonner";
@@ -44,6 +45,8 @@ export type EditInterventionSubmitValues = {
      * `null` lo scollega.
      */
     contractId?: number | null;
+    /** Come `contractId`: assente se non è stato toccato, `null` lo toglie. */
+    customerDeviceId?: number | null;
     interventionDate: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -92,6 +95,14 @@ const EditInterventionDialog = ({
         keepContractId: savedContractId,
     });
     const { contractId: selectedContractId } = formValues;
+    const deviceChoices = useInterventionDeviceChoice({
+        values: formValues,
+        setValues: setFormValues,
+        contractOptions,
+        areContractsReady,
+        preselectSingle: false,
+        resetKey: open,
+    });
     // Come nel dialogo di creazione: un contratto che con il nuovo tipo o la nuova data non vale più si toglie.
     const isSelectedContractValid =
         selectedContractId === "" ||
@@ -164,6 +175,8 @@ const EditInterventionDialog = ({
                     toInvoice: intervention.toInvoice,
                     collaboratorId: String(intervention.collaboratorId),
                     contractId: intervention.contractId != null ? String(intervention.contractId) : "",
+                    customerDeviceId:
+                        intervention.customerDeviceId != null ? String(intervention.customerDeviceId) : "",
                     interventionDate: intervention.interventionDate,
                     startTime: intervention.startTime?.slice(0, 5) ?? "",
                     endTime: intervention.endTime?.slice(0, 5) ?? "",
@@ -213,6 +226,11 @@ const EditInterventionDialog = ({
                 interventionId,
                 ...fields,
                 contractId: formValues.contractId === savedFormValues?.contractId ? undefined : fields.contractId,
+                customerDeviceId:
+                    formValues.customerDeviceId === savedFormValues?.customerDeviceId &&
+                    formValues.contractId === savedFormValues?.contractId
+                        ? undefined
+                        : fields.customerDeviceId,
             });
 
             toast.success("Intervento aggiornato con successo");
@@ -287,6 +305,7 @@ const EditInterventionDialog = ({
                                     withoutProgress
                                     contractOptions={contractOptions}
                                     contractHint={contractHint}
+                                    deviceChoices={deviceChoices}
                                 />
                             </div>
 

@@ -2,6 +2,7 @@ export * from "./errors";
 export * from "./customers";
 export * from "./collaborators";
 export * from "./devices";
+export * from "./customerDevices";
 export * from "./issues";
 export * from "./reports";
 export * from "./interventions";

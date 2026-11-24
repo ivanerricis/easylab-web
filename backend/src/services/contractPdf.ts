@@ -43,7 +43,8 @@ export type ContractPrintData = {
     providerEmail: string;
     providerPhone: string;
     type: ContractType;
-    device: string;
+    /** Una riga per dispositivo coperto ("Nome – Tipo – S/N xxx"); vuoto = la riga non compare. */
+    devices: string[];
     termLabel: string;
     /** "ogni 3 mesi": solo per i noleggi; `null` per l'assistenza. */
     billingLabel: string | null;
@@ -192,7 +193,14 @@ const buildContractDataSection = (contract: ContractPrintData) => {
             body: [
                 sectionBarRow(isQuote ? "DATI DEL PREVENTIVO" : "DATI DEL CONTRATTO", 4),
                 dualFieldRow("Codice", `#${contract.id}`, "Tipo", formatContractType(contract.type)),
-                singleValueRow("Dispositivo", contract.device),
+                ...(contract.devices.length > 0
+                    ? [
+                          singleValueRow(
+                              contract.devices.length === 1 ? "Dispositivo" : "Dispositivi",
+                              contract.devices.join("\n")
+                          ),
+                      ]
+                    : []),
                 isQuote
                     ? dualFieldRow("Decorrenza", contract.startDateLabel, "Durata", contract.termLabel)
                     : dualFieldRow("Stato", formatContractStatus(contract.status), "Durata", contract.termLabel),
@@ -403,7 +411,8 @@ export type CustomerContractSummaryItem = {
     providerName: string;
     /** Nel resoconto di un fornitore la colonna è il cliente, non il fornitore (sempre lo stesso). */
     customerName: string;
-    device: string;
+    /** Una riga per dispositivo coperto ("Nome – Tipo – S/N xxx"); vuoto = "-". */
+    devices: string[];
     /** Solo per i contratti di assistenza. */
     assistance: { package: AssistancePackage; includedHours: number; priceCents: number } | null;
     startDateLabel: string;
@@ -498,7 +507,7 @@ const buildContractsSummaryTable = (contracts: CustomerContractSummaryItem[], is
                 { text: formatContractType(contract.type) },
                 { text: formatSummaryStatus(contract.status) },
                 { text: counterpart(contract) },
-                { text: contract.device, bold: true },
+                { text: contract.devices.length > 0 ? contract.devices.join("\n") : "-", bold: true },
                 { text: formatPackage(contract.assistance), fontSize: 8.5 },
                 { text: contract.startDateLabel, alignment: "center" },
                 { text: contract.endDateLabel, alignment: "center" },

@@ -108,6 +108,7 @@ describe("tutto il resto di /api chiede una sessione", () => {
         "/api/collaborators",
         "/api/technicians",
         "/api/devices",
+        "/api/customer-devices",
         "/api/issues",
         "/api/interventions",
         "/api/notifications",
